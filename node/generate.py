@@ -211,7 +211,7 @@ Based on the user's request, design a logical network topology following the sch
 
 def generate(state: GraphState):
     """
-    Initialize Model with Structured Output
+    Initialize Model with Structured Output and generate network blueprint.
     """
     model = init_chat_model(
         model_provider="openai",
@@ -223,7 +223,7 @@ def generate(state: GraphState):
 
     agent = create_agent(
         model=model,
-        system_prompt=generate_prompt,  # 使用字符串而不是 ChatPromptTemplate
+        system_prompt=generate_prompt,
         tools=[search_vulnerability_image],
         response_format=NetworkBlueprint
     )
@@ -231,14 +231,31 @@ def generate(state: GraphState):
     print("--- 🤖 Agent is designing the network topology... ---")
 
     try:
-        # 1. Invoke LLM - agent expects a dictionary with 'messages' key
+        # Invoke LLM - agent expects a dictionary with 'messages' key
         result = agent.invoke({"messages": [{"role": "user", "content": state["user_request"]}]})
-        blueprint=result["structured_response"]
-        # Extract the structured output from the result
-        print(f"\n Blueprint complex: {blueprint.complexity}")
- 
+
+        # Extract structured response from result
+        # According to LangChain docs, when using response_format, result["structured_response"] contains the structured output
+        if "structured_response" in result:
+            blueprint = result["structured_response"]
+        else:
+            raise ValueError(f"No structured_response in result. Keys: {list(result.keys())}")
+
+        print(f"   -> Blueprint complexity: {blueprint.complexity}")
+        print(f"   -> Nodes: {len(blueprint.nodes)}")
+        print(f"   -> Subnets: {len(blueprint.subnets)}")
+
+        return {
+            "blueprint": blueprint
+        }
+
     except Exception as e:
         print(f"❌ Error generating topology: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "error_logs": f"Generate failed: {str(e)}"
+        }
 
 if __name__ == "__main__":
     user_request = """

@@ -91,8 +91,14 @@ def deploy(state: GraphState):
             ]
         })
 
-        # Extract the agent's response
-        agent_response = result.get("messages", [])[-1].get("content", "")
+        # Extract the agent's response from messages
+        messages = result.get("messages", [])
+        if messages:
+            last_msg = messages[-1]
+            # AIMessage has a content attribute
+            agent_response = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
+        else:
+            agent_response = ""
 
         # Parse the deployment result
         # Check if deployment was successful by looking for success indicators
@@ -104,9 +110,9 @@ def deploy(state: GraphState):
 
             print("✅ Infrastructure is UP. Handing over to Configure stage.")
             return {
-                "error_logs":"",
+                "error_logs": "",
                 "deploy_logs": agent_response,
-                "inspect_date":inspect_data
+                "inspect_data": inspect_data
             }
         else:
             print("❌ Deployment Failed. Returning to Generate stage.")

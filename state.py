@@ -1,4 +1,4 @@
-from typing import TypedDict, List, Dict, Any
+from typing import TypedDict, List, Dict, Any, Union
 from node.utils import NetworkBlueprint
 
 class NodeConfigSpec(TypedDict):
@@ -13,10 +13,10 @@ class NodeConfigSpec(TypedDict):
 class GraphState(TypedDict):
     user_request: str
     yaml_path: str  # 生成的 YAML 文件路径
-    blueprint: NetworkBlueprint  #中间状态
+    blueprint: Union[NetworkBlueprint, None]  #中间状态
     error_logs: str  # validate 的错误信息
     deploy_logs: str  # deploy 的日志信息
     inspect_data: Dict[str, Any]     # containerlab inspect 返回的 JSON 数据
-    retry_count:int
+    retry_count: int
     is_complete: bool  #是否configure完成
 

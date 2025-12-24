@@ -5,6 +5,7 @@ from langchain.agents import create_agent
 from state import GraphState
 from .utils import NetworkBlueprint  # 假设你的 Pydantic 模型定义在这里
 from config import LLM_MODEL,BASE_URL,API_KEY
+from containerlab_tools import clab_lifecycle_tool,node_config_tool
 # 设置最大重试次数，防止死循环
 MAX_RETRIES = 3
 
@@ -26,10 +27,10 @@ def fixer(state: GraphState):
     error_logs = state.get("error_logs", "Unknown Error")
     # 获取当前的蓝图 (如果是 Pydantic 对象则转 dict，如果是 dict 则直接用)
     current_bp = state.get("blueprint")
-    if hasattr(current_bp, "model_dump_json"):
+    if current_bp is not None and hasattr(current_bp, "model_dump_json"):
         current_bp_json = current_bp.model_dump_json()
     else:
-        current_bp_json = str(current_bp)
+        current_bp_json = str(current_bp) if current_bp else "No blueprint available"
 
     # 3. 初始化 LLM
     # 建议使用 GPT-4o，因为 Debug 需要较强的逻辑推理能力.
@@ -79,11 +80,20 @@ def fixer(state: GraphState):
     fixer_agent=create_agent(
         model=model,
         system_prompt=system_prompt,
+        tools=[clab_lifecycle_tool,node_config_tool],
         response_format=NetworkBlueprint
     )
     try:
         print(f"   -> ✅ Fix proposed. Retrying build...")
-        new_blueprint = fixer_agent.invoke(({"messages": [{"role": "user", "content": "Fix the broken network topology design based on deployment error logs."}]}))
+        result = fixer_agent.invoke({"messages": [{"role": "user", "content": "Fix the broken network topology design based on deployment error logs."}]})
+
+        # Extract blueprint from result - similar to generate.py
+        # According to LangChain docs, when using response_format, result["structured_response"] contains the structured output
+        if "structured_response" in result:
+            new_blueprint = result["structured_response"]
+        else:
+            raise ValueError(f"Fixer agent did not return a valid blueprint. Keys: {list(result.keys())}")
+
         # 6. 返回更新后的状态
         return {
             "blueprint": new_blueprint,      # 更新蓝图
@@ -94,8 +104,10 @@ def fixer(state: GraphState):
 
     except Exception as e:
         print(f"   -> ❌ Fixer crashed: {e}")
+        import traceback
+        traceback.print_exc()
         # 如果 Fixer 自己都挂了，为了防止死循环，增加计数并保留错误
         return {
             "retry_count": current_retries + 1,
-            "error_logs": f"Fixer Internal Error: {str(e)}" 
+            "error_logs": f"Fixer Internal Error: {str(e)}"
         }
