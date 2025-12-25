@@ -94,6 +94,16 @@ flowchart TB
 | **Configure** | 配置服务、验证连通性 | 配置日志 |
 | **Fixer** | 错误诊断 + 最小化修复 | 更新后的 Blueprint |
 
+### 错误处理机制
+
+Fixer 会在以下三种情况下被触发：
+
+1. **Build 错误** (`main.py:24-25`): Builder 生成 YAML 时产生 `error_logs`
+2. **Validation 错误** (`main.py:27-28`): 静态验证失败
+3. **Deploy 错误** (`main.py:30-36`): 容器部署失败 (`is_deployed=False` 或有 `error_logs`)
+
+Fixer 执行后，如果重试次数 < 3 次，则返回 Builder 重新构建；否则流程失败。
+
 ## 支持的节点类型
 
 | 类型 | 镜像示例 | 用途 |
