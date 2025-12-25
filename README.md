@@ -49,25 +49,38 @@ flowchart TB
 
     Generate --> Builder[🔨 Builder<br/>生成 Containerlab YAML<br/>IPAM + 路由计算]
 
-    Builder --> Validate{🔍 Validate<br/>静态验证}
+    Builder --> BuildCheck{❓ Build OK?}
+
+    BuildCheck -->|成功| Validate{🔍 Validate<br/>静态验证}
+
+    BuildCheck -->|错误| Fixer[🚑 Fixer<br/>错误分析 & 修复]
 
     Validate -->|通过| Deploy[🚀 Deploy<br/>部署容器]
 
-    Validate -->|失败| Fixer[🚑 Fixer<br/>错误分析 & 修复]
+    Validate -->|失败| Fixer
 
-    Deploy --> Config[⚙️ Configure<br/>配置服务]
+    Deploy --> DeployCheck{❓ Deploy OK?}
+
+    DeployCheck -->|成功| Config[⚙️ Configure<br/>配置服务]
+
+    DeployCheck -->|失败| Fixer
 
     Config --> Success([✅ 完成])
 
-    Fixer -->|重试 < 3 次| Builder
+    Fixer --> RetryCheck{❓ Retry < 3?}
 
-    Fixer -->|超过 3 次| Failed([❌ 失败])
+    RetryCheck -->|是| Builder
+
+    RetryCheck -->|否| Failed([❌ 失败])
 
     style Start fill:#e1f5fe
     style Success fill:#c8e6c9
     style Failed fill:#ffcdd2
     style Fixer fill:#fff9c4
     style Validate fill:#e8eaf6
+    style BuildCheck fill:#e8eaf6
+    style DeployCheck fill:#e8eaf6
+    style RetryCheck fill:#fff3e0
 ```
 
 ### 流程说明
