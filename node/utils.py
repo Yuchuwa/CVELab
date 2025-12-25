@@ -36,9 +36,17 @@ class NetworkBuilder:
         self.node_ip_map: Dict[str, Dict[str, str]] = defaultdict(dict) # {node: {subnet: ip}}
         
         # Initialize workspace
-        if os.path.exists(self.output_dir):
-            shutil.rmtree(self.output_dir)
-        os.makedirs(self.output_dir)
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        # Only remove files if the same lab name already exists
+        yaml_filename = f"{self.bp.lab_name}.clab.yml"
+        yaml_path = os.path.join(self.output_dir, yaml_filename)
+        lab_dir = os.path.join(self.output_dir, f"clab-{self.bp.lab_name}")
+
+        if os.path.exists(yaml_path):
+            os.remove(yaml_path)
+        if os.path.exists(lab_dir):
+            shutil.rmtree(lab_dir)
 
     def build(self) -> str:
         """Main build process. Returns the path to the generated YAML."""
@@ -75,13 +83,18 @@ class NetworkBuilder:
             return "alpine:latest", False
 
         # Endpoints mapping
-        if "kali" in flavor: return "kalilinux/kali-rolling:latest", True
-        if "log4j" in flavor: return "vulfocus/log4j2-rce-2021-12-09:latest", True # Use fixed date version
-        if "redis" in flavor: return "redis:7-alpine", False
-        if "alpine" in flavor: return "alpine:latest", False
-        
-        # Default fallthrough
-        return "alpine:latest", False
+        image_name=flavor
+        is_alpine="alpine" in image_name.lower()
+        needs_apt_tools=not is_alpine
+        if image_name.lower() == "kali":
+            image_name = "kalilinux/kali-rolling:latest"
+            needs_apt_tools = True
+            
+        if image_name.lower() == "ubuntu":
+            image_name = "ubuntu:latest"
+            needs_apt_tools = True
+
+        return image_name, needs_apt_tools
 
     def _process_topology(self):
         # Group nodes by subnet to detect where switches are needed
@@ -111,7 +124,8 @@ class NetworkBuilder:
 
         # Pre-install tools for bare images (Kali/Ubuntu/Debian)
         if needs_tools:
-            node_def['exec'].append("apt-get update && apt-get install -y iproute2 iputils-ping net-tools")
+            node_def['exec'].append("apt-get update")
+            node_def['exec'].append("apt-get install -y iproute2 iputils-ping net-tools")
 
         # Enable forwarding for routers/switches
         if node.role in ["router", "switch"]:

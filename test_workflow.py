@@ -31,7 +31,7 @@ def test_workflow_simple():
         "blueprint": None,
         "yaml_path": "",
         "error_logs": "",
-        "deploy_logs": "",
+        "is_deployed": False,
         "inspect_data": {},
         "retry_count": 0,
         "is_complete": False,
@@ -77,7 +77,7 @@ def test_workflow_medium():
         "blueprint": None,
         "yaml_path": "",
         "error_logs": "",
-        "deploy_logs": "",
+        "is_deployed": False,
         "inspect_data": {},
         "retry_count": 0,
         "is_complete": False,
@@ -111,8 +111,8 @@ def main():
     print("="*60)
 
     tests = [
-        ("Simple Lab", test_workflow_simple)
-        #("Medium Lab", test_workflow_medium),
+        #("Simple Lab", test_workflow_simple)
+        ("Medium Lab", test_workflow_medium)
     ]
 
     results = []

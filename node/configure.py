@@ -1,4 +1,5 @@
 import json
+import yaml
 from typing import Dict, Any, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from langchain.agents import create_agent
@@ -49,7 +50,7 @@ def configure(state: GraphState):
 
     Process:
     1. Parse inspect_data to get all containers
-    2. Parse yaml_content to get expected configurations
+    2. Read YAML file to get expected configurations and network topology
     3. Configure all nodes in parallel (each node gets its own agent)
     4. Aggregate results and update state
 
@@ -58,11 +59,13 @@ def configure(state: GraphState):
     - Single-pass, no iteration needed
     """
     inspect_data = state.get("inspect_data", {})
-    yaml_content = state.get("yaml_content", {})
+    yaml_path = state.get("yaml_path")
 
     # Parse nodes from inspect data
     containers = []
-    for lab_name, nodes in inspect_data.items():
+    lab_name = ""
+    for lab, nodes in inspect_data.items():
+        lab_name = lab
         if isinstance(nodes, list):
             containers.extend(nodes)
 
@@ -70,19 +73,31 @@ def configure(state: GraphState):
         print("⚠️ No containers found in inspect_data")
         return {"is_complete": True}
 
-    # Parse expected configuration from YAML
-    topology = yaml_content.get("topology", {})
-    nodes_config = topology.get("nodes", {})
+    # Read YAML file to get expected configuration and network topology
+    yaml_content = {}
+    nodes_config = {}
+    links = []
+    if yaml_path:
+        try:
+            with open(yaml_path, 'r', encoding='utf-8') as f:
+                yaml_content = yaml.safe_load(f) or {}
+            topology = yaml_content.get("topology", {})
+            nodes_config = topology.get("nodes", {})
+            links = topology.get("links", [])
+        except Exception as e:
+            print(f"⚠️ Failed to read YAML file {yaml_path}: {e}")
 
     print(f"\n🔧 [Stage 2] Configuring {len(containers)} nodes in parallel...")
 
     # Prepare configuration tasks for all nodes
     config_tasks = []
-    lab_name = list(inspect_data.keys())[0] if inspect_data else ""
 
     for container in containers:
         container_name = container.get("name", "")
+        # Extract short node name: clab-simple-router-lab-attacker -> attacker
         node_short_name = container_name.replace(f"clab-{lab_name}-", "")
+
+        # Get expected config from YAML
         expected_config = nodes_config.get(node_short_name, {})
         exec_commands = expected_config.get("exec", [])
 
@@ -164,7 +179,7 @@ def _configure_single_node(task: Dict) -> Dict:
     """
     container_name = task["container_name"]
     node_short_name = task["node_short_name"]
-    exec_commands = task["exec_commands"]
+    exec_commands = task.get("exec_commands", [])
     container = task["container"]
 
     # Build configuration task for the agent
@@ -198,7 +213,25 @@ def _configure_single_node(task: Dict) -> Dict:
         })
 
         # Extract agent response
-        agent_response = result.get("messages", [])[-1].get("content", "")
+        # According to LangChain forum: Filter for the last assistant (AIMessage) and use .text property
+        # Source: https://forum.langchain.com/t/how-to-retireve-the-final-ai-message-after-invoke/2078
+        messages = result.get("messages", [])
+        # Find the last AIMessage (in case graph ends on a ToolMessage)
+        last_ai_message = None
+        for msg in reversed(messages):
+            if hasattr(msg, 'type') and msg.type == 'ai':
+                last_ai_message = msg
+                break
+
+        if last_ai_message and hasattr(last_ai_message, 'text'):
+            # .text safely extracts human-readable text from content
+            agent_response = last_ai_message.text
+        elif last_ai_message and hasattr(last_ai_message, 'content'):
+            # Fallback for older versions
+            content = last_ai_message.content
+            agent_response = str(content) if not isinstance(content, str) else content
+        else:
+            agent_response = ""
 
         # Check if configuration was successful
         config_success = _check_config_success(agent_response)

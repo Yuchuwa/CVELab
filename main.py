@@ -26,13 +26,19 @@ def create_workflow():
 
     def check_validation_errors(state):
         return "deployer" if not state.get("error_logs") else "fixer"
-
+    
     def check_deploy_errors(state):
-        return "configurator" if not state.get("error_logs") else "fixer"
+        # 逻辑：如果 is_deployed 为 False，或者 error_logs 不为空 -> 去 Fixer
+        if not state.get("is_deployed", False) or state.get("error_logs"):
+            print(f"❌ Deploy failed (Status check). Routing to Fixer...")
+            return "fixer"        
+        print("✅ Deploy success. Routing to Configure.")
+        return "configurator"
+
 
     workflow.add_conditional_edges("builder", check_build_errors)
     workflow.add_conditional_edges("validator", check_validation_errors)
-    workflow.add_conditional_edges("deployer", check_deploy_errors)
+    workflow.add_conditional_edges("deployer", check_deploy_errors,{"configurator":"configurator","fixer":"fixer"})
 
     workflow.add_edge("fixer", "builder")  # Fixer always goes back to build
     workflow.add_edge("configurator", END)
@@ -53,7 +59,7 @@ def run(user_request: str):
         "blueprint": None,
         "yaml_path": "",
         "error_logs": "",
-        "deploy_logs": "",
+        "is_deployed": False,
         "inspect_data": {},
         "retry_count": 0,
         "is_complete": False,

@@ -95,7 +95,7 @@ def validate_topology(topology_data: Dict[str, Any]) -> ValidationResult:
     # 正则表达式预编译
     regex_ip_add = re.compile(r"ip\s+addr(?:ess)?\s+add\s+([0-9./]+)\s+dev\s+([a-z0-9]+)")
     regex_ip_route = re.compile(r"ip\s+route\s+add\s+.*via\s+([0-9.]+)")
-    regex_install = re.compile(r"(apt-get|apk)\s+(?:.*)\s+install")
+    regex_install = re.compile(r"(apt-get|apk)\s+(install|-y.*install)")
     
     # 默认管理网段 (Containerlab default)
     mgmt_network = ipaddress.ip_network("172.20.20.0/24", strict=False)
