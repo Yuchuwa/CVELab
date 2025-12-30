@@ -44,43 +44,42 @@
 ## 工作流程
 
 ```mermaid
-flowchart TB
-    Start([用户输入需求]) --> Generate[🤖 Generate<br/>LLM 生成逻辑蓝图]
+flowchart LR
+    subgraph Main["主流程"]
+        direction LR
+        Start([需求输入]) --> Generate["Generate: LLM 生成逻辑拓扑"]
+        Generate --> Builder["Builder: YAML 生成与 IPAM"]
+        Builder --> Validate["Validate: 静态验证"]
+        Validate --> Deploy["Deploy: 容器部署"]
+        Deploy --> Config["Configure: 服务配置"]
+        Config --> End([部署完成])
+    end
 
-    Generate --> Builder[🔨 Builder<br/>生成 Containerlab YAML<br/>IPAM + 路由计算]
+    subgraph Error["错误处理与重试机制"]
+        direction TB
+        Fixer["Fixer: 错误诊断与修复"]
+        Retry{"重试次数 < 3?"}
+        Fixer --> Retry
+    end
 
-    Builder --> BuildCheck{❓ Build OK?}
+    Builder -.->|构建失败| Fixer
+    Validate -.->|验证失败| Fixer
+    Deploy -.->|部署失败| Fixer
 
-    BuildCheck -->|成功| Validate{🔍 Validate<br/>静态验证}
+    Retry -->|是| Builder
+    Retry -->|否| Failed([流程失败])
 
-    BuildCheck -->|错误| Fixer[🚑 Fixer<br/>错误分析 & 修复]
+    classDef terminal fill:#f8f9fa,stroke:#343a40,stroke-width:2px,color:#000
+    classDef process fill:#e7f3ff,stroke:#0066cc,stroke-width:1.5px,color:#000
+    classDef error fill:#fff4e6,stroke:#ff6b35,stroke-width:1.5px,stroke-dasharray: 5 5,color:#000
+    classDef success fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef failed fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#000
 
-    Validate -->|通过| Deploy[🚀 Deploy<br/>部署容器]
-
-    Validate -->|失败| Fixer
-
-    Deploy --> DeployCheck{❓ Deploy OK?}
-
-    DeployCheck -->|成功| Config[⚙️ Configure<br/>配置服务]
-
-    DeployCheck -->|失败| Fixer
-
-    Config --> Success([✅ 完成])
-
-    Fixer --> RetryCheck{❓ Retry < 3?}
-
-    RetryCheck -->|是| Builder
-
-    RetryCheck -->|否| Failed([❌ 失败])
-
-    style Start fill:#e1f5fe
-    style Success fill:#c8e6c9
-    style Failed fill:#ffcdd2
-    style Fixer fill:#fff9c4
-    style Validate fill:#e8eaf6
-    style BuildCheck fill:#e8eaf6
-    style DeployCheck fill:#e8eaf6
-    style RetryCheck fill:#fff3e0
+    class Start,End terminal
+    class Generate,Builder,Validate,Deploy,Config process
+    class Fixer,Retry error
+    class End success
+    class Failed failed
 ```
 
 ### 流程说明
