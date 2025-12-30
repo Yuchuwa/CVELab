@@ -45,41 +45,34 @@
 
 ```mermaid
 flowchart LR
-    subgraph Main["主流程"]
-        direction LR
-        Start([需求输入]) --> Generate["Generate: LLM 生成逻辑拓扑"]
-        Generate --> Builder["Builder: YAML 生成与 IPAM"]
-        Builder --> Validate["Validate: 静态验证"]
-        Validate --> Deploy["Deploy: 容器部署"]
-        Deploy --> Config["Configure: 服务配置"]
-        Config --> End([部署完成])
-    end
+    Start([需求]) --> Generate["Generate<br/>LLM生成拓扑"]
+    Generate --> Builder["Builder<br/>YAML+IPAM"]
+    Builder --> Validate["Validate<br/>静态验证"]
+    Validate --> Deploy["Deploy<br/>部署"]
+    Deploy --> Config["Configure<br/>配置"]
+    Config --> End([完成])
 
-    subgraph Error["错误处理与重试机制"]
-        direction TB
-        Fixer["Fixer: 错误诊断与修复"]
-        Retry{"重试次数 < 3?"}
-        Fixer --> Retry
-    end
+    Fixer["Fixer<br/>错误修复"]
+    Retry{"重试<3?"}
+    Fixer --> Retry
 
-    Builder -.->|构建失败| Fixer
-    Validate -.->|验证失败| Fixer
-    Deploy -.->|部署失败| Fixer
-
+    Builder -.->|失败| Fixer
+    Validate -.->|失败| Fixer
+    Deploy -.->|失败| Fixer
     Retry -->|是| Builder
-    Retry -->|否| Failed([流程失败])
+    Retry -->|否| Failed([失败])
 
-    classDef terminal fill:#f8f9fa,stroke:#343a40,stroke-width:2px,color:#000
-    classDef process fill:#e7f3ff,stroke:#0066cc,stroke-width:1.5px,color:#000
-    classDef error fill:#fff4e6,stroke:#ff6b35,stroke-width:1.5px,stroke-dasharray: 5 5,color:#000
-    classDef success fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000
-    classDef failed fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#000
+    classDef main fill:#e7f3ff,stroke:#0066cc,stroke-width:2px
+    classDef err fill:#fff4e6,stroke:#ff6b35,stroke-width:2px,stroke-dasharray:5 5
+    classDef term fill:#f8f9fa,stroke:#343a40,stroke-width:2px
+    classDef ok fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef bad fill:#ffebee,stroke:#c62828,stroke-width:2px
 
-    class Start,End terminal
-    class Generate,Builder,Validate,Deploy,Config process
-    class Fixer,Retry error
-    class End success
-    class Failed failed
+    class Generate,Builder,Validate,Deploy,Config main
+    class Fixer,Retry err
+    class Start,End term
+    class End ok
+    class Failed bad
 ```
 
 ### 流程说明
