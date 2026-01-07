@@ -1,3 +1,9 @@
+"""ContainerLab Builder - 主入口
+
+基于 LLM 和 LangGraph 的智能网络拓扑自动化构建工具。
+"""
+from typing import Dict, Any
+
 from state import GraphState
 from langgraph.graph import StateGraph, START, END
 from node.generate import generate
@@ -6,11 +12,21 @@ from node.configure import configure
 from node.builder import builder_node
 from node.validate import validator_node
 from node.fixer import fixer
+from session_utils import ensure_session_dir, set_current_session_id
+from config import config
+from logger import (
+    setup_logger,
+    get_logger,
+    set_log_context,
+    log_step
+)
 
 
-def create_workflow():
-    """Create and compile the LangGraph workflow."""
+def create_workflow() -> StateGraph:
+    """创建并编译 LangGraph 工作流。"""
     workflow = StateGraph(GraphState)
+
+    # 添加节点
     workflow.add_node("generator", generate)
     workflow.add_node("builder", builder_node)
     workflow.add_node("validator", validator_node)
@@ -18,42 +34,81 @@ def create_workflow():
     workflow.add_node("configurator", configure)
     workflow.add_node("fixer", fixer)
 
+    # 添加边
     workflow.add_edge(START, "generator")
-    workflow.add_edge("generator","builder")
+    workflow.add_edge("generator", "builder")
 
-    def check_build_errors(state):
-        return "validator" if not state.get("error_logs") else "fixer"
+    # 条件边：检查构建错误
+    def check_build_errors(state: GraphState) -> str:
+        if not state.get("error_logs"):
+            return "validator"
+        return "fixer"
 
-    def check_validation_errors(state):
-        return "deployer" if not state.get("error_logs") else "fixer"
-    
-    def check_deploy_errors(state):
-        # 逻辑：如果 is_deployed 为 False，或者 error_logs 不为空 -> 去 Fixer
+    # 条件边：检查验证错误
+    def check_validation_errors(state: GraphState) -> str:
+        if not state.get("error_logs"):
+            return "deployer"
+        return "fixer"
+
+    # 条件边：检查部署错误
+    def check_deploy_errors(state: GraphState) -> str:
         if not state.get("is_deployed", False) or state.get("error_logs"):
-            print(f"❌ Deploy failed (Status check). Routing to Fixer...")
-            return "fixer"        
-        print("✅ Deploy success. Routing to Configure.")
+            return "fixer"
         return "configurator"
 
-
+    # 添加条件边
     workflow.add_conditional_edges("builder", check_build_errors)
     workflow.add_conditional_edges("validator", check_validation_errors)
-    workflow.add_conditional_edges("deployer", check_deploy_errors,{"configurator":"configurator","fixer":"fixer"})
+    workflow.add_conditional_edges(
+        "deployer",
+        check_deploy_errors,
+        {"configurator": "configurator", "fixer": "fixer"}
+    )
 
-    workflow.add_edge("fixer", "builder")  # Fixer always goes back to build
+    # Fixer 始终回到 Builder
+    workflow.add_edge("fixer", "builder")
     workflow.add_edge("configurator", END)
 
     return workflow.compile()
 
 
-def run(user_request: str):
-    """Run the workflow with a user request."""
-    print("=" * 60)
-    print("🚀 ContainerLab Builder")
-    print("=" * 60)
+def run(user_request: str) -> Dict[str, Any]:
+    """运行工作流。
 
+    Args:
+        user_request: 用户的自然语言请求
+
+    Returns:
+        工作流最终状态
+    """
+    # 生成会话 ID 和目录
+    session_id, session_dir = ensure_session_dir()
+
+    # 设置会话级别的 logger
+    setup_logger(
+        name="containerlab_builder",
+        level=getattr(__import__("logging"), config.log_level),
+        session_id=session_id
+    )
+
+    logger = get_logger("main")
+    set_log_context(stage="main")
+
+    # 打印欢迎信息
+    logger.info("=" * 60)
+    logger.info("🚀 ContainerLab Builder")
+    logger.info("=" * 60)
+    logger.info(f"📁 Session ID: {session_id}")
+    logger.info(f"📂 Output directory: {session_dir}")
+    logger.info(f"⚙️  Config: model={config.llm_model}, max_retries={config.max_retries}")
+
+    # 设置当前会话 ID（供其他模块使用）
+    set_current_session_id(session_id)
+
+    # 创建工作流
     app = create_workflow()
 
+    # 初始状态
     initial_state: GraphState = {
         "user_request": user_request,
         "blueprint": None,
@@ -65,20 +120,31 @@ def run(user_request: str):
         "is_complete": False,
     }
 
-    result = app.invoke(initial_state)
+    # 运行工作流
+    try:
+        result = app.invoke(initial_state)
 
-    print("\n" + "=" * 60)
-    if result.get("is_complete"):
-        print("✅ Workflow completed successfully!")
-        if result.get("yaml_path"):
-            print(f"📄 YAML file: {result['yaml_path']}")
-    else:
-        print("❌ Workflow did not complete as expected.")
-        if result.get("error_logs"):
-            print(f"Error: {result['error_logs']}")
-    print("=" * 60)
+        # 输出最终结果
+        logger.info("=" * 60)
+        if result.get("is_complete"):
+            log_step(logger, "Workflow completed successfully", status="success")
+            if result.get("yaml_path"):
+                logger.info(f"📄 YAML file: {result['yaml_path']}")
+        else:
+            log_step(logger, "Workflow did not complete as expected", status="fail")
+            if result.get("error_logs"):
+                logger.error(f"Error: {result['error_logs']}")
 
-    return result
+        logger.info("=" * 60)
+
+        return result
+
+    except KeyboardInterrupt:
+        logger.warning("Workflow interrupted by user")
+        raise
+    except Exception as e:
+        logger.error(f"Workflow crashed: {e}", exc_info=True)
+        raise
 
 
 if __name__ == "__main__":

@@ -1,13 +1,18 @@
+"""Configure 节点：容器内网络配置
+
+负责在部署后的容器中配置网络接口和路由。
+"""
 import json
 import yaml
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 
 from state import GraphState
-from containerlab_tools import node_config_tool
-from config import LLM_MODEL, BASE_URL, API_KEY
+from tools.containerlab_tools import node_config_tool
+from config import config
+from logger import get_logger, set_log_context, log_step, log_error
 
 
 configure_prompt = """
@@ -44,199 +49,246 @@ Report your findings clearly:
 """
 
 
-def configure(state: GraphState):
+def configure(state: GraphState) -> Dict[str, Any]:
     """
-    Configure ALL nodes in parallel using ThreadPoolExecutor.
+    Configure 节点：并行配置所有容器的网络接口。
 
-    Process:
-    1. Parse inspect_data to get all containers
-    2. Read YAML file to get expected configurations and network topology
-    3. Configure all nodes in parallel (each node gets its own agent)
-    4. Aggregate results and update state
+    工作流程:
+    1. 解析 inspect_data 获取所有容器
+    2. 读取 YAML 文件获取预期配置
+    3. 并行配置所有节点（每个节点有独立的 agent）
+    4. 聚合结果并更新状态
 
-    State updates:
-    - is_complete=True after all nodes processed
-    - Single-pass, no iteration needed
+    Args:
+        state: 当前工作流状态
+
+    Returns:
+        更新后的状态字典
     """
+    logger = get_logger("node.configure")
+    set_log_context(stage="configure")
+
     inspect_data = state.get("inspect_data", {})
     yaml_path = state.get("yaml_path")
 
-    # Parse nodes from inspect data
+    # 解析容器列表
     containers = []
     lab_name = ""
-    for lab, nodes in inspect_data.items():
-        lab_name = lab
-        if isinstance(nodes, list):
-            containers.extend(nodes)
+    try:
+        for lab, nodes in inspect_data.items():
+            lab_name = lab
+            if isinstance(nodes, list):
+                containers.extend(nodes)
 
-    if not containers:
-        print("⚠️ No containers found in inspect_data")
-        return {"is_complete": True}
+        if not containers:
+            logger.warning("No containers found in inspect_data")
+            return {"is_complete": True}
 
-    # Read YAML file to get expected configuration and network topology
-    yaml_content = {}
+    except Exception as e:
+        log_error(logger, e, "Failed to parse inspect_data")
+        return {"is_complete": True}  # 非致命错误，继续流程
+
+    # 读取 YAML 文件
     nodes_config = {}
-    links = []
     if yaml_path:
         try:
             with open(yaml_path, 'r', encoding='utf-8') as f:
                 yaml_content = yaml.safe_load(f) or {}
             topology = yaml_content.get("topology", {})
             nodes_config = topology.get("nodes", {})
-            links = topology.get("links", [])
+            logger.debug(f"Loaded YAML config with {len(nodes_config)} nodes")
         except Exception as e:
-            print(f"⚠️ Failed to read YAML file {yaml_path}: {e}")
+            log_error(logger, e, f"Failed to read YAML file {yaml_path}")
+            # 继续进行，但使用空配置
 
-    print(f"\n🔧 [Stage 2] Configuring {len(containers)} nodes in parallel...")
+    log_step(
+        logger,
+        "Configuring nodes in parallel",
+        status="start",
+        total_nodes=len(containers)
+    )
 
-    # Prepare configuration tasks for all nodes
-    config_tasks = []
+    # 准备配置任务
+    config_tasks = _prepare_config_tasks(containers, lab_name, nodes_config, logger)
 
-    for container in containers:
-        container_name = container.get("name", "")
-        # Extract short node name: clab-simple-router-lab-attacker -> attacker
-        node_short_name = container_name.replace(f"clab-{lab_name}-", "")
+    # 并行配置所有节点
+    results = _configure_nodes_parallel(config_tasks, logger)
 
-        # Get expected config from YAML
-        expected_config = nodes_config.get(node_short_name, {})
-        exec_commands = expected_config.get("exec", [])
-
-        config_tasks.append({
-            "container": container,
-            "container_name": container_name,
-            "node_short_name": node_short_name,
-            "exec_commands": exec_commands
-        })
-
-    # Configure all nodes in parallel
-    results = _configure_nodes_parallel(config_tasks)
-
-    # Print summary
+    # 输出汇总
     success_count = sum(1 for r in results if r["success"])
     fail_count = len(results) - success_count
 
-    print(f"\n{'='*60}")
-    print(f"📊 Configuration Summary:")
-    print(f"   ✅ Success: {success_count}/{len(results)}")
-    print(f"   ❌ Failed:  {fail_count}/{len(results)}")
-    print(f"{'='*60}")
+    log_step(
+        logger,
+        "Node configuration completed",
+        status="success" if fail_count == 0 else "fail",
+        total=len(results),
+        success=success_count,
+        failed=fail_count
+    )
 
-    # Print failed nodes if any
-    for result in results:
-        if not result["success"]:
-            print(f"   ❌ {result['node']}: {result['message']}")
+    # 记录失败的节点
+    if fail_count > 0:
+        logger.error(f"Failed to configure {fail_count} node(s):")
+        for result in results:
+            if not result["success"]:
+                logger.error(f"  - {result['node']}: {result['message']}")
+                logger.debug(f"    Logs: {result.get('logs', '')[:200]}...")
 
     return {"is_complete": True}
 
 
-def _configure_nodes_parallel(tasks: List[Dict]) -> List[Dict]:
-    """
-    Configure multiple nodes in parallel using ThreadPoolExecutor.
+def _prepare_config_tasks(
+    containers: List[Dict],
+    lab_name: str,
+    nodes_config: Dict,
+    logger: Any
+) -> List[Dict]:
+    """准备配置任务列表。
 
-    Each node gets its own agent instance for configuration.
+    Args:
+        containers: 容器列表
+        lab_name: 实验室名称
+        nodes_config: 节点配置字典
+        logger: logger 实例
+
+    Returns:
+        配置任务列表
+    """
+    config_tasks = []
+
+    for container in containers:
+        try:
+            container_name = container.get("name", "")
+            # 提取短节点名: clab-simple-router-lab-attacker -> attacker
+            node_short_name = container_name.replace(f"clab-{lab_name}-", "")
+
+            # 获取预期配置
+            expected_config = nodes_config.get(node_short_name, {})
+            exec_commands = expected_config.get("exec", [])
+
+            config_tasks.append({
+                "container": container,
+                "container_name": container_name,
+                "node_short_name": node_short_name,
+                "exec_commands": exec_commands
+            })
+
+            logger.debug(f"Prepared config task for node: {node_short_name}")
+
+        except Exception as e:
+            logger.warning(f"Failed to prepare config task for container: {e}")
+
+    return config_tasks
+
+
+def _configure_nodes_parallel(
+    tasks: List[Dict],
+    logger: Any
+) -> List[Dict]:
+    """使用 ThreadPoolExecutor 并行配置多个节点。
+
+    每个节点获得独立的 agent 实例进行配置。
+
+    Args:
+        tasks: 配置任务列表
+        logger: logger 实例
+
+    Returns:
+        配置结果列表
     """
     results = []
 
-    # Use ThreadPoolExecutor for parallel execution
-    # Limit workers to avoid overwhelming the system
-    max_workers = min(len(tasks), 5)
+    # 限制并发数，避免系统过载
+    max_workers = min(len(tasks), config.max_configure_workers)
+
+    logger.debug(f"Starting parallel configuration with {max_workers} workers")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all tasks
+        # 提交所有任务
         future_to_task = {
             executor.submit(_configure_single_node, task): task
             for task in tasks
         }
 
-        # Collect results as they complete
+        # 收集结果
         for future in as_completed(future_to_task):
             task = future_to_task[future]
             try:
                 result = future.result()
                 results.append(result)
 
-                # Print progress immediately
+                # 实时输出进度
                 status = "✅" if result["success"] else "❌"
-                print(f"   {status} {result['node']}: {result['message']}")
+                node_name = result.get("node", task.get("node_short_name", "unknown"))
+                logger.info(f"  {status} {node_name}: {result['message']}")
 
             except Exception as e:
+                log_error(logger, e, f"Exception during configuration of {task.get('node_short_name')}")
                 results.append({
                     "node": task["node_short_name"],
                     "success": False,
-                    "message": f"Exception: {str(e)}"
+                    "message": f"Exception: {str(e)}",
+                    "logs": str(e)
                 })
-                print(f"   ❌ {task['node_short_name']}: Exception - {str(e)}")
 
     return results
 
 
 def _configure_single_node(task: Dict) -> Dict:
-    """
-    Configure a single node using a dedicated agent.
+    """使用专用的 agent 配置单个节点。
+
+    Args:
+        task: 配置任务字典
 
     Returns:
-        Dict with keys: node, success, message, logs
+        结果字典，包含 node, success, message, logs
     """
+    logger = get_logger("node.configure")
+    set_log_context(node=task.get("node_short_name", "unknown"))
+
     container_name = task["container_name"]
     node_short_name = task["node_short_name"]
     exec_commands = task.get("exec_commands", [])
-    container = task["container"]
-
-    # Build configuration task for the agent
-    config_task = _build_config_task(
-        container_name=container_name,
-        expected_commands=exec_commands,
-        node_short_name=node_short_name
-    )
-
-    # Initialize model and agent for this node
-    model = init_chat_model(
-        model_provider="openai",
-        model=LLM_MODEL,
-        temperature=0.1,
-        base_url=BASE_URL,
-        api_key=API_KEY
-    )
-
-    agent = create_agent(
-        model=model,
-        system_prompt=configure_prompt,
-        tools=[node_config_tool]
-    )
 
     try:
-        # Invoke the agent
+        # 构建配置任务
+        config_task = _build_config_task(
+            container_name=container_name,
+            expected_commands=exec_commands,
+            node_short_name=node_short_name
+        )
+
+        # 初始化模型和 agent
+        model = init_chat_model(
+            model_provider="openai",
+            model=config.llm_model,
+            temperature=0.1,  # 低温度，更确定性的配置
+            base_url=config.base_url,
+            api_key=config.api_key
+        )
+
+        agent = create_agent(
+            model=model,
+            system_prompt=configure_prompt,
+            tools=[node_config_tool]
+        )
+
+        logger.debug(f"Configuring node {node_short_name}...")
+
+        # 调用 agent
         result = agent.invoke({
-            "messages": [
-                {"role": "user", "content": config_task}
-            ]
+            "messages": [{"role": "user", "content": config_task}]
         })
 
-        # Extract agent response
-        # According to LangChain forum: Filter for the last assistant (AIMessage) and use .text property
-        # Source: https://forum.langchain.com/t/how-to-retireve-the-final-ai-message-after-invoke/2078
-        messages = result.get("messages", [])
-        # Find the last AIMessage (in case graph ends on a ToolMessage)
-        last_ai_message = None
-        for msg in reversed(messages):
-            if hasattr(msg, 'type') and msg.type == 'ai':
-                last_ai_message = msg
-                break
+        # 提取 agent 响应
+        agent_response = _extract_agent_response(result)
 
-        if last_ai_message and hasattr(last_ai_message, 'text'):
-            # .text safely extracts human-readable text from content
-            agent_response = last_ai_message.text
-        elif last_ai_message and hasattr(last_ai_message, 'content'):
-            # Fallback for older versions
-            content = last_ai_message.content
-            agent_response = str(content) if not isinstance(content, str) else content
-        else:
-            agent_response = ""
-
-        # Check if configuration was successful
+        # 检查配置是否成功
         config_success = _check_config_success(agent_response)
 
         if config_success:
+            logger.debug(f"Node {node_short_name} configured successfully")
             return {
                 "node": node_short_name,
                 "success": True,
@@ -244,6 +296,7 @@ def _configure_single_node(task: Dict) -> Dict:
                 "logs": agent_response
             }
         else:
+            logger.warning(f"Node {node_short_name} has configuration issues")
             return {
                 "node": node_short_name,
                 "success": False,
@@ -252,12 +305,45 @@ def _configure_single_node(task: Dict) -> Dict:
             }
 
     except Exception as e:
+        log_error(logger, e, f"Failed to configure node {node_short_name}")
         return {
             "node": node_short_name,
             "success": False,
             "message": f"Exception: {str(e)}",
             "logs": str(e)
         }
+
+
+def _extract_agent_response(result: Dict) -> str:
+    """从 agent 结果中提取响应文本。
+
+    Args:
+        result: agent.invoke() 的返回值
+
+    Returns:
+        提取的响应文本
+    """
+    try:
+        messages = result.get("messages", [])
+
+        # 查找最后一个 AIMessage
+        last_ai_message = None
+        for msg in reversed(messages):
+            if hasattr(msg, 'type') and msg.type == 'ai':
+                last_ai_message = msg
+                break
+
+        if last_ai_message and hasattr(last_ai_message, 'text'):
+            return last_ai_message.text
+        elif last_ai_message and hasattr(last_ai_message, 'content'):
+            content = last_ai_message.content
+            return str(content) if not isinstance(content, str) else content
+        else:
+            return ""
+
+    except Exception as e:
+        get_logger("node.configure").warning(f"Failed to extract agent response: {e}")
+        return ""
 
 
 def _build_config_task(

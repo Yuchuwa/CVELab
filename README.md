@@ -163,18 +163,24 @@ python main.py
 
 ```
 containerlab_builder/
-├── main.py           # LangGraph 工作流入口
-├── state.py          # 全局状态定义
-├── config.py         # 配置文件
+├── main.py              # LangGraph 工作流入口
+├── state.py             # 全局状态定义
+├── config.py            # 配置文件
 ├── node/
-│   ├── generate.py   # LLM 生成逻辑蓝图
-│   ├── builder.py    # YAML 构建器 (IPAM + 路由)
-│   ├── validate.py   # 静态验证
-│   ├── deploy.py     # Containerlab 部署
-│   ├── configure.py  # 服务配置
-│   ├── fixer.py      # 错误修复
-│   └── utils.py      # Pydantic 模型定义
-└── search_vuln_image.py  # 漏洞镜像搜索工具
+│   ├── generate.py      # LLM 生成逻辑蓝图
+│   ├── builder.py       # YAML 构建器 (IPAM + 路由)
+│   ├── validate.py      # 静态验证
+│   ├── deploy.py        # Containerlab 部署
+│   ├── deploy_agent.py  # 部署代理
+│   ├── configure.py     # 服务配置
+│   ├── fixer.py         # 错误修复
+│   └── utils.py         # Pydantic 模型定义
+├── tools/
+│   ├── containerlab_tools.py  # Containerlab 工具函数
+│   └── search_vuln_image.py   # 漏洞镜像搜索工具
+└── test/
+    ├── test_configure.py      # 配置测试
+    └── test_workflow.py       # 工作流测试
 ```
 
 ## 技术栈

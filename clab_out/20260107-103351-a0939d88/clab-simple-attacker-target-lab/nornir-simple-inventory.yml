@@ -1,0 +1,16 @@
+---
+attacker:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.5
+redis-target:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.7
+router:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.6

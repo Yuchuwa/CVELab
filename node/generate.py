@@ -1,17 +1,16 @@
 import os
 import yaml
-from typing import List, Optional, Dict,Any,Literal
+from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
-
 
 from langchain.chat_models import init_chat_model
 from langchain.agents import create_agent
 
 from .utils import NetworkBlueprint
 from state import GraphState
-from search_vuln_image import search_vulnerability_image  # Import the tool we defined earlier
-import json
-from config import LLM_MODEL,BASE_URL,API_KEY
+from tools.search_vuln_image import search_vulnerability_image
+from config import config
+from logger import get_logger, set_log_context, log_step, log_error
 
 
 generate_prompt = """
@@ -209,53 +208,64 @@ Based on the user's request, design a logical network topology following the sch
 
 
 
-def generate(state: GraphState):
+def generate(state: GraphState) -> Dict[str, Any]:
     """
-    Initialize Model with Structured Output and generate network blueprint.
+    Generate 节点：使用 LLM 生成网络拓扑蓝图。
+
+    Args:
+        state: 当前工作流状态
+
+    Returns:
+        更新后的状态字典
     """
-    model = init_chat_model(
-        model_provider="openai",
-        model=LLM_MODEL,
-        temperature=0.3,
-        base_url=BASE_URL,
-        api_key=API_KEY
-    )
-
-    agent = create_agent(
-        model=model,
-        system_prompt=generate_prompt,
-        tools=[search_vulnerability_image],
-        response_format=NetworkBlueprint
-    )
-
-    print("--- 🤖 Agent is designing the network topology... ---")
+    logger = get_logger("node.generate")
+    set_log_context(stage="generate")
 
     try:
-        # Invoke LLM - agent expects a dictionary with 'messages' key
-        result = agent.invoke({"messages": [{"role": "user", "content": state["user_request"]}]})
+        model = init_chat_model(
+            model_provider="openai",
+            model=config.llm_model,
+            temperature=0.3,
+            base_url=config.base_url,
+            api_key=config.api_key
+        )
 
-        # Extract structured response from result
-        # According to LangChain docs, when using response_format, result["structured_response"] contains the structured output
+        agent = create_agent(
+            model=model,
+            system_prompt=generate_prompt,
+            tools=[search_vulnerability_image],
+            response_format=NetworkBlueprint
+        )
+
+        log_step(logger, "Generating network topology", status="start")
+
+        # 调用 LLM
+        result = agent.invoke({
+            "messages": [{"role": "user", "content": state["user_request"]}]
+        })
+
+        # 提取结构化响应
         if "structured_response" in result:
             blueprint = result["structured_response"]
         else:
-            raise ValueError(f"No structured_response in result. Keys: {list(result.keys())}")
+            raise ValueError(
+                f"No structured_response in result. Keys: {list(result.keys())}"
+            )
 
-        print(f"   -> Blueprint complexity: {blueprint.complexity}")
-        print(f"   -> Nodes: {len(blueprint.nodes)}")
-        print(f"   -> Subnets: {len(blueprint.subnets)}")
+        log_step(
+            logger,
+            "Blueprint generated",
+            status="success",
+            complexity=blueprint.complexity,
+            nodes=len(blueprint.nodes),
+            subnets=len(blueprint.subnets)
+        )
 
-        return {
-            "blueprint": blueprint
-        }
+        return {"blueprint": blueprint}
 
     except Exception as e:
-        print(f"❌ Error generating topology: {e}")
-        import traceback
-        traceback.print_exc()
-        return {
-            "error_logs": f"Generate failed: {str(e)}"
-        }
+        log_error(logger, e, "Failed to generate network topology")
+        return {"error_logs": f"Generate failed: {str(e)}"}
 
 if __name__ == "__main__":
     user_request = """

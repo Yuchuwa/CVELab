@@ -1,0 +1,154 @@
+{
+  "name": "simple-attacker-target-lab",
+  "type": "clab",
+  "clab": {
+    "config": {
+      "prefix": "clab",
+      "mgmt": {
+        "network": "clab",
+        "bridge": "br-a943f3e556ee",
+        "ipv4-subnet": "172.20.20.0/24",
+        "ipv4-gw": "172.20.20.1",
+        "ipv6-subnet": "3fff:172:20:20::/64",
+        "ipv6-gw": "3fff:172:20:20::1",
+        "external-access": true
+      }
+    }
+  },
+  "ssh-pub-keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCn1KuAvK8VVu2On+jVmCnGrubWTBL1U7mkJR51zm8rmxuErmp10/VYtVV/pDikQSGmVKzAeT6YZm6//Z/d5O2qpPyheI+bHoif3tOXRlsmUbpUEsnGzxTH/ot+TSgXZeDqSs0FX84+Tf4HF3f2OiETVMsYs58fMJLett5PHOBrdlIQvULDVbEr8xNBvI350uwZMvm+K/RRur8UGG7gDeaapMiErCCNT4XR7oEDCfNIS6AP8LgkQY5NGa6hTmAj1oG+raIj6qA4MSEdUkngJVlqH5v/hBZvWfKS2HogRKHqSmqz2xvqTXRyDx/wR4QqzT2e3GVis8kaeT9sPLvGqgGWLAtkvufvAIoP6hsLigtFDjQsotEELTbNO6JNq8E9Ac6anx1jf91zYG+ILysI+mIT13H0PrAQ5F0UyP9Bj08Q3uhFb+PEw4ylGro+c0x6TkReXcFh+/1pYMBjpMxdSpMVqg0M5pBjlzh3VtuEX0WBjf9kbTeBhHoi+SNyM0BLta8=","ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGqTqQ7V5kBK7o4IUfpNsS/pzkQUqqlh7C7fMUMV+Ebu"],
+  "nodes": {
+    "attacker": {
+      "index": "0",
+      "shortname": "attacker",
+      "longname": "clab-simple-attacker-target-lab-attacker",
+      "fqdn": "attacker.simple-attacker-target-lab.io",
+      "group": "",
+      "labdir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260107-103351-a0939d88/clab-simple-attacker-target-lab/attacker",
+      "kind": "linux",
+      "image": "kalilinux/kali-rolling:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.5",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::5",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-a943f3e556ee",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260107-103351-a0939d88/clab-simple-attacker-target-lab/attacker",
+        "clab-node-longname": "clab-simple-attacker-target-lab-attacker",
+        "clab-node-name": "attacker",
+        "clab-node-type": "",
+        "clab-owner": "wolflab",
+        "clab-topo-file": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260107-103351-a0939d88/simple-attacker-target-lab.clab.yml",
+        "containerlab": "simple-attacker-target-lab"
+      },
+      "port-bindings": [
+      ]
+    },
+    "redis-target": {
+      "index": "1",
+      "shortname": "redis-target",
+      "longname": "clab-simple-attacker-target-lab-redis-target",
+      "fqdn": "redis-target.simple-attacker-target-lab.io",
+      "group": "",
+      "labdir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260107-103351-a0939d88/clab-simple-attacker-target-lab/redis-target",
+      "kind": "linux",
+      "image": "redis",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.7",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::7",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-a943f3e556ee",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260107-103351-a0939d88/clab-simple-attacker-target-lab/redis-target",
+        "clab-node-longname": "clab-simple-attacker-target-lab-redis-target",
+        "clab-node-name": "redis-target",
+        "clab-node-type": "",
+        "clab-owner": "wolflab",
+        "clab-topo-file": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260107-103351-a0939d88/simple-attacker-target-lab.clab.yml",
+        "containerlab": "simple-attacker-target-lab"
+      },
+      "port-bindings": [
+        {
+          "host-ip": "",
+          "host-port": 0,
+          "port": 6379,
+          "protocol": "tcp"
+        }
+      ]
+    },
+    "router": {
+      "index": "2",
+      "shortname": "router",
+      "longname": "clab-simple-attacker-target-lab-router",
+      "fqdn": "router.simple-attacker-target-lab.io",
+      "group": "",
+      "labdir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260107-103351-a0939d88/clab-simple-attacker-target-lab/router",
+      "kind": "linux",
+      "image": "alpine:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.6",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::6",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-a943f3e556ee",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260107-103351-a0939d88/clab-simple-attacker-target-lab/router",
+        "clab-node-longname": "clab-simple-attacker-target-lab-router",
+        "clab-node-name": "router",
+        "clab-node-type": "",
+        "clab-owner": "wolflab",
+        "clab-topo-file": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260107-103351-a0939d88/simple-attacker-target-lab.clab.yml",
+        "containerlab": "simple-attacker-target-lab"
+      },
+      "port-bindings": [
+      ]
+    }
+  },
+  "links": [
+    {
+      "endpoints": {
+        "a": {
+          "node": "attacker",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:42:09:28",
+          "peer": "z"
+        },
+        "z": {
+          "node": "router",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:80:78:28",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "router",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:35:e3:18",
+          "peer": "z"
+        },
+        "z": {
+          "node": "redis-target",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:e8:10:d1",
+          "peer": "a"
+        }
+      }
+    }
+  ]
+}
