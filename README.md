@@ -45,23 +45,31 @@
 
 ```mermaid
 flowchart LR
-    Start([需求]) --> Generate["Generate<br/>LLM生成拓扑"]
-    Generate --> Builder["Builder<br/>YAML+IPAM"]
-    Builder --> Validate["Validate<br/>静态验证"]
-    Validate --> Deploy["Deploy<br/>部署"]
-    Deploy --> Config["Configure<br/>配置"]
-    Config --> End([完成])
+    Start([🎯 用户需求]) --> Generate["🤖 Generate<br/>LLM生成拓扑"]
+    Generate --> Builder["🔨 Builder<br/>YAML+IPAM"]
+    Builder --> Validate["✓ Validate<br/>静态验证"]
+    Validate --> Deploy["🚀 Deploy<br/>部署"]
+    Deploy --> Config["⚙️ Configure<br/>配置"]
+    Config --> End([✅ 完成])
 
-    Fixer["Fixer<br/>智能错误修复"]
+    Fixer["🔧 Fixer<br/>智能错误修复"]
 
-    Builder -.->|BUILD错误| Fixer
-    Validate -.->|VALIDATE错误| Fixer
-    Deploy -.->|DEPLOY错误| Fixer
-    Deploy -.->|SYSTEM错误| Failed([终止])
+    %% 设计错误路径 - 红色虚线
+    Builder -.->|设计问题| Fixer
+    Fixer ==>|建议+重生成| Generate
 
-    Fixer -->|生成建议| Generate
-    Fixer -->|修复YAML| Validate
-    Fixer -->|不可恢复| Failed
+    %% 验证错误路径 - 橙色点线
+    Validate -.-|验证失败| Fixer
+    Fixer ==>|修复YAML| Validate
+
+    %% 部署错误路径 - 紫色虚线
+    Deploy -.->|部署问题| Fixer
+
+    %% 系统错误路径 - 深红色，直接终止
+    Deploy ==>|权限/系统错误| Failed([❌ 终止])
+
+    %% Fixer 到其他路径
+    Fixer -.->|不可恢复| Failed
 
     classDef main fill:#e7f3ff,stroke:#0066cc,stroke-width:2px
     classDef err fill:#fff4e6,stroke:#ff6b35,stroke-width:2px
