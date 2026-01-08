@@ -1,0 +1,17 @@
+all:
+  vars:
+    # The generated inventory is assumed to be used from the clab host.
+    # Hence no http proxy should be used. Therefore we make sure the http
+    # module does not attempt using any global http proxy.
+    ansible_httpapi_use_proxy: false
+  children:
+    linux:
+      hosts:
+        clab-simple-penetration-test-lab-20260108-010818-6a56d516-fake-node:
+          ansible_host: 172.20.20.15
+        clab-simple-penetration-test-lab-20260108-010818-6a56d516-router:
+          ansible_host: 172.20.20.14
+        clab-simple-penetration-test-lab-20260108-010818-6a56d516-sw-internal:
+          ansible_host: 172.20.20.16
+        clab-simple-penetration-test-lab-20260108-010818-6a56d516-ubuntu-server:
+          ansible_host: 172.20.20.13

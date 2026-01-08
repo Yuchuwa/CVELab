@@ -1,0 +1,227 @@
+name: enterprise-ospf-network-lab-20260108-010054-eb86d1a6
+topology:
+  nodes:
+    border-router-01:
+      kind: linux
+      image: frr/frr:v8.5.1
+      binds:
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/border-router-01/daemons:/etc/frr/daemons
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/border-router-01/frr.conf:/etc/frr/frr.conf
+      sysctls:
+        net.ipv4.ip_forward: '1'
+    border-router-02:
+      kind: linux
+      image: frr/frr:v8.5.1
+      binds:
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/border-router-02/daemons:/etc/frr/daemons
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/border-router-02/frr.conf:/etc/frr/frr.conf
+      sysctls:
+        net.ipv4.ip_forward: '1'
+    core-router:
+      kind: linux
+      image: frr/frr:v8.5.1
+      binds:
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/core-router/daemons:/etc/frr/daemons
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/core-router/frr.conf:/etc/frr/frr.conf
+      sysctls:
+        net.ipv4.ip_forward: '1'
+    web-server:
+      kind: linux
+      image: nginx
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.2.64/24 dev eth1
+      - ip route replace default via 10.0.2.1
+    mail-server:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.2.65/24 dev eth1
+      - ip route replace default via 10.0.2.1
+    aggregation-router-01:
+      kind: linux
+      image: frr/frr:v8.5.1
+      binds:
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/aggregation-router-01/daemons:/etc/frr/daemons
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/aggregation-router-01/frr.conf:/etc/frr/frr.conf
+      sysctls:
+        net.ipv4.ip_forward: '1'
+    aggregation-router-02:
+      kind: linux
+      image: frr/frr:v8.5.1
+      binds:
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/aggregation-router-02/daemons:/etc/frr/daemons
+      - /home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010054-eb86d1a6/aggregation-router-02/frr.conf:/etc/frr/frr.conf
+      sysctls:
+        net.ipv4.ip_forward: '1'
+    app-server:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.4.64/24 dev eth1
+      - ip route replace default via 10.0.4.1
+    db-server-01:
+      kind: linux
+      image: redis
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.4.65/24 dev eth1
+      - ip route replace default via 10.0.4.1
+    db-server-02:
+      kind: linux
+      image: redis
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.4.66/24 dev eth1
+      - ip route replace default via 10.0.4.1
+    monitoring-server:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.5.64/24 dev eth1
+    log-server:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.5.65/24 dev eth1
+    attacker:
+      kind: linux
+      image: kalilinux/kali-rolling:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.64/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    sw-external:
+      kind: linux
+      image: alpine:latest
+      sysctls:
+        net.ipv4.ip_forward: '1'
+      exec:
+      - apk add --no-cache bridge-utils
+      - brctl addbr br0
+      - ip link set dev br0 up
+      - brctl addif br0 eth1 && ip link set dev eth1 up
+      - brctl addif br0 eth2 && ip link set dev eth2 up
+      - brctl addif br0 eth3 && ip link set dev eth3 up
+      - ip addr add 10.0.0.2/24 dev br0
+    sw-transit-dmz:
+      kind: linux
+      image: alpine:latest
+      sysctls:
+        net.ipv4.ip_forward: '1'
+      exec:
+      - apk add --no-cache bridge-utils
+      - brctl addbr br0
+      - ip link set dev br0 up
+      - brctl addif br0 eth1 && ip link set dev eth1 up
+      - brctl addif br0 eth2 && ip link set dev eth2 up
+      - brctl addif br0 eth3 && ip link set dev eth3 up
+      - ip addr add 10.0.1.2/24 dev br0
+    sw-dmz:
+      kind: linux
+      image: alpine:latest
+      sysctls:
+        net.ipv4.ip_forward: '1'
+      exec:
+      - apk add --no-cache bridge-utils
+      - brctl addbr br0
+      - ip link set dev br0 up
+      - brctl addif br0 eth1 && ip link set dev eth1 up
+      - brctl addif br0 eth2 && ip link set dev eth2 up
+      - brctl addif br0 eth3 && ip link set dev eth3 up
+      - ip addr add 10.0.2.2/24 dev br0
+    sw-transit-internal:
+      kind: linux
+      image: alpine:latest
+      sysctls:
+        net.ipv4.ip_forward: '1'
+      exec:
+      - apk add --no-cache bridge-utils
+      - brctl addbr br0
+      - ip link set dev br0 up
+      - brctl addif br0 eth1 && ip link set dev eth1 up
+      - brctl addif br0 eth2 && ip link set dev eth2 up
+      - brctl addif br0 eth3 && ip link set dev eth3 up
+      - ip addr add 10.0.3.2/24 dev br0
+    sw-internal:
+      kind: linux
+      image: alpine:latest
+      sysctls:
+        net.ipv4.ip_forward: '1'
+      exec:
+      - apk add --no-cache bridge-utils
+      - brctl addbr br0
+      - ip link set dev br0 up
+      - brctl addif br0 eth1 && ip link set dev eth1 up
+      - brctl addif br0 eth2 && ip link set dev eth2 up
+      - brctl addif br0 eth3 && ip link set dev eth3 up
+      - brctl addif br0 eth4 && ip link set dev eth4 up
+      - brctl addif br0 eth5 && ip link set dev eth5 up
+      - ip addr add 10.0.4.2/24 dev br0
+  links:
+  - endpoints:
+    - border-router-01:eth1
+    - sw-external:eth1
+  - endpoints:
+    - border-router-02:eth1
+    - sw-external:eth2
+  - endpoints:
+    - attacker:eth1
+    - sw-external:eth3
+  - endpoints:
+    - border-router-01:eth2
+    - sw-transit-dmz:eth1
+  - endpoints:
+    - border-router-02:eth2
+    - sw-transit-dmz:eth2
+  - endpoints:
+    - core-router:eth1
+    - sw-transit-dmz:eth3
+  - endpoints:
+    - core-router:eth2
+    - sw-dmz:eth1
+  - endpoints:
+    - web-server:eth1
+    - sw-dmz:eth2
+  - endpoints:
+    - mail-server:eth1
+    - sw-dmz:eth3
+  - endpoints:
+    - core-router:eth3
+    - sw-transit-internal:eth1
+  - endpoints:
+    - aggregation-router-01:eth1
+    - sw-transit-internal:eth2
+  - endpoints:
+    - aggregation-router-02:eth1
+    - sw-transit-internal:eth3
+  - endpoints:
+    - aggregation-router-01:eth2
+    - sw-internal:eth1
+  - endpoints:
+    - aggregation-router-02:eth2
+    - sw-internal:eth2
+  - endpoints:
+    - app-server:eth1
+    - sw-internal:eth3
+  - endpoints:
+    - db-server-01:eth1
+    - sw-internal:eth4
+  - endpoints:
+    - db-server-02:eth1
+    - sw-internal:eth5
+  - endpoints:
+    - monitoring-server:eth1
+    - log-server:eth1

@@ -1,0 +1,21 @@
+---
+fake-node:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.15
+router:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.14
+sw-internal:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.16
+ubuntu-server:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.20.20.13

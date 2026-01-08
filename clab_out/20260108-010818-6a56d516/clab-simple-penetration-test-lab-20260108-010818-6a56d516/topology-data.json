@@ -1,0 +1,195 @@
+{
+  "name": "simple-penetration-test-lab-20260108-010818-6a56d516",
+  "type": "clab",
+  "clab": {
+    "config": {
+      "prefix": "clab",
+      "mgmt": {
+        "network": "clab",
+        "bridge": "br-a943f3e556ee",
+        "ipv4-subnet": "172.20.20.0/24",
+        "ipv4-gw": "172.20.20.1",
+        "ipv6-subnet": "3fff:172:20:20::/64",
+        "ipv6-gw": "3fff:172:20:20::1",
+        "external-access": true
+      }
+    }
+  },
+  "ssh-pub-keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGqTqQ7V5kBK7o4IUfpNsS/pzkQUqqlh7C7fMUMV+Ebu","ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCn1KuAvK8VVu2On+jVmCnGrubWTBL1U7mkJR51zm8rmxuErmp10/VYtVV/pDikQSGmVKzAeT6YZm6//Z/d5O2qpPyheI+bHoif3tOXRlsmUbpUEsnGzxTH/ot+TSgXZeDqSs0FX84+Tf4HF3f2OiETVMsYs58fMJLett5PHOBrdlIQvULDVbEr8xNBvI350uwZMvm+K/RRur8UGG7gDeaapMiErCCNT4XR7oEDCfNIS6AP8LgkQY5NGa6hTmAj1oG+raIj6qA4MSEdUkngJVlqH5v/hBZvWfKS2HogRKHqSmqz2xvqTXRyDx/wR4QqzT2e3GVis8kaeT9sPLvGqgGWLAtkvufvAIoP6hsLigtFDjQsotEELTbNO6JNq8E9Ac6anx1jf91zYG+ILysI+mIT13H0PrAQ5F0UyP9Bj08Q3uhFb+PEw4ylGro+c0x6TkReXcFh+/1pYMBjpMxdSpMVqg0M5pBjlzh3VtuEX0WBjf9kbTeBhHoi+SNyM0BLta8="],
+  "nodes": {
+    "fake-node": {
+      "index": "0",
+      "shortname": "fake-node",
+      "longname": "clab-simple-penetration-test-lab-20260108-010818-6a56d516-fake-node",
+      "fqdn": "fake-node.simple-penetration-test-lab-20260108-010818-6a56d516.io",
+      "group": "",
+      "labdir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/clab-simple-penetration-test-lab-20260108-010818-6a56d516/fake-node",
+      "kind": "linux",
+      "image": "alpine:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.15",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::f",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-a943f3e556ee",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/clab-simple-penetration-test-lab-20260108-010818-6a56d516/fake-node",
+        "clab-node-longname": "clab-simple-penetration-test-lab-20260108-010818-6a56d516-fake-node",
+        "clab-node-name": "fake-node",
+        "clab-node-type": "",
+        "clab-owner": "wolflab",
+        "clab-topo-file": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/simple-penetration-test-lab-20260108-010818-6a56d516.clab.yml",
+        "containerlab": "simple-penetration-test-lab-20260108-010818-6a56d516"
+      },
+      "port-bindings": [
+      ]
+    },
+    "router": {
+      "index": "1",
+      "shortname": "router",
+      "longname": "clab-simple-penetration-test-lab-20260108-010818-6a56d516-router",
+      "fqdn": "router.simple-penetration-test-lab-20260108-010818-6a56d516.io",
+      "group": "",
+      "labdir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/clab-simple-penetration-test-lab-20260108-010818-6a56d516/router",
+      "kind": "linux",
+      "image": "alpine:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.14",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::e",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-a943f3e556ee",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/clab-simple-penetration-test-lab-20260108-010818-6a56d516/router",
+        "clab-node-longname": "clab-simple-penetration-test-lab-20260108-010818-6a56d516-router",
+        "clab-node-name": "router",
+        "clab-node-type": "",
+        "clab-owner": "wolflab",
+        "clab-topo-file": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/simple-penetration-test-lab-20260108-010818-6a56d516.clab.yml",
+        "containerlab": "simple-penetration-test-lab-20260108-010818-6a56d516"
+      },
+      "port-bindings": [
+      ]
+    },
+    "sw-internal": {
+      "index": "2",
+      "shortname": "sw-internal",
+      "longname": "clab-simple-penetration-test-lab-20260108-010818-6a56d516-sw-internal",
+      "fqdn": "sw-internal.simple-penetration-test-lab-20260108-010818-6a56d516.io",
+      "group": "",
+      "labdir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/clab-simple-penetration-test-lab-20260108-010818-6a56d516/sw-internal",
+      "kind": "linux",
+      "image": "alpine:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.16",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::10",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-a943f3e556ee",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/clab-simple-penetration-test-lab-20260108-010818-6a56d516/sw-internal",
+        "clab-node-longname": "clab-simple-penetration-test-lab-20260108-010818-6a56d516-sw-internal",
+        "clab-node-name": "sw-internal",
+        "clab-node-type": "",
+        "clab-owner": "wolflab",
+        "clab-topo-file": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/simple-penetration-test-lab-20260108-010818-6a56d516.clab.yml",
+        "containerlab": "simple-penetration-test-lab-20260108-010818-6a56d516"
+      },
+      "port-bindings": [
+      ]
+    },
+    "ubuntu-server": {
+      "index": "3",
+      "shortname": "ubuntu-server",
+      "longname": "clab-simple-penetration-test-lab-20260108-010818-6a56d516-ubuntu-server",
+      "fqdn": "ubuntu-server.simple-penetration-test-lab-20260108-010818-6a56d516.io",
+      "group": "",
+      "labdir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/clab-simple-penetration-test-lab-20260108-010818-6a56d516/ubuntu-server",
+      "kind": "linux",
+      "image": "ubuntu:latest",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.20.20.13",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "3fff:172:20:20::d",
+      "mgmt-ipv6-prefix-length": 64,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-a943f3e556ee",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/clab-simple-penetration-test-lab-20260108-010818-6a56d516/ubuntu-server",
+        "clab-node-longname": "clab-simple-penetration-test-lab-20260108-010818-6a56d516-ubuntu-server",
+        "clab-node-name": "ubuntu-server",
+        "clab-node-type": "",
+        "clab-owner": "wolflab",
+        "clab-topo-file": "/home/wolflab/Desktop/containerlab_builder/clab_out/20260108-010818-6a56d516/simple-penetration-test-lab-20260108-010818-6a56d516.clab.yml",
+        "containerlab": "simple-penetration-test-lab-20260108-010818-6a56d516"
+      },
+      "port-bindings": [
+      ]
+    }
+  },
+  "links": [
+    {
+      "endpoints": {
+        "a": {
+          "node": "fake-node",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:f5:60:a4",
+          "peer": "z"
+        },
+        "z": {
+          "node": "sw-internal",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:ce:82:74",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "ubuntu-server",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:c8:33:c5",
+          "peer": "z"
+        },
+        "z": {
+          "node": "sw-internal",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:3a:5c:01",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "router",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:9e:ed:6f",
+          "peer": "z"
+        },
+        "z": {
+          "node": "sw-internal",
+          "interface": "eth3",
+          "mac": "aa:c1:ab:ac:5f:91",
+          "peer": "a"
+        }
+      }
+    }
+  ]
+}
