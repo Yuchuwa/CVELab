@@ -1,0 +1,145 @@
+name: many-endpoints
+topology:
+  nodes:
+    router:
+      kind: linux
+      image: alpine:latest
+      exec:
+      - ip addr add 10.0.0.1/24 dev eth1
+      sysctls:
+        net.ipv4.ip_forward: '1'
+    server-1:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.64/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    server-2:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.65/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    server-3:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.66/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    server-4:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.67/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    server-5:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.68/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    server-6:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.69/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    server-7:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.70/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    server-8:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.71/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    server-9:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.72/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    server-10:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.73/24 dev eth1
+      - ip route replace default via 10.0.0.1
+    sw-lan:
+      kind: linux
+      image: alpine:latest
+      sysctls:
+        net.ipv4.ip_forward: '1'
+      exec:
+      - apk add --no-cache bridge-utils
+      - brctl addbr br0
+      - ip link set dev br0 up
+      - brctl addif br0 eth1 && ip link set dev eth1 up
+      - brctl addif br0 eth2 && ip link set dev eth2 up
+      - brctl addif br0 eth3 && ip link set dev eth3 up
+      - brctl addif br0 eth4 && ip link set dev eth4 up
+      - brctl addif br0 eth5 && ip link set dev eth5 up
+      - brctl addif br0 eth6 && ip link set dev eth6 up
+      - brctl addif br0 eth7 && ip link set dev eth7 up
+      - brctl addif br0 eth8 && ip link set dev eth8 up
+      - brctl addif br0 eth9 && ip link set dev eth9 up
+      - brctl addif br0 eth10 && ip link set dev eth10 up
+      - brctl addif br0 eth11 && ip link set dev eth11 up
+      - ip addr add 10.0.0.2/24 dev br0
+  links:
+  - endpoints:
+    - router:eth1
+    - sw-lan:eth1
+  - endpoints:
+    - server-1:eth1
+    - sw-lan:eth2
+  - endpoints:
+    - server-2:eth1
+    - sw-lan:eth3
+  - endpoints:
+    - server-3:eth1
+    - sw-lan:eth4
+  - endpoints:
+    - server-4:eth1
+    - sw-lan:eth5
+  - endpoints:
+    - server-5:eth1
+    - sw-lan:eth6
+  - endpoints:
+    - server-6:eth1
+    - sw-lan:eth7
+  - endpoints:
+    - server-7:eth1
+    - sw-lan:eth8
+  - endpoints:
+    - server-8:eth1
+    - sw-lan:eth9
+  - endpoints:
+    - server-9:eth1
+    - sw-lan:eth10
+  - endpoints:
+    - server-10:eth1
+    - sw-lan:eth11

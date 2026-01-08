@@ -52,24 +52,25 @@ flowchart LR
     Deploy --> Config["Configure<br/>配置"]
     Config --> End([完成])
 
-    Fixer["Fixer<br/>错误修复"]
-    Retry{"重试<3?"}
-    Fixer --> Retry
+    Fixer["Fixer<br/>智能错误修复"]
 
-    Builder -.->|失败| Fixer
-    Validate -.->|失败| Fixer
-    Deploy -.->|失败| Fixer
-    Retry -->|是| Builder
-    Retry -->|否| Failed([失败])
+    Builder -.->|BUILD错误| Fixer
+    Validate -.->|VALIDATE错误| Fixer
+    Deploy -.->|DEPLOY错误| Fixer
+    Deploy -.->|SYSTEM错误| Failed([终止])
+
+    Fixer -->|生成建议| Generate
+    Fixer -->|修复YAML| Validate
+    Fixer -->|不可恢复| Failed
 
     classDef main fill:#e7f3ff,stroke:#0066cc,stroke-width:2px
-    classDef err fill:#fff4e6,stroke:#ff6b35,stroke-width:2px,stroke-dasharray:5 5
+    classDef err fill:#fff4e6,stroke:#ff6b35,stroke-width:2px
     classDef term fill:#f8f9fa,stroke:#343a40,stroke-width:2px
     classDef ok fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
     classDef bad fill:#ffebee,stroke:#c62828,stroke-width:2px
 
     class Generate,Builder,Validate,Deploy,Config main
-    class Fixer,Retry err
+    class Fixer err
     class Start,End term
     class End ok
     class Failed bad
@@ -88,13 +89,19 @@ flowchart LR
 
 ### 错误处理机制
 
-Fixer 会在以下三种情况下被触发：
+Fixer 通过**错误类型标识符**自动分类并智能路由：
 
-1. **Build 错误** (`main.py:24-25`): Builder 生成 YAML 时产生 `error_logs`
-2. **Validation 错误** (`main.py:27-28`): 静态验证失败
-3. **Deploy 错误** (`main.py:30-36`): 容器部署失败 (`is_deployed=False` 或有 `error_logs`)
+| 错误类型 | 标识符 | 触发节点 | 修复方式 | 路由目标 |
+|---------|--------|---------|---------|---------|
+| **设计错误** | `[ERROR_TYPE:BUILD]` | Builder | 生成改进建议，附加到 user_request | Generator |
+| **验证错误** | `[ERROR_TYPE:VALIDATE]` | Validator | 修改 YAML 配置文件 | Validator |
+| **部署错误** | `[ERROR_TYPE:DEPLOY]` | Deployer | 修改 YAML 配置文件 | Validator |
+| **系统错误** | `[ERROR_TYPE:SYSTEM]` | Deployer | 无法自动修复 | END |
 
-Fixer 执行后，如果重试次数 < 3 次，则返回 Builder 重新构建；否则流程失败。
+**技术特点**：
+- 静态错误分类（字符串匹配，无需 LLM）
+- 专门的 Agent：建议生成 Agent + YAML 修复 Agent
+- 状态驱动路由（根据 blueprint 是否为 None 推断）
 
 ## 支持的节点类型
 

@@ -6,6 +6,7 @@ from typing import Dict, Any
 
 from state import GraphState
 from .utils import NetworkBuilder
+from .fixer import ERROR_TYPE_BUILD
 from session_utils import get_current_session_id
 from logger import get_logger, set_log_context, log_step, log_error
 
@@ -32,7 +33,7 @@ def builder_node(state: GraphState) -> Dict[str, Any]:
     blueprint = state.get('blueprint')
 
     if blueprint is None:
-        error_msg = "No blueprint provided to builder"
+        error_msg = f"{ERROR_TYPE_BUILD} No blueprint provided to builder"
         logger.error(error_msg)
         return {"error_logs": error_msg}
 
@@ -71,4 +72,4 @@ def builder_node(state: GraphState) -> Dict[str, Any]:
 
     except Exception as e:
         log_error(logger, e, "Failed to build YAML")
-        return {"error_logs": f"Builder Error: {str(e)}"}
+        return {"error_logs": f"{ERROR_TYPE_BUILD} Builder Error: {str(e)}"}

@@ -11,6 +11,7 @@ from typing import Dict, Any, Tuple, Optional
 from state import GraphState
 from config import config, TIMEOUT_SECONDS
 from logger import get_logger, set_log_context, log_step, log_error
+from .fixer import ERROR_TYPE_DEPLOY, ERROR_TYPE_SYSTEM
 
 
 # 检测是否需要 sudo（全局缓存一次）
@@ -342,6 +343,18 @@ def deploy(state: GraphState) -> Dict[str, Any]:
     if return_code != 0:
         # 只返回最后 2000 字符避免 Token 爆炸，但保留错误信息
         error_logs = logs[-2000:] if len(logs) > 2000 else logs
+
+        # 判断是系统错误还是部署错误
+        error_lower = error_logs.lower()
+        if any(keyword in error_lower for keyword in [
+            "permission denied", "access denied", "operation not permitted",
+            "no space left", "disk full", "out of memory", "oom",
+            "docker daemon", "docker not running"
+        ]):
+            error_type = ERROR_TYPE_SYSTEM
+        else:
+            error_type = ERROR_TYPE_DEPLOY
+
         log_step(
             logger,
             "Deployment failed",
@@ -349,7 +362,7 @@ def deploy(state: GraphState) -> Dict[str, Any]:
             return_code=return_code
         )
         return {
-            "error_logs": error_logs,
+            "error_logs": f"{error_type} {error_logs}",
             "is_deployed": False,
             "inspect_data": None
         }
@@ -368,7 +381,7 @@ def deploy(state: GraphState) -> Dict[str, Any]:
         )
         log_step(logger, "Health check failed", status="fail")
         return {
-            "error_logs": error_msg,
+            "error_logs": f"{ERROR_TYPE_DEPLOY} {error_msg}",
             "is_deployed": False,
             "inspect_data": None
         }

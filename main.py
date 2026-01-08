@@ -56,6 +56,19 @@ def create_workflow() -> StateGraph:
             return "fixer"
         return "configurator"
 
+    # 条件边：fixer 后的路由（根据 state 内容推断路由目标）
+    def route_after_fixer(state: GraphState) -> str:
+        """
+        根据 fixer 返回的 state 内容推断路由目标：
+        - blueprint 为 None → fixer 清空了蓝图，需要重新生成 → generator
+        - blueprint 不为 None → fixer 修复了 YAML，需要重新验证 → validator
+        """
+        # 检查 blueprint 是否被清空
+        if state.get("blueprint") is None:
+            return "generator"
+        else:
+            return "validator"
+
     # 添加条件边
     workflow.add_conditional_edges("builder", check_build_errors)
     workflow.add_conditional_edges("validator", check_validation_errors)
@@ -65,8 +78,16 @@ def create_workflow() -> StateGraph:
         {"configurator": "configurator", "fixer": "fixer"}
     )
 
-    # Fixer 始终回到 Builder
-    workflow.add_edge("fixer", "builder")
+    # Fixer 智能路由（根据 state 内容动态路由）
+    workflow.add_conditional_edges(
+        "fixer",
+        route_after_fixer,
+        {
+            "generator": "generator",
+            "validator": "validator"
+        }
+    )
+
     workflow.add_edge("configurator", END)
 
     return workflow.compile()

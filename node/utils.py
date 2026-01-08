@@ -142,65 +142,96 @@ class NetworkBuilder:
 
     def _wire_subnet(self, subnet_name: str, members: List[Any]):
         """
-        Connects members of a subnet. 
-        If > 2 members, injects a Switch-in-a-Container.
+        Connects members of a subnet and assigns IPs according to C-class allocation rules.
+        IP Allocation Strategy for /24 subnet:
+        - .0       : Network address (reserved)
+        - .1       : Router (infrastructure)
+        - .2       : Switch (infrastructure, if exists)
+        - .3       : Reserved for future infrastructure
+        - .4-.63   : Reserved pool (60 addresses)
+        - .64-.254 : User LAN pool (191 addresses)
+        - .255     : Broadcast address (reserved)
+
+        Process:
+        1. Determine L2 topology (switch vs point-to-point)
+        2. Create physical links first (increments interface counters)
+        3. Then assign IPs using correct interface indices
         """
         cidr_obj = self.subnet_map[subnet_name]
-        
-        # Determine L2 topology
+
+        # ============================================
+        # Step 1: Create Physical Links (L2 Topology)
+        # ============================================
+        switch_name = None
         if len(members) > 2:
-            # Create Switch
-            sw_name = f"sw-{subnet_name}"
-            self._inject_switch_node(sw_name)
-            
+            # Create Switch-in-Container
+            switch_name = f"sw-{subnet_name}"
+            self._inject_switch_node(switch_name)
+
             # Connect everyone to switch
             for member in members:
-                self._create_link(member.name, sw_name)
-        
+                self._create_link(member.name, switch_name)
+
         elif len(members) == 2:
-            # Point-to-Point
+            # Point-to-Point connection
             self._create_link(members[0].name, members[1].name)
-            
-        # Assign IPs logic
-        router_host = 1
-        client_host = 10
-        
-        for member in members:
-            # Allocate IP
-            if member.role == "router":
-                ip_str = str(cidr_obj[router_host])
-                router_host += 1
-            else:
-                ip_str = str(cidr_obj[client_host])
-                client_host += 1
-            
-            self.node_ip_map[member.name][subnet_name] = ip_str
-            
-            # --- Configuration Injection ---
-            
-            # Case A: Complex Router (FRR) -> Deferred to file generation
-            if self.bp.complexity == "complex" and member.role == "router":
-                pass # Configs generated later
-                
-            # Case B: Simple/Medium Node -> Inject 'ip addr' commands
-            else:
-                # We need to determine interface name (eth1, eth2...)
-                # Simplified: assume sequential based on link order. 
-                # In prod, we track link counts. Here, we blindly append.
-                # A robust way is to use 'ip addr add ... dev $(ls /sys/class/net | grep eth | tail -1)' hack 
-                # or verify link count. For MVP, let's assume specific order or use wildcard?
-                # BETTER: Use Containerlab's deterministic naming: eth1, eth2...
-                # We need to track how many links this node has so far.
-                iface_idx = self._get_interface_count(member.name)
+
+        # ============================================
+        # Step 2: Allocate IPs to Original Members
+        # ============================================
+        # IP allocation pointers
+        router_ip_offset = 1      # .1 for routers
+        user_lan_offset = 64      # .64 for endpoints
+
+        # Collect routers and endpoints for ordered allocation
+        routers = [m for m in members if m.role == "router"]
+        endpoints = [m for m in members if m.role == "endpoint"]
+
+        # Assign IPs to routers first (infrastructure range)
+        for router in routers:
+            ip_str = str(cidr_obj[router_ip_offset])
+            router_ip_offset += 1  # Next router gets .2, .3, etc.
+
+            self.node_ip_map[router.name][subnet_name] = ip_str
+
+            # Configuration injection
+            if not (self.bp.complexity == "complex" and router.role == "router"):
+                iface_idx = self._get_interface_count(router.name)
                 iface_name = f"eth{iface_idx}"
-                
                 cmd = f"ip addr add {ip_str}/24 dev {iface_name}"
-                self.clab_nodes[member.name]['exec'].append(cmd)
-                
-                # Add Default Route (if endpoint)
-                if member.role == "endpoint":
-                    gateway = str(cidr_obj[1]) # Assume router is always .1
-                    self.clab_nodes[member.name]['exec'].append(f"ip route replace default via {gateway}")
+                self.clab_nodes[router.name]['exec'].append(cmd)
+
+        # Assign IPs to endpoints (user LAN range)
+        for endpoint in endpoints:
+            ip_str = str(cidr_obj[user_lan_offset])
+            user_lan_offset += 1
+
+            self.node_ip_map[endpoint.name][subnet_name] = ip_str
+
+            # Configuration injection (endpoints are never FRR)
+            iface_idx = self._get_interface_count(endpoint.name)
+            iface_name = f"eth{iface_idx}"
+            cmd = f"ip addr add {ip_str}/24 dev {iface_name}"
+            self.clab_nodes[endpoint.name]['exec'].append(cmd)
+
+            # Add default route (gateway is first router at .1)
+            if routers:
+                gateway = str(cidr_obj[1])
+                self.clab_nodes[endpoint.name]['exec'].append(f"ip route replace default via {gateway}")
+
+        # ============================================
+        # Step 3: Assign IP to Switch (if exists)
+        # ============================================
+        if switch_name:
+            # Switch gets .2
+            switch_ip = str(cidr_obj[2])
+            self.node_ip_map[switch_name][subnet_name] = switch_ip
+
+            # Switch configuration (Alpine bridge needs IP for management)
+            iface_idx = self._get_interface_count(switch_name)
+            iface_name = f"eth{iface_idx}"
+            cmd = f"ip addr add {switch_ip}/24 dev br0"
+            self.clab_nodes[switch_name]['exec'].append(cmd)
 
     def _generate_static_routes(self):
         """
@@ -308,55 +339,82 @@ class NetworkBuilder:
 
     # --- FRR Config Generation (Complex Mode) ---
     def _generate_frr_configs(self):
+        # Router index for unique ID generation
+        router_idx = 0
+
         for name, node_def in self.clab_nodes.items():
             # Check if it corresponds to a complex router
             # We look up in blueprint nodes
             bp_node = next((n for n in self.bp.nodes if n.name == name), None)
             if bp_node and bp_node.role == "router" and self.bp.complexity == "complex":
-                
+
                 config_path = os.path.join(self.output_dir, name)
                 os.makedirs(config_path, exist_ok=True)
-                
+
+                # Generate unique router-id and loopback for this router
+                # Using 10.10.X.Y format where X = router index
+                router_idx += 1
+                unique_loopback = f"10.10.{router_idx}.1"
+                router_id = unique_loopback
+
                 # 1. Generate daemons
                 with open(os.path.join(config_path, "daemons"), "w") as f:
                     f.write("zebra=yes\nospfd=yes\n")
-                
+
                 # 2. Generate frr.conf
                 lines = [
-                    "frr version 8.5", "frr defaults traditional", 
-                    f"hostname {name}", "no ipv6 forwarding", "!"
+                    "frr version 8.5",
+                    "frr defaults traditional",
+                    f"hostname {name}",
+                    "no ipv6 forwarding",
+                    "!"
                 ]
-                
-                # Loopback
-                lines.extend(["interface lo", " ip address 10.10.10.1/32", "!"])
-                
-                # Interfaces
-                # We need to map subnets to interface names again. 
-                # This requires tracking which subnet mapped to which interface index.
-                # For this snippet, let's assume the node_ip_map iteration order matches link creation.
-                # (In production code, you strictly link interface names to subnets).
-                
-                current_eth = 1
-                connected_subs = self.node_ip_map[name]
-                for sub_name, ip in connected_subs.items():
-                    lines.extend([
-                        f"interface eth{current_eth}",
-                        f" ip address {ip}/24",
-                        "!"
-                    ])
-                    current_eth += 1
 
-                # OSPF
+                # Loopback with unique address
                 lines.extend([
-                    "router ospf",
-                    " ospf router-id 10.10.10.1",
-                    " network 0.0.0.0/0 area 0", # Lazy OSPF
+                    "interface lo",
+                    f" ip address {unique_loopback}/32",
                     "!"
                 ])
-                
+
+                # Physical interfaces
+                # Note: Switches (sw-*) don't get FRR configs, only routers
+                current_eth = 1
+                connected_subs = self.node_ip_map[name]
+
+                # Track networks for OSPF configuration
+                ospf_networks = []
+
+                for subnet_name, ip_addr in connected_subs.items():
+                    lines.extend([
+                        f"interface eth{current_eth}",
+                        f" ip address {ip_addr}/24",
+                        "!"
+                    ])
+
+                    # Add this subnet to OSPF (exclude management network 172.20.20.0/24)
+                    subnet_cidr = str(self.subnet_map[subnet_name])
+                    if not subnet_cidr.startswith("172.20.20"):
+                        ospf_networks.append(subnet_cidr)
+
+                    current_eth += 1
+
+                # OSPF configuration with specific networks
+                lines.extend([
+                    "router ospf",
+                    f" ospf router-id {router_id}",
+                    " passive-interface eth0",  # Disable OSPF on management interface
+                ])
+
+                # Add only data networks to OSPF
+                for network in ospf_networks:
+                    lines.append(f" network {network} area 0")
+
+                lines.append("!")
+
                 with open(os.path.join(config_path, "frr.conf"), "w") as f:
                     f.write("\n".join(lines))
-                
+
                 # Add binds to node definition
                 abs_path = os.path.abspath(config_path)
                 node_def['binds'] = [

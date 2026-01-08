@@ -3,6 +3,7 @@ import ipaddress
 import yaml
 from typing import Dict, List, Any, Set, Tuple
 from state import GraphState
+from .fixer import ERROR_TYPE_VALIDATE
 
 # 定义返回结构
 class ValidationResult:
@@ -213,17 +214,17 @@ def validator_node(state: GraphState):
     yaml_path = state.get('yaml_path')
     if not yaml_path:
         print("   -> Validation Failed: No YAML file path provided.")
-        return {"error_logs": "No YAML file path provided"}
+        return {"error_logs": f"{ERROR_TYPE_VALIDATE} No YAML file path provided"}
 
     try:
         with open(yaml_path, 'r', encoding='utf-8') as f:
             topology_data = yaml.safe_load(f)
     except yaml.YAMLError as e:
         print(f"   -> Validation Failed: Invalid YAML syntax: {e}")
-        return {"error_logs": f"Invalid YAML syntax: {e}"}
+        return {"error_logs": f"{ERROR_TYPE_VALIDATE} Invalid YAML syntax: {e}"}
     except Exception as e:
         print(f"   -> Validation Failed: Error reading file: {e}")
-        return {"error_logs": f"Error reading file: {e}"}
+        return {"error_logs": f"{ERROR_TYPE_VALIDATE} Error reading file: {e}"}
 
     result = validate_topology(topology_data)
     if result.valid:
@@ -231,4 +232,5 @@ def validator_node(state: GraphState):
         return {"error_logs": ""}
     else:
         print(f"   -> Validation Failed: {result.errors}")
-        return {"error_logs": "\n".join(result.errors)}
+        error_msg = "\n".join(result.errors)
+        return {"error_logs": f"{ERROR_TYPE_VALIDATE} Validation failed:\n{error_msg}"}

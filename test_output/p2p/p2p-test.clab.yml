@@ -1,0 +1,21 @@
+name: p2p-test
+topology:
+  nodes:
+    router-a:
+      kind: linux
+      image: alpine:latest
+      exec:
+      - ip addr add 10.0.0.1/24 dev eth1
+      sysctls:
+        net.ipv4.ip_forward: '1'
+    router-b:
+      kind: linux
+      image: alpine:latest
+      exec:
+      - ip addr add 10.0.0.2/24 dev eth1
+      sysctls:
+        net.ipv4.ip_forward: '1'
+  links:
+  - endpoints:
+    - router-a:eth1
+    - router-b:eth1

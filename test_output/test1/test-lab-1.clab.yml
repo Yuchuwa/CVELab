@@ -1,0 +1,22 @@
+name: test-lab-1
+topology:
+  nodes:
+    edge-router:
+      kind: linux
+      image: alpine:latest
+      exec:
+      - ip addr add 10.0.0.1/24 dev eth1
+      sysctls:
+        net.ipv4.ip_forward: '1'
+    web-server:
+      kind: linux
+      image: ubuntu:latest
+      exec:
+      - apt-get update
+      - apt-get install -y iproute2 iputils-ping net-tools
+      - ip addr add 10.0.0.64/24 dev eth1
+      - ip route replace default via 10.0.0.1
+  links:
+  - endpoints:
+    - edge-router:eth1
+    - web-server:eth1

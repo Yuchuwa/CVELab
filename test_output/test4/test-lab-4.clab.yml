@@ -1,0 +1,46 @@
+name: test-lab-4
+topology:
+  nodes:
+    router-1:
+      kind: linux
+      image: frr/frr:v8.5.1
+      binds:
+      - /home/wolflab/Desktop/containerlab_builder/test_output/test4/router-1/daemons:/etc/frr/daemons
+      - /home/wolflab/Desktop/containerlab_builder/test_output/test4/router-1/frr.conf:/etc/frr/frr.conf
+      sysctls:
+        net.ipv4.ip_forward: '1'
+      cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    router-2:
+      kind: linux
+      image: frr/frr:v8.5.1
+      binds:
+      - /home/wolflab/Desktop/containerlab_builder/test_output/test4/router-2/daemons:/etc/frr/daemons
+      - /home/wolflab/Desktop/containerlab_builder/test_output/test4/router-2/frr.conf:/etc/frr/frr.conf
+      sysctls:
+        net.ipv4.ip_forward: '1'
+      cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    router-3:
+      kind: linux
+      image: frr/frr:v8.5.1
+      binds:
+      - /home/wolflab/Desktop/containerlab_builder/test_output/test4/router-3/daemons:/etc/frr/daemons
+      - /home/wolflab/Desktop/containerlab_builder/test_output/test4/router-3/frr.conf:/etc/frr/frr.conf
+      sysctls:
+        net.ipv4.ip_forward: '1'
+      cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+  links:
+  - endpoints:
+    - router-1:eth1
+    - router-3:eth1
+  - endpoints:
+    - router-1:eth2
+    - router-2:eth1
+  - endpoints:
+    - router-2:eth2
+    - router-3:eth2
