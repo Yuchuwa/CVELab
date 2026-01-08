@@ -1,6 +1,6 @@
 [project]
 name = "containerlab-builder"
-version = "0.1.0"
+version = "1.0.0"
 description = "Intelligent network topology automation builder based on LLM and LangGraph"
 readme = "README.md"
 requires-python = ">=3.10"

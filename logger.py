@@ -127,6 +127,8 @@ def setup_logger(
 ) -> logging.Logger:
     """设置并返回一个配置好的 logger。
 
+    同时配置根 logger，确保所有子 logger 都能输出到文件。
+
     Args:
         name: logger 名称
         level: 日志级别
@@ -136,15 +138,6 @@ def setup_logger(
     Returns:
         配置好的 logger 实例
     """
-    logger = logging.getLogger(name)
-
-    # 避免重复添加 handler
-    if logger.handlers:
-        return logger
-
-    logger.setLevel(level)
-    logger.propagate = False  # 防止传播到根 logger
-
     # 确定日志文件路径
     if log_file is None and session_id:
         # 自动生成日志文件路径
@@ -152,18 +145,40 @@ def setup_logger(
         os.makedirs(session_dir, exist_ok=True)
         log_file = os.path.join(session_dir, f"{session_id}.log")
 
-    # 控制台处理器
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(level)
-    console_handler.setFormatter(SessionFormatter())
-    logger.addHandler(console_handler)
+    # 配置根 logger（确保所有子 logger 都能输出）
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)  # 根 logger 设置为最低级别
 
-    # 文件处理器（如果有日志文件）
-    if log_file:
+    # 检查根 logger 是否已有控制台 handler
+    root_has_console = any(
+        isinstance(h, logging.StreamHandler) and h.stream == sys.stdout
+        for h in root_logger.handlers
+    )
+
+    # 检查根 logger 是否已有文件 handler
+    root_has_file = any(
+        isinstance(h, logging.FileHandler)
+        for h in root_logger.handlers
+    )
+
+    # 根 logger 的控制台处理器（只添加一次）
+    if not root_has_console:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(level)
+        console_handler.setFormatter(SessionFormatter())
+        root_logger.addHandler(console_handler)
+
+    # 根 logger 的文件处理器（只添加一次）
+    if log_file and not root_has_file:
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)  # 文件记录更详细的日志
         file_handler.setFormatter(FileFormatter())
-        logger.addHandler(file_handler)
+        root_logger.addHandler(file_handler)
+
+    # 获取指定的 logger
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.propagate = True  # 允许传播到根 logger
 
     return logger
 

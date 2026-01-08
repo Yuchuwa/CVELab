@@ -4,6 +4,7 @@ import yaml
 from typing import Dict, List, Any, Set, Tuple
 from state import GraphState
 from .fixer import ERROR_TYPE_VALIDATE
+from logger import get_logger, set_log_context, log_step
 
 # 定义返回结构
 class ValidationResult:
@@ -208,29 +209,31 @@ def validate_topology(topology_data: Dict[str, Any]) -> ValidationResult:
     return res
 
 def validator_node(state: GraphState):
-    print("\n🔍 [Validator] Checking configuration...")
+    logger = get_logger("node.validate")
+    set_log_context(stage="validate")
+    log_step(logger, "Validating topology configuration", status="start")
 
     # 读取 YAML 文件内容
     yaml_path = state.get('yaml_path')
     if not yaml_path:
-        print("   -> Validation Failed: No YAML file path provided.")
+        log_step(logger, "Validation failed - No YAML file path provided", status="fail")
         return {"error_logs": f"{ERROR_TYPE_VALIDATE} No YAML file path provided"}
 
     try:
         with open(yaml_path, 'r', encoding='utf-8') as f:
             topology_data = yaml.safe_load(f)
     except yaml.YAMLError as e:
-        print(f"   -> Validation Failed: Invalid YAML syntax: {e}")
+        log_step(logger, f"Validation failed - Invalid YAML syntax: {e}", status="fail")
         return {"error_logs": f"{ERROR_TYPE_VALIDATE} Invalid YAML syntax: {e}"}
     except Exception as e:
-        print(f"   -> Validation Failed: Error reading file: {e}")
+        log_step(logger, f"Validation failed - Error reading file: {e}", status="fail")
         return {"error_logs": f"{ERROR_TYPE_VALIDATE} Error reading file: {e}"}
 
     result = validate_topology(topology_data)
     if result.valid:
-        print("   -> Validation Passed.")
+        log_step(logger, "Topology validation completed successfully", status="success")
         return {"error_logs": ""}
     else:
-        print(f"   -> Validation Failed: {result.errors}")
+        log_step(logger, f"Validation failed - {len(result.errors)} error(s) found", status="fail", errors=result.errors)
         error_msg = "\n".join(result.errors)
         return {"error_logs": f"{ERROR_TYPE_VALIDATE} Validation failed:\n{error_msg}"}
