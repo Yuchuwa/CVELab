@@ -11,3 +11,5 @@ wheels/
 # custom setup
 .yaml
 .env
+#claude specific
+claude_code_env.sh
