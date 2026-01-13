@@ -133,7 +133,7 @@ Fixer 通过**错误类型标识符**自动分类并智能路由：
 - Python 3.10+
 - Containerlab
 - Docker
-- OpenAI API Key（或其他兼容的 LLM API）
+- LLM API Key（支持 OpenAI、DeepSeek 等兼容接口）
 
 ### 安装
 
@@ -142,24 +142,43 @@ Fixer 通过**错误类型标识符**自动分类并智能路由：
 git clone <repository-url>
 cd containerlab_builder
 
-# 安装依赖
-pip install -r requirements.txt
+# 使用 uv 安装（推荐）
+uv sync
+
+# 或使用 pip
+pip install -e .
 ```
 
 ### 配置
 
-编辑 `config.py`，设置你的 LLM API 配置：
+复制示例配置文件并填写你的配置：
 
-```python
-LLM_MODEL = "gpt-4o"  # 或其他模型
-BASE_URL = "https://api.openai.com/v1"
-API_KEY = "your-api-key-here"
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 文件，设置必要的环境变量：
+
+```bash
+# 必需配置
+LLM_API_KEY="your_api_key_here"
+
+# 可选配置
+LLM_BASE_URL="https://api.deepseek.com/v1"  # 或其他 LLM API
+LLM_MODEL="DeepSeek-V3.2"
+MAX_RETRIES=3
+LOG_LEVEL="INFO"
 ```
 
 ### 运行
 
 ```bash
 python main.py
+```
+
+项目会自动为每次运行创建独立的会话目录，所有输出文件（YAML、日志等）都会保存在：
+```
+clab_out/<session_id>/
 ```
 
 ## 使用示例
@@ -180,31 +199,35 @@ python main.py
 containerlab_builder/
 ├── main.py              # LangGraph 工作流入口
 ├── state.py             # 全局状态定义
-├── config.py            # 配置文件
+├── config.py            # 配置管理（基于 Pydantic）
+├── logger.py            # 日志系统（支持会话隔离、彩色输出）
+├── session_utils.py     # 会话管理工具
+├── pyproject.toml       # 项目依赖配置
+├── .env.example         # 环境变量配置示例
 ├── node/
 │   ├── generate.py      # LLM 生成逻辑蓝图
 │   ├── builder.py       # YAML 构建器 (IPAM + 路由)
-│   ├── validate.py      # 静态验证
+│   ├── validate.py      # 静态验证（IP冲突、接口重复等）
 │   ├── deploy.py        # Containerlab 部署
-│   ├── deploy_agent.py  # 部署代理
-│   ├── configure.py     # 服务配置
-│   ├── fixer.py         # 错误修复
-│   └── utils.py         # Pydantic 模型定义
+│   ├── deploy_agent.py  # 部署代理（异步部署、健康检查）
+│   ├── configure.py     # 服务配置（路由注入、服务启动）
+│   ├── fixer.py         # 错误修复（智能诊断与修复）
+│   └── utils.py         # Pydantic 数据模型定义
 ├── tools/
 │   ├── containerlab_tools.py  # Containerlab 工具函数
 │   └── search_vuln_image.py   # 漏洞镜像搜索工具
-└── test/
-    ├── test_configure.py      # 配置测试
-    └── test_workflow.py       # 工作流测试
+├── test/
+│   └── test_configure.py      # 配置测试
+└── clab_out/            # 输出目录（自动生成）
+    └── <session_id>/    # 每次运行的独立会话目录
+        ├── *.clab.yml   # 生成的拓扑配置
+        └── *.log        # 会话日志
 ```
 
 ## 技术栈
 
-- **LangGraph**: 工作流编排
-- **LangChain**: LLM 集成
-- **Pydantic**: 数据验证
+- **LangChain**: LLM 集成与工作流编排
 - **Containerlab**: 容器网络部署
-- **FRR**: 动态路由协议 (OSPF)
 
 ## 许可证
 
