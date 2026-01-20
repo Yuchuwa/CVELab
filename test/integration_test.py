@@ -18,13 +18,13 @@ def test_simple_topology():
     print("\n" + "="*80)
     print("📋 测试 1: 简单拓扑 (Simple)")
     print("="*80)
-    print("场景: Kali 攻击机 + Redis 靶机，通过路由器连接")
+    print("场景: Kali 攻击机 + redis，通过路由器连接")
     print("-"*80)
 
     user_request = """
     创建一个简单的渗透测试实验室：
     - 1 个 Kali Linux 作为攻击机
-    - 1 个 Redis 服务器作为靶机
+    - 1 个 Redis 服务器作为靶机,包含CVE-2022-0543漏洞
     - 1 个 Alpine 路由器连接它们
     - 复杂度：simple
     """

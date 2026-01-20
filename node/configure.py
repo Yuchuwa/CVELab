@@ -1,63 +1,86 @@
-"""Configure 节点：容器内网络配置
+"""Configure 节点：容器内网络和服务验证
 
-负责在部署后的容器中配置网络接口和路由。
+使用 ConfigApplier 收集诊断数据，然后使用 LLM 分析判断配置是否正确。
 """
 import json
-import yaml
 from typing import Dict, Any, List
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from langchain.agents import create_agent
+from pydantic import BaseModel, Field
 from langchain.chat_models import init_chat_model
+from langchain.agents import create_agent
 
 from state import GraphState
-from tools.containerlab_tools import node_config_tool
 from config import config
-from logger import get_logger, set_log_context, log_step, log_error
+from logger import get_logger, set_log_context, log_step
+from .utils import ConfigApplier
+
+
+# ============================================
+# 结构化输出模型
+# ============================================
+class NodeCheckResult(BaseModel):
+    """单个节点的检查结果"""
+    node_name: str = Field(..., description="Node name")
+    overall_status: str = Field(..., description="PASS or FAIL")
+    checks: List[str] = Field(..., description="List of check results (e.g., '✓ IP configured', '✗ Route not found')")
+    issues: List[str] = Field(default=[], description="List of issues found (empty if none)")
+
+
+class ConfigurationAnalysis(BaseModel):
+    """配置分析结果（结构化输出）"""
+    overall_status: str = Field(..., description="Overall status: PASS or FAIL")
+    node_results: List[NodeCheckResult] = Field(..., description="Results for each node")
+    summary: str = Field(..., description="Brief summary of the analysis")
 
 
 configure_prompt = """
-You are a Network Configuration Specialist working inside containerlab containers.
+You are a Network and Service Configuration Analyzer.
 
-Your task is to verify and fix network configuration for a single node.
+Your task is to analyze the diagnostic data from containerlab containers and determine if the configuration is correct.
 
-CONFIGURATION CHECKLIST:
-1. Check if IP tools are installed (iproute2, iputils-ping, net-tools)
-2. Verify each interface has the correct IP address configured
-3. Verify the default route is configured
-4. Verify interfaces are UP
-5. Test connectivity with ping if needed
+DIAGNOSTIC DATA includes:
+- container: Container status (running/not_found)
+- ip_config: "ip addr show" output + expected interfaces
+- interfaces: "ip link show" output + expected interfaces
+- routes: "ip route show" output + expected default route
+- ports: "ss -tlnp" or "netstat -tlnp" output + expected ports
+- processes: "ps aux" output + expected image
 
-DIAGNOSIS COMMANDS:
-- Check interfaces: "ip addr show" or "ip a"
-- Check routes: "ip route show" or "ip r"
-- Check tools: "which ip", "which ping"
+ANALYSIS CHECKLIST:
+1. **Container Check**: Is the container running?
+2. **IP Configuration**: Do the expected IP addresses appear in the output?
+3. **Interface State**: Are all expected interfaces in UP state?
+4. **Routing**: Is the default route configured (for endpoints/vul-targets)?
+5. **Port Listening**: For specified ports, are they listening?
+6. **Process Running**: Does the expected service process appear in ps aux?
 
-FIX COMMANDS:
-- Install tools (Alpine): "apk add --no-cache iproute2 iputils-ping net-tools"
-- Install tools (Debian/Ubuntu/Kali): "apt-get update && apt-get install -y iproute2 iputils-ping net-tools"
-- Configure IP: "ip addr add <ip>/<mask> dev <interface>"
-- Bring up interface: "ip link set <interface> up"
-- Set default route: "ip route replace default via <gateway_ip>"
+JUDGMENT:
+- Return "PASS" if ALL critical checks succeed
+- Return "FAIL" if ANY critical check fails
+- Skip non-critical checks (e.g., port checks if no ports specified)
 
-VERIFICATION:
-After applying fixes, always verify by running "ip addr show" to confirm.
+OUTPUT FORMAT:
+Fill in the structured output template with:
+- overall_status: "PASS" or "FAIL"
+- node_results: List of NodeCheckResult
+  - node_name: Name of the node
+  - overall_status: "PASS" or "FAIL" for this node
+  - checks: List of check descriptions like "✓ IP address 10.0.0.64 configured", "✗ Default route not found"
+  - issues: List of specific issues found
+- summary: Brief summary (1-2 sentences)
 
-Report your findings clearly:
-- ✅ PASS if all checks succeed
-- ❌ FAIL if issues persist
-- Return detailed logs of what you checked and fixed.
+Be specific about failures. Use ✓ for pass, ✗ for fail.
 """
 
 
 def configure(state: GraphState) -> Dict[str, Any]:
     """
-    Configure 节点：并行配置所有容器的网络接口。
+    Configure 节点：验证所有容器的网络和服务状态。
 
     工作流程:
-    1. 解析 inspect_data 获取所有容器
-    2. 读取 YAML 文件获取预期配置
-    3. 并行配置所有节点（每个节点有独立的 agent）
-    4. 聚合结果并更新状态
+    1. 使用 ConfigApplier.collect_diagnostics() 收集原始诊断数据
+    2. 将诊断数据发送给 LLM 分析（使用结构化输出）
+    3. LLM 填充 ConfigurationAnalysis 模板
+    4. 根据分析结果设置 error_logs 和 is_complete
 
     Args:
         state: 当前工作流状态
@@ -68,202 +91,36 @@ def configure(state: GraphState) -> Dict[str, Any]:
     logger = get_logger("node.configure")
     set_log_context(stage="configure")
 
-    inspect_data = state.get("inspect_data", {})
     yaml_path = state.get("yaml_path")
+    json_path = state.get("json_path")
 
-    # 解析容器列表
-    containers = []
-    lab_name = ""
-    try:
-        for lab, nodes in inspect_data.items():
-            lab_name = lab
-            if isinstance(nodes, list):
-                containers.extend(nodes)
+    if not yaml_path or not json_path:
+        logger.warning("Missing yaml_path or json_path, skipping verification")
+        return {"is_complete": True}
 
-        if not containers:
-            logger.warning("No containers found in inspect_data")
-            return {"is_complete": True}
-
-    except Exception as e:
-        log_error(logger, e, "Failed to parse inspect_data")
-        return {"is_complete": True}  # 非致命错误，继续流程
-
-    # 读取 YAML 文件
-    nodes_config = {}
-    if yaml_path:
-        try:
-            with open(yaml_path, 'r', encoding='utf-8') as f:
-                yaml_content = yaml.safe_load(f) or {}
-            topology = yaml_content.get("topology", {})
-            nodes_config = topology.get("nodes", {})
-            logger.debug(f"Loaded YAML config with {len(nodes_config)} nodes")
-        except Exception as e:
-            log_error(logger, e, f"Failed to read YAML file {yaml_path}")
-            # 继续进行，但使用空配置
-
-    log_step(
-        logger,
-        "Configuring nodes in parallel",
-        status="start",
-        total_nodes=len(containers)
-    )
-
-    # 准备配置任务
-    config_tasks = _prepare_config_tasks(containers, lab_name, nodes_config, logger)
-
-    # 并行配置所有节点
-    results = _configure_nodes_parallel(config_tasks, logger)
-
-    # 输出汇总
-    success_count = sum(1 for r in results if r["success"])
-    fail_count = len(results) - success_count
-
-    log_step(
-        logger,
-        "Node configuration completed",
-        status="success" if fail_count == 0 else "fail",
-        total=len(results),
-        success=success_count,
-        failed=fail_count
-    )
-
-    # 记录失败的节点
-    if fail_count > 0:
-        logger.error(f"Failed to configure {fail_count} node(s):")
-        for result in results:
-            if not result["success"]:
-                logger.error(f"  - {result['node']}: {result['message']}")
-                logger.debug(f"    Logs: {result.get('logs', '')[:200]}...")
-
-    return {"is_complete": True}
-
-
-def _prepare_config_tasks(
-    containers: List[Dict],
-    lab_name: str,
-    nodes_config: Dict,
-    logger: Any
-) -> List[Dict]:
-    """准备配置任务列表。
-
-    Args:
-        containers: 容器列表
-        lab_name: 实验室名称
-        nodes_config: 节点配置字典
-        logger: logger 实例
-
-    Returns:
-        配置任务列表
-    """
-    config_tasks = []
-
-    for container in containers:
-        try:
-            container_name = container.get("name", "")
-            # 提取短节点名: clab-simple-router-lab-attacker -> attacker
-            node_short_name = container_name.replace(f"clab-{lab_name}-", "")
-
-            # 获取预期配置
-            expected_config = nodes_config.get(node_short_name, {})
-            exec_commands = expected_config.get("exec", [])
-
-            config_tasks.append({
-                "container": container,
-                "container_name": container_name,
-                "node_short_name": node_short_name,
-                "exec_commands": exec_commands
-            })
-
-            logger.debug(f"Prepared config task for node: {node_short_name}")
-
-        except Exception as e:
-            logger.warning(f"Failed to prepare config task for container: {e}")
-
-    return config_tasks
-
-
-def _configure_nodes_parallel(
-    tasks: List[Dict],
-    logger: Any
-) -> List[Dict]:
-    """使用 ThreadPoolExecutor 并行配置多个节点。
-
-    每个节点获得独立的 agent 实例进行配置。
-
-    Args:
-        tasks: 配置任务列表
-        logger: logger 实例
-
-    Returns:
-        配置结果列表
-    """
-    results = []
-
-    # 限制并发数，避免系统过载
-    max_workers = min(len(tasks), config.max_configure_workers)
-
-    logger.debug(f"Starting parallel configuration with {max_workers} workers")
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 提交所有任务
-        future_to_task = {
-            executor.submit(_configure_single_node, task): task
-            for task in tasks
-        }
-
-        # 收集结果
-        for future in as_completed(future_to_task):
-            task = future_to_task[future]
-            try:
-                result = future.result()
-                results.append(result)
-
-                # 实时输出进度
-                status = "✅" if result["success"] else "❌"
-                node_name = result.get("node", task.get("node_short_name", "unknown"))
-                logger.info(f"  {status} {node_name}: {result['message']}")
-
-            except Exception as e:
-                log_error(logger, e, f"Exception during configuration of {task.get('node_short_name')}")
-                results.append({
-                    "node": task["node_short_name"],
-                    "success": False,
-                    "message": f"Exception: {str(e)}",
-                    "logs": str(e)
-                })
-
-    return results
-
-
-def _configure_single_node(task: Dict) -> Dict:
-    """使用专用的 agent 配置单个节点。
-
-    Args:
-        task: 配置任务字典
-
-    Returns:
-        结果字典，包含 node, success, message, logs
-    """
-    logger = get_logger("node.configure")
-    set_log_context(node=task.get("node_short_name", "unknown"))
-
-    container_name = task["container_name"]
-    node_short_name = task["node_short_name"]
-    exec_commands = task.get("exec_commands", [])
+    log_step(logger, "Collecting diagnostics from all nodes", status="start")
 
     try:
-        # 构建配置任务
-        config_task = _build_config_task(
-            container_name=container_name,
-            expected_commands=exec_commands,
-            node_short_name=node_short_name
-        )
+        import os
+        lab_name = os.path.basename(yaml_path).replace('.clab.yml', '')
+        config_dir = os.path.dirname(json_path)
 
-        # 初始化模型和 agent
+        # 1. 收集诊断数据
+        applier = ConfigApplier(lab_name, config_dir)
+        diagnostics = applier.collect_diagnostics(yaml_path)
+
+        logger.info(f"Collected diagnostics from {len(diagnostics['nodes'])} nodes")
+
+        # 2. 准备 LLM 分析任务
+        analysis_prompt = _build_analysis_prompt(diagnostics)
+
+        # 3. 调用 LLM 分析（使用结构化输出）
+        log_step(logger, "Analyzing diagnostics with LLM", status="start")
+
         model = init_chat_model(
             model_provider="openai",
             model=config.llm_model,
-            temperature=0.1,  # 低温度，更确定性的配置
+            temperature=0.1,
             base_url=config.base_url,
             api_key=config.api_key
         )
@@ -271,168 +128,138 @@ def _configure_single_node(task: Dict) -> Dict:
         agent = create_agent(
             model=model,
             system_prompt=configure_prompt,
-            tools=[node_config_tool]
+            tools=[],
+            response_format=ConfigurationAnalysis  # 结构化输出
         )
 
-        logger.debug(f"Configuring node {node_short_name}...")
-
-        # 调用 agent
         result = agent.invoke({
-            "messages": [{"role": "user", "content": config_task}]
+            "messages": [{"role": "user", "content": analysis_prompt}]
         })
 
-        # 提取 agent 响应
-        agent_response = _extract_agent_response(result)
+        # 4. 提取结构化响应
+        analysis = _extract_structured_response(result)
 
-        # 检查配置是否成功
-        config_success = _check_config_success(agent_response)
+        if analysis is None:
+            logger.error("Failed to extract structured response from LLM")
+            return {"is_complete": True}
 
-        if config_success:
-            logger.debug(f"Node {node_short_name} configured successfully")
+        # 5. 记录分析结果
+        logger.info(f"Overall Status: {analysis.overall_status}")
+        logger.info(f"Summary: {analysis.summary}")
+
+        for node_result in analysis.node_results:
+            if node_result.overall_status == "PASS":
+                logger.info(f"✓ {node_result.node_name}: All checks passed")
+            else:
+                logger.error(f"✗ {node_result.node_name}: Checks failed")
+
+            for check in node_result.checks:
+                logger.info(f"  {check}")
+
+            for issue in node_result.issues:
+                logger.error(f"  Issue: {issue}")
+
+        # 6. 判断是否有问题
+        if analysis.overall_status == "FAIL":
+            log_step(logger, "Configuration issues detected", status="fail")
+
+            # 构建详细错误信息
+            error_lines = [f"Configuration verification failed: {analysis.summary}"]
+            for node_result in analysis.node_results:
+                if node_result.overall_status == "FAIL":
+                    error_lines.append(f"\nNode: {node_result.node_name}")
+                    for issue in node_result.issues:
+                        error_lines.append(f"  - {issue}")
+
+            error_msg = "\n".join(error_lines)
             return {
-                "node": node_short_name,
-                "success": True,
-                "message": "Configured successfully",
-                "logs": agent_response
+                "is_complete": False,
+                "error_logs": error_msg
             }
         else:
-            logger.warning(f"Node {node_short_name} has configuration issues")
-            return {
-                "node": node_short_name,
-                "success": False,
-                "message": "Configuration issues detected",
-                "logs": agent_response
-            }
+            log_step(logger, "All configurations verified", status="success")
+            return {"is_complete": True}
 
     except Exception as e:
-        log_error(logger, e, f"Failed to configure node {node_short_name}")
-        return {
-            "node": node_short_name,
-            "success": False,
-            "message": f"Exception: {str(e)}",
-            "logs": str(e)
-        }
+        import traceback
+        logger.error(f"Verification failed: {str(e)}")
+        logger.debug(traceback.format_exc())
+
+        # 验证失败不阻塞流程
+        return {"is_complete": True}
 
 
-def _extract_agent_response(result: Dict) -> str:
-    """从 agent 结果中提取响应文本。
+def _build_analysis_prompt(diagnostics: Dict[str, Any]) -> str:
+    """构建 LLM 分析提示。"""
+    prompt = "Analyze the following diagnostic data from containerlab containers:\n\n"
 
-    Args:
-        result: agent.invoke() 的返回值
+    for node_name, node_data in diagnostics["nodes"].items():
+        prompt += f"## Node: {node_name}\n"
 
-    Returns:
-        提取的响应文本
-    """
+        for check_name, check_data in node_data.get("checks", {}).items():
+            prompt += f"\n{check_name.upper()}:\n"
+
+            # 添加原始输出
+            raw_output = check_data.get("raw_output", "")
+            if raw_output:
+                # 限制输出长度（避免 token 过多）
+                if len(raw_output) > 500:
+                    raw_output = raw_output[:500] + "\n... (truncated)"
+                prompt += f"Raw output:\n```\n{raw_output}\n```\n"
+
+            # 添加期望值
+            expected = check_data.get("expected")
+            if expected:
+                prompt += f"Expected: {json.dumps(expected, indent=2)}\n"
+
+            expected_image = check_data.get("expected_image")
+            if expected_image:
+                prompt += f"Expected image: {expected_image}\n"
+
+            # 特殊状态
+            status = check_data.get("status")
+            if status:
+                prompt += f"Status: {status}\n"
+
+        prompt += "\n" + "-"*50 + "\n"
+
+    prompt += "\nPlease analyze and fill in the structured output template."
+
+    return prompt
+
+
+def _extract_structured_response(result: Dict) -> ConfigurationAnalysis:
+    """从 LLM 结果中提取结构化响应。"""
+    logger = get_logger("node.configure")
+
     try:
         messages = result.get("messages", [])
 
+        # 查找 structured_response
+        if "structured_response" in result:
+            return result["structured_response"]
+
         # 查找最后一个 AIMessage
-        last_ai_message = None
         for msg in reversed(messages):
             if hasattr(msg, 'type') and msg.type == 'ai':
-                last_ai_message = msg
-                break
+                if hasattr(msg, 'content') and isinstance(msg.content, dict):
+                    # 某些版本可能返回字典
+                    if "overall_status" in msg.content:
+                        return ConfigurationAnalysis(**msg.content)
+                elif hasattr(msg, 'content'):
+                    # 尝试解析 JSON
+                    import json
+                    content_str = str(msg.content)
+                    try:
+                        content_dict = json.loads(content_str)
+                        return ConfigurationAnalysis(**content_dict)
+                    except:
+                        pass
 
-        if last_ai_message and hasattr(last_ai_message, 'text'):
-            return last_ai_message.text
-        elif last_ai_message and hasattr(last_ai_message, 'content'):
-            content = last_ai_message.content
-            return str(content) if not isinstance(content, str) else content
-        else:
-            return ""
+        logger.error("Could not extract structured response from LLM output")
+        return None
 
     except Exception as e:
-        get_logger("node.configure").warning(f"Failed to extract agent response: {e}")
-        return ""
-
-
-def _build_config_task(
-    container_name: str,
-    expected_commands: List[str],
-    node_short_name: str
-) -> str:
-    """Build the configuration task prompt for the agent."""
-    task = f"""
-Configure the node: {container_name}
-
-EXPECTED CONFIGURATION (from YAML):
-The following commands should have been executed during container startup:
-"""
-    for cmd in expected_commands:
-        task += f"  - {cmd}\n"
-
-    task += f"""
-YOUR TASK:
-1. First, DIAGNOSE the current state:
-   - Run "ip addr show" to see all interfaces and their IPs
-   - Run "ip route show" to see routing table
-   - Check if 'ip' command is available (run "which ip" or "ip addr")
-
-2. VERIFY the configuration:
-   - Check if interfaces have IP addresses assigned
-   - Check if default route exists (for endpoints)
-   - Check if interfaces are UP (not DOWN)
-
-3. FIX any issues you find:
-   - If 'ip' command not found, install tools:
-     * For Alpine: "apk add --no-cache iproute2 iputils-ping net-tools"
-     * For Debian/Ubuntu/Kali: "apt-get update && apt-get install -y iproute2 iputils-ping net-tools"
-   - If interface has no IP, configure it based on expected commands
-   - If interface is DOWN, bring it UP: "ip link set <interface> up"
-   - If route missing, add it: "ip route replace default via <gateway>"
-
-4. VERIFY your fixes:
-   - Run "ip addr show" again to confirm IPs are configured
-   - Run "ip route show" to confirm routes exist
-
-IMPORTANT:
-- Container name: {container_name}
-- Use the node_config_tool with the exact container name
-- Always run verification commands after applying fixes
-- Be concise in your response
-
-Begin your diagnosis and configuration now.
-"""
-    return task
-
-
-def _check_config_success(response: str) -> bool:
-    """Check if the configuration response indicates success."""
-    # Success indicators in agent response
-    success_indicators = [
-        "✅",
-        "pass",
-        "configured successfully",
-        "all checks passed",
-        "verification complete",
-        "interfaces are up",
-        "ip address configured",
-        "route configured",
-        "configuration is correct"
-    ]
-
-    response_lower = response.lower()
-    for indicator in success_indicators:
-        if indicator in response_lower:
-            return True
-
-    # Check for inet addresses in response (indicates IP is configured)
-    if "inet " in response and "up" in response_lower:
-        return True
-
-    # Default to success if no obvious failure indicators
-    failure_indicators = [
-        "failed",
-        "error:",
-        "not found",
-        "command failed",
-        "unable to"
-    ]
-    for indicator in failure_indicators:
-        if indicator in response_lower:
-            return False
-
-    return True
-
-
+        logger.error(f"Error extracting structured response: {e}")
+        return None
 

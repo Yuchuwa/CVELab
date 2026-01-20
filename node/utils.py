@@ -1,16 +1,20 @@
 import os
+import subprocess
 import yaml
+import json
 import ipaddress
 import shutil
 from collections import defaultdict
-from typing import Dict, Any, List,Literal, Union
+from typing import Dict, Any, List,Literal, Union, Optional
 
 from pydantic import BaseModel, Field
+from logger import get_logger
 
 class LogicalNode(BaseModel):
     name: str = Field(..., description="Unique hostname. MUST be lowercase, kebab-case (e.g., 'edge-router'). NO spaces, underscores, or special characters.")
-    role: Literal["router", "endpoint", "switch"] = Field(..., description="The functional role of the node.")
-    image_flavor: str = Field(..., description="Abstract flavor: 'kali', 'alpine', 'redis', 'log4j-vuln', etc.")
+    role: Literal["router", "endpoint", "vul-target"] = Field(..., description="The functional role of the node. 'vul-target' is for vulnerability target nodes from Vulhub.")
+    image_flavor: str = Field(default="", description="Abstract flavor for standard images: 'kali', 'alpine', 'redis', etc. Empty for vul-target nodes.")
+    container_path: Union[str, None] = Field(None, description="For 'vul-target' role: Path to Vulhub vulnerability directory (e.g., '/path/to/vulhub/activemq/CVE-2023-46604'). The builder will parse docker-compose.yml from this path.")
     connected_subnets: List[str] = Field(..., description="List of subnet names this node connects to. e.g. ['dmz', 'internal'].")
 
 class NetworkBlueprint(BaseModel):
@@ -24,17 +28,20 @@ class NetworkBuilder:
     def __init__(self, blueprint: NetworkBlueprint, output_dir: str = "./clab_out"):
         self.bp = blueprint
         self.output_dir = output_dir
-        
+
         # Output structures
         self.clab_nodes: Dict[str, Any] = {}
         self.clab_links: List[Dict[str, Any]] = []
-        
+
         # IPAM State
         self.supernet = ipaddress.IPv4Network("10.0.0.0/8")
         self.subnet_iterator = self.supernet.subnets(new_prefix=24)
-        self.subnet_map: Dict[str, ipaddress.IPv4Network] = {} 
+        self.subnet_map: Dict[str, ipaddress.IPv4Network] = {}
         self.node_ip_map: Dict[str, Dict[str, str]] = defaultdict(dict) # {node: {subnet: ip}}
-        
+
+        # Vul-target compose file cache
+        self.vul_target_compose: Dict[str, Dict[str, Any]] = {}  # {node_name: compose_data}
+
         # Initialize workspace
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -48,53 +55,84 @@ class NetworkBuilder:
         if os.path.exists(lab_dir):
             shutil.rmtree(lab_dir)
 
-    def build(self) -> str:
-        """Main build process. Returns the path to the generated YAML."""
+    def build(self) -> tuple[str, str]:
+        """Main build process. Returns paths to YAML and config JSON."""
         self._allocate_subnets()
         self._process_topology()
-        self._generate_static_routes()
+        self._generate_frr_configs()
+
+        # Generate YAML (topology only)
         yaml_content = self._generate_yaml_structure()
-        
-        filename = f"{self.output_dir}/{self.bp.lab_name}.clab.yml"
-        with open(filename, "w") as f:
+        yaml_path = f"{self.output_dir}/{self.bp.lab_name}.clab.yml"
+        with open(yaml_path, "w") as f:
             yaml.dump(yaml_content, f, sort_keys=False)
-        
-        return filename
+
+        # Generate config JSON (IPs, routes, FRR, ext-container paths)
+        config_json = self._generate_config_json()
+        json_path = f"{self.output_dir}/{self.bp.lab_name}.config.json"
+        with open(json_path, "w") as f:
+            json.dump(config_json, f, indent=2)
+
+        return yaml_path, json_path
 
     def _allocate_subnets(self):
         """Assign real CIDRs to logical subnet names."""
         for name in self.bp.subnets:
             self.subnet_map[name] = next(self.subnet_iterator)
 
-    def _determine_image(self, flavor: str, role: str) -> tuple[str, bool]:
-        """Maps abstract flavors to real Docker images and checks if tools are needed."""
+    def _determine_image(self, flavor: str, role: str) -> str:
+        """Maps abstract flavors to real Docker images."""
         flavor = flavor.lower()
-        
-        # Complex Router -> FRR
-        if self.bp.complexity == "complex" and role == "router":
-            return "frr/frr:v8.5.1", False
-        
-        # Simple Router -> Alpine
+
+        # All routers use FRR
         if role == "router":
-            return "alpine:latest", False
-            
-        # Switch -> Alpine
-        if role == "switch":
-            return "alpine:latest", False
+            return "frrouting/frr:v8.4.1"
 
-        # Endpoints mapping
-        image_name=flavor
-        is_alpine="alpine" in image_name.lower()
-        needs_apt_tools=not is_alpine
-        if image_name.lower() == "kali":
-            image_name = "kalilinux/kali-rolling:latest"
-            needs_apt_tools = True
-            
-        if image_name.lower() == "ubuntu":
-            image_name = "ubuntu:latest"
-            needs_apt_tools = True
+        # Endpoint mapping
+        if flavor == "kali":
+            return "kalilinux/kali-rolling:latest"
+        elif flavor == "ubuntu":
+            return "ubuntu:latest"
+        elif flavor == "alpine":
+            return "alpine:latest"
+        else:
+            # For redis, nginx, etc.
+            return f"{flavor}:latest"
 
-        return image_name, needs_apt_tools
+    def _parse_compose_file(self, compose_path: str) -> Dict[str, Any]:
+        """
+        Parse docker-compose.yml file from Vulhub path.
+
+        Args:
+            compose_path: Path to the Vulhub vulnerability directory
+
+        Returns:
+            Dictionary with compose file data (image, ports, etc.)
+        """
+        compose_file = os.path.join(compose_path, "docker-compose.yml")
+
+        if not os.path.exists(compose_file):
+            return {}
+
+        try:
+            with open(compose_file, 'r') as f:
+                compose_data = yaml.safe_load(f)
+
+            # Extract the first service's configuration
+            if 'services' in compose_data and compose_data['services']:
+                first_service = list(compose_data['services'].values())[0]
+                return {
+                    'image': first_service.get('image', ''),
+                    'ports': first_service.get('ports', []),
+                    'volumes': first_service.get('volumes', []),
+                    'environment': first_service.get('environment', {}),
+                    'command': first_service.get('command', ''),
+                    'service_name': list(compose_data['services'].keys())[0]
+                }
+        except Exception as e:
+            print(f"Warning: Failed to parse compose file {compose_file}: {e}")
+
+        return {}
 
     def _process_topology(self):
         # Group nodes by subnet to detect where switches are needed
@@ -111,217 +149,130 @@ class NetworkBuilder:
         for sub_name, members in subnet_members.items():
             self._wire_subnet(sub_name, members)
 
+        # 3. Configure vul-target ports (bind to eth1 IP)
+        self._configure_vul_target_ports()
+
     def _create_clab_node(self, node):
-        image, needs_tools = self._determine_image(node.image_flavor, node.role)
-        
+        """Create containerlab node definition (no exec commands)."""
+        # Handle vul-target role - parse docker-compose.yml from container_path
+        if node.role == "vul-target" and node.container_path:
+            # Parse compose file to get image and configuration
+            compose_data = self._parse_compose_file(node.container_path)
+            self.vul_target_compose[node.name] = compose_data
+
+            image = compose_data.get('image', '')
+
+            node_def = {
+                "kind": "linux",
+                "image": image,
+                "exec": [],  # No exec commands - container handles its own startup
+                "binds": [],  # Bind mounts from compose will be added later if needed
+                "ports": compose_data.get('ports', []),
+                "environment": compose_data.get('environment', {}),
+                "cmd": compose_data.get('command', '')
+            }
+            self.clab_nodes[node.name] = node_def
+
+            # Track node metadata for config JSON
+            if not hasattr(self, '_node_metadata'):
+                self._node_metadata = {}
+            self._node_metadata[node.name] = {
+                "role": node.role,
+                "image": image,
+                "image_flavor": node.image_flavor,
+                "container_path": node.container_path,
+                "compose_data": compose_data
+            }
+            return
+
+        image = self._determine_image(node.image_flavor, node.role)
+
         node_def = {
             "kind": "linux",
             "image": image,
-            "exec": [],
+            "exec": [],  # Empty - all config via nsenter/FRR
             "binds": [],
             "sysctls": {}
         }
 
-        # Pre-install tools for bare images (Kali/Ubuntu/Debian)
-        if needs_tools:
-            node_def['exec'].append("apt-get update")
-            node_def['exec'].append("apt-get install -y iproute2 iputils-ping net-tools")
-
-        # Enable forwarding for routers/switches
-        if node.role in ["router", "switch"]:
+        # Enable forwarding for routers
+        if node.role == "router":
             node_def['sysctls'] = {"net.ipv4.ip_forward": "1"}
-            
-        # Specific FRR handling for complex routers
-        if self.bp.complexity == "complex" and node.role == "router":
-            # FRR capabilities
-            node_def["cap_add"] = ["NET_ADMIN", "SYS_ADMIN"]
-            # We don't use 'exec' for IP config in FRR, we use config files.
-            # But we still create the node structure here.
 
         self.clab_nodes[node.name] = node_def
 
+        # Track node metadata for config JSON
+        if not hasattr(self, '_node_metadata'):
+            self._node_metadata = {}
+        self._node_metadata[node.name] = {
+            "role": node.role,
+            "image": image,
+            "image_flavor": node.image_flavor,
+            "container_path": node.container_path
+        }
+
     def _wire_subnet(self, subnet_name: str, members: List[Any]):
         """
-        Connects members of a subnet and assigns IPs according to C-class allocation rules.
+        Wire subnet: creates bridge/links and allocates IPs (no exec commands).
         IP Allocation Strategy for /24 subnet:
-        - .0       : Network address (reserved)
-        - .1       : Router (infrastructure)
-        - .2       : Switch (infrastructure, if exists)
-        - .3       : Reserved for future infrastructure
-        - .4-.63   : Reserved pool (60 addresses)
-        - .64-.254 : User LAN pool (191 addresses)
-        - .255     : Broadcast address (reserved)
-
-        Process:
-        1. Determine L2 topology (switch vs point-to-point)
-        2. Create physical links first (increments interface counters)
-        3. Then assign IPs using correct interface indices
+        - .1       : First router
+        - .2-.63   : Additional routers
+        - .64-.254 : Endpoints
         """
         cidr_obj = self.subnet_map[subnet_name]
 
         # ============================================
         # Step 1: Create Physical Links (L2 Topology)
         # ============================================
-        switch_name = None
         if len(members) > 2:
-            # Create Switch-in-Container
-            switch_name = f"sw-{subnet_name}"
-            self._inject_switch_node(switch_name)
+            # Use containerlab bridge kind
+            bridge_name = f"sw-{subnet_name}"
+            self._inject_bridge_node(bridge_name)
 
-            # Connect everyone to switch
+            # Connect everyone to bridge
             for member in members:
-                self._create_link(member.name, switch_name)
+                self._create_link(member.name, bridge_name)
 
         elif len(members) == 2:
             # Point-to-Point connection
             self._create_link(members[0].name, members[1].name)
 
         # ============================================
-        # Step 2: Allocate IPs to Original Members
+        # Step 2: Allocate IPs (stored in node_ip_map only)
         # ============================================
-        # IP allocation pointers
-        router_ip_offset = 1      # .1 for routers
-        user_lan_offset = 64      # .64 for endpoints
+        router_ip_offset = 1  # .1 for first router
+        user_lan_offset = 64  # .64 for endpoints
 
-        # Collect routers and endpoints for ordered allocation
         routers = [m for m in members if m.role == "router"]
-        endpoints = [m for m in members if m.role == "endpoint"]
+        endpoints = [m for m in members if m.role in ["endpoint", "vul-target"]]
 
-        # Assign IPs to routers first (infrastructure range)
+        # Assign IPs to routers
         for router in routers:
             ip_str = str(cidr_obj[router_ip_offset])
-            router_ip_offset += 1  # Next router gets .2, .3, etc.
-
+            router_ip_offset += 1
             self.node_ip_map[router.name][subnet_name] = ip_str
 
-            # Configuration injection
-            if not (self.bp.complexity == "complex" and router.role == "router"):
-                iface_idx = self._get_interface_count(router.name)
-                iface_name = f"eth{iface_idx}"
-                cmd = f"ip addr add {ip_str}/24 dev {iface_name}"
-                self.clab_nodes[router.name]['exec'].append(cmd)
-
-        # Assign IPs to endpoints (user LAN range)
+        # Assign IPs to endpoints
         for endpoint in endpoints:
             ip_str = str(cidr_obj[user_lan_offset])
             user_lan_offset += 1
-
             self.node_ip_map[endpoint.name][subnet_name] = ip_str
 
-            # Configuration injection (endpoints are never FRR)
-            iface_idx = self._get_interface_count(endpoint.name)
-            iface_name = f"eth{iface_idx}"
-            cmd = f"ip addr add {ip_str}/24 dev {iface_name}"
-            self.clab_nodes[endpoint.name]['exec'].append(cmd)
-
-            # Add default route (gateway is first router at .1)
-            if routers:
-                gateway = str(cidr_obj[1])
-                self.clab_nodes[endpoint.name]['exec'].append(f"ip route replace default via {gateway}")
-
-        # ============================================
-        # Step 3: Assign IP to Switch (if exists)
-        # ============================================
-        if switch_name:
-            # Switch gets .2
-            switch_ip = str(cidr_obj[2])
-            self.node_ip_map[switch_name][subnet_name] = switch_ip
-
-            # Switch configuration (Alpine bridge needs IP for management)
-            iface_idx = self._get_interface_count(switch_name)
-            iface_name = f"eth{iface_idx}"
-            cmd = f"ip addr add {switch_ip}/24 dev br0"
-            self.clab_nodes[switch_name]['exec'].append(cmd)
-
-    def _generate_static_routes(self):
-        """
-        为简单/中等复杂度的网络计算静态路由。
-        算法逻辑：
-        1. 找出所有路由器。
-        2. 对于每个路由器 A，找出它 *没有* 直连的子网。
-        3. 找出通往那个子网的邻居路由器 B。
-        4. 添加路由: ip route add {target_subnet} via {neighbor_ip}
-        """
-        
-        # 仅针对 Simple/Medium 模式 (Complex 模式由 FRR OSPF 自动处理)
-        if self.bp.complexity == "complex":
-            return
-
-        # 1. 建立路由表映射: RouterName -> {ConnectedSubnets}
-        router_subnets = {}
-        router_ips = {} # RouterName -> {SubnetName: IP}
-        
-        for node in self.bp.nodes:
-            if node.role == "router":
-                router_subnets[node.name] = set(node.connected_subnets)
-                router_ips[node.name] = self.node_ip_map[node.name]
-
-        # 2. 遍历所有路由器，填补路由表
-        for r_name, r_connected in router_subnets.items():
-            # 遍历所有子网
-            for subnet_name, cidr_obj in self.subnet_map.items():
-                subnet_cidr = str(cidr_obj)
-                
-                # 如果这个子网我已经直连了，跳过
-                if subnet_name in r_connected:
-                    continue
-                
-                # 如果不直连，我需要找到谁连了这个子网（目标路由器）
-                # 寻找同时连接了 "我的直连网段" 和 "目标网段" 的路由器（下一跳）
-                # 这是一个简化的线性/星型查找。对于复杂网状，必须用 FRR。
-                
-                next_hop_ip = None
-                
-                # 遍历其他路由器作为潜在的下一跳
-                for potential_nh_name, nh_connected in router_subnets.items():
-                    if potential_nh_name == r_name: continue
-                    
-                    # 如果这个潜在下一跳直连了目标网段
-                    if subnet_name in nh_connected:
-                        # 检查我和这个下一跳是否有共同的网段（即我们是否直连）
-                        common_subnets = r_connected.intersection(nh_connected)
-                        if common_subnets:
-                            # 找到了！下一跳 IP 就是它在共同网段里的 IP
-                            common_sub = list(common_subnets)[0]
-                            next_hop_ip = router_ips[potential_nh_name][common_sub]
-                            break
-                
-                # 生成路由命令
-                if next_hop_ip:
-                    cmd = f"ip route add {subnet_cidr} via {next_hop_ip}"
-                    # 避免重复添加
-                    if cmd not in self.clab_nodes[r_name]['exec']:
-                        self.clab_nodes[r_name]['exec'].append(cmd)
-
-  
-
-    def _inject_switch_node(self, name):
-        """Injects an Alpine-based Linux Bridge."""
+    def _inject_bridge_node(self, name):
+        """Inject containerlab bridge node (not a container)."""
         if name not in self.clab_nodes:
             self.clab_nodes[name] = {
-                "kind": "linux",
-                "image": "alpine:latest",
-                "sysctls": {"net.ipv4.ip_forward": "1"},
-                "exec": [
-                    "apk add --no-cache bridge-utils",
-                    "brctl addbr br0",
-                    "ip link set dev br0 up"
-                    # 'brctl addif' commands will be added when links are created ideally,
-                    # or we can use a loop script inside the container.
-                    # Simplified: We assume eth1...ethN need to be added.
-                ]
+                "kind": "bridge"
             }
 
     def _create_link(self, node_a, node_b):
-        self.clab_links.append({"endpoints": [f"{node_a}:eth{self._inc_interface(node_a)}", 
-                                              f"{node_b}:eth{self._inc_interface(node_b)}"]})
-        
-        # If one is a switch, add logic to attach interface to bridge
-        for n in [node_a, node_b]:
-            if n.startswith("sw-"):
-                iface_id = self._get_interface_count(n)
-                cmd = f"brctl addif br0 eth{iface_id} && ip link set dev eth{iface_id} up"
-                self.clab_nodes[n]['exec'].append(cmd)
+        """Create link between two nodes (no exec commands)."""
+        self.clab_links.append({
+            "endpoints": [
+                f"{node_a}:eth{self._inc_interface(node_a)}",
+                f"{node_b}:eth{self._inc_interface(node_b)}"
+            ]
+        })
 
     # --- Helper: Interface Counting ---
     def _interface_tracker(self):
@@ -337,22 +288,34 @@ class NetworkBuilder:
     def _get_interface_count(self, node):
         return self._interface_tracker()[node]
 
-    # --- FRR Config Generation (Complex Mode) ---
+    # --- FRR Config Generation (All Routers) ---
+    def _configure_vul_target_ports(self):
+        """Remove port mappings from vul-target nodes.
+
+        Vul-target services should only be accessible via internal container network,
+        not exposed to host. This avoids port conflicts and improves network isolation.
+        """
+        for node in self.bp.nodes:
+            if node.role != "vul-target" or not node.container_path:
+                continue
+
+            # Remove port mappings - services only listen on container internal network
+            if node.name in self.clab_nodes:
+                self.clab_nodes[node.name]['ports'] = []
+
     def _generate_frr_configs(self):
-        # Router index for unique ID generation
+        """Generate FRR configs for all routers (not just complex mode)."""
         router_idx = 0
 
         for name, node_def in self.clab_nodes.items():
-            # Check if it corresponds to a complex router
-            # We look up in blueprint nodes
+            # Check if this is a router
             bp_node = next((n for n in self.bp.nodes if n.name == name), None)
-            if bp_node and bp_node.role == "router" and self.bp.complexity == "complex":
+            if bp_node and bp_node.role == "router":
 
                 config_path = os.path.join(self.output_dir, name)
                 os.makedirs(config_path, exist_ok=True)
 
-                # Generate unique router-id and loopback for this router
-                # Using 10.10.X.Y format where X = router index
+                # Generate unique router-id and loopback
                 router_idx += 1
                 unique_loopback = f"10.10.{router_idx}.1"
                 router_id = unique_loopback
@@ -370,7 +333,7 @@ class NetworkBuilder:
                     "!"
                 ]
 
-                # Loopback with unique address
+                # Loopback
                 lines.extend([
                     "interface lo",
                     f" ip address {unique_loopback}/32",
@@ -378,11 +341,8 @@ class NetworkBuilder:
                 ])
 
                 # Physical interfaces
-                # Note: Switches (sw-*) don't get FRR configs, only routers
                 current_eth = 1
                 connected_subs = self.node_ip_map[name]
-
-                # Track networks for OSPF configuration
                 ospf_networks = []
 
                 for subnet_name, ip_addr in connected_subs.items():
@@ -392,21 +352,20 @@ class NetworkBuilder:
                         "!"
                     ])
 
-                    # Add this subnet to OSPF (exclude management network 172.20.20.0/24)
+                    # Add to OSPF (exclude management network)
                     subnet_cidr = str(self.subnet_map[subnet_name])
                     if not subnet_cidr.startswith("172.20.20"):
                         ospf_networks.append(subnet_cidr)
 
                     current_eth += 1
 
-                # OSPF configuration with specific networks
+                # OSPF configuration
                 lines.extend([
                     "router ospf",
                     f" ospf router-id {router_id}",
-                    " passive-interface eth0",  # Disable OSPF on management interface
+                    " passive-interface eth0",
                 ])
 
-                # Add only data networks to OSPF
                 for network in ospf_networks:
                     lines.append(f" network {network} area 0")
 
@@ -421,6 +380,15 @@ class NetworkBuilder:
                     f"{abs_path}/daemons:/etc/frr/daemons",
                     f"{abs_path}/frr.conf:/etc/frr/frr.conf"
                 ]
+
+                # Store FRR config for JSON output
+                if not hasattr(self, '_frr_configs'):
+                    self._frr_configs = {}
+                self._frr_configs[name] = {
+                    "router_id": router_id,
+                    "loopback": unique_loopback,
+                    "ospf_networks": ospf_networks
+                }
 
     def _prune_empty(self, data) -> Any:
         """
@@ -446,14 +414,365 @@ class NetworkBuilder:
             return data
 
     def _generate_yaml_structure(self) -> Dict[str, Any]:
-        # Post-processing for FRR
-        raw_structure= {
+        """Generate containerlab YAML structure (topology only)."""
+        return self._prune_empty({
             "name": self.bp.lab_name,
             "topology": {
                 "nodes": self.clab_nodes,
                 "links": self.clab_links
             }
+        })
+
+    def _generate_config_json(self) -> Dict[str, Any]:
+        """Generate configuration JSON for external config applier."""
+        config = {
+            "lab_name": self.bp.lab_name,
+            "subnets": {
+                name: str(cidr)
+                for name, cidr in self.subnet_map.items()
+            },
+            "nodes": {}
         }
-        if self.bp.complexity == "complex":
-            self._generate_frr_configs()
-        return self._prune_empty(raw_structure)
+
+        # Build node configurations
+        for node_name in self.clab_nodes.keys():
+            # Skip bridges
+            if node_name.startswith("sw-"):
+                continue
+
+            # Get metadata
+            metadata = self._node_metadata.get(node_name, {})
+            role = metadata.get("role", "endpoint")
+            container_path = metadata.get("container_path")
+
+            node_config = {
+                "role": role,
+                "image": metadata.get("image", ""),
+            }
+
+            # Add container_path for vul-target
+            if container_path:
+                node_config["container_path"] = container_path
+
+            # Add IP configurations
+            if node_name in self.node_ip_map:
+                interfaces = []
+                current_eth = 1
+                for subnet_name, ip_addr in self.node_ip_map[node_name].items():
+                    interfaces.append({
+                        "name": f"eth{current_eth}",
+                        "subnet": subnet_name,
+                        "address": f"{ip_addr}/24"
+                    })
+                    current_eth += 1
+                node_config["interfaces"] = interfaces
+
+                # Add default route for endpoints
+                if role == "endpoint" or role == "vul-target":
+                    # Find first router in the same subnet
+                    for subnet_name in self.node_ip_map[node_name].keys():
+                        # Find routers in this subnet
+                        for other_node, other_ips in self.node_ip_map.items():
+                            if subnet_name in other_ips:
+                                other_metadata = self._node_metadata.get(other_node, {})
+                                if other_metadata.get("role") == "router":
+                                    # Get router's IP in the current subnet
+                                    gateway_ip = other_ips[subnet_name]
+                                    node_config["default_route"] = {
+                                        "destination": "0.0.0.0/0",
+                                        "gateway": gateway_ip
+                                    }
+                                    break
+                        break
+
+            # Add FRR configuration for routers
+            if role == "router" and hasattr(self, '_frr_configs') and node_name in self._frr_configs:
+                node_config["frr"] = self._frr_configs[node_name]
+
+            config["nodes"][node_name] = node_config
+
+        return config
+
+
+# ============================================
+# Network Configuration Applier
+# ============================================
+class ConfigApplier:
+    """
+    使用 nsenter 为容器应用网络配置。
+
+    读取 JSON 配置文件，使用 nsenter 在容器的网络命名空间中执行命令。
+    """
+
+    def __init__(self, lab_name: str, config_dir: str = "./clab_out"):
+        self.lab_name = lab_name
+        self.config_dir = config_dir
+        self.config_file = os.path.join(config_dir, f"{lab_name}.config.json")
+        self.logger = get_logger("node.apply_config")
+
+    def load_config(self) -> Dict[str, Any]:
+        """加载配置 JSON 文件。"""
+        if not os.path.exists(self.config_file):
+            raise FileNotFoundError(f"Config file not found: {self.config_file}")
+
+        with open(self.config_file, 'r') as f:
+            return json.load(f)
+
+    def get_container_pid(self, node_name: str) -> Optional[int]:
+        """获取运行中容器的 PID。"""
+        container_name = f"clab-{self.lab_name}-{node_name}"
+        try:
+            result = subprocess.run(
+                ["docker", "inspect", "-f", "{{.State.Pid}}", container_name],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10
+            )
+            return int(result.stdout.strip())
+        except subprocess.CalledProcessError:
+            self.logger.warning(f"Container {container_name} not found or not running")
+            return None
+        except subprocess.TimeoutExpired:
+            self.logger.warning(f"Timeout getting PID for {container_name}")
+            return None
+        except ValueError:
+            self.logger.error(f"Invalid PID returned for {container_name}")
+            return None
+
+    def nsenter_exec(self, pid: int, command: str) -> bool:
+        """使用 nsenter 在容器网络命名空间中执行命令。"""
+        if not pid:
+            return False
+
+        try:
+            full_cmd = f"sudo nsenter -n -t {pid} -- {command}"
+            subprocess.run(full_cmd, shell=True, check=True, capture_output=True, timeout=30)
+            return True
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Command failed: {command}")
+            self.logger.error(f"Error: {e.stderr.decode() if e.stderr else str(e)}")
+            return False
+        except subprocess.TimeoutExpired:
+            self.logger.error(f"Command timeout: {command}")
+            return False
+
+    def _nsenter_capture(self, pid: int, command: str) -> str:
+        """使用 nsenter 执行命令并返回输出。"""
+        if not pid:
+            return ""
+
+        try:
+            full_cmd = f"sudo nsenter -n -t {pid} -- {command}"
+            result = subprocess.run(
+                full_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            self.logger.warning(f"Command failed: {command}")
+            return e.stderr or ""
+        except subprocess.TimeoutExpired:
+            self.logger.warning(f"Command timeout: {command}")
+            return ""
+
+    def apply_node_config(self, node_name: str, node_config: Dict[str, Any]) -> bool:
+        """为单个节点应用网络配置。"""
+        self.logger.debug(f"Configuring {node_name}...")
+
+        role = node_config.get("role")
+
+        # 跳过路由器节点（FRR 已配置 IP 和路由）
+        if role == "router":
+            self.logger.debug(f"  Skipping router {node_name} (configured by FRR)")
+            return True
+
+        # 获取容器 PID
+        pid = self.get_container_pid(node_name)
+        if not pid:
+            self.logger.warning(f"  Container not found for {node_name}, skipping")
+            return False
+
+        success = True
+
+        # 应用 IP 地址
+        if "interfaces" in node_config:
+            for iface in node_config["interfaces"]:
+                iface_name = iface["name"]
+                address = iface["address"]
+
+                self.logger.debug(f"  Setting {iface_name}: {address}")
+
+                if not self.nsenter_exec(pid, f"ip addr add {address} dev {iface_name}"):
+                    self.logger.warning(f"  Failed to add address to {iface_name}")
+                    success = False
+
+                if not self.nsenter_exec(pid, f"ip link set dev {iface_name} up"):
+                    self.logger.warning(f"  Failed to bring up {iface_name}")
+                    success = False
+
+        # 应用默认路由
+        if "default_route" in node_config:
+            route = node_config["default_route"]
+            gateway = route.get("gateway")
+
+            if gateway:
+                self.logger.debug(f"  Setting default route via {gateway}")
+                if not self.nsenter_exec(pid, f"ip route replace default via {gateway}"):
+                    self.logger.warning(f"  Failed to set default route")
+                    success = False
+
+        # 注意：FRR 配置通过 bind mounts 应用
+        if "frr" in node_config:
+            self.logger.debug(f"  Restarting FRR for {node_name}...")
+            self.nsenter_exec(pid, "supervisorctl restart frr")
+
+        return success
+
+    def apply_all(self) -> Dict[str, Any]:
+        """
+        为所有节点应用配置。
+
+        Returns:
+            包含统计信息的字典
+        """
+        self.logger.info(f"Loading configuration from {self.config_file}")
+        config = self.load_config()
+
+        self.logger.info(f"Applying network configuration for lab: {config['lab_name']}")
+        self.logger.debug(f"Subnets: {config['subnets']}")
+
+        success_count = 0
+        failed_nodes = []
+
+        for node_name, node_config in config["nodes"].items():
+            if self.apply_node_config(node_name, node_config):
+                success_count += 1
+            else:
+                failed_nodes.append(node_name)
+
+        total = len(config["nodes"])
+        self.logger.info(f"Configuration complete: {success_count}/{total} nodes configured")
+
+        if failed_nodes:
+            self.logger.warning(f"Failed nodes: {', '.join(failed_nodes)}")
+
+        return {
+            "total": total,
+            "success": success_count,
+            "failed": len(failed_nodes),
+            "failed_nodes": failed_nodes
+        }
+
+    # ============================================
+    # 诊断数据收集方法
+    # ============================================
+    def collect_diagnostics(self, yaml_path: str = None) -> Dict[str, Any]:
+        """
+        收集所有节点的原始诊断数据（不做判断，由 LLM 分析）。
+
+        Args:
+            yaml_path: YAML 文件路径（用于获取 ports 配置）
+
+        Returns:
+            包含所有节点原始诊断数据的字典
+        """
+        self.logger.info(f"Loading configuration from {self.config_file}")
+        config = self.load_config()
+
+        # 加载 YAML 以获取 ports 信息
+        yaml_config = {}
+        if yaml_path and os.path.exists(yaml_path):
+            with open(yaml_path, 'r') as f:
+                yaml_config = yaml.safe_load(f)
+
+        self.logger.info(f"Collecting diagnostics for lab: {config['lab_name']}")
+
+        diagnostics = {
+            "lab_name": config['lab_name'],
+            "nodes": {}
+        }
+
+        for node_name, node_config in config["nodes"].items():
+            yaml_node_config = yaml_config.get("topology", {}).get("nodes", {}).get(node_name, {})
+            node_diagnostics = self._collect_node_diagnostics(node_name, node_config, yaml_node_config)
+            diagnostics["nodes"][node_name] = node_diagnostics
+
+        self.logger.info(f"Diagnostics collected for {len(diagnostics['nodes'])} nodes")
+
+        return diagnostics
+
+    def _collect_node_diagnostics(
+        self,
+        node_name: str,
+        node_config: Dict[str, Any],
+        yaml_node_config: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """收集单个节点的原始诊断数据（不做判断）。"""
+        if yaml_node_config is None:
+            yaml_node_config = {}
+
+        self.logger.debug(f"Collecting diagnostics from: {node_name}")
+
+        diagnostics = {
+            "node": node_name,
+            "checks": {}
+        }
+
+        # 1. 检查容器是否存在
+        pid = self.get_container_pid(node_name)
+        if not pid:
+            diagnostics["checks"]["container"] = {
+                "status": "not_found",
+                "message": "Container not found or not running",
+                "pid": None
+            }
+            return diagnostics
+
+        diagnostics["checks"]["container"] = {
+            "status": "running",
+            "message": f"Container running (PID: {pid})",
+            "pid": pid
+        }
+
+        # 2. 收集 IP 地址配置
+        ip_output = self._nsenter_capture(pid, "ip addr show")
+        diagnostics["checks"]["ip_config"] = {
+            "raw_output": ip_output,
+            "expected": node_config.get("interfaces", [])
+        }
+
+        # 3. 收集接口状态
+        iface_output = self._nsenter_capture(pid, "ip link show")
+        diagnostics["checks"]["interfaces"] = {
+            "raw_output": iface_output,
+            "expected": node_config.get("interfaces", [])
+        }
+
+        # 4. 收集路由配置
+        route_output = self._nsenter_capture(pid, "ip route show")
+        diagnostics["checks"]["routes"] = {
+            "raw_output": route_output,
+            "expected": node_config.get("default_route", None)
+        }
+
+        # 5. 收集端口监听状态
+        port_output = self._nsenter_capture(pid, "ss -tlnp")
+        if not port_output:
+            port_output = self._nsenter_capture(pid, "netstat -tlnp")
+        diagnostics["checks"]["ports"] = {
+            "raw_output": port_output,
+            "expected": yaml_node_config.get("ports", [])
+        }
+
+        # 6. 收集进程状态
+        process_output = self._nsenter_capture(pid, "ps aux")
+        diagnostics["checks"]["processes"] = {
+            "raw_output": process_output,
+            "expected_image": node_config.get("image", "")
+        }
+
+        return diagnostics

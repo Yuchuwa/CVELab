@@ -59,16 +59,17 @@ def builder_node(state: GraphState) -> Dict[str, Any]:
 
         # 构建网络
         builder = NetworkBuilder(final_blueprint, output_dir=output_dir)
-        yaml_path = builder.build()
+        yaml_path, json_path = builder.build()
 
         log_step(
             logger,
-            "YAML built successfully",
+            "YAML and config built successfully",
             status="success",
-            yaml_path=yaml_path
+            yaml_path=yaml_path,
+            json_path=json_path
         )
 
-        return {"yaml_path": yaml_path, "error_logs": ""}
+        return {"yaml_path": yaml_path, "json_path": json_path, "error_logs": ""}
 
     except Exception as e:
         log_error(logger, e, "Failed to build YAML")

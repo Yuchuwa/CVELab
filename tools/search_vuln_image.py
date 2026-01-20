@@ -19,54 +19,56 @@ class VulnKnowledgeBase:
     def search(self, query: str) -> List[Dict]:
         """
         Search the dataframe for rows matching the query.
-        Prioritize CVE ID match, then Name/Description match.
+        Search order: CVE > Type > Name/Description.
         """
         query = query.lower().strip()
         results = []
-        
+
         # 1. Exact or Partial CVE Match (High Priority)
         if "cve-" in query:
             cve_matches = self.df[self.df['CVE'].str.lower().str.contains(query)]
             if not cve_matches.empty:
                 return cve_matches.to_dict(orient='records')
 
-        # 2. General Keyword Match (Name or Description)
+        # 2. Type Match (e.g., 'RCE', 'SQL Injection', 'XSS')
+        type_matches = self.df[self.df['Type'].str.lower().str.contains(query)]
+        if not type_matches.empty:
+            return type_matches.to_dict(orient='records')
+
+        # 3. General Keyword Match (Name or Description)
         mask = (
-            self.df['Name'].str.lower().str.contains(query) | 
+            self.df['Name'].str.lower().str.contains(query) |
             self.df['Description'].str.lower().str.contains(query)
         )
         matches = self.df[mask]
-        
+
         return matches.to_dict(orient='records')
 
 # Specify the path to your CSV file
-CSV_FILE_PATH = 'source/20251009-160138-dac310-vuln_list_w_url.csv'
+CSV_FILE_PATH = 'source/vulhub_cves_20260114.csv'
 
 # Initialize the Knowledge Base with the file path
 kb = VulnKnowledgeBase(CSV_FILE_PATH)
 
 # 2. Define Input Schema for the Tool
 class VulnSearchInput(BaseModel):
-    query: str = Field(description="The vulnerability name, CVE ID, or keyword to search for (e.g., 'CVE-2023-46604' or 'ActiveMQ').")
+    query: str = Field(description="The vulnerability name, CVE ID, type, or keyword to search for (e.g., 'CVE-2023-46604', 'ActiveMQ', or 'RCE').")
 
 # 3. Create the LangChain Tool
 @tool("search_vulnerability_image", args_schema=VulnSearchInput)
 def search_vulnerability_image(query: str) -> str:
     """
-    Search for vulnerability details by CVE ID or software name.
-    
-    IMPORTANT: This tool converts raw Vulhub paths into ready-to-use 
-    Docker Image names (vulfocus based) for Containerlab.
-    
+    Search for vulnerability details by CVE ID or software name from local CSV.
+
     Returns:
-        A string containing the vulnerability description and the 
-        'Recommended Docker Image' which MUST be used in the topology YAML.
+        A string containing the vulnerability description and the
+        'Vulhub Path' which MUST be used in the NetworkBlueprint.
     """
     results = kb.search(query)
-    
+
     if not results:
         return f"No vulnerabilities found matching '{query}' in the local database."
-    
+
     # Format the output for the LLM to understand easily
     response = f"Found {len(results)} matching entries:\n"
     for idx, r in enumerate(results):
@@ -75,15 +77,9 @@ def search_vulnerability_image(query: str) -> str:
         response += f"CVE: {r['CVE']}\n"
         response += f"Description: {r['Description']}\n"
         response += f"Vulhub Path: {r['Path']}\n"
-        response += f"Startup Command: {r['Startup']}\n"
-        
-        # Helper for Agent: Suggest a potential image name based on logic
-        # (This is a heuristic. Actual Vulfocus image names may vary slightly,
-        # but it gives the LLM a good starting point.)
-        cve_underscore = r['CVE'].replace('-', '_').lower()
-        potential_image = f"vulfocus/{r['Name'].lower().replace(' ', '')}-{cve_underscore}"
-        response += f"Suggestion for Containerlab Image: {potential_image} (Note: Verify existence)\n"
-        
+        response += f"Type: {r['Type']}\n"
+        response += f"Network role: {r['Role']}\n"
+        response += f"Runtime Language: {r['Runtime_lang']}\n"
     return response
 
 
@@ -94,9 +90,15 @@ if __name__ == "__main__":
 
     print("\nTest 1: Search by CVE ID 'CVE-2023-46604'")
     print(search_vulnerability_image.invoke({"query": "CVE-2023-46604"}))
-    
+
     print("\nTest 2: Search by Software Name 'ActiveMQ'")
     print(search_vulnerability_image.invoke({"query": "ActiveMQ"}))
 
-    print("\nTest 3: Search for a non-existent CVE")
+    print("\nTest 3: Search by Type 'RCE'")
+    print(search_vulnerability_image.invoke({"query": "RCE"}))
+
+    print("\nTest 4: Search by Type 'SQL Injection'")
+    print(search_vulnerability_image.invoke({"query": "SQL Injection"}))
+
+    print("\nTest 5: Search for a non-existent CVE")
     print(search_vulnerability_image.invoke({"query": "CVE-9999-9999"}))

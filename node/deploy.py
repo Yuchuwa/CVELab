@@ -3,15 +3,15 @@
 负责 ContainerLab 拓扑的部署、权限修复和容器健康检查。
 """
 import subprocess
-import json
 import os
 import time
 from typing import Dict, Any, Tuple, Optional
 
 from state import GraphState
-from config import config, TIMEOUT_SECONDS
+from config import config
 from logger import get_logger, set_log_context, log_step, log_error
 from .fixer import ERROR_TYPE_DEPLOY, ERROR_TYPE_SYSTEM
+from .utils import ConfigApplier
 
 
 # 检测是否需要 sudo（全局缓存一次）
@@ -33,10 +33,11 @@ def check_containerlab_needs_sudo() -> bool:
     logger.debug("Checking if containerlab requires sudo...")
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["containerlab", "version"],
             capture_output=True,
-            timeout=5
+            timeout=5,
+            check=True
         )
         _NEEDS_SUDO = False
         logger.debug("containerlab can run without sudo")
@@ -87,9 +88,9 @@ def run_command_streaming(
             cmd,
             shell=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,  # 将错误流合并到标准输出
+            stderr=subprocess.STDOUT,
             text=True,
-            bufsize=1,  # 行缓冲
+            bufsize=1,
         )
     except Exception as e:
         log_error(logger, e, "Failed to start command process")
@@ -98,36 +99,30 @@ def run_command_streaming(
     full_output = []
     start_time = time.time()
 
-    # 确保 stdout 可用
     if process.stdout is None:
         process.wait()
         return process.returncode, "Error: stdout is None"
 
-    # 实时读取日志
     last_progress_time = start_time
-    progress_interval = 30  # 每30秒输出一次进度提示
+    progress_interval = 30
 
     try:
         while True:
-            # 检查是否超时
             elapsed = time.time() - start_time
             if elapsed > timeout:
                 process.kill()
                 logger.warning(f"Command timeout after {elapsed:.1f}s")
                 return -1, "".join(full_output) + f"\n[Timeout after {elapsed:.1f}s]"
 
-            # 定期输出进度（避免长时间无输出时用户焦虑）
             if elapsed - (last_progress_time - start_time) > progress_interval:
                 logger.debug(f"Command still running... ({elapsed:.1f}s elapsed)")
                 last_progress_time = time.time()
 
-            # 读取一行
             line = process.stdout.readline()
             if not line and process.poll() is not None:
                 break
 
             if line:
-                # 记录到文件日志（不打印到控制台，避免重复）
                 logger.debug(f"   | {line.strip()}")
                 full_output.append(line)
 
@@ -145,14 +140,6 @@ def wait_for_lab_healthy(
 ) -> Tuple[bool, Optional[Dict]]:
     """
     异步轮询：主动检查 inspect 状态，直到所有容器都 Running。
-
-    containerlab inspect 返回的 JSON 格式:
-    {
-      "lab-name": [
-        { "name": "...", "state": "running", ... },
-        ...
-      ]
-    }
 
     Args:
         yaml_path: YAML 文件路径
@@ -188,7 +175,7 @@ def wait_for_lab_healthy(
 
         if res.returncode == 0:
             try:
-                data = json.loads(res.stdout)
+                data = __import__("json").loads(res.stdout)
 
                 # 提取容器列表
                 containers = []
@@ -197,7 +184,6 @@ def wait_for_lab_healthy(
                         containers = value
                         break
 
-                # 1. 检查是否有容器
                 if not containers:
                     logger.warning(
                         f"Inspect returned valid JSON but no containers found "
@@ -208,7 +194,6 @@ def wait_for_lab_healthy(
                     time.sleep(interval)
                     continue
 
-                # 2. 检查所有容器是否都是 'running'
                 not_ready = [c['name'] for c in containers if c['state'].lower() != 'running']
 
                 if not not_ready:
@@ -224,7 +209,7 @@ def wait_for_lab_healthy(
                         f"Waiting for {len(not_ready)}/{len(containers)} containers: "
                         f"{', '.join(not_ready[:3])}{'...' if len(not_ready) > 3 else ''}"
                     )
-            except json.JSONDecodeError as e:
+            except __import__("json").JSONDecodeError as e:
                 logger.error(f"JSON decode error (attempt {attempt + 1}/{max_retries}): {e}")
                 logger.debug(f"Raw output: {res.stdout[:200]}...")
         else:
@@ -245,55 +230,6 @@ def wait_for_lab_healthy(
     return False, None
 
 
-def fix_permissions(path: str, logger: Optional[Any] = None) -> bool:
-    """
-    递归修改指定路径的所有权。
-
-    将文件从 root 改回当前 sudo 的调用用户，使 VSCode 等工具能读取状态文件。
-
-    Args:
-        path: 要修改权限的路径
-        logger: logger 实例
-
-    Returns:
-        True 如果成功，否则 False
-    """
-    if logger is None:
-        logger = get_logger("node.deploy")
-
-    logger.debug(f"Fixing permissions for: {path}")
-
-    try:
-        sudo_prefix = get_sudo_prefix()
-        # 使用 shell 逻辑动态判断用户
-        cmd = (
-            f"if [ -n \"$SUDO_USER\" ]; then "
-            f"chown -R $SUDO_USER:$SUDO_USER {path}; "
-            f"else "
-            f"chown -R $(id -un):$(id -gn) {path}; "
-            f"fi"
-        )
-
-        result = subprocess.run(
-            f"{sudo_prefix}sh -c '{cmd}'",
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-
-        if result.returncode == 0:
-            logger.debug("Permissions fixed successfully")
-            return True
-        else:
-            logger.warning(f"Failed to fix permissions: {result.stderr}")
-            return False
-
-    except Exception as e:
-        log_error(logger, e, "Error fixing permissions")
-        return False
-
-
 def deploy(state: GraphState) -> Dict[str, Any]:
     """
     Deploy 节点：部署容器实验室并进行健康检查。
@@ -301,8 +237,8 @@ def deploy(state: GraphState) -> Dict[str, Any]:
     工作流程:
     1. 预清理（destroy 已有的 lab）
     2. 流式部署（实时输出进度）
-    3. 修复文件权限
-    4. 健康检查（等待所有容器 running）
+    3. 健康检查（等待所有容器 running）
+    4. 应用网络配置（使用 JSON + ConfigApplier）
 
     Args:
         state: 当前工作流状态
@@ -314,6 +250,7 @@ def deploy(state: GraphState) -> Dict[str, Any]:
     set_log_context(stage="deploy")
 
     yaml_path = os.path.abspath(state['yaml_path'])
+    json_path = state.get('json_path')
     sudo_prefix = get_sudo_prefix()
 
     log_step(logger, f"Deploying {yaml_path}", status="start")
@@ -321,7 +258,10 @@ def deploy(state: GraphState) -> Dict[str, Any]:
     if check_containerlab_needs_sudo():
         logger.debug("Using sudo for containerlab commands")
 
-    # 1. PRE-CLEAN（快速清理）
+    # =========================================
+    # 步骤 1: 预清理（快速清理）
+    # =========================================
+    log_step(logger, "Pre-cleaning existing deployment", status="start")
     logger.debug("Pre-cleaning existing deployment...")
     try:
         subprocess.run(
@@ -330,10 +270,15 @@ def deploy(state: GraphState) -> Dict[str, Any]:
             capture_output=True,
             timeout=60
         )
+        log_step(logger, "Pre-clean completed", status="success")
     except Exception as e:
         logger.debug(f"Pre-clean warning (non-critical): {e}")
+        log_step(logger, "Pre-clean skipped (no existing deployment)", status="success")
 
-    # 2. STREAMING DEPLOY（实时输出）
+    # =========================================
+    # 步骤 2: 流式部署
+    # =========================================
+    log_step(logger, "Deploying containers with containerlab", status="start")
     return_code, logs = run_command_streaming(
         f"{sudo_prefix}containerlab deploy -t {yaml_path} --reconfigure",
         timeout=config.timeout_seconds,
@@ -341,11 +286,8 @@ def deploy(state: GraphState) -> Dict[str, Any]:
     )
 
     if return_code != 0:
-        # 只返回最后 2000 字符避免 Token 爆炸，但保留错误信息
-        error_logs = logs[-2000:] if len(logs) > 2000 else logs
-
         # 判断是系统错误还是部署错误
-        error_lower = error_logs.lower()
+        error_lower = logs.lower()
         if any(keyword in error_lower for keyword in [
             "permission denied", "access denied", "operation not permitted",
             "no space left", "disk full", "out of memory", "oom",
@@ -355,23 +297,29 @@ def deploy(state: GraphState) -> Dict[str, Any]:
         else:
             error_type = ERROR_TYPE_DEPLOY
 
+        # 截断日志（避免 token 过多）
+        error_logs_short = logs[-2000:] if len(logs) > 2000 else logs
+
+        logger.error(f"Error logs (will be sent to fixer):\n{error_logs_short}")
+
         log_step(
             logger,
             "Deployment failed",
             status="fail",
             return_code=return_code
         )
+
         return {
-            "error_logs": f"{error_type} {error_logs}",
+            "error_logs": f"{error_type} {error_logs_short}",
             "is_deployed": False,
             "inspect_data": None
         }
 
-    # 3. 修复文件权限
-    output_dir = os.path.dirname(yaml_path)
-    fix_permissions(output_dir, logger=logger)
+    log_step(logger, "Containers deployed successfully", status="success")
 
-    # 4. 健康检查
+    # =========================================
+    # 步骤 3: 健康检查
+    # =========================================
     is_healthy, inspect_data = wait_for_lab_healthy(yaml_path, logger=logger)
 
     if not is_healthy:
@@ -386,7 +334,48 @@ def deploy(state: GraphState) -> Dict[str, Any]:
             "inspect_data": None
         }
 
-    log_step(logger, "Deployment successful", status="success")
+    # =========================================
+    # 步骤 5: 应用网络配置
+    # =========================================
+    if json_path:
+        log_step(logger, "Applying network configuration", status="start")
+
+        try:
+            # 提取 lab_name（去除 .clab.yml 后缀）
+            lab_name = os.path.basename(yaml_path).replace('.clab.yml', '')
+            config_dir = os.path.dirname(json_path)
+
+            logger.debug(f"Applying network config for lab: {lab_name}")
+            logger.debug(f"Config directory: {config_dir}")
+
+            # 直接使用 ConfigApplier 类
+            applier = ConfigApplier(lab_name, config_dir)
+            stats = applier.apply_all()
+
+            if stats["failed"] == 0:
+                log_step(
+                    logger,
+                    "Network configuration applied successfully",
+                    status="success",
+                    configured=stats["success"]
+                )
+            else:
+                log_step(
+                    logger,
+                    "Network configuration completed with warnings",
+                    status="success",
+                    configured=stats["success"],
+                    failed=stats["failed"]
+                )
+                logger.warning(f"Failed nodes: {', '.join(stats['failed_nodes'])}")
+
+        except FileNotFoundError as e:
+            log_error(logger, e, "Config file not found (non-critical)")
+        except Exception as e:
+            log_error(logger, e, "Failed to apply network configuration (non-critical)")
+            # 不中断部署流程，只记录错误
+
+    log_step(logger, "Deployment completed successfully", status="success")
 
     return {
         "error_logs": "",

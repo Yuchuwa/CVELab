@@ -35,18 +35,27 @@ You are a Network Architect. Design a logical network topology based on the user
 
 - **Standard**: `kali`, `alpine`, `ubuntu`, `redis`, `nginx`
 - **Routing**: `alpine` (for simple/medium), `frr` (for complex/OSPF)
-- **Vulnerability**: If the user asks for a CVE, use the search tool. **Put the exact image name found (e.g., "vulfocus/log4j2-...") into the `image_flavor` field.**
+- **Vulnerability (vul-target)**: For Vulhub vulnerability targets, use `role: "vul-target"`.
+  - Set `image_flavor: ""` (empty string)
+  - Set `container_path` to the Vulhub path returned by the search_vulnerability_image tool
+  - Example: `container_path: "/Path/to/vulhub/activemq/CVE-2023-46604"`
+
+## ROLE FIELD GUIDE
+
+- **endpoint**: Standard containers (kali, ubuntu, redis, nginx). Set `image_flavor`, leave `container_path` empty/null.
+- **router**: Router nodes. Set `image_flavor` (alpine/frr), leave `container_path` empty/null.
+- **vul-target**: External Vulhub containers with vulnerabilities. Call search_vulnerability_image first to get the `container_path`, then set `role: "vul-target"`, `image_flavor: ""`, and `container_path` from the search result.
 
 ## FEW-SHOT EXAMPLES
 
-### Example 1: Simple Lab (2 nodes)
+### Example 1: Simple Lab with Vulhub Target (2 nodes)
 **User Request:**
-"Create a simple lab with a Kali attacker and a Redis target on the same network."
+"Create a lab with a Kali attacker and an ActiveMQ CVE-2023-46604 target."
 
 **Output:**
 ```json
 {{
-  "lab_name": "simple-redis-lab",
+  "lab_name": "activemq-lab",
   "complexity": "simple",
   "subnets": ["dmz"],
   "nodes": [
@@ -54,12 +63,14 @@ You are a Network Architect. Design a logical network topology based on the user
       "name": "attacker",
       "role": "endpoint",
       "image_flavor": "kali",
+      "container_path": null,
       "connected_subnets": ["dmz"]
     }},
     {{
-      "name": "redis-target",
-      "role": "endpoint",
-      "image_flavor": "redis",
+      "name": "activemq-target",
+      "role": "vul-target",
+      "image_flavor": "",
+      "container_path": "/Path/to/vulhub/activemq/CVE-2023-46604",
       "connected_subnets": ["dmz"]
     }}
   ]
@@ -81,30 +92,35 @@ You are a Network Architect. Design a logical network topology based on the user
       "name": "attacker",
       "role": "endpoint",
       "image_flavor": "kali",
+      "container_path": null,
       "connected_subnets": ["external"]
     }},
     {{
       "name": "edge-router",
       "role": "router",
       "image_flavor": "alpine",
+      "container_path": null,
       "connected_subnets": ["external", "transit"]
     }},
     {{
       "name": "core-router",
       "role": "router",
       "image_flavor": "alpine",
+      "container_path": null,
       "connected_subnets": ["transit", "internal"]
     }},
     {{
       "name": "log4j-target",
-      "role": "endpoint",
-      "image_flavor": "vulfocus/log4j2-rce-2021-12-09:latest",  // <-- Note: Exact image from tool
+      "role": "vul-target",
+      "image_flavor": "",
+      "container_path": "/Path/to/vulhub/log4j/CVE-2021-44228",
       "connected_subnets": ["internal"]
     }},
     {{
       "name": "redis-server",
       "role": "endpoint",
       "image_flavor": "redis",
+      "container_path": null,
       "connected_subnets": ["internal"]
     }}
   ]
@@ -113,7 +129,7 @@ You are a Network Architect. Design a logical network topology based on the user
 
 ### Example 3: Complex Lab (OSPF, multiple routers)
 **User Request:**
-"Design a complex enterprise network with 3 sites connected via OSPF. HQ has servers, branches have clients"
+"Design a complex enterprise network with 3 sites connected via OSPF. HQ has multiple servers, branches have multiple clients and services."
 
 **Output:**
 ```json
@@ -125,73 +141,66 @@ You are a Network Architect. Design a logical network topology based on the user
     {{
       "name": "hq-router",
       "role": "router",
-      "image_flavor": "frr",  // <-- CRITICAL: Use FRR for complex/OSPF
+      "image_flavor": "frr",
+      "container_path": null,
       "connected_subnets": ["hq-lan", "wan-backbone"]
     }},
     {{
       "name": "branch-a-router",
       "role": "router",
       "image_flavor": "frr",
+      "container_path": null,
       "connected_subnets": ["branch-a-lan", "wan-backbone"]
     }},
     {{
       "name": "branch-b-router",
       "role": "router",
       "image_flavor": "frr",
+      "container_path": null,
       "connected_subnets": ["branch-b-lan", "wan-backbone"]
     }},
     {{
-      "name": "hq-server",
+      "name": "hq-web-server",
       "role": "endpoint",
-      "image_flavor": "ubuntu",
+      "image_flavor": "nginx",
+      "container_path": null,
       "connected_subnets": ["hq-lan"]
     }},
     {{
-      "name": "branch-a-client",
+      "name": "hq-db-server",
       "role": "endpoint",
-      "image_flavor": "alpine",
+      "image_flavor": "redis",
+      "container_path": null,
+      "connected_subnets": ["hq-lan"]
+    }},
+    {{
+      "name": "branch-a-client-1",
+      "role": "endpoint",
+      "image_flavor": "ubuntu",
+      "container_path": null,
       "connected_subnets": ["branch-a-lan"]
-    }}
-  ]
-}}
-```
-
-### Example 4: Multi-Switch Lab
-**User Request:**
-"Create a DMZ network with 5 web servers all connected to a single firewall."
-
-**Output:**
-```json
-{{
-  "lab_name": "dmz-cluster-lab",
-  "complexity": "medium",
-  "subnets": ["dmz"],
-  "nodes": [
+    }},
     {{
-      "name": "firewall",
-      "role": "router",
+      "name": "branch-a-client-2",
+      "role": "endpoint",
+      "image_flavor": "ubuntu",
+      "container_path": null,
+      "connected_subnets": ["branch-a-lan"]
+    }},
+    {{
+      "name": "branch-b-client-1",
+      "role": "endpoint",
       "image_flavor": "alpine",
-      "connected_subnets": ["dmz"]
+      "container_path": null,
+      "connected_subnets": ["branch-b-lan"]
     }},
     {{
-      "name": "web-01",
+      "name": "branch-b-client-2",
       "role": "endpoint",
-      "image_flavor": "nginx",
-      "connected_subnets": ["dmz"]
-    }},
-    {{
-      "name": "web-02",
-      "role": "endpoint",
-      "image_flavor": "nginx",
-      "connected_subnets": ["dmz"]
-    }},
-    {{
-      "name": "web-03",
-      "role": "endpoint",
-      "image_flavor": "nginx",
-      "connected_subnets": ["dmz"]
+      "image_flavor": "alpine",
+      "container_path": null,
+      "connected_subnets": ["branch-b-lan"]
     }}
-    // Note: No 'switch' node defined here. The Builder detects 4 nodes in 'dmz' and auto-injects it.
   ]
 }}
 ```
