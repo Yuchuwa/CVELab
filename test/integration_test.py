@@ -2,7 +2,7 @@
 """
 Containerlab Builder 集成测试
 
-测试简单、中等、复杂三种难度的网络拓扑构建。
+测试场景A（单层网络）和场景B（三层企业网络）的拓扑构建。
 """
 import sys
 import os
@@ -13,135 +13,135 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from main import run
 
 
-def test_simple_topology():
-    """测试简单拓扑：2个节点，点对点连接"""
+def test_scenario_a():
+    """测试场景A：单层网络，1个漏洞目标 + N个端点"""
     print("\n" + "="*80)
-    print("📋 测试 1: 简单拓扑 (Simple)")
+    print("📋 测试 1: 场景A - 单层网络")
     print("="*80)
-    print("场景: Kali 攻击机 + redis，通过路由器连接")
+    print("场景: 扁平网络，Kali 攻击机 + Redis 漏洞目标")
     print("-"*80)
 
     user_request = """
-    创建一个简单的渗透测试实验室：
+    创建一个场景A的简单渗透测试实验室：
     - 1 个 Kali Linux 作为攻击机
-    - 1 个 Redis 服务器作为靶机,包含CVE-2022-0543漏洞
-    - 1 个 Alpine 路由器连接它们
-    - 复杂度：simple
+    - 1 个 Redis 服务器作为靶机，包含CVE-2022-0543漏洞
+    - 所有节点在同一个网络中
     """
 
     try:
         result = run(user_request)
 
         if result.get("is_complete"):
-            print("\n✅ 简单拓扑测试 - 成功")
+            print("\n✅ 场景A测试 - 成功")
             print(f"   YAML: {result.get('yaml_path', 'N/A')}")
+            print(f"   JSON: {result.get('json_path', 'N/A')}")
             return True
         else:
-            print(f"\n❌ 简单拓扑测试 - 失败")
+            print(f"\n❌ 场景A测试 - 失败")
             print(f"   错误: {result.get('error_logs', 'Unknown')[:200]}")
             return False
 
     except Exception as e:
-        print(f"\n❌ 简单拓扑测试 - 异常: {e}")
+        print(f"\n❌ 场景A测试 - 异常: {e}")
         import traceback
         traceback.print_exc()
         return False
 
 
-def test_medium_topology():
-    """测试中等拓扑：多层隔离网络"""
+def test_scenario_b():
+    """测试场景B：三层企业网络，多层隔离"""
     print("\n" + "="*80)
-    print("📋 测试 2: 中等拓扑 (Medium)")
+    print("📋 测试 2: 场景B - 三层企业网络")
     print("="*80)
-    print("场景: DMZ + 内网，多层隔离")
+    print("场景: 边缘层 → 分发层 → 核心层，多层隔离")
     print("-"*80)
 
     user_request = """
-    创建一个中等复杂度的渗透测试实验室：
-    - DMZ 区域：边界路由器 + Web 服务器
-    - 内网区域：核心路由器 + 数据库服务器 + 文件服务器
-    - 攻击机：Kali Linux
-    - 复杂度：medium
+    创建一个场景B的企业级渗透测试实验室：
+    - 外网区域（边缘层）：Kali 攻击机
+    - DMZ 区域：Web 服务器（包含Log4j漏洞 CVE-2021-44228）
+    - 内网区域（核心层）：Redis 数据库服务器
+    - 使用路由器实现三层架构和跨区域通信
     """
 
     try:
         result = run(user_request)
 
         if result.get("is_complete"):
-            print("\n✅ 中等拓扑测试 - 成功")
+            print("\n✅ 场景B测试 - 成功")
             print(f"   YAML: {result.get('yaml_path', 'N/A')}")
+            print(f"   JSON: {result.get('json_path', 'N/A')}")
             return True
         else:
-            print(f"\n❌ 中等拓扑测试 - 失败")
+            print(f"\n❌ 场景B测试 - 失败")
             print(f"   错误: {result.get('error_logs', 'Unknown')[:200]}")
             return False
 
     except Exception as e:
-        print(f"\n❌ 中等拓扑测试 - 异常: {e}")
+        print(f"\n❌ 场景B测试 - 异常: {e}")
         import traceback
         traceback.print_exc()
         return False
 
 
-def test_complex_topology():
-    """测试复杂拓扑：网状网络 + OSPF 动态路由"""
+def test_scenario_c_reserved():
+    """测试场景C：防火墙保护网络（预留接口）"""
     print("\n" + "="*80)
-    print("📋 测试 3: 复杂拓扑 (Complex)")
+    print("📋 测试 3: 场景C - 防火墙保护网络（预留）")
     print("="*80)
-    print("场景: 企业级网状拓扑，多区域 + OSPF 动态路由")
+    print("场景: 多层网络 + 防火墙放置点（实现待定）")
     print("-"*80)
 
     user_request = """
-    创建一个复杂的企业级网络实验室：
-    - 外网区域：边界路由器 x2
-    - DMZ 区域：核心路由器 + Web 服务器 + 邮件服务器
-    - 内网区域：汇聚路由器 x2 + 应用服务器 + 数据库服务器集群
-    - 管理网：监控服务器 + 日志服务器
-    - 攻击机：Kali Linux
-    - 要求使用 OSPF 动态路由
-    - 复杂度：complex
+    创建一个场景C的防火墙保护网络实验室：
+    - 外网区域：Kali 攻击机
+    - DMZ 区域：Nginx Web 服务器（包含漏洞）
+    - 内网区域：Redis 数据库服务器
+    - 多层路由架构，为防火墙预留放置点
     """
 
     try:
         result = run(user_request)
 
         if result.get("is_complete"):
-            print("\n✅ 复杂拓扑测试 - 成功")
+            print("\n✅ 场景C测试 - 成功")
             print(f"   YAML: {result.get('yaml_path', 'N/A')}")
+            print(f"   JSON: {result.get('json_path', 'N/A')}")
+            print("   注意: 防火墙节点已预留，具体实现待定")
             return True
         else:
-            print(f"\n❌ 复杂拓扑测试 - 失败")
+            print(f"\n❌ 场景C测试 - 失败")
             print(f"   错误: {result.get('error_logs', 'Unknown')[:200]}")
             return False
 
     except Exception as e:
-        print(f"\n❌ 复杂拓扑测试 - 异常: {e}")
+        print(f"\n❌ 场景C测试 - 异常: {e}")
         import traceback
         traceback.print_exc()
         return False
 
 
 def test_error_recovery():
-    """测试错误恢复机制：使用不存在的镜像"""
+    """测试错误恢复机制：使用不存在的漏洞"""
     print("\n" + "="*80)
     print("📋 测试 4: 错误恢复 (Fixer 智能修复)")
     print("="*80)
-    print("场景: 故意使用不存在的镜像，测试 Fixer 的修复能力")
+    print("场景: 故意请求不存在的漏洞，测试 Fixer 的修复能力")
     print("-"*80)
 
     user_request = """
-    创建一个渗透测试实验室：
-    - 1 个不存在镜像的节点（fake-image:invalid-tag）
-    - 1 个标准 Ubuntu 服务器
-    - 1 个路由器连接它们
+    创建一个场景A的渗透测试实验室：
+    - 1 个 Kali 攻击机
+    - 1 个不存在的漏洞目标（FakeVuln-9999-9999）
+    - 测试 Fixer 的错误处理能力
     """
 
     try:
         result = run(user_request)
 
-        # 由于镜像不存在，Fixer 应该会修复并重试
+        # 由于漏洞不存在，Fixer 应该会修复并重试
         if result.get("is_complete"):
-            print("\n✅ 错误恢复测试 - 成功（Fixer 成功修复了问题）")
+            print("\n✅ 错误恢复测试 - 成功（Fixer 成功处理了问题）")
             print(f"   YAML: {result.get('yaml_path', 'N/A')}")
             return True
         else:
@@ -166,19 +166,19 @@ def main():
     print("\n" + "="*80)
     print("🚀 Containerlab Builder 集成测试套件")
     print("="*80)
-    print("测试范围：简单、中等、复杂拓扑 + 错误恢复机制")
+    print("测试范围：场景A（单层）、场景B（三层）、场景C（防火墙预留）+ 错误恢复")
     print("="*80)
 
     results = {}
 
-    # 测试 1: 简单拓扑
-    results['simple'] = test_simple_topology()
+    # 测试 1: 场景A
+#    results['scenario_a'] = test_scenario_a()
 
-    # # 测试 2: 中等拓扑
-    # results['medium'] = test_medium_topology()
+    # 测试 2: 场景B
+    results['scenario_b'] = test_scenario_b()
 
-    # # 测试 3: 复杂拓扑
-    # results['complex'] = test_complex_topology()
+    # # 测试 3: 场景C（预留，可选）
+    # results['scenario_c'] = test_scenario_c_reserved()
 
     # # 测试 4: 错误恢复
     # results['error_recovery'] = test_error_recovery()

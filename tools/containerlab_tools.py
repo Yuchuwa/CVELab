@@ -36,7 +36,7 @@ def clab_lifecycle_tool(action: ClabAction, topology_path: str) -> str:
         return "Error: File path must end with .yml or .yaml"
 
     # 2. Command Construction
-    base_cmd = ["sudo", "containerlab"]
+    base_cmd = ["containerlab"]
     
     if action == ClabAction.DEPLOY:
         # Standard deploy

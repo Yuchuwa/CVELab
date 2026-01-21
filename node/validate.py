@@ -337,26 +337,30 @@ def validate_consistency(
     yaml_nodes = topo.get('nodes', {})
     json_nodes = config_data.get('nodes', {})
 
-    # 排除 bridge 节点
-    yaml_nodes_no_bridge = {n: cfg for n, cfg in yaml_nodes.items() if cfg.get('kind') != 'bridge'}
+    # 排除 switch 节点（通过节点名称前缀 sw- 或 JSON 中的 role 字段判断）
+    # Switches are now linux containers with role "switch" in JSON, but may have any kind in YAML
+    yaml_nodes_no_switch = {n: cfg for n, cfg in yaml_nodes.items()
+                            if not n.startswith('sw-') and cfg.get('kind') != 'bridge'}
+    json_nodes_no_switch = {n: cfg for n, cfg in json_nodes.items()
+                            if cfg.get('role') != 'switch'}
 
     # =========================================
     # C1: 节点数量一致性
     # =========================================
-    yaml_count = len(yaml_nodes_no_bridge)
-    json_count = len(json_nodes)
+    yaml_count = len(yaml_nodes_no_switch)
+    json_count = len(json_nodes_no_switch)
 
     if yaml_count != json_count:
         res.add_error(
             f"[Consistency Error] Node count mismatch: YAML has {yaml_count} nodes, "
-            f"JSON has {json_count} nodes (excluding bridges)"
+            f"JSON has {json_count} nodes (excluding switches)"
         )
 
     # =========================================
     # C2: 节点名称一致性
     # =========================================
-    yaml_node_names = set(yaml_nodes_no_bridge.keys())
-    json_node_names = set(json_nodes.keys())
+    yaml_node_names = set(yaml_nodes_no_switch.keys())
+    json_node_names = set(json_nodes_no_switch.keys())
 
     missing_in_json = yaml_node_names - json_node_names
     if missing_in_json:

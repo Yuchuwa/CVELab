@@ -47,14 +47,24 @@ DIAGNOSTIC DATA includes:
 
 ANALYSIS CHECKLIST:
 1. **Container Check**: Is the container running?
-2. **IP Configuration**: Do the expected IP addresses appear in the output?
-3. **Interface State**: Are all expected interfaces in UP state?
-4. **Routing**: Is the default route configured (for endpoints/vul-targets)?
-5. **Port Listening**: For specified ports, are they listening?
-6. **Process Running**: Does the expected service process appear in ps aux?
+2. **Node Type**: Identify the node role (router, endpoint, vul-target, switch)
+3. **IP Configuration**:
+   - For routers/endpoints/vul-targets: Do the expected IP addresses appear in the output?
+   - For switches (nodes with "sw-" prefix): NO IP configuration expected - they are Layer 2 switches
+4. **Interface State**: Are all expected interfaces in UP state?
+5. **Routing**: Is the default route configured (for endpoints/vul-targets only)?
+6. **Port Listening**: For specified ports, are they listening?
+7. **Process Running**: Does the expected service process appear in ps aux?
+
+SPECIAL CASES:
+- **Switch nodes** (names starting with "sw-"): These are Layer 2 switches and should NOT have IP addresses.
+  - PASS if: Container running + Interfaces UP + NO IP addresses (except IPv6 link-local)
+  - FAIL if: Container not running OR Interfaces DOWN OR Has IP addresses configured
+- **Router nodes**: Should have IP addresses on all interfaces and run FRR (zebra, ospfd processes)
+- **Endpoint/Vul-target nodes**: Should have IP addresses and default route configured
 
 JUDGMENT:
-- Return "PASS" if ALL critical checks succeed
+- Return "PASS" if ALL critical checks succeed for each node
 - Return "FAIL" if ANY critical check fails
 - Skip non-critical checks (e.g., port checks if no ports specified)
 
@@ -202,10 +212,15 @@ def _build_analysis_prompt(diagnostics: Dict[str, Any]) -> str:
             # 添加原始输出
             raw_output = check_data.get("raw_output", "")
             if raw_output:
-                # 限制输出长度（避免 token 过多）
-                if len(raw_output) > 500:
+                # IP 配置相关检查不截断（避免丢失关键信息）
+                if check_name in ["ip_config", "interfaces", "routes"]:
+                    prompt += f"Raw output:\n```\n{raw_output}\n```\n"
+                # 其他检查限制输出长度（避免 token 过多）
+                elif len(raw_output) > 500:
                     raw_output = raw_output[:500] + "\n... (truncated)"
-                prompt += f"Raw output:\n```\n{raw_output}\n```\n"
+                    prompt += f"Raw output:\n```\n{raw_output}\n```\n"
+                else:
+                    prompt += f"Raw output:\n```\n{raw_output}\n```\n"
 
             # 添加期望值
             expected = check_data.get("expected")
