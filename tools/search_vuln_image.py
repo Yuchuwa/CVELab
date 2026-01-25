@@ -10,7 +10,7 @@ class VulnKnowledgeBase:
     def __init__(self, csv_filepath: str):
         if not os.path.exists(csv_filepath):
             raise FileNotFoundError(f"CSV file not found at: {csv_filepath}")
-        
+
         self.df = pd.read_csv(csv_filepath)
         # Ensure string columns are strings and handle NaNs by filling with empty strings
         self.df.fillna('', inplace=True)
@@ -44,8 +44,10 @@ class VulnKnowledgeBase:
 
         return matches.to_dict(orient='records')
 
-# Specify the path to your CSV file
-CSV_FILE_PATH = 'source/vulhub_cves_20260114.csv'
+# Specify the path to your CSV file (absolute path based on script location)
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_SCRIPT_DIR)
+CSV_FILE_PATH = os.path.join(_PROJECT_ROOT, 'source/vulhub_cves_20260114.csv')
 
 # Initialize the Knowledge Base with the file path
 kb = VulnKnowledgeBase(CSV_FILE_PATH)

@@ -40,55 +40,37 @@ def create_workflow() -> StateGraph:
 
     # 条件边：检查构建错误
     def check_build_errors(state: GraphState) -> str:
-        if not state.get("error_logs"):
-            return "validator"
-        return "fixer"
+        error_logs = state.get("error_logs", "")
+        if "[ERROR_TYPE:BUILD]" in error_logs:
+            return "fixer"
+        return "validator"
 
     # 条件边：检查验证错误
     def check_validation_errors(state: GraphState) -> str:
-        if not state.get("error_logs"):
-            return "deployer"
-        return "fixer"
+        error_logs = state.get("error_logs", "")
+        if "[ERROR_TYPE:VALIDATE]" in error_logs:
+            return "fixer"
+        return "deployer"
 
     # 条件边：检查部署错误
     def check_deploy_errors(state: GraphState) -> str:
-        if not state.get("is_deployed", False) or state.get("error_logs"):
+        error_logs = state.get("error_logs", "")
+        if "[ERROR_TYPE:DEPLOY]" in error_logs:
             return "fixer"
         return "configurator"
 
-    # 条件边：fixer 后的路由（根据 state 内容推断路由目标）
-    def route_after_fixer(state: GraphState) -> str:
-        """
-        根据 fixer 返回的 state 内容推断路由目标：
-        - blueprint 为 None → fixer 清空了蓝图，需要重新生成 → generator
-        - blueprint 不为 None → fixer 修复了 YAML，需要重新验证 → validator
-        """
-        # 检查 blueprint 是否被清空
-        if state.get("blueprint") is None:
-            return "generator"
-        else:
-            return "validator"
+    # 条件边：检查配置错误
+    def check_configuration_errors(state: GraphState) -> str:
+        error_logs = state.get("error_logs", "")
+        if "[ERROR_TYPE:CONFIGURE]" in error_logs:
+            return "fixer"
+        return END
 
     # 添加条件边
     workflow.add_conditional_edges("builder", check_build_errors)
     workflow.add_conditional_edges("validator", check_validation_errors)
-    workflow.add_conditional_edges(
-        "deployer",
-        check_deploy_errors,
-        {"configurator": "configurator", "fixer": "fixer"}
-    )
-
-    # Fixer 智能路由（根据 state 内容动态路由）
-    workflow.add_conditional_edges(
-        "fixer",
-        route_after_fixer,
-        {
-            "generator": "generator",
-            "validator": "validator"
-        }
-    )
-
-    workflow.add_edge("configurator", END)
+    workflow.add_conditional_edges("deployer", check_deploy_errors)
+    workflow.add_conditional_edges("configurator", check_configuration_errors)
 
     return workflow.compile()
 
@@ -134,6 +116,7 @@ def run(user_request: str) -> Dict[str, Any]:
         "user_request": user_request,
         "blueprint": None,
         "yaml_path": "",
+        "json_path": "",
         "error_logs": "",
         "is_deployed": False,
         "inspect_data": {},

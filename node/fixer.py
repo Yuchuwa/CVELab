@@ -2,17 +2,18 @@
 
 分析部署错误日志，智能修复网络拓扑设计问题。
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Literal
 import yaml
 
 from langchain.chat_models import init_chat_model
 from langchain.agents import create_agent
 from pydantic import BaseModel, Field
+from langgraph.types import Command
 
 from state import GraphState
 from .utils import NetworkBlueprint
 from config import config, MAX_RETRIES
-from tools.containerlab_tools import clab_lifecycle_tool, node_config_tool
+from tools.file_tools import read_file_tool, modify_file_tool
 from logger import get_logger, set_log_context, log_error, log_step
 
 
@@ -22,6 +23,7 @@ from logger import get_logger, set_log_context, log_error, log_step
 ERROR_TYPE_BUILD = "[ERROR_TYPE:BUILD]"
 ERROR_TYPE_VALIDATE = "[ERROR_TYPE:VALIDATE]"
 ERROR_TYPE_DEPLOY = "[ERROR_TYPE:DEPLOY]"
+ERROR_TYPE_CONFIGURE = "[ERROR_TYPE:CONFIGURE]"
 ERROR_TYPE_SYSTEM = "[ERROR_TYPE:SYSTEM]"
 
 
@@ -34,32 +36,34 @@ class SuggestionResult(BaseModel):
 
 
 class YamlFixResult(BaseModel):
-    """YAML 修复 Agent 的返回结构（用于 validator/deployer 错误）"""
-    yaml_content: str = Field(..., description="修复后的完整 YAML 内容")
+    """YAML 修复 Agent 的返回结构（用于 validator/deployer/configurator 错误）"""
     changes_summary: str = Field(..., description="修改内容摘要")
+    files_modified: list[str] = Field(..., description="修改的文件路径列表")
 
 
-def fixer(state: GraphState) -> Dict[str, Any]:
+def fixer(state: GraphState) -> Command[Literal["generator", "validator", "deployer"]]:
     """
-    Fixer Node: 智能分析错误日志并路由到对应的修复 Agent。
+    Fixer Node: 智能分析错误日志并修复配置文件，同时决定下一步路由。
 
     工作流程:
     1. 检查重试次数（熔断机制）
     2. 静态分析错误类型（无需 LLM）
-    3. 根据错误类型路由到专门的修复 Agent
-    4. 返回修复后的状态和路由目标
+    3. 根据错误类型调用对应的修复 Agent
+    4. Agent 使用工具修改文件
+    5. 返回 Command 对象，包含 state 更新和路由目标
 
     路由策略:
-    - BUILD 错误   → 生成建议 → generator
-    - VALIDATE 错误 → 修改 YAML → validator
-    - DEPLOY 错误   → 修改 YAML → validator
-    - SYSTEM 错误   → 无法修复 → END
+    - BUILD 错误     → 生成建议 → generator
+    - VALIDATE 错误   → 修改 YAML → validator
+    - DEPLOY 错误     → 修改 YAML → validator
+    - CONFIGURE 错误  → 修改 YAML → deployer
+    - SYSTEM 错误     → 无法修复 → raise RuntimeError
 
     Args:
         state: 当前工作流状态
 
     Returns:
-        更新后的状态字典，包含 _fixer_target 路由标记
+        Command 对象，包含 state 更新和 goto 路由目标
 
     Raises:
         RuntimeError: 当达到最大重试次数或遇到系统错误时
@@ -114,67 +118,82 @@ def fixer(state: GraphState) -> Dict[str, Any]:
                 routing_to="generator"
             )
 
-            # 返回标志：清空 blueprint 表示需要重新生成
-            return {
-                "user_request": enhanced_request,
-                "blueprint": None,  # 清空旧蓝图，让 generator 重新生成
-                "error_logs": "",
-                "retry_count": current_retries + 1,
-            }
+            return Command(
+                update={
+                    "user_request": enhanced_request,
+                    "blueprint": None,
+                    "error_logs": "",
+                    "retry_count": current_retries + 1
+                },
+                goto="generator"
+            )
 
         except Exception as e:
             log_error(logger, e, "Suggestion agent failed")
-            return {
-                "error_logs": f"Fixer Suggestion Error: {str(e)}",
-                "retry_count": current_retries + 1,
-            }
+            return Command(
+                update={
+                    "error_logs": f"Fixer Suggestion Error: {str(e)}",
+                    "retry_count": current_retries + 1
+                },
+                goto="generator"
+            )
 
-    # 场景 2/3: validator 或 deployer 错误（配置问题）
-    elif ERROR_TYPE_VALIDATE in error_logs or ERROR_TYPE_DEPLOY in error_logs:
-        error_type = "Validation" if ERROR_TYPE_VALIDATE in error_logs else "Deployment"
+    # 场景 2/3: validator 或 deployer 或 configurator 错误（配置问题）
+    elif ERROR_TYPE_VALIDATE in error_logs or ERROR_TYPE_DEPLOY in error_logs or ERROR_TYPE_CONFIGURE in error_logs:
+        if ERROR_TYPE_CONFIGURE in error_logs:
+            error_type = "Configuration"
+            next_node = "deployer"
+        elif ERROR_TYPE_VALIDATE in error_logs:
+            error_type = "Validation"
+            next_node = "validator"
+        else:  # ERROR_TYPE_DEPLOY
+            error_type = "Deployment"
+            next_node = "validator"
+
         logger.info(f"🔧 {error_type} error detected → invoking YAML fix agent")
 
         try:
             fixer_result = _call_yaml_fix_agent(state, error_logs)
 
-            # 写入修复后的 YAML
-            yaml_path = state.get("yaml_path")
-            if not yaml_path:
-                raise ValueError("yaml_path not found in state")
-
-            with open(yaml_path, 'w', encoding='utf-8') as f:
-                f.write(fixer_result.yaml_content)
-
             log_step(
                 logger,
-                "YAML fixed",
+                "Files fixed by agent",
                 status="success",
                 changes=fixer_result.changes_summary,
-                routing_to="validator"
+                files_modified=fixer_result.files_modified,
+                routing_to=next_node
             )
 
-            # 返回标志：保留 blueprint，只清空 error_logs
-            return {
-                "error_logs": "",
-                "retry_count": current_retries + 1,
-            }
+            return Command(
+                update={
+                    "error_logs": "",
+                    "retry_count": current_retries + 1
+                },
+                goto=next_node
+            )
 
         except Exception as e:
             log_error(logger, e, "YAML fix agent failed")
-            return {
-                "error_logs": f"Fixer YAML Error: {str(e)}",
-                "retry_count": current_retries + 1,
-            }
+            return Command(
+                update={
+                    "error_logs": f"Fixer YAML Error: {str(e)}",
+                    "retry_count": current_retries + 1
+                },
+                goto=next_node
+            )
 
-    # 未知错误类型（降级处理）
+    # 未知错误类型（降级处理)
     else:
         logger.warning(f"⚠️  Unknown error type, defaulting to generator route")
         logger.warning(f"   Error logs: {error_logs[:200]}")
 
-        return {
-            "error_logs": "",
-            "retry_count": current_retries + 1,
-        }
+        return Command(
+            update={
+                "error_logs": "",
+                "retry_count": current_retries + 1
+            },
+            goto="generator"
+        )
 
 
 def _call_suggestion_agent(state: GraphState, error_logs: str) -> SuggestionResult:
@@ -250,22 +269,24 @@ def _call_suggestion_agent(state: GraphState, error_logs: str) -> SuggestionResu
 
 def _call_yaml_fix_agent(state: GraphState, error_logs: str) -> YamlFixResult:
     """
-    调用 YAML 修复 Agent（用于 validator/deployer 错误）。
+    调用 YAML 修复 Agent（用于 validator/deployer/configurator 错误）。
+
+    Agent 会自主读取 YAML 和 JSON 文件内容，分析错误，并使用 modify_file_tool 修复文件。
 
     Args:
         state: 工作流状态
         error_logs: 错误日志
 
     Returns:
-        YamlFixResult: 包含修复后的 YAML 内容和修改摘要
+        YamlFixResult: 包含修改摘要和修改的文件列表
     """
     yaml_path = state.get("yaml_path")
+    json_path = state.get("json_path")
+
     if not yaml_path:
         raise ValueError("yaml_path not found in state")
-
-    # 读取当前 YAML
-    with open(yaml_path, 'r', encoding='utf-8') as f:
-        current_yaml = f.read()
+    if not json_path:
+        raise ValueError("json_path not found in state")
 
     model = init_chat_model(
         model_provider="openai",
@@ -275,60 +296,432 @@ def _call_yaml_fix_agent(state: GraphState, error_logs: str) -> YamlFixResult:
         api_key=config.api_key
     )
 
-    system_prompt = f"""你是 ContainerLab 配置修复专家。分析错误并修复 YAML 文件。
+    system_prompt = """You are a ContainerLab and Docker infrastructure expert. Analyze deployment errors and fix configuration files.
 
-### 当前 YAML 配置
+## Background: ContainerLab Architecture
+
+ContainerLab is a container-based network emulation tool that uses Docker containers to create network topologies.
+
+### Key Concepts:
+- **Nodes**: Docker containers representing network devices (routers, switches, endpoints, vulnerability targets)
+- **Links**: Virtual ethernet connections between nodes (veth pairs)
+- **Networks**: Docker bridge networks that connect nodes
+- **Node Types**:
+  - `kind: linux`: General Linux containers (endpoints, servers, attackers)
+  - `kind: bridge`: Legacy bridge nodes (being replaced with linux switches)
+- **Network Namespace**: Each container has its own network namespace for isolation
+- **Interfaces**: Named eth1, eth2, eth3, etc. (eth0 is reserved for management)
+
+### YAML Configuration Structure (.clab.yml):
 ```yaml
-{current_yaml}
+name: topology-name
+topology:
+  nodes:
+    node-name:
+      kind: linux
+      image: image:tag
+      environment:          # Environment variables for container startup
+        ENV_VAR: value
+      binds:                # Volume mounts (host-path:container-path)
+        - /host/path:/container/path
+      sysctls:              # System parameters (sysctl)
+        net.ipv4.ip_forward: "1"
+      cmd: ''               # Override container command
+  links:
+    - endpoints:
+      - node1:eth1
+      - node2:eth1
 ```
 
-### 错误日志
+### JSON Configuration Structure (config.json):
+```json
+{
+  "nodes": {
+    "node-name": {
+      "role": "endpoint|router|vul-target|switch",
+      "image": "image:tag",
+      "interfaces": [
+        {
+          "name": "eth1",
+          "ip": "10.0.0.1/24",
+          "gateway": "10.0.0.254"
+        }
+      ],
+      "routes": [
+        {
+          "target": "0.0.0.0/0",
+          "via": "10.0.0.254"
+        }
+      ],
+      "exec": [
+        "command to run in container"
+      ]
+    }
+  }
+}
+```
+
+## File Paths
+You are authorized to work with ONLY these two files:
+- YAML file: `{yaml_path}`
+- JSON file: `{json_path}`
+
+## Error Logs
+```
 {error_logs}
+```
 
-### 你的任务
-1. 分析错误原因
-2. 修复 YAML 中的问题
-3. 只修改必要部分，保持其他内容不变
-4. 返回完整的修复后 YAML
+## Your Task
+1. Analyze the error logs to identify the root cause
+2. Use `read_file_tool` to read the current content of `{yaml_path}` and/or `{json_path}`
+3. Determine what changes are needed to fix the issues
+4. Use `modify_file_tool` to write the corrected content to the file(s)
+5. Only modify the necessary parts, preserve everything else
+6. Return a summary of changes and list of modified files
 
-### 常见错误修复方法
+## Available Tools
 
-**IP 地址冲突**
-• 修改冲突的 IP 地址，确保每个接口 IP 唯一
-• 路由器使用 .1, 交换机使用 .2, 端点从 .64 开始
-• 同一子网内不能有重复的 IP
+### read_file_tool
+Reads the content of a file.
+- Use this to examine the current YAML or JSON configuration before making changes
+- `file_path`: The path to read (must be `{yaml_path}` or `{json_path}`)
 
-**路由配置错误**
-• 检查默认路由配置（via IP 必须是网关地址）
-• 静态路由的目标网段不能与直连网段重叠
-• 确保下一跳 IP 在直连网段内可达
+### modify_file_tool
+Writes new content to a file, overwriting the existing content.
+- `file_path`: The path to modify (must be `{yaml_path}` or `{json_path}`)
+- `new_content`: Complete new file content (NOT a diff, must be the entire file)
 
-**命令执行错误**
-• 修正命令语法错误
-• 调整 exec 命令的执行顺序（先安装工具，再配置 IP）
-• 确保使用的命令在对应镜像中可用
+## SECURITY CONSTRAINTS
+- You are ONLY authorized to read/modify these two files: `{yaml_path}` and `{json_path}`
+- NEVER attempt to read or modify any other files
+- All file paths you provide to tools MUST match exactly these paths
 
-**接口配置错误**
-• 确保 IP 配置的接口名称与实际链路对应
-• 检查接口编号（eth1, eth2 等）是否正确
+## Common Errors and Fixes
 
-### 输出要求
-- 返回完整的、可直接使用的 YAML 文件
-- 保持 YAML 格式正确，缩进使用 2 个空格
-- 在 changes_summary 中简要说明修改了什么
+### 1. Container Startup Failures
+
+#### Missing Required Environment Variables
+**Problem**: Database containers fail to start without required environment variables.
+
+**Symptoms**:
+- Container status: "Restarting (1)" or "Exited (1)"
+- Error logs: "database is shut down", "password authentication failed"
+
+**Fix**: Add required environment variables in YAML node configuration:
+
+**PostgreSQL** (postgres:latest):
+```yaml
+postgres-db:
+  kind: linux
+  image: postgres:latest
+  environment:
+    POSTGRES_PASSWORD: password123
+    # Alternative: POSTGRES_HOST_AUTH_METHOD: trust
+```
+
+**MySQL** (mysql:latest):
+```yaml
+mysql-db:
+  kind: linux
+  image: mysql:latest
+  environment:
+    MYSQL_ROOT_PASSWORD: password123
+    # Alternative: MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+```
+
+**Redis** (redis:latest):
+- No environment variables required
+
+**Vulhub Images** (vulhub/*):
+- Most require no environment variables
+- Check specific vulhub documentation if needed
+
+#### Image Pull Errors
+**Problem**: Image not found or pull access denied.
+
+**Symptoms**:
+- Error: "manifest not found", "pull access denied"
+
+**Fix**: Change to standard, verified images:
+- `alpine:latest` - Minimal Linux distro
+- `ubuntu:latest` - Standard Ubuntu
+- `kalilinux/kali-rolling:latest` - Kali Linux
+- `nginx:latest` - Web server
+- `postgres:latest`, `mysql:latest`, `redis:latest` - Databases
+
+### 2. IP Configuration Errors
+
+#### IP Address Conflicts
+**Problem**: Duplicate IP addresses on the same subnet.
+
+**Symptoms**:
+- Error: "RTNETLINK answers: File exists"
+- Containers unable to communicate
+
+**Fix in JSON**: Modify IP addresses to follow addressing scheme:
+- Routers: `.1` in each subnet (e.g., `10.0.0.1/24`)
+- Switches: `.2` in each subnet (e.g., `10.0.0.2/24`)
+- Endpoints/Vul-targets: `.64` and higher (e.g., `10.0.0.64/24`)
+- Ensure no duplicate IPs in the same subnet
+
+#### Interface Naming Mismatch
+**Problem**: JSON interface name doesn't match YAML link definition.
+
+**Symptoms**:
+- Error: "Cannot find device", "No such device"
+- IP configuration fails
+
+**Fix**: Ensure interface names match:
+- YAML links define: `node1:eth1` <-> `node2:eth1`
+- JSON must reference: `"name": "eth1"` (not eth2, eth0, etc.)
+- Interface numbering starts at eth1 (eth0 is management)
+
+### 3. Routing Configuration Errors
+
+#### Default Route Issues
+**Problem**: Default gateway not reachable or misconfigured.
+
+**Symptoms**:
+- Error: "RTNETLINK answers: Network is unreachable"
+- Container cannot reach external networks
+
+**Fix in JSON**: Ensure default route via IP matches router interface:
+```json
+{
+  "routes": [
+    {
+      "target": "0.0.0.0/0",
+      "via": "10.0.0.1"  // Must be router's IP in this subnet
+    }
+  ]
+}
+```
+
+#### Static Route Overlap
+**Problem**: Static route target overlaps with directly connected network.
+
+**Symptoms**:
+- Routing table conflicts
+- Unreachable networks
+
+**Fix**: Static routes should NOT overlap with interface subnets:
+- If eth1 is `10.0.0.0/24`, don't add route for `10.0.0.0/24` or `10.0.0.0/16`
+- Only add routes for remote networks (e.g., `192.168.1.0/24`)
+
+### 4. FRR Routing Configuration
+
+#### FRR Not Applying Configuration
+**Problem**: Router ignores OSPF/BGP configuration.
+
+**Cause**: FRR daemon (zebra/ospfd) needs restart to reload bind-mounted config.
+
+**Current Implementation**:
+- Config applied via bind mounts in YAML
+- Restart handled by: `killall -HUP zebra ospfd` (executed during deployment)
+- No JSON changes needed
+
+**What to Check**:
+- YAML binds: `/path/to/daemons:/etc/frr/daemons`
+- YAML binds: `/path/to/frr.conf:/etc/frr/frr.conf`
+- daemons file must enable: `zebra=yes`, `ospfd=yes`
+
+### 5. Command Execution Errors
+
+#### Command Not Found
+**Problem**: Exec command fails because tool not available in image.
+
+**Symptoms**:
+- Error: "command not found", "exec: command not found"
+
+**Fix**: Use commands available in the specific image:
+- **Alpine**: Use `apk add` to install tools
+- **Ubuntu/Debian**: Use `apt-get update && apt-get install`
+- **Kali**: Has most tools pre-installed
+- **CentOS/RHEL**: Use `yum install`
+
+#### Command Order Dependencies
+**Problem**: IP config fails because interface not ready yet.
+
+**Symptoms**:
+- Intermittent failures
+- "Cannot find device" errors
+
+**Fix**: Order commands properly in JSON exec array:
+```json
+{
+  "exec": [
+    "ip link set eth1 up",           // 1. Bring interface up
+    "ip addr add 10.0.0.64/24 dev eth1",  // 2. Add IP
+    "ip route add default via 10.0.0.1"   // 3. Add route
+  ]
+}
+```
+
+### 6. Link and Topology Errors
+
+#### Duplicate Endpoint
+**Problem**: Same endpoint appears in multiple links.
+
+**Symptoms**:
+- Validation error: "duplicate endpoint"
+- Deployment fails
+
+**Fix in YAML**: Each interface can only be used in one link:
+```yaml
+links:
+  - endpoints:
+    - router:eth1
+    - switch:eth1
+  - endpoints:
+    - router:eth2    # OK: different interface
+    - switch:eth2
+  # NOT OK: router:eth1 used again in another link
+```
+
+#### Too Many Nodes Without Switch
+**Problem**: More than 2 endpoints in same subnet without switch.
+
+**Current Implementation**:
+- Builder automatically injects `sw-` nodes when needed
+- Switches are `kind: linux` with `image: alpine:latest`
+- Switches have NO IP addresses (Layer 2 only)
+
+**What to Check**:
+- If subnet has 3+ nodes, ensure switch node exists
+- Switch node name format: `sw-<zone>` (e.g., `sw-dmz`, `sw-internal`)
+- All nodes in subnet connect to switch via links
+
+### 7. Docker and Container Issues
+
+#### Container Not Running
+**Problem**: Container exits immediately after start.
+
+**Symptoms**:
+- `docker ps` shows container not in list
+- `docker ps -a` shows "Exited (1)"
+
+**Common Causes**:
+1. Missing environment variables (see #1)
+2. Invalid command in YAML `cmd` field
+3. Image doesn't support default entrypoint
+
+**Fix**: Remove or correct `cmd` field in YAML:
+```yaml
+node-name:
+  kind: linux
+  image: image:tag
+  cmd: ''        # Empty string uses default entrypoint
+  # OR remove cmd field entirely
+```
+
+#### Volume Mount Failures
+**Problem**: Bind mount source file doesn't exist.
+
+**Symptoms**:
+- Error: "no such file or directory"
+- Container fails to start
+
+**Fix**: Ensure bind mount source paths exist:
+```yaml
+node:
+  binds:
+    - /existing/host/path:/container/path  # Source must exist
+```
+
+## Network Addressing Scheme Reference
+
+When modifying IP addresses in JSON, follow this scheme:
+
+### Subnet Design
+- Use private IP ranges: `10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12`
+- Each subnet should be `/24` (254 usable addresses) or smaller
+
+### IP Assignment within Subnet
+- `.1`: Router (gateway)
+- `.2`: Switch (if present)
+- `.64 - .254`: Endpoints and vulnerability targets
+- `.254`: Network gateway (if different from router)
+
+### Example Subnet: 10.0.0.0/24
+```
+10.0.0.1   - Router (gateway)
+10.0.0.2   - Switch (if present)
+10.0.0.64  - Endpoint 1
+10.0.0.65  - Endpoint 2
+10.0.0.66  - Vul-target
+...
+10.0.0.254 - Default gateway (if applicable)
+```
+
+## Docker Image-Specific Requirements
+
+### Standard Images
+- **alpine**: Minimal, use `apk add` to install tools
+- **ubuntu**: Use `apt-get`, has many tools available
+- **kalilinux/kali-rolling**: Pentest tools pre-installed
+
+### Vulnerability Images (Vulhub)
+- **vulhub/redis:5.0.7**: No special config needed
+- **vulhub/solr:8.11.0**: No special config needed
+- **vulhub/weblogic:******: May need specific ports exposed
+- Check vulhub documentation for specific requirements
+
+### Database Images
+- **postgres**: Requires `POSTGRES_PASSWORD`
+- **mysql**: Requires `MYSQL_ROOT_PASSWORD`
+- **redis**: No environment variables needed
+- **mongo**: Requires `MONGO_INITDB_ROOT_USERNAME` and `MONGO_INITDB_ROOT_PASSWORD`
+
+### Routing Images
+- **frrouting/frr:v8.4.1**: Use bind mounts for config, restart with HUP signal
+
+## Workflow
+1. Analyze error logs and identify error type
+2. Examine current YAML and JSON configurations
+3. Determine root cause (refer to common errors above)
+4. Decide which file(s) to modify
+5. Use `modify_file_tool` to write corrected file content
+6. Return summary of changes and list of modified files
+
+## Output Requirements
+- `changes_summary`: Brief description of what was changed and why
+- `files_modified`: List of file paths that were modified
+- Be specific about environment variables added, IPs changed, routes fixed, etc.
+
+## Important Notes
+- Always provide COMPLETE file content to `modify_file_tool`, not just changes
+- Maintain proper YAML indentation (2 spaces)
+- Maintain proper JSON syntax (quotes, commas, brackets)
+- When adding environment variables, use the exact variable names required
+- When modifying IPs, ensure they follow the addressing scheme
+- When fixing routes, verify the via IP is reachable
 """
+
+    # 使用字符串替换填充路径占位符（避免转义花括号）
+    system_prompt_filled = system_prompt.replace("{yaml_path}", yaml_path) \
+                                          .replace("{json_path}", json_path) \
+                                          .replace("{error_logs}", error_logs)
 
     agent = create_agent(
         model=model,
-        system_prompt=system_prompt,
-        tools=[clab_lifecycle_tool],  # 可能需要检查容器状态
+        system_prompt=system_prompt_filled,
+        tools=[read_file_tool, modify_file_tool],  # Agent 使用工具读取和修改文件
         response_format=YamlFixResult
     )
 
     result = agent.invoke({
         "messages": [{
             "role": "user",
-            "content": "请修复 YAML 配置文件。"
+            "content": f"""Please analyze the deployment errors and fix the configuration files.
+
+You are authorized to work with ONLY these two files:
+- YAML: {yaml_path}
+- JSON: {json_path}
+
+Use the read_file_tool to examine the current content, then use modify_file_tool to fix any issues.
+
+Error logs:
+{error_logs}"""
         }]
     })
 

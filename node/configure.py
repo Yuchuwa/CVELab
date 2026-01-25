@@ -13,6 +13,9 @@ from config import config
 from logger import get_logger, set_log_context, log_step
 from .utils import ConfigApplier
 
+# Configure 错误类型标识符
+ERROR_TYPE_CONFIGURE = "[ERROR_TYPE:CONFIGURE]"
+
 
 # ============================================
 # 结构化输出模型
@@ -184,7 +187,7 @@ def configure(state: GraphState) -> Dict[str, Any]:
             error_msg = "\n".join(error_lines)
             return {
                 "is_complete": False,
-                "error_logs": error_msg
+                "error_logs": f"{ERROR_TYPE_CONFIGURE} {error_msg}"
             }
         else:
             log_step(logger, "All configurations verified", status="success")
