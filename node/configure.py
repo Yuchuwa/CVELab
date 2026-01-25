@@ -53,16 +53,17 @@ ANALYSIS CHECKLIST:
 2. **Node Type**: Identify the node role (router, endpoint, vul-target, switch)
 3. **IP Configuration**:
    - For routers/endpoints/vul-targets: Do the expected IP addresses appear in the output?
-   - For switches (nodes with "sw-" prefix): NO IP configuration expected - they are Layer 2 switches
+   - For switches (nodes with "sw-" prefix): NO IP configuration expected on data interfaces (eth1+) - eth0 is Docker management and should be ignored
 4. **Interface State**: Are all expected interfaces in UP state?
 5. **Routing**: Is the default route configured (for endpoints/vul-targets only)?
 6. **Port Listening**: For specified ports, are they listening?
 7. **Process Running**: Does the expected service process appear in ps aux?
 
 SPECIAL CASES:
-- **Switch nodes** (names starting with "sw-"): These are Layer 2 switches and should NOT have IP addresses.
-  - PASS if: Container running + Interfaces UP + NO IP addresses (except IPv6 link-local)
-  - FAIL if: Container not running OR Interfaces DOWN OR Has IP addresses configured
+- **Switch nodes** (names starting with "sw-"): These are Layer 2 switches and should NOT have IP addresses on data interfaces.
+  - eth0 (Docker management interface with 172.20.20.x) - IGNORE this, it's normal and required for container management
+  - PASS if: Container running + All interfaces UP + NO IP addresses on eth1/eth2/etc (eth0 IP is allowed and ignored)
+  - FAIL if: Container not running OR Interfaces DOWN OR Has IP addresses on data interfaces (eth1+)
 - **Router nodes**: Should have IP addresses on all interfaces and run FRR (zebra, ospfd processes)
 - **Endpoint/Vul-target nodes**: Should have IP addresses and default route configured
 
