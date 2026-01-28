@@ -48,6 +48,8 @@ def create_workflow() -> StateGraph:
     # 条件边：检查验证错误
     def check_validation_errors(state: GraphState) -> str:
         error_logs = state.get("error_logs", "")
+        if "[ERROR_TYPE:SYSTEM]" in error_logs:
+            return END
         if "[ERROR_TYPE:VALIDATE]" in error_logs:
             return "fixer"
         return "deployer"

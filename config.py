@@ -41,14 +41,6 @@ class AppConfig(BaseModel):
         description="操作超时时间（秒）"
     )
 
-    # 并发配置
-    max_configure_workers: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="并发配置节点数量"
-    )
-
     # 容器配置
     container_health_check_interval: int = Field(
         default=3,
@@ -137,7 +129,6 @@ def _load_config() -> AppConfig:
             api_key=os.getenv("LLM_API_KEY"),
             max_retries=int(os.getenv("MAX_RETRIES", "3")),
             timeout_seconds=int(os.getenv("TIMEOUT_SECONDS", "600")),
-            max_configure_workers=int(os.getenv("MAX_CONFIGURE_WORKERS", "5")),
             container_health_check_interval=int(os.getenv("CONTAINER_HEALTH_CHECK_INTERVAL", "3")),
             container_health_check_max_retries=int(os.getenv("CONTAINER_HEALTH_CHECK_MAX_RETRIES", "10")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
@@ -171,4 +162,3 @@ BASE_URL = config.base_url
 API_KEY = config.api_key
 MAX_RETRIES = config.max_retries
 TIMEOUT_SECONDS = config.timeout_seconds
-MAX_CONFIGURE_WORKERS = config.max_configure_workers

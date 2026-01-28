@@ -90,6 +90,8 @@ def configure(state: GraphState) -> Dict[str, Any]:
     """
     Configure 节点：验证所有容器的网络和服务状态。
 
+    新架构：所有验证信息均从 JSON（唯一真源）读取，不再依赖 YAML。
+
     工作流程:
     1. 使用 ConfigApplier.collect_diagnostics() 收集原始诊断数据
     2. 将诊断数据发送给 LLM 分析（使用结构化输出）
@@ -105,23 +107,23 @@ def configure(state: GraphState) -> Dict[str, Any]:
     logger = get_logger("node.configure")
     set_log_context(stage="configure")
 
-    yaml_path = state.get("yaml_path")
     json_path = state.get("json_path")
 
-    if not yaml_path or not json_path:
-        logger.warning("Missing yaml_path or json_path, skipping verification")
+    if not json_path:
+        logger.warning("Missing json_path, skipping verification")
         return {"is_complete": True}
 
     log_step(logger, "Collecting diagnostics from all nodes", status="start")
 
     try:
         import os
-        lab_name = os.path.basename(yaml_path).replace('.clab.yml', '')
+        # 从 JSON 文件路径提取 lab_name 和 config_dir
+        lab_name = os.path.basename(json_path).replace('.config.json', '')
         config_dir = os.path.dirname(json_path)
 
-        # 1. 收集诊断数据
+        # 1. 收集诊断数据（所有配置从 JSON 读取）
         applier = ConfigApplier(lab_name, config_dir)
-        diagnostics = applier.collect_diagnostics(yaml_path)
+        diagnostics = applier.collect_diagnostics()
 
         logger.info(f"Collected diagnostics from {len(diagnostics['nodes'])} nodes")
 
@@ -161,7 +163,10 @@ def configure(state: GraphState) -> Dict[str, Any]:
         logger.info(f"Overall Status: {analysis.overall_status}")
         logger.info(f"Summary: {analysis.summary}")
 
-        for node_result in analysis.node_results:
+        # Sort node results by name for consistent log output order
+        sorted_node_results = sorted(analysis.node_results, key=lambda x: x.node_name)
+
+        for node_result in sorted_node_results:
             if node_result.overall_status == "PASS":
                 logger.info(f"✓ {node_result.node_name}: All checks passed")
             else:
@@ -179,7 +184,7 @@ def configure(state: GraphState) -> Dict[str, Any]:
 
             # 构建详细错误信息
             error_lines = [f"Configuration verification failed: {analysis.summary}"]
-            for node_result in analysis.node_results:
+            for node_result in sorted_node_results:
                 if node_result.overall_status == "FAIL":
                     error_lines.append(f"\nNode: {node_result.node_name}")
                     for issue in node_result.issues:

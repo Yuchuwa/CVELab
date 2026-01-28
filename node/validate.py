@@ -1,6 +1,7 @@
 import ipaddress
 import json
 import yaml
+import subprocess
 from typing import Dict, List, Any, Set
 from collections import Counter
 from state import GraphState
@@ -26,17 +27,78 @@ class ValidationResult:
 
 
 # ============================================
-# A. YAML 拓扑验证（纯拓扑结构）
+# A. YAML 文件验证（containerlab 可解析性）
+# ============================================
+def validate_yaml_with_containerlab(yaml_path: str) -> ValidationResult:
+    """
+    使用 containerlab 验证 YAML 文件是否可解析
+
+    使用 containerlab graph 命令验证 YAML 语法。
+    graph 命令在没有容器运行时会自动降级到离线模式，只解析拓扑文件，
+    因此可以在首次部署前验证 YAML 语法是否正确。
+
+    Args:
+        yaml_path: YAML 文件路径
+
+    Returns:
+        ValidationResult 对象
+    """
+    res = ValidationResult()
+    logger = get_logger("node.validate")
+
+    try:
+        # 使用 containerlab graph 验证（离线模式，无需容器）
+        # graph 命令在容器不存在时会自动降级到离线模式，只解析拓扑文件
+        result = subprocess.run(
+            ["containerlab", "graph", "-t", yaml_path, "--dot"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode != 0:
+            # containerlab 无法解析
+            error_output = result.stderr or result.stdout
+            res.add_error(
+                f"[YAML Containerlab] containerlab cannot parse this YAML file:\n"
+                f"{error_output[:500]}\n\n"
+                f"This indicates a bug in NetworkBuilder._generate_yaml_from_config()."
+            )
+            logger.error(f"containerlab graph validation failed: {error_output[:200]}")
+        else:
+            logger.debug("✓ YAML validated by containerlab graph (offline mode)")
+
+    except subprocess.TimeoutExpired:
+        res.add_warning("[YAML Containerlab] Validation timeout (30s)")
+        logger.warning("containerlab graph timeout")
+    except FileNotFoundError:
+        res.add_warning("[YAML Containerlab] containerlab command not found, skipping validation")
+        logger.debug("containerlab not found in PATH")
+    except Exception as e:
+        res.add_warning(f"[YAML Containerlab] Validation skipped: {str(e)}")
+        logger.debug(f"containerlab graph validation error: {e}")
+
+    return res
+
+
+# ============================================
+# B. YAML 拓扑验证（纯拓扑结构）
 # ============================================
 def validate_yaml_topology(topology_data: Dict[str, Any]) -> ValidationResult:
     """
-    验证 YAML 拓扑结构的正确性。
+    验证 YAML 拓扑结构的正确性（Builder 正确性检查）
 
-    由于 YAML 不包含 IP 地址，只检查：
+    在新架构下，YAML 由 JSON 派生，本函数用于验证：
+    1. YAML 正确反映了 JSON 的拓扑结构
+    2. Builder 的 YAML 生成逻辑没有 bug
+
+    检查项：
     - 节点名称唯一性
     - 链路格式正确性
     - 链路节点存在性
     - 接口排他性
+
+    注意：如果发现 YAML 拓扑错误，说明 NetworkBuilder 有 bug。
     """
     res = ValidationResult()
 
@@ -321,14 +383,19 @@ def validate_json_config(config_data: Dict[str, Any]) -> ValidationResult:
 
 
 # ============================================
-# C. YAML-JSON 一致性验证
+# C. YAML-JSON 一致性验证（Builder 正确性检查）
 # ============================================
 def validate_consistency(
     topology_data: Dict[str, Any],
     config_data: Dict[str, Any]
 ) -> ValidationResult:
     """
-    验证 YAML 和 JSON 配置的一致性。
+    验证 YAML 是否正确从 JSON 派生（Builder 正确性检查）
+
+    在新架构下，YAML 应由 JSON 生成（NetworkBuilder._generate_yaml_from_config），
+    如果出现不一致，说明 Builder 的 YAML 生成逻辑存在 bug。
+
+    注意：这是 Builder 的 bug，不应触发 Fixer，而是直接报错。
     """
     res = ValidationResult()
 
@@ -416,15 +483,24 @@ def validate_consistency(
 # ============================================
 def validator_node(state: GraphState):
     """
-    Validate 节点：同时验证 YAML 和 JSON 配置文件
+    Validate 节点：验证配置文件正确性
+
+    新架构下的验证逻辑：
+    1. JSON 是唯一真源 - 进行完整验证（核心）
+    2. YAML 是派生产物 - 验证其正确反映 JSON（Builder 正确性）
+    3. YAML-JSON 一致性 - 捕获 Builder 的 bug
 
     工作流程:
-    1. 读取 YAML 文件
-    2. 读取 JSON 文件
-    3. 验证 YAML 拓扑（纯拓扑结构）
-    4. 验证 JSON 配置（网络配置）
-    5. 验证 YAML-JSON 一致性
+    1. 读取 JSON 文件（唯一真源）
+    2. 读取 YAML 文件（派生产物）
+    3. 验证 JSON 配置（网关、IP、路由器等）
+    4. 验证 YAML 拓扑（语法和结构）+ containerlab 验证
+    5. 验证 YAML 是否正确派生自 JSON
     6. 合并验证结果
+
+    注意：
+    - JSON 错误会触发 Fixer 修复
+    - YAML 错误说明 Builder 有 bug，直接报错中断
     """
     logger = get_logger("node.validate")
     set_log_context(stage="validate")
@@ -475,6 +551,23 @@ def validator_node(state: GraphState):
         log_step(logger, "YAML topology validation", status="success")
     else:
         log_step(logger, "YAML topology validation", status="fail", errors=len(yaml_result.errors))
+
+    # =========================================
+    # 步骤 3.5: 使用 containerlab 验证 YAML
+    # =========================================
+    log_step(logger, "Validating YAML with containerlab", status="start")
+    containerlab_result = validate_yaml_with_containerlab(yaml_path)
+    if containerlab_result.valid:
+        log_step(logger, "containerlab validation", status="success")
+    else:
+        log_step(logger, "containerlab validation", status="fail", errors=len(containerlab_result.errors))
+        # containerlab验证失败是致命错误，说明Builder有bug
+        if containerlab_result.errors:
+            error_msg = "\n".join(containerlab_result.errors)
+            return {"error_logs": f"[ERROR_TYPE:SYSTEM] {error_msg}"}
+
+    # 合并containerlab的警告
+    yaml_result.warnings.extend(containerlab_result.warnings)
 
     # =========================================
     # 步骤 4: 验证 JSON 配置
@@ -533,5 +626,22 @@ def validator_node(state: GraphState):
         for warning in all_warnings:
             logger.warning(f"  ⚠️  {warning}")
 
+        # 特殊处理：如果只有一致性错误（YAML与JSON不一致），说明是Builder bug
+        if consistency_result.errors and not yaml_result.errors and not json_result.errors:
+            error_details = []
+            for error in consistency_result.errors:
+                error_details.append(f"  ❌ {error}")
+
+            error_msg = (
+                "YAML derivation error detected (Builder bug):\n"
+                "The YAML file does not match the JSON configuration.\n"
+                "This indicates a bug in NetworkBuilder._generate_yaml_from_config().\n\n"
+                "Inconsistencies found:\n" +
+                "\n".join(error_details) +
+                "\n\nPlease report this bug to the developer."
+            )
+            return {"error_logs": f"[ERROR_TYPE:SYSTEM] {error_msg}"}
+
+        # 其他验证错误（JSON或YAML格式问题），触发Fixer修复
         error_msg = "\n".join(all_errors)
         return {"error_logs": f"{ERROR_TYPE_VALIDATE} Validation failed:\n{error_msg}"}
