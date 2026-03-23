@@ -11,7 +11,7 @@ from typing import Optional
 from contextvars import ContextVar
 import traceback as tb
 
-from session_utils import get_current_session_id, get_session_output_dir
+from clab_builder.session_utils import get_current_session_id, get_session_output_dir
 
 
 # 日志上下文变量（线程安全）

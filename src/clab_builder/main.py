@@ -4,17 +4,17 @@
 """
 from typing import Dict, Any
 
-from state import GraphState
+from clab_builder.state import GraphState
 from langgraph.graph import StateGraph, START, END
-from node.generate import generate
-from node.deploy import deploy
-from node.configure import configure
-from node.builder import builder_node
-from node.validate import validator_node
-from node.fixer import fixer
-from session_utils import ensure_session_dir, set_current_session_id
-from config import config
-from logger import (
+from clab_builder.node.generate import generate
+from clab_builder.node.deploy import deploy
+from clab_builder.node.configure import configure
+from clab_builder.node.builder import builder_node
+from clab_builder.node.validate import validator_node
+from clab_builder.node.fixer import fixer
+from clab_builder.session_utils import ensure_session_dir, set_current_session_id
+from clab_builder.config import config
+from clab_builder.logger import (
     setup_logger,
     get_logger,
     set_log_context,

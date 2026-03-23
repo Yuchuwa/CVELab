@@ -7,14 +7,25 @@ from langchain.chat_models import init_chat_model
 from langchain.agents import create_agent
 
 from .utils import NetworkBlueprint
-from state import GraphState
+from clab_builder.state import GraphState
 from tools.search_vuln_image import search_vulnerability_image
-from config import config
-from logger import get_logger, set_log_context, log_step, log_error
+from clab_builder.config import config
+from clab_builder.logger import get_logger, set_log_context, log_step, log_error
 
 
 generate_prompt = """
 You are a Network Architect. Design a logical network topology based on the user's scenario request.
+
+## CRITICAL: VULNERABILITY DIVERSITY RULE
+
+**ALWAYS select DIFFERENT vulnerability types across different generations to maximize scenario diversity.**
+
+When users don't specify exact vulnerabilities:
+- **Vary the attack surfaces**: Web apps, message queues, databases, caching servers, CI/CD tools, monitoring systems
+- **Vary the vulnerability types**: RCE, SQL injection, deserialization, auth bypass, file upload, SSRF, XXE
+- **Vary the exploit complexity**: Some easy (weak passwords), some medium (deserialization), some hard (chain exploits)
+- **AVOID repetition**: Do NOT default to Log4j, Redis, or ActiveMQ for every request
+- **Think creatively**: Explore lesser-known but realistic vulnerabilities
 
 ## SCENARIO TYPES
 
@@ -75,19 +86,52 @@ You are a Network Architect. Design a logical network topology based on the user
 ## DESIGN RULES
 
 1. **Naming**: Use kebab-case (lowercase with hyphens), NO spaces or underscores.
-2. **Subnet Logic**:
-   - Nodes in the same `connected_subnets` list are Layer 2 connected.
-   - If a subnet has > 2 nodes, the system will automatically inject a switch. You do NOT need to define switch nodes manually unless explicitly requested.
-3. **Routers**: A node is a router if it connects to 2 or more different subnets.
+
+2. **Subnet Logic (CRITICAL)**:
+   - Each subnet represents a Layer 2 broadcast domain (logical network segment)
+   - **All nodes in the same subnet MUST use the EXACT SAME subnet name in `connected_subnets`**
+   - Do NOT create unique subnet names for each node connection
+
+   **Example - Correct subnet assignment:**
+   ```json
+   {
+     "name": "redis-target",
+     "connected_subnets": ["dmz"]  // ← All dmz nodes use "dmz"
+   },
+   {
+     "name": "nginx-web",
+     "connected_subnets": ["dmz"]  // ← Same subnet name!
+   },
+   {
+     "name": "ubuntu-app",
+     "connected_subnets": ["dmz"]  // ← Same subnet name!
+   }
+   ```
+   This places all 3 nodes in the same "dmz" broadcast domain
+
+3. **Routers**:
+   - A node is a router if it connects to 2 or more **different** subnets
    - **ALL scenarios (A, B, C) MUST include at least one router node**
    - Use role: "router" with image_flavor: "alpine" or "frr"
    - Router nodes should connect different subnets to enable routing
-4. **Abstraction**: Do NOT define IP addresses, interface names (eth1), or static routes. The Builder system handles IPAM and OSPF routing configuration.
-5. **Decoy Nodes**:
+   - Example: `connected_subnets: ["external", "dmz"]` means this router connects external and dmz
+
+4. **Scenario Subnet Design**:
+   - **Scenario A**: Use exactly 2 subnets - ["external", "dmz"]
+     - external: [attacker] only
+     - dmz: [router, all vul-targets, all decoys] - all in ONE broadcast domain
+   - **Scenario B**: Use exactly 3 subnets - ["external", "dmz", "internal"]
+     - external: [attacker] only
+     - dmz: [edge-router, core-router, dmz vul-targets, dmz decoys] - all in ONE broadcast domain
+     - internal: [core-router, internal vul-targets, internal decoys] - all in ONE broadcast domain
+
+5. **Abstraction**: Do NOT define IP addresses, interface names (eth1), or static routes. The Builder system handles IPAM and OSPF routing configuration.
+
+6. **Decoy Nodes**:
    - REQUIRED for all scenarios (A, B, C)
    - Use role: "endpoint" for decoy servers
    - Choose appropriate image_flavor: nginx, ubuntu, alpine, redis, etc.
-   - Place decoys in appropriate zones to simulate realistic environments
+   - Place decoys in appropriate zones/subnets to simulate realistic environments
    - Do NOT mark decoys as "vul-target" - they are normal, non-vulnerable servers
 
 ## IMAGE FLAVORS GUIDE
@@ -134,32 +178,36 @@ You are a Network Architect. Design a logical network topology based on the user
       "role": "router",
       "image_flavor": "alpine",
       "container_path": null,
-      "connected_subnets": ["external", "dmz"]
+      "connected_subnets": ["external", "dmz"]  // Router connects both subnets
     }},
     {{
       "name": "redis-target",
       "role": "vul-target",
       "image_flavor": "",
       "container_path": "/Path/to/vulhub/redis/CVE-2022-0543",
-      "connected_subnets": ["dmz"]
+      "connected_subnets": ["dmz"]  // ← In dmz subnet
     }},
     {{
       "name": "nginx-web",
       "role": "endpoint",
       "image_flavor": "nginx",
       "container_path": null,
-      "connected_subnets": ["dmz"]
+      "connected_subnets": ["dmz"]  // ← Same "dmz" subnet
     }},
     {{
       "name": "ubuntu-app",
       "role": "endpoint",
       "image_flavor": "ubuntu",
       "container_path": null,
-      "connected_subnets": ["dmz"]
+      "connected_subnets": ["dmz"]  // ← Same "dmz" subnet
     }}
   ]
 }}
 ```
+**Logical Subnet Design:**
+- external subnet: [attacker, router]
+- dmz subnet: [router, redis-target, nginx-web, ubuntu-app] - all nodes in same broadcast domain
+
 **Components**: 1 vul-target (redis) + 1 attacker + 1 router + 2 decoy servers (nginx-web, ubuntu-app)
 **Decoys**: Nginx web server and Ubuntu app server simulate production environment
 **Routing**: Single router with OSPF connects external and dmz subnets
@@ -201,46 +249,51 @@ You are a Network Architect. Design a logical network topology based on the user
       "role": "vul-target",
       "image_flavor": "",
       "container_path": "/Path/to/vulhub/log4j/CVE-2021-44228",
-      "connected_subnets": ["dmz"]
+      "connected_subnets": ["dmz"]  // ← In dmz subnet
     }},
     {{
       "name": "nginx-proxy",
       "role": "endpoint",
       "image_flavor": "nginx",
       "container_path": null,
-      "connected_subnets": ["dmz"]
+      "connected_subnets": ["dmz"]  // ← Same "dmz" subnet
     }},
     {{
       "name": "redis-server",
       "role": "vul-target",
       "image_flavor": "",
       "container_path": "/Path/to/vulhub/redis/CVE-2022-0543",
-      "connected_subnets": ["internal"]
+      "connected_subnets": ["internal"]  // ← In internal subnet
     }},
     {{
       "name": "postgres-db",
       "role": "endpoint",
       "image_flavor": "postgres",
       "container_path": null,
-      "connected_subnets": ["internal"]
+      "connected_subnets": ["internal"]  // ← Same "internal" subnet
     }},
     {{
       "name": "file-server",
       "role": "endpoint",
       "image_flavor": "ubuntu",
       "container_path": null,
-      "connected_subnets": ["internal"]
+      "connected_subnets": ["internal"]  // ← Same "internal" subnet
     }},
     {{
       "name": "app-server",
       "role": "endpoint",
       "image_flavor": "alpine",
       "container_path": null,
-      "connected_subnets": ["internal"]
+      "connected_subnets": ["internal"]  // ← Same "internal" subnet
     }}
   ]
 }}
 ```
+**Logical Subnet Design:**
+- external subnet: [attacker, edge-router]
+- dmz subnet: [edge-router, core-router, log4j-target, nginx-proxy] - all nodes in same broadcast domain
+- internal subnet: [core-router, redis-server, postgres-db, file-server, app-server] - all nodes in same broadcast domain
+
 **Architecture**: External (attacker) → DMZ (log4j vul-target + nginx-proxy decoy) → Internal (redis vul-target + postgres-db decoy + file-server decoy + app-server decoy)
 **Components**: 2 vul-targets (log4j, redis) + 1 attacker + 2 routers + 4 decoy servers (nginx-proxy, postgres-db, file-server, app-server)
 **Decoys Purpose**: Simulate enterprise production workloads, add lateral movement targets
@@ -399,7 +452,7 @@ if __name__ == "__main__":
     """
 
     # 测试代码
-    from state import initial_state
+    from clab_builder.state import initial_state
     state = initial_state()
     state["user_request"] = user_request
     result = generate(state)

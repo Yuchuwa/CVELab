@@ -9,11 +9,11 @@ from langchain.agents import create_agent
 from pydantic import BaseModel, Field
 from langgraph.types import Command
 
-from state import GraphState
+from clab_builder.state import GraphState
 from .utils import regenerate_yaml_from_json
-from config import config
+from clab_builder.config import config
 from tools.file_tools import read_file_tool, modify_file_tool
-from logger import get_logger, set_log_context, log_error, log_step
+from clab_builder.logger import get_logger, set_log_context, log_error, log_step
 
 
 # ============================================

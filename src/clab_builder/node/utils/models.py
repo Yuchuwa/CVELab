@@ -39,14 +39,17 @@ class NetworkBlueprint(BaseModel):
 
 class ContainerConfig(BaseModel):
     """容器配置（用于生成 containerlab YAML）"""
-    kind: Literal["linux"] = Field(default="linux", description="Node kind in containerlab")
-    image: str = Field(..., description="Docker image name with tag")
+    kind: Literal["linux", "bridge"] = Field(default="linux", description="Node kind in containerlab")
+    image: Optional[str] = Field(None, description="Docker image name with tag (not required for bridge)")
+    network_mode: Optional[str] = Field(None, alias="network-mode", description="Network mode (e.g., 'container:xxx' for namespace sharing)")
     binds: List[str] = Field(default_factory=list, description="Volume bind mounts (host:container)")
     env: Dict[str, str] = Field(default_factory=dict, description="Environment variables")
     sysctls: Dict[str, str] = Field(default_factory=dict, description="Kernel parameters (e.g., net.ipv4.ip_forward)")
     cmd: str = Field(default="", description="Override container command")
     ports: List[str] = Field(default_factory=list, description="Port mappings (host:container)")
     exec: List[str] = Field(default_factory=list, description="Commands to execute after startup (deprecated)")
+
+    model_config = {"populate_by_name": True}
 
 
 class LinkEndpoint(BaseModel):
@@ -80,8 +83,8 @@ class ClabYAML(BaseModel):
     topology: ClabTopology = Field(..., description="Topology definition")
 
     def to_yaml_dict(self) -> Dict[str, Any]:
-        """转换为 YAML 友好的字典（移除空值）"""
-        data = self.model_dump(exclude_none=True, exclude_unset=True)
+        """转换为 YAML 友好的字典（移除空值，使用 field alias）"""
+        data = self.model_dump(exclude_none=True, exclude_unset=True, by_alias=True)
         return self._prune_empty(data)
 
     @staticmethod

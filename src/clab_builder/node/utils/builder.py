@@ -75,6 +75,7 @@ class NetworkBuilder:
         # 1) 内部计算：分配子网、处理拓扑、生成 FRR 配置
         self._allocate_subnets()
         self._process_topology()
+        self._apply_scenario_policies()  # 应用场景特定的安全策略
         self._generate_frr_configs()
 
         # 2) 生成 LabConfig（Pydantic 模型，单一数据源）
@@ -85,8 +86,8 @@ class NetworkBuilder:
         with open(json_path, "w") as f:
             json.dump(lab_config.model_dump(exclude_none=True), f, indent=2)
 
-        # 4) 基于 LabConfig 生成 YAML
-        clab_yaml = self._generate_yaml_from_config(lab_config)
+        # 4) 直接从 self.clab_nodes 生成 YAML（包含网桥和背板容器）
+        clab_yaml = self._generate_yaml_direct()
         yaml_path = f"{self.output_dir}/{self.bp.lab_name}.clab.yml"
         with open(yaml_path, "w") as f:
             yaml.dump(clab_yaml.to_yaml_dict(), f, sort_keys=False)
@@ -160,7 +161,7 @@ class NetworkBuilder:
                     'image': first_service.get('image', ''),
                     'ports': first_service.get('ports', []),
                     'volumes': first_service.get('volumes', []),
-                    'environment': first_service.get('environment', {}),
+                    'env': first_service.get('environment', {}),  # docker-compose uses 'environment'
                     'command': first_service.get('command', ''),
                     'service_name': list(compose_data['services'].keys())[0]
                 }
@@ -188,6 +189,123 @@ class NetworkBuilder:
         # 3. Configure vul-target ports (bind to eth1 IP)
         self._configure_vul_target_ports()
 
+    def _apply_scenario_policies(self):
+        """应用场景特定的安全策略（防火墙规则、ACL、NAT等）
+
+        场景B：
+        1. 在 core-router 上添加 ACL，阻止 External 直接访问 Internal
+        2. 在 edge-router 上添加 NAT 规则，允许内网访问外网
+
+        ACL规则：
+        - External (10.0.1.0/24) → Internal (10.0.2.0/24): DENY
+        - DMZ (10.0.0.0/24) → Internal (10.0.2.0/24): ALLOW
+
+        NAT规则：
+        - 内网→外网: MASQUERADE on eth0
+        """
+        # 识别子网（支持多种命名方式）
+        external_subnet = None
+        dmz_subnet = None
+        internal_subnet = None
+
+        for subnet in self.bp.subnets:
+            if subnet == "external":
+                external_subnet = subnet
+            elif subnet == "dmz":
+                dmz_subnet = subnet
+            elif subnet == "internal":
+                internal_subnet = subnet
+
+        # 如果没有标准名称，按字母序备用逻辑
+        if not all([external_subnet, dmz_subnet, internal_subnet]):
+            sorted_subnets = sorted(self.bp.subnets)
+            if len(sorted_subnets) >= 3:
+                # 字母序：dmz, external, internal
+                dmz_subnet = sorted_subnets[0]  # dmz
+                external_subnet = sorted_subnets[1]  # external
+                internal_subnet = sorted_subnets[2]  # internal
+
+        # 添加 NAT 规则到 edge-router（所有场景）
+        if external_subnet:
+            edge_router_name = None
+            for node in self.bp.nodes:
+                if node.role == "router" and external_subnet in node.connected_subnets:
+                    edge_router_name = node.name
+                    break
+
+            if edge_router_name and edge_router_name in self.clab_nodes:
+                router_def = self.clab_nodes[edge_router_name]
+                if "exec" not in router_def:
+                    router_def["exec"] = []
+
+                # 添加 NAT MASQUERADE 规则
+                nat_rule = "iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
+                router_def["exec"].append(nat_rule)
+                print(f"[DEBUG] Applied NAT rule to {edge_router_name}: {nat_rule}")
+
+        # 只在场景B应用 ACL 规则
+        if self.bp.scenario != "B":
+            return
+
+        # 检查是否有三段子网（场景B特征）
+        if len(self.bp.subnets) < 3:
+            return
+
+        if not all([external_subnet, dmz_subnet, internal_subnet]):
+            return
+
+        # 获取子网 CIDR
+        external_cidr = str(self.subnet_map.get(external_subnet))
+        internal_cidr = str(self.subnet_map.get(internal_subnet))
+        dmz_cidr = str(self.subnet_map.get(dmz_subnet))
+
+        # 提取网络地址（/24）
+        external_network = external_cidr[:external_cidr.rfind('.') + 1] + '0/24'
+        internal_network = internal_cidr[:internal_cidr.rfind('.') + 1] + '0/24'
+        dmz_network = dmz_cidr[:dmz_cidr.rfind('.') + 1] + '0/24'
+
+        # 找到 core-router（连接 DMZ 和 Internal 的路由器）
+        core_router_name = None
+        for node in self.bp.nodes:
+            if node.role == "router":
+                # 检查是否连接 dmz 和 internal
+                connected = set(node.connected_subnets)
+                if dmz_subnet in connected and internal_subnet in connected:
+                    core_router_name = node.name
+                    # 排除 edge-router（如果同时连接 external）
+                    if external_subnet in connected:
+                        core_router_name = None
+                    break
+
+        if not core_router_name:
+            return
+
+        # 添加 iptables 规则到 core-router
+        if core_router_name in self.clab_nodes:
+            router_def = self.clab_nodes[core_router_name]
+
+            # 确保 exec 字段存在
+            if "exec" not in router_def:
+                router_def["exec"] = []
+
+            # 添加 ACL 规则
+            acl_rules = [
+                # 1. 阻止 External (10.0.1.0/24) 直接访问 Internal (10.0.2.0/24)
+                f"iptables -A FORWARD -s {external_network} -d {internal_network} -j DROP",
+                # 2. 允许 DMZ (10.0.0.0/24) 访问 Internal (10.0.2.0/24)
+                f"iptables -A FORWARD -s {dmz_network} -d {internal_network} -j ACCEPT",
+                # 3. 允许已建立的连接返回流量
+                f"iptables -A FORWARD -s {internal_network} -d {dmz_network} -m state --state ESTABLISHED,RELATED -j ACCEPT",
+                # 4. 允许 Internal → DMZ 的新连接
+                f"iptables -A FORWARD -s {internal_network} -d {dmz_network} -j ACCEPT",
+            ]
+
+            # 将规则添加到 exec 列表
+            router_def["exec"].extend(acl_rules)
+            print(f"[DEBUG] Applied ACL rules to {core_router_name}:")
+            for rule in acl_rules:
+                print(f"  - {rule}")
+
     def _create_clab_node(self, node: LogicalNode):
         """创建 containerlab 节点定义（不包含 exec 命令）
 
@@ -208,7 +326,7 @@ class NetworkBuilder:
                 "exec": [],  # No exec commands - container handles its own startup
                 "binds": [],  # Bind mounts from compose will be added later if needed
                 "ports": compose_data.get('ports', []),
-                "environment": compose_data.get('environment', {}),
+                "env": compose_data.get('env', {}),
                 "cmd": compose_data.get('command', '')
             }
             self.clab_nodes[node.name] = node_def
@@ -267,13 +385,13 @@ class NetworkBuilder:
 
         # Step 1: Create Physical Links (L2 Topology)
         if len(members) > 2:
-            # Use containerlab bridge kind
-            bridge_name = f"sw-{subnet_name}"
-            self._inject_bridge_node(bridge_name)
+            # Use containerlab namespace bridge
+            # 返回完整节点名（如 sw-dmz|backplane）
+            bridge_full_name = self._inject_bridge_node(f"sw-{subnet_name}")
 
-            # Connect everyone to bridge
+            # Connect everyone to bridge（使用完整节点名）
             for member in members:
-                self._create_link(member.name, bridge_name, subnet_name)
+                self._create_link(member.name, bridge_full_name, subnet_name)
 
         elif len(members) == 2:
             # Point-to-Point connection
@@ -298,39 +416,76 @@ class NetworkBuilder:
             user_lan_offset += 1
             self.node_ip_map[endpoint.name][subnet_name] = ip_str
 
-    def _inject_bridge_node(self, name: str):
-        """注入作为交换机的 containerlab linux 节点
+    def _inject_bridge_node(self, name: str) -> str:
+        """注入 namespace bridge 类型的交换机节点
+
+        使用 containerlab 的 namespace bridge（在容器命名空间内创建），
+        不需要宿主机特权。每个网桥都有独立的 backplane 容器。
+
+        网桥节点命名格式：{bridge_name}|{backplane_name}（如 sw-dmz|backplane-dmz）
 
         Args:
-            name: 网桥/交换机节点名称
+            name: 网桥/交换机节点名称（如 sw-dmz, sw-internal）
+
+        Returns:
+            完整节点名（如 sw-dmz|backplane-dmz），用于创建 links
         """
-        if name not in self.clab_nodes:
-            self.clab_nodes[name] = {
+        # 确保元数据字典存在
+        if not hasattr(self, '_node_metadata'):
+            self._node_metadata = {}
+
+        # 从网桥名称提取 subnet 名称（如 sw-dmz -> dmz）
+        subnet_name = name.replace("sw-", "", 1)
+        backplane_name = f"backplane-{subnet_name}"
+        bridge_full_name = f"{name}|{backplane_name}"
+
+        # 创建 backplane 容器（作为网络命名空间载体）
+        if backplane_name not in self.clab_nodes:
+            self.clab_nodes[backplane_name] = {
                 "kind": "linux",
-                "image": "alpine:latest"
+                "image": "alpine:latest",
+                "cmd": "sleep infinity"  # 保持容器运行，确保 namespace bridge 稳定
             }
 
-            # Track switch metadata for config JSON
-            if not hasattr(self, '_node_metadata'):
-                self._node_metadata = {}
-            self._node_metadata[name] = {
+        # backplane 容器元数据
+        if backplane_name not in self._node_metadata:
+            self._node_metadata[backplane_name] = {
                 "role": "switch",
                 "image": "alpine:latest",
                 "image_flavor": "alpine",
                 "container_path": None
             }
 
+        # 创建网桥节点（namespace bridge，附加到 backplane 容器）
+        if bridge_full_name not in self.clab_nodes:
+            self.clab_nodes[bridge_full_name] = {
+                "kind": "bridge",
+                "network-mode": f"container:{backplane_name}"
+            }
+
+        # 网桥节点元数据
+        if bridge_full_name not in self._node_metadata:
+            self._node_metadata[bridge_full_name] = {
+                "role": "switch",
+                "image": None,
+                "image_flavor": None,
+                "container_path": None
+            }
+
+        return bridge_full_name  # 返回完整节点名供调用者使用
+
     def _create_link(self, node_a: str, node_b: str, subnet_name: str = None):
         """在两个节点之间创建链路（不包含 exec 命令）
 
         Args:
-            node_a: 第一个节点名称
-            node_b: 第二个节点名称
+            node_a: 第一个节点名称（如果是网桥，格式如 sw-dmz）
+            node_b: 第二个节点名称（如果是网桥，格式如 sw-dmz）
             subnet_name: 子网名称（用于记录接口映射）
         """
         eth_a = self._inc_interface(node_a)
         eth_b = self._inc_interface(node_b)
 
+        # 使用节点名创建链接
         self.clab_links.append({
             "endpoints": [
                 f"{node_a}:eth{eth_a}",
@@ -338,7 +493,7 @@ class NetworkBuilder:
             ]
         })
 
-        # Record interface mapping (NEW: 修复接口编号问题)
+        # 记录接口映射
         if subnet_name:
             self.link_interface_map[node_a][subnet_name] = f"eth{eth_a}"
             self.link_interface_map[node_b][subnet_name] = f"eth{eth_b}"
@@ -496,6 +651,12 @@ class NetworkBuilder:
             # Get metadata
             metadata = self._node_metadata.get(node_name, {})
             role = metadata.get("role", "endpoint")
+
+            # 跳过 namespace bridge 节点（格式: sw-dmz|backplane-dmz）
+            # 这些是附加到 backplane 容器的虚拟网桥，不是真正的容器
+            if "|" in node_name:
+                continue
+
             container_path = metadata.get("container_path")
 
             # 构建 interfaces（使用 link_interface_map 确保顺序正确）
@@ -544,9 +705,10 @@ class NetworkBuilder:
             clab_node = self.clab_nodes[node_name]
             container_config = ContainerConfig(
                 kind=clab_node.get("kind", "linux"),
-                image=metadata.get("image", ""),
+                image=metadata.get("image") or clab_node.get("image", ""),
+                network_mode=clab_node.get("network-mode"),
                 binds=clab_node.get("binds", []),
-                env=clab_node.get("environment", {}),
+                env=clab_node.get("env", {}),
                 sysctls=clab_node.get("sysctls", {}),
                 cmd=clab_node.get("cmd", ""),
                 ports=clab_node.get("ports", []),
@@ -580,6 +742,41 @@ class NetworkBuilder:
             subnets={name: str(cidr) for name, cidr in self.subnet_map.items()},
             links=topology_links,
             nodes=nodes_config
+        )
+
+    def _generate_yaml_direct(self) -> ClabYAML:
+        """直接从内部状态生成 YAML（包含所有节点，包括网桥）
+
+        Returns:
+            ClabYAML: containerlab YAML 对象
+        """
+        # 直接使用 self.clab_nodes 构建节点配置
+        clab_nodes = {}
+        for node_name, node_def in self.clab_nodes.items():
+            # 转换为 ContainerConfig
+            container_config = ContainerConfig(
+                kind=node_def.get("kind", "linux"),
+                image=node_def.get("image"),
+                network_mode=node_def.get("network-mode"),
+                binds=node_def.get("binds", []),
+                env=node_def.get("env", {}),
+                sysctls=node_def.get("sysctls", {}),
+                cmd=node_def.get("cmd", ""),
+                ports=node_def.get("ports", []),
+                exec=node_def.get("exec", [])
+            )
+            clab_nodes[node_name] = container_config
+
+        # 直接使用 self.clab_links 构建链路配置
+        clab_links = self.clab_links
+
+        # 返回 ClabYAML 对象
+        return ClabYAML(
+            name=self.bp.lab_name,
+            topology=ClabTopology(
+                nodes=clab_nodes,
+                links=clab_links
+            )
         )
 
     def _generate_yaml_from_config(self, lab_config: LabConfig) -> ClabYAML:
@@ -695,12 +892,44 @@ def _generate_yaml_from_lab_config(lab_config: LabConfig) -> ClabYAML:
     Returns:
         ClabYAML: containerlab YAML对象
     """
-    # 构建 nodes（直接使用 container_config）
+    # Step 1: 从 links 中提取所有网桥节点名（以 sw- 开头）
+    bridge_nodes = set()
+    for link in lab_config.links:
+        for endpoint in link.endpoints:
+            node_name = endpoint.node
+            if node_name.startswith("sw-"):
+                bridge_nodes.add(node_name)
+
+    # Step 2: 构建 nodes（从 JSON 中获取）
     clab_nodes = {}
     for node_name, node_config in lab_config.nodes.items():
         clab_nodes[node_name] = node_config.container_config
 
-    # 构建 links（转换为 containerlab 格式）
+    # Step 3: 添加 namespace bridge 节点（格式: sw-dmz|backplane-dmz）
+    for bridge_full_name in sorted(bridge_nodes):
+        if bridge_full_name not in clab_nodes:
+            # Namespace bridge: 提取 backplane 名称并设置 network-mode
+            bridge_name, backplane_name = bridge_full_name.split("|", 1)
+
+            # 确保 backplane 容器存在
+            if backplane_name not in clab_nodes:
+                # 从 JSON 中查找 backplane 配置
+                backplane_config = None
+                for node_name, node_config in lab_config.nodes.items():
+                    if node_name == backplane_name:
+                        backplane_config = node_config.container_config
+                        break
+
+                if backplane_config:
+                    clab_nodes[backplane_name] = backplane_config
+
+            # 创建 namespace bridge 节点
+            clab_nodes[bridge_full_name] = ContainerConfig(
+                kind="bridge",
+                network_mode=f"container:{backplane_name}"
+            )
+
+    # Step 4: 构建 links（转换为 containerlab 格式）
     clab_links = [link.to_clab_format() for link in lab_config.links]
 
     # 返回 ClabYAML 对象

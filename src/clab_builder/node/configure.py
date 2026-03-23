@@ -8,9 +8,9 @@ from pydantic import BaseModel, Field
 from langchain.chat_models import init_chat_model
 from langchain.agents import create_agent
 
-from state import GraphState
-from config import config
-from logger import get_logger, set_log_context, log_step
+from clab_builder.state import GraphState
+from clab_builder.config import config
+from clab_builder.logger import get_logger, set_log_context, log_step
 from .utils import ConfigApplier
 
 # Configure 错误类型标识符

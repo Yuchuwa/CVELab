@@ -7,7 +7,7 @@ import subprocess
 import json
 from typing import Dict, Any, Optional
 
-from logger import get_logger
+from clab_builder.logger import get_logger
 
 
 class ConfigApplier:
@@ -212,15 +212,23 @@ class ConfigApplier:
 
         success_count = 0
         failed_nodes = []
+        skipped_count = 0
 
         for node_name, node_config in config["nodes"].items():
+            # 跳过网桥节点（它们不需要网络配置）
+            role = node_config.get("role", "")
+            if role == "switch":
+                self.logger.debug(f"  Skipping {node_name} (role: {role}, no network config needed)")
+                skipped_count += 1
+                continue
+
             if self.apply_node_config(node_name, node_config):
                 success_count += 1
             else:
                 failed_nodes.append(node_name)
 
-        total = len(config["nodes"])
-        self.logger.info(f"Configuration complete: {success_count}/{total} nodes configured")
+        total = len(config["nodes"]) - skipped_count  # 只统计需要配置的节点
+        self.logger.info(f"Configuration complete: {success_count}/{total} nodes configured (skipped {skipped_count} bridge nodes)")
 
         if failed_nodes:
             self.logger.warning(f"Failed nodes: {', '.join(failed_nodes)}")

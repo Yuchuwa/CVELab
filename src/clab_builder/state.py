@@ -1,5 +1,5 @@
 from typing import TypedDict, List, Dict, Any, Union
-from node.utils import NetworkBlueprint
+from clab_builder.node.utils import NetworkBlueprint
 
 class NodeConfigSpec(TypedDict):
     node_name: str

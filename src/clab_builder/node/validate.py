@@ -4,9 +4,9 @@ import yaml
 import subprocess
 from typing import Dict, List, Any, Set
 from collections import Counter
-from state import GraphState
+from clab_builder.state import GraphState
 from .fixer import ERROR_TYPE_VALIDATE
-from logger import get_logger, set_log_context, log_step
+from clab_builder.logger import get_logger, set_log_context, log_step
 
 
 # ============================================
@@ -404,12 +404,20 @@ def validate_consistency(
     yaml_nodes = topo.get('nodes', {})
     json_nodes = config_data.get('nodes', {})
 
-    # 排除 switch 节点（通过节点名称前缀 sw- 或 JSON 中的 role 字段判断）
-    # Switches are now linux containers with role "switch" in JSON, but may have any kind in YAML
+    # 排除 namespace bridge 节点
+    #
+    # YAML 中排除：
+    #   - kind 为 bridge 的节点（namespace bridge，如 sw-dmz|backplane-dmz）
+    #
+    # JSON 中排除：
+    #   - 节点名包含 | 的节点（namespace bridge 的虚拟节点）
+    #
+    # 注意：backplane 容器（如 backplane-dmz）是真正的 linux 容器，
+    # role 为 switch 但应该被包含在统计中
     yaml_nodes_no_switch = {n: cfg for n, cfg in yaml_nodes.items()
-                            if not n.startswith('sw-') and cfg.get('kind') != 'bridge'}
+                            if cfg.get('kind') != 'bridge'}
     json_nodes_no_switch = {n: cfg for n, cfg in json_nodes.items()
-                            if cfg.get('role') != 'switch'}
+                            if '|' not in n}  # 排除 namespace bridge（格式: sw-dmz|backplane-dmz）
 
     # =========================================
     # C1: 节点数量一致性

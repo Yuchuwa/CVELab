@@ -4,11 +4,11 @@
 """
 from typing import Dict, Any
 
-from state import GraphState
+from clab_builder.state import GraphState
 from .utils import NetworkBuilder
 from .fixer import ERROR_TYPE_BUILD
-from session_utils import get_current_session_id
-from logger import get_logger, set_log_context, log_step, log_error
+from clab_builder.session_utils import get_current_session_id
+from clab_builder.logger import get_logger, set_log_context, log_step, log_error
 
 
 def builder_node(state: GraphState) -> Dict[str, Any]:

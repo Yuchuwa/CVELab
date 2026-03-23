@@ -13,7 +13,7 @@ from dataclasses import dataclass
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from main import run
+from clab_builder.main import run
 
 
 # ============================================
@@ -316,7 +316,7 @@ def test_scenario_b_01_clear_input() -> TestResult:
 
     网络分层：
     1. 外网区域（external）：Kali攻击机
-    2. DMZ区域：Log4j漏洞目标 + Nginx诱饵服务器
+    2. DMZ区域：WebLogic漏洞目标 + Nginx诱饵服务器
     3. 内网区域（internal）：Redis漏洞目标 + PostgreSQL诱饵 + 文件服务器
 
     路由架构：
@@ -324,7 +324,7 @@ def test_scenario_b_01_clear_input() -> TestResult:
     - 核心路由器（core-router）：连接dmz和internal
 
     漏洞目标：
-    - DMZ：Log4j CVE-2021-44228
+    - DMZ：WebLogic CVE-2020-14882（未授权访问RCE漏洞）
     - Internal：Redis CVE-2022-0543
 
     诱饵服务器：
@@ -524,19 +524,30 @@ def test_scenario_b_04_multiple_vulns() -> TestResult:
 
 
 def test_scenario_b_05_lateral_movement() -> TestResult:
-    """测试场景B - 横向移动：测试多层诱饵服务器"""
+    """测试场景B - 横向移动：双层漏洞实战"""
     print("\n" + "="*80)
-    print("📋 测试 B-5: 场景B - 横向移动场景（多层诱饵）")
+    print("📋 测试 B-5: 场景B - 横向移动实战（双层漏洞）")
     print("="*80)
-    print("描述: 测试多层诱饵服务器配置，模拟横向移动场景")
+    print("描述: DMZ和内网各部署一个漏洞目标，练习横向移动")
     print("-"*80)
 
     user_request = """
-    场景B，需要练习横向移动的企业网络：
-    - Kali在外网
-    - DMZ有Web漏洞和2个正常业务服务器
-    - 内网有数据库漏洞，还有文件服务器、应用服务器、数据库服务器等4-5个正常服务器
-    - 模拟真实的企业环境，方便练习从DMZ打到内网
+    创建一个场景B的渗透测试实验室，用于练习横向移动：
+
+    网络分层：
+    1. 外网区域：Kali Linux攻击机
+    2. DMZ区域：一个漏洞目标 + 2个正常业务服务器
+    3. 内网区域：一个漏洞目标 + 3个正常服务器（数据库、文件服务器、应用服务器）
+
+    路由架构：
+    - 边缘路由器连接外网和DMZ
+    - 核心路由器连接DMZ和内网，配置ACL阻止外网直接访问内网
+
+    测试目标：
+    1. 从外网扫描并发现DMZ的漏洞
+    2. 利用DMZ漏洞获取立足点
+    3. 从DMZ横向移动到内网
+    4. 发现并利用内网漏洞目标
     """
 
     try:
@@ -546,13 +557,13 @@ def test_scenario_b_05_lateral_movement() -> TestResult:
             print("\n✅ 测试 B-5 - 成功")
             print(f"   YAML: {result.get('yaml_path', 'N/A')}")
             print(f"   JSON: {result.get('json_path', 'N/A')}")
-            print("   说明: 成功创建横向移动练习环境")
+            print("   说明: 成功创建双层漏洞横向移动环境")
             return TestResult(
                 test_name="B-5_Lateral_Movement",
                 passed=True,
                 yaml_path=result.get('yaml_path', ''),
                 json_path=result.get('json_path', ''),
-                notes="横向移动场景配置成功"
+                notes="双层漏洞横向移动场景配置成功"
             )
         else:
             print(f"\n❌ 测试 B-5 - 失败")
