@@ -46,7 +46,8 @@ class VulnKnowledgeBase:
 
 # Specify the path to your CSV file (absolute path based on script location)
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT = os.path.dirname(_SCRIPT_DIR)
+# Go up to project root: tools/ -> clab_builder/ -> src/ -> project_root/
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_SCRIPT_DIR)))
 CSV_FILE_PATH = os.path.join(_PROJECT_ROOT, 'source/vulhub_cves_20260114.csv')
 
 # Initialize the Knowledge Base with the file path

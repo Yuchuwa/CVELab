@@ -5,7 +5,7 @@ from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 
 from clab_builder.state import GraphState
-from tools.containerlab_tools import clab_lifecycle_tool, ClabAction
+# from tools.containerlab_tools import clab_lifecycle_tool, ClabAction  # TODO: containerlab_tools.py not found
 from clab_builder.config import LLM_MODEL, BASE_URL, API_KEY
 
 

@@ -12,7 +12,7 @@ from langgraph.types import Command
 from clab_builder.state import GraphState
 from .utils import regenerate_yaml_from_json
 from clab_builder.config import config
-from tools.file_tools import read_file_tool, modify_file_tool
+from clab_builder.tools.file_tools import read_file_tool, modify_file_tool
 from clab_builder.logger import get_logger, set_log_context, log_error, log_step
 
 

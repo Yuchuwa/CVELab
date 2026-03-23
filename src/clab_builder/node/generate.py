@@ -8,7 +8,7 @@ from langchain.agents import create_agent
 
 from .utils import NetworkBlueprint
 from clab_builder.state import GraphState
-from tools.search_vuln_image import search_vulnerability_image
+from clab_builder.tools.search_vuln_image import search_vulnerability_image
 from clab_builder.config import config
 from clab_builder.logger import get_logger, set_log_context, log_step, log_error
 
