@@ -207,6 +207,9 @@ def parse_environments(vulhub_path, output_csv):
 
     results = []
 
+    # Get absolute path of vulhub for computing relative paths
+    vulhub_abs = os.path.abspath(vulhub_path)
+
     for env in data.get('environment', []):
         name = env.get('name', '')
         cve_list = env.get('cve', [])
@@ -240,14 +243,22 @@ def parse_environments(vulhub_path, output_csv):
         # Determine role based on app runtime environment and vulnerability tags
         role, runtime_lang = determine_role(app, tags)
 
-        # Build result row
-        # valid_cves is already a string (either joined CVEs or "unknown")
+        # Build result row - use RELATIVE path from project root (source/)
+        if os.path.exists(readme_path):
+            readme_abs_dir = os.path.dirname(os.path.abspath(readme_path))
+            # Compute relative path from source/ directory
+            rel_path = os.path.relpath(readme_abs_dir, vulhub_abs)
+            # Path stored relative to source/vulhub/
+            stored_path = f"source/vulhub/{rel_path}"
+        else:
+            stored_path = ''
+
         result = {
             'Name': folder_name,
             'CVE': valid_cves,
             'Description': name,
             'Reference': references,
-            'Path': os.path.dirname(os.path.abspath(readme_path)) if os.path.exists(readme_path) else '',
+            'Path': stored_path,
             'Type': vuln_type,
             'Role': role,
             'Runtime_lang': runtime_lang,

@@ -136,6 +136,7 @@ class NodeConfig(BaseModel):
 
     # 可选元数据
     container_path: Optional[str] = Field(None, description="Vulhub container path (for vul-targets)")
+    flag: Optional[str] = Field(None, description="Randomized FLAG for vul-target nodes (format: FLAG{...})")
 
 
 class LabConfig(BaseModel):

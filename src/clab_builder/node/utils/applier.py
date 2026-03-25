@@ -398,4 +398,12 @@ class ConfigApplier:
             "expected_image": node_config.get("image", "")
         }
 
+        # 7. 收集 FLAG 信息（vul-target 节点）
+        if node_config.get("role") == "vul-target" and node_config.get("flag"):
+            flag_output = self._nsenter_capture(pid, "cat /flag/flag")
+            diagnostics["checks"]["flag"] = {
+                "raw_output": flag_output,
+                "expected": node_config.get("flag")
+            }
+
         return diagnostics

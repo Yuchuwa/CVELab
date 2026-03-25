@@ -16,10 +16,25 @@ class VulnKnowledgeBase:
         self.df.fillna('', inplace=True)
         print(f"Successfully loaded {len(self.df)} vulnerability entries from {csv_filepath}")
 
+        # Store project root for relative path resolution
+        self._script_dir = os.path.dirname(os.path.abspath(__file__))
+        # tools/ -> clab_builder/ -> src/ -> project_root/
+        self._project_root = os.path.dirname(os.path.dirname(os.path.dirname(self._script_dir)))
+
+    def _resolve_path(self, path: str) -> str:
+        """Convert relative path to absolute path based on project root."""
+        if not path:
+            return ''
+        if os.path.isabs(path):
+            return path
+        # Path is relative to project root
+        return os.path.join(self._project_root, path)
+
     def search(self, query: str) -> List[Dict]:
         """
         Search the dataframe for rows matching the query.
         Search order: CVE > Type > Name/Description.
+        Returns records with resolved absolute paths.
         """
         query = query.lower().strip()
         results = []
@@ -28,12 +43,12 @@ class VulnKnowledgeBase:
         if "cve-" in query:
             cve_matches = self.df[self.df['CVE'].str.lower().str.contains(query)]
             if not cve_matches.empty:
-                return cve_matches.to_dict(orient='records')
+                return [self._resolve_record(r) for r in cve_matches.to_dict(orient='records')]
 
         # 2. Type Match (e.g., 'RCE', 'SQL Injection', 'XSS')
         type_matches = self.df[self.df['Type'].str.lower().str.contains(query)]
         if not type_matches.empty:
-            return type_matches.to_dict(orient='records')
+            return [self._resolve_record(r) for r in type_matches.to_dict(orient='records')]
 
         # 3. General Keyword Match (Name or Description)
         mask = (
@@ -42,7 +57,13 @@ class VulnKnowledgeBase:
         )
         matches = self.df[mask]
 
-        return matches.to_dict(orient='records')
+        return [self._resolve_record(r) for r in matches.to_dict(orient='records')]
+
+    def _resolve_record(self, record: Dict) -> Dict:
+        """Resolve Path in a record to absolute path."""
+        if 'Path' in record:
+            record['Path'] = self._resolve_path(record['Path'])
+        return record
 
 # Specify the path to your CSV file (absolute path based on script location)
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

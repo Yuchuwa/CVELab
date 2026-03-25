@@ -7,6 +7,8 @@ import yaml
 import json
 import ipaddress
 import shutil
+import secrets
+import string
 from collections import defaultdict
 from typing import Dict, Any, List
 
@@ -24,6 +26,20 @@ class NetworkBuilder:
     将逻辑网络蓝图转换为 containerlab 可用的 YAML 和 JSON 配置文件。
     处理子网分配、IP 地址管理、节点创建和 FRR 路由配置生成。
     """
+
+    @staticmethod
+    def generate_flag(length: int = 32) -> str:
+        """生成随机化的FLAG
+
+        Args:
+            length: FLAG随机字符串长度，默认32位
+
+        Returns:
+            格式为 FLAG{随机字符串} 的FLAG
+        """
+        alphabet = string.ascii_letters + string.digits
+        random_str = ''.join(secrets.choice(alphabet) for _ in range(length))
+        return f"FLAG{{{random_str}}}"
 
     def __init__(self, blueprint: NetworkBlueprint, output_dir: str = "./clab_out"):
         """初始化网络构建器
@@ -320,11 +336,21 @@ class NetworkBuilder:
 
             image = compose_data.get('image', '')
 
+            # Generate random FLAG and create bind mount to /flag
+            flag = self.generate_flag()
+            flag_dir = os.path.join(self.output_dir, f"flag-{node.name}")
+            flag_file = os.path.join(flag_dir, "flag")
+            os.makedirs(flag_dir, exist_ok=True)
+            with open(flag_file, 'w') as f:
+                f.write(flag)
+            # Use absolute path for bind mount (containerlab requires absolute paths)
+            flag_bind = f"{os.path.abspath(flag_file)}:/flag/flag"
+
             node_def = {
                 "kind": "linux",
                 "image": image,
                 "exec": [],  # No exec commands - container handles its own startup
-                "binds": [],  # Bind mounts from compose will be added later if needed
+                "binds": [flag_bind],  # Bind mount FLAG to /flag
                 "ports": compose_data.get('ports', []),
                 "env": compose_data.get('env', {}),
                 "cmd": compose_data.get('command', '')
@@ -339,7 +365,8 @@ class NetworkBuilder:
                 "image": image,
                 "image_flavor": node.image_flavor,
                 "container_path": node.container_path,
-                "compose_data": compose_data
+                "compose_data": compose_data,
+                "flag": flag
             }
             return
 
@@ -733,7 +760,8 @@ class NetworkBuilder:
                     default_route=default_route,
                     frr=frr_config,
                     container_config=container_config,
-                    container_path=container_path
+                    container_path=container_path,
+                    flag=metadata.get("flag")
                 )
 
         # 返回 LabConfig 对象
