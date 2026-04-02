@@ -103,7 +103,7 @@ def nsenter_exec(pid, command):
     if not pid:
         return False
     try:
-        full_cmd = f"sudo nsenter -n -t {{{{pid}}}} -- {{{{command}}}}"
+        full_cmd = f"sudo nsenter -n -t {pid} -- {command}"
         subprocess.run(full_cmd, shell=True, check=True, capture_output=True, timeout=30)
         return True
     except subprocess.CalledProcessError as e:
@@ -146,10 +146,10 @@ try:
                 iface_name = iface["name"]
                 address = iface["address"]
 
-                if not nsenter_exec(pid, f"ip addr add {{{{address}}}} dev {{{{iface_name}}}}"):
+                if not nsenter_exec(pid, f"ip addr add {address} dev {iface_name}"):
                     node_success = False
 
-                if not nsenter_exec(pid, f"ip link set dev {{{{iface_name}}}} up"):
+                if not nsenter_exec(pid, f"ip link set dev {iface_name} up"):
                     node_success = False
 
         # 配置默认路由
@@ -157,7 +157,7 @@ try:
             route = node_config["default_route"]
             gateway = route.get("gateway")
 
-            if gateway and not nsenter_exec(pid, f"ip route replace default via {{{{gateway}}}}"):
+            if gateway and not nsenter_exec(pid, f"ip route replace default via {gateway}"):
                 node_success = False
 
         if node_success:
@@ -166,15 +166,15 @@ try:
             failed_nodes.append(node_name)
 
     total = len([n for n, c in config["nodes"].items() if c.get("role") != "switch"])
-    print(f"✓ Configuration complete: {{{{success_count}}}}/{{{{total}}}} nodes")
+    print(f"✓ Configuration complete: {success_count}/{total} nodes")
 
     if failed_nodes:
-        print(f"⚠️  Failed nodes: {{{{', '.join(failed_nodes)}}}}")
+        print(f"⚠️  Failed nodes: {', '.join(failed_nodes)}")
 
     sys.exit(0)
 
 except Exception as e:
-    print(f"✗ Configuration failed: {{{{e}}}}")
+    print(f"✗ Configuration failed: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)

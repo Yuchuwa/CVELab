@@ -860,7 +860,7 @@ def regenerate_yaml_from_json(
         ValidationError: JSON不符合LabConfig schema
     """
     import yaml
-    from logger import get_logger
+    from clab_builder.logger import get_logger
 
     logger = get_logger("node.builder")
     logger.info(f"Regenerating YAML from JSON: {json_path}")
