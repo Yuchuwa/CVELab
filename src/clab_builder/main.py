@@ -1,165 +1,80 @@
-"""ContainerLab Builder - 主入口
-
-基于 LLM 和 LangGraph 的智能网络拓扑自动化构建工具。
-"""
-from typing import Dict, Any
-
-from clab_builder.state import GraphState
-from langgraph.graph import StateGraph, START, END
-from clab_builder.node.generate import generate
-from clab_builder.node.deploy import deploy
-from clab_builder.node.configure import configure
-from clab_builder.node.builder import builder_node
-from clab_builder.node.validate import validator_node
-from clab_builder.node.fixer import fixer
-from clab_builder.session_utils import ensure_session_dir, set_current_session_id
-from clab_builder.config import config
-from clab_builder.logger import (
-    setup_logger,
-    get_logger,
-    set_log_context,
-    log_step
-)
+"""主入口点 - 用于 clab-builder 命令"""
+import sys
+from .core import ContainerLabParser, EnvironmentValidator
+from .core.generator import TopologyGenerator
 
 
-def create_workflow() -> StateGraph:
-    """创建并编译 LangGraph 工作流。"""
-    workflow = StateGraph(GraphState)
+def main():
+    """主入口点"""
+    if len(sys.argv) < 2:
+        print("Clab Builder - ContainerLab拓扑生成和验证工具")
+        print("")
+        print("使用方法:")
+        print("  python -m packages.clab_builder parse <yaml_file>")
+        print("  python -m packages.clab_builder validate <lab_name>")
+        print("  python -m packages.clab_builder generate <yaml_file>")
+        sys.exit(1)
 
-    # 添加节点
-    workflow.add_node("generator", generate)
-    workflow.add_node("builder", builder_node)
-    workflow.add_node("validator", validator_node)
-    workflow.add_node("deployer", deploy)
-    workflow.add_node("configurator", configure)
-    workflow.add_node("fixer", fixer)
+    command = sys.argv[1]
 
-    # 添加边
-    workflow.add_edge(START, "generator")
-    workflow.add_edge("generator", "builder")
-
-    # 条件边：检查构建错误
-    def check_build_errors(state: GraphState) -> str:
-        error_logs = state.get("error_logs", "")
-        if "[ERROR_TYPE:BUILD]" in error_logs:
-            return "fixer"
-        return "validator"
-
-    # 条件边：检查验证错误
-    def check_validation_errors(state: GraphState) -> str:
-        error_logs = state.get("error_logs", "")
-        if "[ERROR_TYPE:SYSTEM]" in error_logs:
-            return END
-        if "[ERROR_TYPE:VALIDATE]" in error_logs:
-            return "fixer"
-        return "deployer"
-
-    # 条件边：检查部署错误
-    def check_deploy_errors(state: GraphState) -> str:
-        error_logs = state.get("error_logs", "")
-        if "[ERROR_TYPE:DEPLOY]" in error_logs:
-            return "fixer"
-        return "configurator"
-
-    # 条件边：检查配置错误
-    def check_configuration_errors(state: GraphState) -> str:
-        error_logs = state.get("error_logs", "")
-        if "[ERROR_TYPE:CONFIGURE]" in error_logs:
-            return "fixer"
-        return END
-
-    # 添加条件边
-    workflow.add_conditional_edges("builder", check_build_errors)
-    workflow.add_conditional_edges("validator", check_validation_errors)
-    workflow.add_conditional_edges("deployer", check_deploy_errors)
-    workflow.add_conditional_edges("configurator", check_configuration_errors)
-
-    return workflow.compile()
+    if command == 'parse':
+        if len(sys.argv) < 3:
+            print("使用方法: python -m packages.clab_builder parse <yaml_file>")
+            sys.exit(1)
+        parse_command(sys.argv[2])
+    elif command == 'validate':
+        if len(sys.argv) < 3:
+            print("使用方法: python -m packages.clab_builder validate <lab_name>")
+            sys.exit(1)
+        validate_command(sys.argv[2])
+    elif command == 'generate':
+        if len(sys.argv) < 3:
+            print("使用方法: python -m packages.clab_builder generate <yaml_file>")
+            sys.exit(1)
+        generate_command(sys.argv[2])
+    else:
+        print(f"未知命令: {command}")
+        sys.exit(1)
 
 
-def run(user_request: str) -> Dict[str, Any]:
-    """运行工作流。
+def parse_command(yaml_file: str):
+    """解析ContainerLab YAML文件"""
+    print(f"📄 解析文件: {yaml_file}")
+    parser = ContainerLabParser(yaml_file)
+    topology = parser.extract_topology_specification()
 
-    Args:
-        user_request: 用户的自然语言请求
-
-    Returns:
-        工作流最终状态
-    """
-    # 生成会话 ID 和目录
-    session_id, session_dir = ensure_session_dir()
-
-    # 设置会话级别的 logger
-    setup_logger(
-        name="containerlab_builder",
-        level=getattr(__import__("logging"), config.log_level),
-        session_id=session_id
-    )
-
-    logger = get_logger("main")
-    set_log_context(stage="main")
-
-    # 打印欢迎信息
-    logger.info("=" * 60)
-    logger.info("🚀 ContainerLab Builder")
-    logger.info("=" * 60)
-    logger.info(f"📁 Session ID: {session_id}")
-    logger.info(f"📂 Output directory: {session_dir}")
-    logger.info(f"⚙️  Config: model={config.llm_model}, max_retries={config.max_retries}")
-
-    # 设置当前会话 ID（供其他模块使用）
-    set_current_session_id(session_id)
-
-    # 创建工作流
-    app = create_workflow()
-
-    # 初始状态
-    initial_state: GraphState = {
-        "user_request": user_request,
-        "blueprint": None,
-        "yaml_path": "",
-        "json_path": "",
-        "error_logs": "",
-        "is_deployed": False,
-        "inspect_data": {},
-        "retry_count": 0,
-        "is_complete": False,
-    }
-
-    # 运行工作流
-    try:
-        result = app.invoke(initial_state)
-
-        # 输出最终结果
-        logger.info("=" * 60)
-        if result.get("is_complete"):
-            log_step(logger, "Workflow completed successfully", status="success")
-            if result.get("yaml_path"):
-                logger.info(f"📄 YAML file: {result['yaml_path']}")
-        else:
-            log_step(logger, "Workflow did not complete as expected", status="fail")
-            if result.get("error_logs"):
-                logger.error(f"Error: {result['error_logs']}")
-
-        logger.info("=" * 60)
-
-        return result
-
-    except KeyboardInterrupt:
-        logger.warning("Workflow interrupted by user")
-        raise
-    except Exception as e:
-        logger.error(f"Workflow crashed: {e}", exc_info=True)
-        raise
+    print(f"✅ 解析成功!")
+    print(f"   实验室名称: {topology.lab_name}")
+    print(f"   节点数量: {len(topology.nodes)}")
+    print(f"   链接数量: {len(topology.links)}")
+    cve_nodes = [n.name for n in topology.nodes if n.cve_injection]
+    print(f"   有CVE的节点: {cve_nodes if cve_nodes else '无'}")
 
 
-if __name__ == "__main__":
-    # Test with a simple example
-    test_request = """
-    Create a simple pentest lab with:
-    - External zone: A Kali attacker machine
-    - Internal zone: A Redis server
-    - Connect them through a router
-    """
+def validate_command(lab_name: str):
+    """验证已部署的实验室环境"""
+    print(f"🔍 验证实验室: {lab_name}")
+    validator = EnvironmentValidator(lab_name)
+    result = validator.validate_all()
 
-    run(test_request)
+    print(f"✅ 验证完成!")
+    print(f"   总分: {result.total_score:.1f}/100")
+    print(f"   语法验证: {result.syntax_score:.1f}/20")
+    print(f"   部署验证: {result.deployment_score:.1f}/30")
+    print(f"   容器验证: {result.container_score:.1f}/20")
+    print(f"   网络验证: {result.network_score:.1f}/15")
+    print(f"   CVE验证: {result.cve_score:.1f}/15")
+
+
+def generate_command(yaml_file: str):
+    """生成拓扑配置"""
+    print(f"🏗️  生成拓扑: {yaml_file}")
+    generator = TopologyGenerator(yaml_file)
+    clab_config, ansible_config = generator.generate()
+
+    print(f"✅ 生成完成!")
+    print(f"   生成了ContainerLab和Ansible配置")
+
+
+if __name__ == '__main__':
+    main()

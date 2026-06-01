@@ -1,0 +1,142 @@
+# 三层Web应用渗透环境 - Spring4Shell + SQL注入
+name: three-tier-web-lab
+
+topology:
+  nodes:
+    # 攻击者
+    attacker:
+      kind: linux
+      image: kalilinux/kali-rolling:latest
+      labels:
+        group: attackers
+        role: primary_attacker
+
+    # 边界路由器
+    internet-router:
+      kind: linux
+      image: frrouting/frr:latest
+      labels:
+        group: network_infrastructure
+        role: edge_router
+        routing_protocol: bgp
+      sysctls:
+        net.ipv4.ip_forward: 1
+
+    # ====== DMZ层：前端Web服务器 ======
+    load-balancer:
+      kind: linux
+      image: haproxy:latest
+      labels:
+        group: dmz_servers
+        role: load_balancer
+        service_type: reverse_proxy
+        startup_priority: 1
+        exposed_ports: [80, 443]
+      ports:
+        - 80/tcp
+        - 443/tcp
+
+    web-app-1:
+      kind: linux
+      image: nginx:latest
+      labels:
+        group: dmz_servers
+        role: web_application
+        cve_id: CVE-2022-22965  # Spring4Shell
+        attack_vector: http
+        backend_dependency: app-server
+        startup_priority: 2
+        exposed_ports: [8080]
+      ports:
+        - 80/tcp
+
+    web-app-2:
+      kind: linux
+      image: nginx:latest
+      labels:
+        group: dmz_servers
+        role: web_application
+        cve_id: CVE-2022-22965
+        attack_vector: http
+        backend_dependency: app-server
+        startup_priority: 2
+        exposed_ports: [8080]
+      ports:
+        - 80/tcp
+
+    # ====== 应用层：应用服务器 ======
+    app-server:
+      kind: linux
+      image: nginx:latest
+      labels:
+        group: application_servers
+        role: application_server
+        service_type: web_container
+        database_dependency: postgresql
+        startup_priority: 3
+        exposed_ports: [80]
+      ports:
+        - 80/tcp
+
+    # ====== 数据层：数据库服务器 ======
+    postgresql:
+      kind: linux
+      image: postgres:latest
+      labels:
+        group: database_servers
+        role: primary_database
+        service_type: relational_db
+        vulnerability: sql_injection  # SQL注入漏洞
+        startup_priority: 4
+        sensitive_data: true
+        exposed_ports: [5432]
+      environment:
+        POSTGRES_DB: webapp
+        POSTGRES_USER: webapp_user
+        POSTGRES_PASSWORD: insecure_password
+      ports:
+        - 5432/tcp
+
+    # 内部网络：备份服务器
+    backup-server:
+      kind: linux
+      image: ubuntu:latest
+      labels:
+        group: internal_services
+        role: backup_server
+        sensitive_data: true
+        backup_source: postgresql
+
+    # 内部路由器
+    internal-router:
+      kind: linux
+      image: frrouting/frr:latest
+      labels:
+        group: network_infrastructure
+        role: internal_router
+        routing_protocol: ospf
+      sysctls:
+        net.ipv4.ip_forward: 1
+
+  links:
+    # 外部连接
+    - endpoints: ["attacker:eth1", "internet-router:eth1"]
+
+    # DMZ层连接
+    - endpoints: ["internet-router:eth2", "load-balancer:eth1"]
+    - endpoints: ["load-balancer:eth2", "web-app-1:eth1"]
+    - endpoints: ["load-balancer:eth3", "web-app-2:eth1"]
+
+    # DMZ到应用层（修复接口冲突）
+    - endpoints: ["internet-router:eth3", "app-server:eth1"]
+    - endpoints: ["web-app-1:eth2", "app-server:eth2"]
+    - endpoints: ["web-app-2:eth2", "internal-router:eth1"]
+    - endpoints: ["internal-router:eth3", "app-server:eth3"]
+
+    # 应用层到数据层
+    - endpoints: ["app-server:eth4", "postgresql:eth1"]
+
+    # 内部网络
+    - endpoints: ["postgresql:eth2", "backup-server:eth1"]
+    - endpoints: ["internet-router:eth4", "internal-router:eth2"]
+    - endpoints: ["internal-router:eth4", "backup-server:eth2"]

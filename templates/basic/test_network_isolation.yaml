@@ -1,0 +1,91 @@
+# 网络隔离测试环境
+name: network-isolation-test
+
+topology:
+  nodes:
+    # 攻击者
+    attacker:
+      kind: linux
+      image: kalilinux/kali-rolling:latest
+      labels:
+        role: attacker
+        security_zone: attacker_zone
+
+    # 边界路由器
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+      labels:
+        role: router
+        security_zone: dmz_zone
+      sysctls:
+        net.ipv4.ip_forward: 1
+
+    # Web服务器 (DMZ区域)
+    web-server:
+      kind: linux
+      image: nginx:latest
+      labels:
+        role: web_server
+        security_zone: dmz_zone
+      ports:
+        - 80/tcp
+        - 443/tcp
+
+    # 数据库 (内部区域)
+    database:
+      kind: linux
+      image: mysql:latest
+      labels:
+        role: database
+        security_zone: internal_zone
+      ports:
+        - 3306/tcp
+
+    # 内部文件服务器
+    file-server:
+      kind: linux
+      image: nginx:latest
+      labels:
+        role: file_server
+        security_zone: internal_zone
+      ports:
+        - 80/tcp
+
+  links:
+    # 攻击者到边界路由器
+    - endpoints: ["attacker:eth1", "edge-router:eth1"]
+    # 边界路由器到DMZ
+    - endpoints: ["edge-router:eth2", "web-server:eth1"]
+    # 边界路由器到内部网络
+    - endpoints: ["edge-router:eth3", "database:eth1"]
+    - endpoints: ["edge-router:eth4", "file-server:eth1"]
+
+# 网络隔离策略
+isolation_policies:
+  # 允许攻击者访问DMZ的Web服务
+  - source: attacker_zone
+    destination: dmz_zone
+    action: ACCEPT
+    allowed_ports: [80, 443]
+    description: "允许攻击者访问Web服务"
+
+  # 阻止攻击者直接访问内部网络
+  - source: attacker_zone
+    destination: internal_zone
+    action: DROP
+    log: true
+    description: "阻止攻击者直接访问内部网络"
+
+  # 阻止DMZ访问内部网络
+  - source: dmz_zone
+    destination: internal_zone
+    action: DROP
+    log: true
+    description: "阻止DMZ区域的Web服务器访问内部数据库"
+
+  # 允许内部网络互连
+  - source: internal_zone
+    destination: internal_zone
+    action: ACCEPT
+    description: "允许内部网络设备互连"

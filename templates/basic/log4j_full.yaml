@@ -1,0 +1,100 @@
+# Log4j CVE-2021-44228 完整复现环境
+name: log4j-full-lab
+
+topology:
+  nodes:
+    # 攻击者
+    attacker:
+      kind: linux
+      image: kalilinux/kali-rolling:latest
+      labels:
+        group: attackers
+        role: primary_attacker
+
+    # 边界路由器
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+      labels:
+        group: network_infrastructure
+        role: router
+        routing_protocol: ospf
+      sysctls:
+        net.ipv4.ip_forward: 1
+
+    # ====== Log4j CVE场景组件 ======
+    # 基础设施层：数据库
+    mongodb:
+      kind: linux
+      image: mongo:latest
+      labels:
+        group: log4j-infrastructure
+        role: database
+        service_type: nosql
+        startup_priority: 1
+        exposed_ports: [27017]
+
+    # 基础设施层：认证服务
+    ldap-server:
+      kind: linux
+      image: osixia/openldap:latest
+      labels:
+        group: log4j-infrastructure
+        role: authentication
+        service_type: directory
+        startup_priority: 2
+        exposed_ports: [389, 636]
+
+    # 核心攻击面：UniFi Controller (使用nginx作为测试)
+    unifi-controller:
+      kind: linux
+      image: nginx:latest
+      labels:
+        group: log4j-targets
+        role: primary_vulnerability
+        cve_id: CVE-2021-44228
+        attack_vector: ldap
+        exploitation_port: 8443
+        required_dependencies: [mongodb, ldap-server]
+        startup_priority: 3
+        exposed_ports: [8080, 8443, 8443]
+      ports:
+        - 80/tcp
+        - 443/tcp
+
+    # 内部网络：文件服务器
+    file-server:
+      kind: linux
+      image: nginx:latest
+      labels:
+        group: internal_targets
+        role: lateral_movement_target
+        exposed_ports: [80, 443]
+
+    # 内部路由器
+    internal-router:
+      kind: linux
+      image: frrouting/frr:latest
+      labels:
+        group: network_infrastructure
+        role: internal_router
+        routing_protocol: ospf
+      sysctls:
+        net.ipv4.ip_forward: 1
+
+  links:
+    # 外部连接
+    - endpoints: ["attacker:eth1", "edge-router:eth1"]
+
+    # DMZ区域：Log4j场景内部连接（修复接口冲突）
+    - endpoints: ["edge-router:eth2", "mongodb:eth1"]
+    - endpoints: ["edge-router:eth3", "ldap-server:eth1"]
+    - endpoints: ["edge-router:eth4", "unifi-controller:eth1"]
+
+    # 服务间连接
+    - endpoints: ["mongodb:eth2", "unifi-controller:eth2"]
+    - endpoints: ["ldap-server:eth2", "unifi-controller:eth3"]
+
+    # 跨区域连接
+    - endpoints: ["edge-router:eth5", "internal-router:eth1"]
+    - endpoints: ["internal-router:eth2", "file-server:eth1"]

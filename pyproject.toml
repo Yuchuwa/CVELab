@@ -1,17 +1,15 @@
 [project]
 name = "clab-builder"
-version = "1.0.0"
-description = "Intelligent network topology automation builder based on LLM and LangGraph"
+version = "2.0.0"
+description = "Writeup-driven training data generator for cybersecurity LLM training"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "python-dotenv>=1.0.0",
-    "langchain>=1.2.0",
-    "langchain-openai>=1.1.6",
-    "langgraph>=1.0.5",
+    "anthropic>=0.40.0",
     "pydantic>=2.0.0",
     "pyyaml>=6.0",
-    "pandas>=2.3.3",
+    "requests>=2.31.0",
 ]
 
 [project.optional-dependencies]
@@ -26,11 +24,14 @@ dev = [
 clab-builder = "clab_builder.main:main"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/clab_builder"]
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.black]
 line-length = 100
@@ -42,12 +43,64 @@ target-version = "py310"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
 pythonpath = ["src"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--tb=short",
+    "--cov=src/clab_builder",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml:coverage.xml",
+    "--maxfail=5"
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "network: Network-related tests",
+    "isolation: Network isolation tests",
+    "connectivity: Connectivity tests",
+    "cve: CVE-related tests",
+    "slow: Slow running tests",
+    "docker: Tests requiring Docker"
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]
 
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-docker>=3.1.0",
     "black>=24.0.0",
     "ruff>=0.1.0",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "@abc.abstractmethod"
 ]

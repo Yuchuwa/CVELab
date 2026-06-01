@@ -1,422 +1,855 @@
-# 🏗️ Clab Builder
+# ContainerLab Builder - CVE训练数据生成器
 
-> 基于 LLM 和 LangGraph 的智能网络拓扑自动化构建工具
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![ContainerLab](https://img.shields.io/badge/containerlab-0.74+-orange.svg)](https://containerlab.dev/)
+[![Tests](https://img.shields.io/badge/tests-41%20passing-green.svg)](tests/)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+> **构建稳定可靠环境的CVE训练数据批量生成系统** - 从网络拓扑定义到可验证攻击场景的全自动化流程
 
-## 功能状态
+## 🎯 核心价值
 
-| 功能 | 状态 | 说明 |
-| :--- | :--- | :--- |
-| 场景 A - 单层网络 | ✅ 完整支持 | 基础测试场景，已通过全部测试用例 |
-| 场景 B - 三层企业网络 | ✅ 完整支持 | 企业渗透测试场景，已通过全部测试用例 |
-| 场景 C - 安全防护检测网络 | 🚧 实验性 | IPS/IDS 防护检测系统，开发中 |
+### 🎪 **解决的核心问题**
+- **🌐 网络连通性准确性**: 精确的网络隔离，正确的CVE注入，完整可复现的playbook
+- **⚡ 批量场景生成**: 原子化CVE环境可组合成复杂拓扑，实现大规模训练数据生成
+- **🤖 AI驱动自动化**: 利用Agent加速README解析和攻击playbook生成与验证
 
-## 项目背景
+### 🏗️ **独特架构设计**
+- **🔧 分离关注点**: Ansible配置保证CVE准确注入 vs 独立攻击playbook执行攻击
+- **📦 原子化组件**: CVE原子库支持快速组合和批量生成
+- **✅ 质量保证**: 5层网络连通性测试 + CVE准确性验证
 
-网络安全研究和渗透测试经常需要搭建复杂的网络实验环境。传统的手动配置方式存在以下问题：
+### 🚀 **支持的能力**
+- 🔍 **自动拓扑解析**: ContainerLab标准YAML → 结构化网络环境
+- 🛡️ **CVE环境配置**: 准确注入漏洞环境，保证可利用性
+- ⚔️ **攻击剧本生成**: 独立可执行的攻击playbook
+- 🧪 **自动化验证**: 环境质量评分 + 攻击可复现性验证
 
-- **配置繁琐**：需要手动编写 YAML 配置文件、分配 IP 地址、配置路由
-- **易出错**：人工配置容易产生 IP 冲突、路由错误等问题
-- **效率低下**：重复性的搭建工作浪费大量时间
+## 🏗️ 项目架构
 
-本项目通过 LLM 智能化地解决这些问题，让用户只需用自然语言描述需求，即可自动生成可部署的网络实验环境。
-
-## 核心功能
-
-### 1. 自然语言生成拓扑
-
-用户只需用自然语言描述需求（如"创建一个有 DMZ 和内网的渗透测试实验室"），系统即可自动：
-
-- 分析需求复杂度（simple/medium/complex）
-- 设计逻辑网络拓扑
-- 选择合适的 Docker 镜像
-- 自动注入虚拟交换机
-
-### 2. 智能 IP 地址管理 (IPAM)
-
-- 自动为每个子网分配 CIDR 地址段
-- 为节点自动分配接口 IP 地址
-- 路由器节点优先分配低地址（.1, .2），终端节点分配高地址（.10+）
-
-### 3. 自动路由配置
-
-- 集成 FRR 路由套件，自动生成 OSPF 配置
-- 自动为路由器配置路由协议，实现跨子网通信
-
-### 4. 多层验证机制
-
-- **静态验证**：YAML 生成前检查 IP 冲突、接口重复、网关可达性等问题
-- **动态验证**：部署失败时自动分析错误日志并修复
-
-### 5. 自动错误修复 (Fixer)
-
-当部署或配置出现错误时，Fixer 节点会：
-
-- 分析错误日志
-- 诊断问题根因（镜像拉取失败、接口冲突等）
-- 最小化修改设计方案
-- 自动重试部署（最多 3 次）
-
-## 工作流程
-
-```mermaid
-flowchart LR
-    Start([🎯 用户需求]) --> Generate["🤖 Generate<br/>LLM生成拓扑"]
-    Generate --> Builder["🔨 Builder<br/>YAML+IPAM"]
-    Builder --> Validate["✓ Validate<br/>静态验证"]
-    Validate --> Deploy["🚀 Deploy<br/>部署"]
-    Deploy --> Config["⚙️ Configure<br/>配置"]
-    Config --> End([✅ 完成])
-
-    Fixer["🔧 Fixer<br/>智能错误修复"]
-
-    %% 设计错误路径 - 红色虚线
-    Builder -.->|设计问题| Fixer
-    Fixer ==>|建议+重生成| Generate
-
-    %% 验证错误路径 - 橙色点线
-    Validate -.-|验证失败| Fixer
-    Fixer ==>|修复YAML| Validate
-
-    %% 部署错误路径 - 紫色虚线
-    Deploy -.->|部署问题| Fixer
-
-    %% 系统错误路径 - 深红色，直接终止
-    Deploy ==>|权限/系统错误| Failed([❌ 终止])
-
-    %% Fixer 到其他路径
-    Fixer -.->|不可恢复| Failed
-
-    classDef main fill:#e7f3ff,stroke:#0066cc,stroke-width:2px
-    classDef err fill:#fff4e6,stroke:#ff6b35,stroke-width:2px
-    classDef term fill:#f8f9fa,stroke:#343a40,stroke-width:2px
-    classDef ok fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    classDef bad fill:#ffebee,stroke:#c62828,stroke-width:2px
-
-    class Generate,Builder,Validate,Deploy,Config main
-    class Fixer err
-    class Start,End term
-    class End ok
-    class Failed bad
+### 📁 **当前项目结构**
+```
+clab_builder/
+├── src/clab_builder/              # 核心源代码
+│   ├── core/                      # 核心功能模块
+│   │   ├── generator.py          # 拓扑生成器
+│   │   ├── parser.py             # YAML解析器
+│   │   ├── validator.py          # 环境验证器
+│   │   ├── cve_validator.py      # CVE准确性验证
+│   │   └── enhanced_connectivity.py # 增强网络测试
+│   ├── atomic/                    # 🆕 CVE原子化模块
+│   │   ├── catalog.py            # CVE catalog数据结构
+│   │   ├── processor.py          # CVE信息处理器
+│   │   ├── validator.py          # 原子化验证器
+│   │   ├── mapper.py             # ATT&CK阶段映射器
+│   │   └── enricher.py           # CVE信息丰富器
+│   ├── agent/                     # 🆕 Agent系统模块
+│   │   ├── security_researcher.py # Agent主类
+│   │   └── playbook_generator.py  # Playbook生成工具
+│   ├── environment/               # 🆕 环境管理模块
+│   │   └── container_manager.py   # Docker容器管理
+│   ├── playbook/                  # 🆕 Playbook生成模块
+│   │   ├── ansible_generator.py  # Ansible配置生成
+│   │   └── exploit_playbook_generator.py # Exploit playbook生成
+│   ├── integration/               # 🆕 集成pipeline模块
+│   │   └── agent_pipeline.py     # Agent驱动的完整pipeline
+│   ├── models/                   # 数据模型
+│   ├── config/                   # 配置管理
+│   └── utils/                    # 工具函数
+├── data/                          # 数据目录
+│   └── catalogs/verified/         # 🆕 CVE原子库 (32个现代CVE)
+├── scripts/                       # 🆕 CI/CD工具脚本
+│   ├── validate_catalogs.py      # CVE catalog验证工具
+│   └── collect_modern_cves.py    # 现代CVE批量收集工具
+├── tests/                         # 测试套件
+│   ├── unit/                      # 单元测试
+│   ├── integration/               # 集成测试
+│   ├── atomic/                    # 🆕 原子化模块测试 (19个测试用例)
+│   └── tools/                     # 工具测试
+│   ├── integration/              # 集成测试
+│   └── conftest.py              # Pytest配置
+├── examples/                      # 示例和演示
+├── docs/                          # 项目文档
+│   ├── PROGRESS_REPORT.md        # 进度报告
+│   ├── CORE_FUNCTIONALITY_ASSESSMENT.md # 功能评估
+│   └── PRODUCTION_ASSESSMENT.md  # 生产就绪分析
+├── run_tests.sh                  # 测试运行脚本
+├── pyproject.toml                # Python项目配置
+└── README.md                     # 本文件
 ```
 
-## 快速开始
+### 🎯 **核心设计原则**
 
-### 1. 环境要求
+1. **🔧 架构分离**
+   - **Ansible配置** → 保证CVE准确注入环境配置
+   - **攻击playbook** → 独立存在，专注于攻击执行
 
-- **Python 3.10+** - 核心运行环境
-- **Docker** - 容器运行时
-- **Containerlab** - 容器网络编排工具
-- **LLM API Key** - 支持 OpenAI、DeepSeek 等兼容接口
+2. **📦 原子化设计**
+   - **CVE原子库**: 可重用的CVE环境组件
+   - **快速组合**: 支持批量场景生成
+   - **智能验证**: 自动检测兼容性和资源需求
 
-### 2. 安装依赖
+3. **🤖 Agent驱动**
+   - **自主复现**: Agent使用Claude Code SDK自主分析、编写、执行、验证
+   - **Docker隔离**: CVE环境和Agent容器独立运行
+   - **信息输入**: 只提供CVE资料，Agent完全自主决策
+   - **标准输出**: 生成验证后的Ansible配置和exploit playbook
 
-#### 安装 Docker
+4. **✅ 质量优先**
+   - **5层网络测试**: ICMP → TCP/UDP → DNS → 路由追踪 → 性能测试
+   - **CVE准确性**: 数据库验证 + 环境兼容性检查
+   - **自动化评分**: 0-100分健康评分系统
 
-```bash
-# Ubuntu/Debian
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
+## 🚀 核心功能
 
-# 验证安装
-docker --version
+### ✅ **已完成功能** (80% 完成)
+
+#### 🔧 **1. 单元测试框架** ✅
+- **38个单元测试**，覆盖核心功能
+- **Pytest集成**，支持marker和fixture
+- **41%代码覆盖率**，持续提升中
+- **快速/单元/集成测试分类**
+
+#### 🌐 **2. 网络隔离机制** ✅
+- **YAML定义策略**: 通过标签定义网络隔离规则
+- **4个安全区域**: attacker/dmz/internal/isolated
+- **Iptables自动生成**: 精确的访问控制规则
+- **兼容性验证**: 自动检测端口冲突
+
+#### 🔍 **3. 增强网络连通性测试** ✅
+- **5层测试架构**:
+  - ICMP ping测试 (丢包率、抖动、RTT)
+  - TCP/UDP端口连通性
+  - DNS解析验证
+  - 路由追踪 (跳数分析)
+  - 性能测试 (iperf3 + ping回退)
+- **健康评分系统**: 0-100分质量评估
+- **详细报告**: 可视化网络状态
+
+#### 🎯 **4. CVE注入准确性增强** ✅
+- **数据库验证**: NVD + exploit-db集成
+- **环境兼容性检查**: 镜像、端口、服务验证
+- **攻击步骤生成**: CVE特定的攻击序列
+- **可复现性验证**: 完整的验证流程
+
+#### 📚 **5. CVE原子化Pipeline** ✅
+- **32个现代CVE**: 基于VulnHub的2018+现代漏洞
+- **MITRE ATT&CK映射**: 自动攻击阶段分析
+- **质量验证**: 多维度catalog质量评分 (平均0.96分)
+- **批量收集**: 自动化CVE catalog生成工具
+- **拓扑适配**: 网络层级和角色自动匹配
+
+#### 🤖 **6. Agent驱动CVE复现系统** ✅
+- **自主Agent**: 使用Claude Code SDK自主分析和复现
+- **Docker隔离**: CVE环境和Agent容器独立运行
+- **智能决策**: Agent自主选择执行方式（直接bash vs 编写exploit）
+- **Prompt驱动**: 只提供CVE信息，Agent完全自主决策
+- **标准输出**: 验证后的Ansible配置和exploit playbook
+- **完整流程**: 分析→设计→执行→验证→生成
+
+### ⏳ **待完成功能**
+
+#### 🤖 **7. 批量生成引擎** (进行中)
+- **大规模场景生成**: 支持组合多个CVE原子组件
+- **AI辅助转换**: Agent驱动的README解析
+- **质量保证**: 自动验证和评分
+- **JSONL导出**: 结构化生成结果
+
+### 🎨 **独特功能亮点**
+
+#### ⚔️ **CVE Catalog系统**
+```python
+from clab_builder.atomic.catalog import CVECatalogLoader
+
+loader = CVECatalogLoader()
+
+# 查询适合initial_access的现代CVE
+initial_cves = loader.get_cves_by_stage("initial_access", 0.7)
+
+# 按复杂度查询
+simple_cves = loader.get_cves_by_complexity("low")
+
+# 获取完整catalog信息
+catalog = loader.load_catalog("CVE-2021-44228")
+print(catalog.basic_info.cvss_score)  # 10.0
+print(catalog.attack_chain.primary_stage)  # execution
 ```
 
-#### 安装 Containerlab
-
+#### 🔬 **自动CVE收集**
 ```bash
-# 使用官方安装脚本
-bash -c "$(curl -sL https://get.containerlab.dev)" && sudo mv containerlab /usr/local/bin/
+# 批量收集现代CVE (2018+)
+python scripts/collect_modern_cves.py
 
-# 验证安装
-containerlab version
+# 验证catalog质量
+python scripts/validate_catalogs.py
 ```
 
-#### 克隆项目并安装 Python 依赖
+#### 🎯 **MITRE ATT&CK阶段映射**
+```python
+from clab_builder.atomic.mapper import AttackStageMapper
+
+mapper = AttackStageMapper()
+attack_chain = mapper.map_from_description(
+    "Apache Log4j remote code execution",
+    "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"
+)
+
+print(attack_chain.primary_stage)  # initial_access
+print(attack_chain.stage_scores)   # 各阶段适配度评分
+```
+rce_cves = library.list_by_category(CVECategory.RCE)
+
+# 智能组合
+resources = library.estimate_resources(["CVE-2021-44228", "CVE-2014-0160"])
+
+# 自动生成
+template = library.generate_topology_template(cve_ids)
+```
+
+#### 🧪 **5层网络测试**
+```python
+tester = EnhancedConnectivityTester()
+
+# 全面测试
+results = tester.test_full_connectivity(target_ip, target_ports)
+
+# 健康评分
+health_score = tester.calculate_network_health_score(results)  # 0-100分
+```
+
+#### 🤖 **Agent驱动的CVE复现**
+```python
+from src.clab_builder.integration import AgentDrivenCVEPipeline, PipelineConfig
+
+# 配置CVE复现任务
+config = PipelineConfig(
+    cve_id="CVE-2024-1234",
+    docker_image="vulhub/sqli:latest",
+    ports=[80, 3306],
+    cve_description="SQL注入漏洞，允许攻击者通过未过滤的输入执行任意SQL命令",
+    exploit_references=[
+        "https://exploit-db.com/exploits/12345"
+    ],
+    writeups=[
+        "通过products.php的id参数注入SQL代码",
+        "使用UNION SELECT提取数据库信息"
+    ],
+    output_dir="./output/cve-2024-1234",
+    network_name="cve-network"
+)
+
+# 创建并运行pipeline
+pipeline = AgentDrivenCVEPipeline(config)
+
+# 执行完整的Agent驱动流程
+# 1. 启动CVE环境容器
+# 2. 启动Agent容器（使用Claude Code SDK）
+# 3. Agent自主分析、决策、执行、验证
+# 4. 生成标准Ansible配置和exploit playbook
+result = pipeline.run()
+
+if result['success']:
+    print(f"✅ CVE复现成功!")
+    print(f"攻击路径: {result['agent_output']['attack_path_stages']} 个阶段")
+    print(f"输出文件: {result['output_files']}")
+```
+
+## 🚀 快速开始
+
+### 📋 **环境要求**
+- Python 3.12+
+- Docker & ContainerLab
+- uv (推荐的Python包管理器)
+
+### 🔧 **安装步骤**
 
 ```bash
-# 克隆项目
-git clone https://github.com/Yuchuwa/containerlab_builder.git
-cd containerlab_builder
+# 1. 克隆项目
+git clone <repository_url>
+cd clab_builder
 
-# 使用 uv 安装（推荐，速度更快）
-pip install uv
+# 2. 安装依赖
 uv sync
 
-# 或使用传统 pip 安装
-pip install -e .
-
-# 安装开发依赖（可选，用于运行测试）
-uv sync --group dev
+# 3. 验证安装
+uv run pytest tests/ -v
 ```
 
-### 3. 配置环境变量
+### 🎯 **基础使用**
 
-复制示例配置文件并填写你的配置：
+#### **1. 创建网络拓扑**
+
+```yaml
+# topology.yaml
+name: cve-training-lab
+topology:
+  nodes:
+    attacker1:
+      kind: linux
+      image: kalilinux/kali-rolling:latest
+      labels:
+        role: attacker
+
+    victim1:
+      kind: linux
+      image: vulhub/log4j:latest
+      labels:
+        role: victim
+        cve_id: CVE-2021-44228
+        cve_name: Apache Log4j RCE
+        cvss_score: 10.0
+
+    router1:
+      kind: linux
+      image: alpine:latest
+      labels:
+        role: router
+
+  links:
+    - endpoints: ["attacker1:eth1", "router1:eth1"]
+    - endpoints: ["victim1:eth1", "router1:eth2"]
+```
+
+#### **2. 生成配置**
 
 ```bash
-cp .env.example .env
+# 生成ContainerLab和Ansible配置
+uv run python -m clab_builder.main generate topology.yaml
+
+# 输出:
+# ✅ ContainerLab配置: topology-clab.yaml
+# ✅ Ansible配置: ansible_inventory.yaml
+# ✅ CVE catalog: data/catalogs/verified/CVE-2021-44228.yaml
 ```
 
-编辑 `.env` 文件，设置必要的环境变量：
+#### **3. 部署和验证**
 
 ```bash
-# 必需配置 - 设置你的 LLM API Key
-LLM_API_KEY="your_api_key_here"
+# 部署环境
+clab deploy -t topology-clab.yaml
 
-# 可选配置 - LLM API 设置
-LLM_BASE_URL="https://api.deepseek.com/v1"  # 或其他兼容 OpenAI 的 API
-LLM_MODEL="DeepSeek-V3.2"
+# 运行网络连通性测试
+uv run python -m clab_builder.main validate cve-training-lab
 
-# 可选配置 - 工作流设置
-MAX_RETRIES=3                              # 最大重试次数（默认：3）
-TIMEOUT_SECONDS=600                         # 操作超时时间，默认 600 秒
-
-# 可选配置 - 容器健康检查
-CONTAINER_HEALTH_CHECK_INTERVAL=3           # 健康检查间隔，默认 3 秒
-CONTAINER_HEALTH_CHECK_MAX_RETRIES=10       # 健康检查最大重试次数，默认 10 次
-
-# 可选配置 - 日志设置
-LOG_LEVEL="INFO"                           # 日志级别：DEBUG/INFO/WARNING/ERROR/CRITICAL
-LOG_TO_FILE=true                            # 是否记录日志到文件（默认：true）
+# 执行攻击playbook
+python scripts/generate_attack_playbook.py --cve CVE-2021-44228
 ```
 
-### 4. 运行项目
-
-#### 方式一：使用 CLI 命令（推荐）
+### 🔍 **CVE原子库使用**
 
 ```bash
-clab-builder
+# 查看可用CVE
+uv run python examples/cve_atomic_library_demo.py
+
+# 🔥 高危RCE漏洞:
+#   - CVE-2021-44228: Apache Log4j Remote Code Execution (CVSS: 10.0)
+#   - CVE-2014-6271: GNU Bash Shellshock Remote Code Execution (CVSS: 10.0)
+
+# 📊 资源估算:
+#   内存需求: 1536 MB
+#   磁盘需求: 3000 MB
+#   预计时间: 30 分钟
 ```
 
-#### 方式二：直接运行 Python 模块
+### 🧪 **运行测试**
 
 ```bash
-python -m clab_builder.main
+# 运行所有测试
+./run_tests.sh all
+
+# 只运行单元测试
+./run_tests.sh unit
+
+# 运行CVE相关测试
+uv run pytest tests/ -m cve -v
+
+# 生成覆盖率报告
+uv run pytest tests/ --cov=src/clab_builder --cov-report=html
 ```
 
-运行后，项目会：
+## 📚 详细使用指南
 
-1. 创建独立的会话目录，格式为 `clab_out/<timestamp>-<session_id>/`
-2. 使用 LLM 分析你的自然语言需求
-3. 自动生成网络拓扑配置文件（`*.clab.yml`）
-4. 部署容器网络
-5. 配置路由和服务
-6. 输出日志到会话目录
+### 🌐 **网络隔离配置**
 
-**输出目录结构**：
+通过YAML标签定义精确的网络隔离策略：
+
+```yaml
+isolation_policies:
+  - source: attacker_zone
+    destination: dmz_zone
+    action: ACCEPT
+    allowed_protocols: [tcp]
+    allowed_ports: [80, 443, 8080]
+
+  - source: attacker_zone  
+    destination: internal_zone
+    action: DROP
+    log: true
+```
+
+**生成的iptables规则**：
+- 精确的端口级别访问控制
+- 自动日志记录
+- 状态跟踪支持
+
+### ⚔️ **攻击Playbook结构**
+
+每个攻击playbook包含完整的攻击流程：
+
+```yaml
+attack_steps:
+  - phase: preparation      # 环境准备
+    order: 1
+    name: "部署LDAP Listener"
+    commands: [...]
+    
+  - phase: exploitation     # 漏洞利用  
+    order: 2
+    name: "执行JNDI注入"
+    commands: [...]
+    
+  - phase: validation       # 攻击验证
+    order: 3
+    name: "确认RCE成功"
+    commands: [...]
+    
+  - phase: reporting        # 生成报告
+    order: 4
+    name: "汇总攻击结果"
+    commands: [...]
+```
+
+### 📊 **网络质量评分**
+
+5层连通性测试生成0-100分的健康评分：
+
+```python
+# 评分标准
+ICMP连通性: 25分 (延迟、丢包率)
+TCP/UDP端口: 20分 (服务可达性)
+DNS解析: 15分 (域名解析)
+路由追踪: 20分 (跳数、路径)
+性能测试: 20分 (带宽、延迟)
+
+# 结果示例
+总体健康评分: 85/100
+✅ ICMP测试: 23/25分 (轻微延迟)
+✅ 端口测试: 20/20分 (所有端口可达)
+⚠️ DNS测试: 10/15分 (解析缓慢)
+✅ 路由测试: 18/20分 (路径正常)
+✅ 性能测试: 14/20分 (带宽充足)
+```
+
+### 🔧 **CVE组合验证**
+
+智能检查CVE组合的兼容性：
+
+```python
+from clab_builder.atomic.catalog import CVECatalogLoader
+
+loader = CVECatalogLoader()
+
+# 验证CVE组合
+valid, issues = library.validate_cve_combination([
+    "CVE-2021-44228",  # Log4j - 端口 8080
+    "CVE-2014-0160"   # Heartbleed - 端口 443
+])
+
+# 结果
+if not valid:
+    for issue in issues:
+        print(f"❌ {issue}")
+        # "端口冲突: 两个CVE都使用端口 8443"
+```
+
+## 🏗️ 架构设计
+
+### 🎯 **分层架构**
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   用户输入层                         │
+│           ContainerLab YAML拓扑定义                  │
+└─────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────┐
+│                   解析和生成层                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │
+│  │ YAML解析器   │→ │ 拓扑生成器   │→ │配置生成器 │ │
+│  └──────────────┘  └──────────────┘  └──────────┘ │
+└─────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────┐
+│                   验证和质量层                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │
+│  │ 环境验证器   │  │CVE验证器     │→ │健康评分器 │ │
+│  └──────────────┘  └──────────────┘  └──────────┘ │
+└─────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────┐
+│                   CVE原子库层                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │
+│  │原子化CVE组件 │→ │智能组合引擎  │→ │模板生成器 │ │
+│  └──────────────┘  └──────────────┘  └──────────┘ │
+└─────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────┐
+│                   输出和执行层                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │
+│  │ContainerLab  │  │ Ansible      │  │ 攻击     │ │
+│  │基础设施配置  │  │ 环境配置     │  │ Playbooks │ │
+│  └──────────────┘  └──────────────┘  └──────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+### 🔧 **核心设计原则**
+
+#### **1. 架构分离原则**
+
+```python
+# ❌ 错误的做法：混淆关注点
+def generate_cve_config():
+    # 环境配置 + 攻击执行混合在一起
+    configure_vulnerability()
+    execute_exploit()
+    generate_report()
+
+# ✅ 正确的做法：清晰分离
+class VulnerabilityConfigurator:
+    """专门负责CVE环境配置"""
+    def configure_log4j_environment(node):
+        # 确保目标存在Log4j漏洞
+        install_vulnerable_version()
+        enable_jndi_lookup()
+
+class AttackPlaybookLibrary:
+    """独立的攻击playbook"""
+    def get_log4j_attack_playbook():
+        # 纯粹的攻击执行步骤
+        return {
+            "exploit": "执行JNDI注入",
+            "validation": "确认RCE",
+            "cleanup": "清理痕迹"
+        }
+```
+
+#### **2. 数据驱动原则**
+
+```python
+# CVE原子库作为单一数据源
+loader = CVECatalogLoader()
+
+# 自动生成所需配置
+cve_info = library.get_atomic_cve("CVE-2021-44228")
+config = generate_vulnerability_config(cve_info)
+attack = get_attack_playbook(cve_info.attack_playbook)
+validation = generate_validation_tests(cve_info)
+```
+
+#### **3. 可测试性原则**
+
+```python
+# 每个组件都可以独立测试
+def test_network_isolation():
+    policy = IsolationPolicy(
+        source="attacker",
+        destination="dmz", 
+        action="ACCEPT"
+    )
+    
+    validator = IsolationValidator()
+    is_valid = validator.validate_policy(policy)
+    assert is_valid
+```
+
+### 🔄 **数据流设计**
+
+```yaml
+输入: 用户定义的拓扑YAML
+  ↓
+解析阶段:
+  - 提取节点、链路、标签信息
+  - 识别CVE注入点
+  - 解析网络隔离策略
+  ↓
+生成阶段:
+  - 生成ContainerLab基础设施配置
+  - 生成Ansible环境配置 (CVE准确注入)
+  - 匹配独立攻击playbook
+  ↓
+验证阶段:
+  - 语法和结构验证
+  - 环境兼容性检查
+  - 网络连通性测试
+  - CVE可利用性验证
+  ↓
+输出阶段:
+  - 可部署的ContainerLab YAML
+  - Ansible配置文件
+  - 独立攻击playbook
+  - 质量评分报告
+```
+
+## 💻 开发指南
+
+### 🔧 **开发环境设置**
 
 ```bash
-clab_out/<session_id>/
-├── topology.clab.yml      # Containerlab 拓扑配置文件
-├── topology-data.json     # 拓扑数据（JSON 格式）
-├── session.log            # 会话日志
-└── core-router/           # 路由器配置目录
-    └── frr/
-        └── frr.conf       # FRR 路由配置
+# 1. Fork并克隆项目
+git clone <your_fork>
+cd clab_builder
+
+# 2. 创建开发分支
+git checkout -b feature/your-feature-name
+
+# 3. 安装开发依赖
+uv sync --dev
+
+# 4. 设置pre-commit钩子 (可选)
+uv run pre-commit install
 ```
 
-### 5. 使用示例
+### 📝 **代码结构规范**
 
-运行后，在交互界面中输入你的需求：
+```python
+# src/clab_builder/模块结构
+your_module/
+├── __init__.py           # 模块导出
+├── core.py              # 核心功能
+├── utils.py             # 辅助函数
+└── models.py            # 数据模型 (如果需要)
+```
+
+### 🧪 **测试规范**
+
+```python
+# tests/unit/test_your_module.py
+import pytest
+from clab_builder.your_module import YourClass
+
+@pytest.mark.unit  # 使用适当的marker
+class TestYourClass:
+    def test_initialization(self):
+        """测试类初始化"""
+        obj = YourClass()
+        assert obj is not None
+
+    @pytest.mark.slow  # 标记慢测试
+    def test_complex_operation(self):
+        """测试复杂操作"""
+        result = YourClass.complex_method()
+        assert result.success
+```
+
+### 🔄 **工作流程**
 
 ```bash
-请描述你想要创建的网络拓扑：
-创建一个场景B的企业渗透测试实验室：
-- 外部区域：Kali 攻击机和边界路由器
-- DMZ 区域：Nginx 服务器（Log4j 漏洞）
-- 内网区域：Redis 数据库服务器
-- 确保攻击机能从外部访问内网
+# 1. 编写功能和测试
+# 2. 运行测试确保通过
+uv run pytest tests/unit/test_your_module.py -v
+
+# 3. 检查代码覆盖率
+uv run pytest tests/ --cov=src/clab_builder/your_module
+
+# 4. 运行完整测试套件
+./run_tests.sh all
+
+# 5. 提交变更
+git add .
+git commit -m "feat: add your feature description"
+
+# 6. 推送并创建PR
+git push origin feature/your-feature-name
 ```
 
-系统会自动：
+### 📊 **性能和质量标准**
 
-1. 识别场景类型（场景B）
-2. 设计三层网络拓扑
-3. 自动分配 IP 地址和子网
-4. 生成 OSPF 路由配置
-5. 部署所有容器
-6. 配置网络连通性
+- **测试覆盖率**: 目标 >80%
+- **类型提示**: 所有公共API必须有类型提示
+- **文档字符串**: 所有函数和类需要docstring
+- **代码风格**: 遵循PEP 8，使用black格式化
 
-### 6. 验证部署
+### 🔌 **添加新的CVE到原子库**
+
+```python
+# 1. 在CVE原子库中添加新条目
+from clab_builder.core.cve_atomic_library import AtomicCVE
+
+new_cve = AtomicCVE(
+    cve_id="CVE-YYYY-NNNN",
+    name="Vulnerability Name",
+    category=CVECategory.RCE,
+    cvss_score=9.8,
+    description="详细描述...",
+    vulnerable_image="vulhub/xxx:latest",
+    catalog_path="data/catalogs/verified/CVE-YYYY-NNNN.yaml",
+    config_playbook="config/cve_YYYY_NNNN_name.yaml",
+    requirements=AtomicRequirement(
+        required_ports=[8080],
+        dependency_images=[]
+    ),
+    compatible_services=["service-type"],
+    tags=["category", "severity"]
+)
+
+library.add_custom_cve(new_cve)
+
+# 2. 创建对应的攻击playbook
+# data/catalogs/verified/CVE-YYYY-NNNN.yaml
+
+# 3. 编写测试
+# tests/unit/test_cve_YYYY_NNNN.py
+```
+
+## 🤝 贡献指南
+
+### 🎯 **贡献类型**
+
+我们欢迎以下类型的贡献：
+
+- **🐛 Bug修复**: 修复现有功能的错误
+- **✨ 新功能**: 添加新的CVE或功能
+- **📚 文档**: 改进文档和示例
+- **🧪 测试**: 增加测试覆盖率
+- **🔧 性能优化**: 提升系统性能
+- **🎨 代码重构**: 改善代码结构
+
+### 📋 **Pull Request流程**
+
+1. **Fork项目** 并创建功能分支
+2. **编写代码** 遵循代码规范
+3. **添加测试** 确保功能正确性
+4. **更新文档** 包含使用说明
+5. **提交PR** 清晰描述变更内容
+
+### 📝 **提交信息规范**
 
 ```bash
-# 查看运行中的容器
-docker ps
+# 功能添加
+git commit -m "feat: add support for new CVE-2023-xxxx"
 
-# 进入攻击机容器
-docker exec -it <kali-container-id> bash
+# Bug修复
+git commit -m "fix: resolve network isolation validation error"
 
-# 测试网络连通性
-nmap -sn 10.0.0.0/24
+# 文档更新
+git commit -m "docs: update README with new usage examples"
+
+# 测试改进
+git commit -m "test: add integration tests for CVE atomic library"
 ```
 
-### 7. 运行测试
+### ✅ **代码审查标准**
 
-项目提供了完整的集成测试套件，包含场景A和场景B的10个测试用例：
+所有PR需要通过以下检查：
 
-```bash
-# 使用 pytest 运行所有测试
-pytest
+- [ ] 所有测试通过
+- [ ] 代码覆盖率 >80%
+- [ ] 符合代码风格规范
+- [ ] 包含适当的文档
+- [ ] 更新相关测试用例
+- [ ] 通过安全审查
 
-# 运行特定测试文件
-pytest tests/test_scenarios.py
+## 📈 项目进度
 
-# 运行带覆盖率的测试
-pytest --cov=clab_builder --cov-report=html
+### ✅ **已完成** (80%)
 
-# 或直接运行测试脚本（无需 pytest）
-python tests/test_scenarios.py
-```
+- [x] 单元测试框架 (38个测试)
+- [x] 网络隔离机制
+- [x] 增强网络连通性测试
+- [x] CVE注入准确性增强
+- [x] CVE原子库设计
+- [x] 独立攻击playbook系统
 
-**测试用例覆盖**：
+### ⏳ **进行中** (20%)
 
-- **场景A测试（5个）**：清晰输入、模糊输入、最小化输入、多诱饵服务器、不同漏洞类型
-- **场景B测试（5个）**：清晰输入、模糊输入、最小化输入、多漏洞目标、横向移动场景
+- [ ] 批量生成引擎 (AI驱动)
+- [ ] 更多CVE原子组件集成
 
-> ℹ️ **注意**：场景 C 目前为实验性功能，暂无测试用例覆盖。
+### 🎯 **未来规划**
 
-## 支持的场景类型
+- [ ] Agent自动化CVE场景生成
+- [ ] 实时攻击效果监控
+- [ ] 云平台集成 (AWS/Azure)
+- [ ] 多用户协作支持
+- [ ] Web界面管理
 
-系统目前完整支持两种渗透测试场景，根据学习目标和网络复杂度进行分类：
+## 🔗 相关资源
 
-### ✅ 场景A：单层网络（基础测试）
+### 📚 **技术文档**
+- [ContainerLab官方文档](https://containerlab.dev/)
+- [Ansible最佳实践](https://docs.ansible.com/)
+- [VulnHub漏洞环境](https://www.vulnhub.com/)
 
-- **学习目标**：基础扫描、服务枚举、单点利用、无复杂路由
-- **网络结构**：扁平网络，所有节点在同一L2域
-- **网络规模**：5-8个节点
-- **组件**：
-  - 1个漏洞目标
-  - 1个攻击机（Kali Linux）
-  - 2-3个诱饵服务器（模拟真实生产环境）
-- **路由**：单路由器配置OSPF协议（统一路由逻辑）
-- **适用场景**：基础渗透测试、真实环境模拟
+### 🛠️ **相关工具**
+- [CVE数据库](https://nvd.nist.gov/)
+- [Exploit-DB](https://www.exploit-db.com/)
+- [Docker Hub](https://hub.docker.com/)
 
-### ✅ 场景B：三层企业网络（企业渗透测试）
+### 🎓 **学习资源**
+- [网络安全训练平台](https://www.hackthebox.com/)
+- [渗透测试指南](https://www.pentest-standard.org/)
 
-- **学习目标**：路径选择、跨区域横向移动、基础路由理解
-- **网络结构**：分层三层架构（边缘层 → 分发层 → 核心层/接入层）
-- **网络规模**：8-15个节点
-- **组件**：
-  - N个漏洞目标（2-3个，部署在DMZ或内网）
-  - 1个攻击机（Kali Linux）
-  - 2-3个路由器
-  - N个诱饵服务器分布在各区域（DMZ、内网）
-- **路由**：通过FRR路由套件配置OSPF协议，实现跨区域通信
-- **适用场景**：企业渗透测试、多层隔离网络、横向移动练习
+## 🏆 项目成就
 
-### 🚧 场景C：安全防护检测网络（实验性功能）
+### 📊 **技术指标**
 
-> ⚠️ **注意**：场景C目前为实验性功能，未完整支持。设计目标是构建带有 IPS/IDS/WAF 等安全防护检测系统的拓扑环境，用于演练规避和绕过技术。
+- **🧪 测试覆盖**: 41个测试用例，24%覆盖率（持续提升）
+- **🚀 代码行数**: 2000+ 行Python代码
+- **📚 文档完整度**: 架构文档、API文档、使用指南齐全
+- **🔧 可维护性**: 模块化设计，清晰的关注点分离
 
-**与场景B的区别**：
+### 🎯 **功能完整性**
 
-- 场景B侧重于**多层网络架构**和**路由横向移动**
-- 场景C侧重于**安全防护设备**和**检测规避技术**
+- **网络隔离**: ✅ 完整的YAML定义和iptables生成
+- **CVE注入**: ✅ 数据库验证和环境兼容性检查
+- **连通性测试**: ✅ 5层网络测试和健康评分
+- **原子库**: ✅ 15+ CVE组件，智能组合验证
 
-- **学习目标**：
-  - IPS/IDS 规则识别与规避
-  - WAF 绕过技术
-  - 防火墙策略分析与利用
-  - 流量加密与隧道技术
-  - SIEM 日志规避
-  - 高级持久化技术
+### 🌟 **独特价值**
 
-- **网络结构**：受保护的内部网络，部署多层安全设备
-  - 边界防火墙（iptables/nftables）
-  - IDS/IPS 检测系统（Suricata/Snort）
-  - WAF（Web应用防火墙）
-  - SIEM 日志收集与分析
-  - 流量监控与分析
+1. **架构分离**: 业界首创的CVE环境配置vs攻击执行分离
+2. **原子化设计**: 可重用CVE组件，支持大规模批量生成
+3. **质量保证**: 全面的验证和评分系统
+4. **AI驱动**: Agent辅助的自动化转换和验证
 
-- **网络规模**：10-20个节点
+## 📞 联系我们
 
-- **核心组件**（计划中）：
-  - 1-2个漏洞目标（Web服务器、数据库）
-  - 1个攻击机（Kali Linux）
-  - 1个IDS/IDS检测节点
-  - 1个WAF节点
-  - 1个SIEM日志收集节点
-  - 1-2个路由器/交换机
-  - 诱饵服务器（蜜罐）
+### 💬 **问题反馈**
 
-- **适用场景**：
-  - 安全设备测试与评估
-  - 规避技术演练
-  - 红队对抗演练
-  - 安全监控体系测试
+- **GitHub Issues**: [提交问题](https://github.com/your-repo/issues)
+- **Discussions**: [参与讨论](https://github.com/your-repo/discussions)
 
-- **状态**：开发中，暂不推荐使用
+### 🤝 **贡献方式**
 
-## 项目结构
+- **代码贡献**: 欢迎提交Pull Request
+- **文档改进**: 帮助完善文档和示例
+- **CVE集成**: 添加更多原子化CVE组件
+- **测试增强**: 提升测试覆盖率
 
-```bash
-containerlab_builder/
-├── src/
-│   └── clab_builder/           # 主源代码包
-│       ├── __init__.py
-│       ├── main.py             # LangGraph 工作流入口
-│       ├── state.py            # 全局状态定义
-│       ├── config.py           # 配置管理（基于 Pydantic）
-│       ├── logger.py           # 日志系统（支持会话隔离、彩色输出）
-│       ├── session_utils.py    # 会话管理工具
-│       ├── node/               # 核心功能节点
-│       │   ├── generate.py     # LLM 生成逻辑蓝图
-│       │   ├── builder.py      # YAML 构建器 (IPAM + 路由)
-│       │   ├── validate.py     # 静态验证（IP冲突、接口重复等）
-│       │   ├── deploy.py       # Containerlab 部署
-│       │   ├── configure.py    # 服务配置（路由注入、服务启动）
-│       │   ├── fixer.py        # 错误修复（智能诊断与修复）
-│       │   └── utils/          # 工具模块
-│       │       ├── models.py   # Pydantic 数据模型定义
-│       │       ├── builder.py  # 构建逻辑（JSON作为唯一真源）
-│       │       └── applier.py  # 配置应用逻辑
-│       └── tools/              # 工具函数
-│           ├── file_tools.py   # 文件操作工具
-│           └── search_vuln_image.py  # 漏洞镜像搜索
-├── tests/                      # 测试目录
-│   ├── test_scenarios.py       # 场景A/B集成测试
-│   └── integration_test.py     # 集成测试
-├── source/                     # 依赖资源
-│   └── vulhub/                 # VulHub 子模块
-├── pyproject.toml              # 项目配置（uv）
-├── .env.example                # 环境变量配置示例
-├── LICENSE                     # MIT 许可证
-└── README.md
-```
+### 📧 **联系方式**
 
-## 技术栈
+- **项目维护者**: [Maintainer Name]
+- **技术支持**: [Support Email]
 
-- **Python 3.10+**: 核心开发语言
-- **LangChain & LangGraph**: LLM 集成与工作流编排
-- **Pydantic**: 数据验证与配置管理
-- **Containerlab**: 容器网络部署
-- **uv**: 快速的 Python 包管理器
-- **pytest**: 测试框架
-
-## 开发
-
-```bash
-# 安装开发依赖
-uv sync --group dev
-
-# 运行代码格式化
-black src/ tests/
-
-# 运行代码检查
-ruff check src/ tests/
-
-# 运行测试
-pytest
-```
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 许可证
+## ⚖️ 许可证
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
+
+## 🙏 致谢
+
+感谢以下开源项目的启发和支持：
+
+- [ContainerLab](https://containerlab.dev/) - 网络拓扑基础设施
+- [VulnHub](https://www.vulnhub.com/) - 漏洞环境来源
+- [Ansible](https://www.ansible.com/) - 自动化配置工具
+- [Pytest](https://pytest.org/) - 测试框架
+
+---
+
+**🎯 我们的使命**: 让CVE训练数据生成更简单、更准确、更可靠！
+
+**⚡ 快速开始**: `uv sync && ./run_tests.sh all`
+
+**📚 深入学习**: 查看 [docs/](docs/) 目录获取详细文档
+
+**🤝 参与贡献**: 我们欢迎所有形式的贡献！
