@@ -1,0 +1,41 @@
+cve_id: 4-unacc
+category: redis
+description: ' Redis Post Exploitation Due to Master and Slave Synchronisation'
+vulnerability_type: RCE
+docker_image: vulhub/redis:4.0.14
+ports:
+- 6379
+services:
+- name: redis
+  image: vulhub/redis:4.0.14
+  is_target: true
+verified: true
+mitre_mapping:
+  initial_access:
+  - T1078
+  execution:
+  - T1059
+  - T1505
+  command_and_control:
+  - T1571
+requirements:
+  network_access: TCP to Redis port 6379 on target, and target must be able to reach
+    attacker's rogue master port
+  authentication: none - Redis has no password configured (requirepass is empty)
+  tools_needed:
+  - nc (netcat)
+  - python3
+  - gcc (for compiling exploit module)
+evidence:
+- Redis 4.0.14 on target accepts connections without any authentication (requirepass
+  is empty)
+- SLAVEOF command accepted from unauthenticated client - target successfully became
+  a slave of our rogue master server
+- Rogue master PSYNC/SYNC handshake completed - arbitrary data was delivered to the
+  target via replication protocol
+- CONFIG SET dir and CONFIG SET dbfilename commands accepted - attacker controls file
+  write path
+- MODULE LOAD capability exists in Redis 4.x - allows loading compiled .so modules
+  for code execution
+timestamp: '2026-06-01T21:07:57.658011'
+source: data/vulhub/redis/4-unacc

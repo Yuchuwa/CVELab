@@ -1,0 +1,38 @@
+- name: Deploy pwnscriptum
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: Create network cve-network
+    community.docker.docker_network:
+      name: cve-network
+      state: present
+  - name: Start mysql (mysql:5)
+    community.docker.docker_container:
+      name: pwnscriptum-mysql
+      image: mysql:5
+      state: started
+      networks_cli_compatible: true
+      networks:
+      - name: cve-network
+      restart_policy: unless-stopped
+      env:
+        MYSQL_ROOT_PASSWORD: root
+  - name: Start web (vulhub/wordpress:4.6)
+    community.docker.docker_container:
+      name: pwnscriptum-web
+      image: vulhub/wordpress:4.6
+      state: started
+      networks_cli_compatible: true
+      networks:
+      - name: cve-network
+      restart_policy: unless-stopped
+      published_ports:
+      - 8080:80
+      env:
+        WORDPRESS_DB_HOST: mysql:3306
+        WORDPRESS_DB_USER: root
+        WORDPRESS_DB_PASSWORD: root
+        WORDPRESS_DB_NAME: wordpress
+  - name: Wait for web
+    ansible.builtin.pause:
+      seconds: 10

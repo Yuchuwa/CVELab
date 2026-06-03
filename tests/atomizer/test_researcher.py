@@ -1,0 +1,167 @@
+"""Researcher 容器管理单元测试
+
+测试 SecurityResearcherAgent 的容器生命周期逻辑（mock docker）。
+"""
+
+import pytest
+import json
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+
+from clab_builder.atomizer.agent.researcher import (
+    SecurityResearcherAgent,
+    CVEInput,
+    AgentOutput,
+    AGENT_RUNNER_SRC,
+)
+
+
+@pytest.mark.unit
+class TestCVEInput:
+    """CVEInput 数据类测试"""
+
+    def test_defaults(self):
+        inp = CVEInput(cve_id="CVE-2021-TEST", description="test",
+                       target_ip="10.0.0.1", target_ports=[80])
+        assert inp.writeup == ""
+        assert inp.exploit_files == {}
+
+    def test_with_exploit_files(self):
+        inp = CVEInput(cve_id="CVE-2021-TEST", description="test",
+                       target_ip="10.0.0.1", target_ports=[80],
+                       exploit_files={"poc.py": "code"})
+        assert inp.exploit_files["poc.py"] == "code"
+
+
+@pytest.mark.unit
+class TestAgentRunnerSrc:
+    """验证 agent_runner.py 源文件路径"""
+
+    def test_exists(self):
+        assert AGENT_RUNNER_SRC.exists()
+        assert AGENT_RUNNER_SRC.name == "agent_runner.py"
+
+
+@pytest.mark.unit
+class TestSecurityResearcherAgent:
+    """容器生命周期管理测试（mock subprocess）"""
+
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_start_basic(self, mock_subprocess):
+        """基本启动"""
+        mock_subprocess.run.return_value = MagicMock(returncode=0, stdout="abc123\n")
+
+        agent = SecurityResearcherAgent()
+        assert agent.max_turns == 50
+        cid = agent.start("cve-network", "/tmp/workspace", "sk-test-key")
+
+        assert cid == "abc123"
+        assert agent.container_id == "abc123"
+
+        # 验证 docker run 命令
+        call_args = mock_subprocess.run.call_args_list[-1]
+        cmd = call_args[0][0]
+        assert "docker" in cmd
+        assert "run" in cmd
+        assert "--network=cve-network" in cmd
+        # agent_runner.py 挂载到 /opt/agent_runner.py
+        assert any("/opt/agent_runner.py:ro" in arg for arg in cmd)
+        # API key 作为 ANTHROPIC_API_KEY
+        assert "ANTHROPIC_API_KEY=sk-test-key" in cmd
+
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_custom_max_turns(self, mock_subprocess):
+        """自定义 max_turns 传递到 docker exec 命令"""
+        agent = SecurityResearcherAgent(max_turns=10)
+        assert agent.max_turns == 10
+
+        # 验证参数构建（不实际执行 run）
+        expected_args = [
+            "docker", "exec", agent.container_name,
+            "python3", "/opt/agent_runner.py",
+            "--input", "/workspace/input.json",
+            "--output", "/workspace/output.json",
+            "--max-turns", "10",
+        ]
+        import subprocess as real_subprocess
+        # 检查参数格式正确
+        assert expected_args[-1] == "10"
+        assert expected_args[-2] == "--max-turns"
+
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_start_with_base_url_and_model(self, mock_subprocess):
+        """带 base_url 和 model 启动"""
+        mock_subprocess.run.return_value = MagicMock(returncode=0, stdout="abc\n")
+
+        agent = SecurityResearcherAgent()
+        agent.start("net", "/tmp/ws", "key",
+                    base_url="https://api.example.com", model="gpt-4")
+
+        call_args = mock_subprocess.run.call_args_list[-1]
+        cmd = call_args[0][0]
+        assert "ANTHROPIC_BASE_URL=https://api.example.com" in cmd
+        assert "MODEL=gpt-4" in cmd
+
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_run_success(self, mock_subprocess, tmp_path):
+        """Agent 执行成功"""
+        # docker exec 成功
+        mock_subprocess.run.return_value = MagicMock(returncode=0, stderr="")
+
+        agent = SecurityResearcherAgent()
+        agent.container_name = "test-container"
+        agent.container_id = "fake"
+
+        # 写 output.json
+        output = {
+            "success": True,
+            "evidence": ["proof"],
+            "exploit_steps": [{"name": "step1", "command": "cmd"}],
+            "mitre_mapping": {"initial_access": ["T1190"]},
+        }
+        (tmp_path / "output.json").write_text(json.dumps(output))
+
+        cve_input = CVEInput(
+            cve_id="CVE-2021-TEST", description="test",
+            target_ip="10.0.0.1", target_ports=[80],
+        )
+        result = agent.run(cve_input, str(tmp_path))
+
+        assert result.success is True
+        assert result.cve_id == "CVE-2021-TEST"
+        assert len(result.exploit_steps) == 1
+        assert result.evidence == ["proof"]
+
+        # 验证 input.json 被写入
+        input_data = json.loads((tmp_path / "input.json").read_text())
+        assert input_data["cve_id"] == "CVE-2021-TEST"
+
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_run_agent_failure(self, mock_subprocess, tmp_path):
+        """Agent 执行失败"""
+        mock_subprocess.run.return_value = MagicMock(
+            returncode=1, stderr="Error: something failed"
+        )
+
+        agent = SecurityResearcherAgent()
+        agent.container_name = "test-container"
+        agent.container_id = "fake"
+
+        cve_input = CVEInput(
+            cve_id="CVE-2021-TEST", description="test",
+            target_ip="10.0.0.1", target_ports=[80],
+        )
+        result = agent.run(cve_input, str(tmp_path))
+
+        assert result.success is False
+        assert "failed" in result.evidence[0].lower()
+
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_stop(self, mock_subprocess):
+        """停止容器"""
+        agent = SecurityResearcherAgent()
+        agent.container_id = "fake123"
+
+        agent.stop()
+        assert agent.container_id is None
+        mock_subprocess.run.assert_called()

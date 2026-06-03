@@ -1,0 +1,22 @@
+- name: Deploy 5-rce
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: Create network cve-network
+    community.docker.docker_network:
+      name: cve-network
+      state: present
+  - name: Start web (vulhub/thinkphp:5.0.20)
+    community.docker.docker_container:
+      name: 5rce-web
+      image: vulhub/thinkphp:5.0.20
+      state: started
+      networks_cli_compatible: true
+      networks:
+      - name: cve-network
+      restart_policy: unless-stopped
+      published_ports:
+      - 8080:80
+  - name: Wait for web
+    ansible.builtin.pause:
+      seconds: 10

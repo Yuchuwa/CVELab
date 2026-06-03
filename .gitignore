@@ -70,6 +70,9 @@ Thumbs.db
 # Project specific
 clab_out/
 output/
+logs/
+htmlcov/
+coverage.xml
 
 # Claude specific
 claude_code_env.sh
