@@ -86,3 +86,5 @@ packages/*/dist/
 packages/*/build/
 packages/*/.eggs/
 packages/*/*.egg-info/
+data/scenarios/
+data/vulhub/
