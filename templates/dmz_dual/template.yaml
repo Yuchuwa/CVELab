@@ -1,0 +1,33 @@
+name: dmz_dual
+description: "单层 DMZ 网络，两个不同服务目标，attacker 需分别攻破"
+difficulty: easy
+
+transits:
+  - subnet: "10.255.255.0/30"
+    endpoints: [attacker, edge-router]
+
+zones:
+  dmz: {subnet: "192.168.100.0/24", type: dmz, router: edge-router}
+
+routers:
+  edge-router: {image: frrouting/frr:latest, connects: [attacker, dmz]}
+
+isolation_rules:
+  - {from: attacker, to: dmz, action: accept}
+
+injection_points:
+  - id: dmz-target-1
+    zone: dmz
+    role_description: "第一个目标服务"
+    required_mitre: [initial_access, execution]
+    required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass]
+    required_service_role: [web_application, middleware, framework]
+    count: 1
+
+  - id: dmz-target-2
+    zone: dmz
+    role_description: "第二个目标服务（不同漏洞类型）"
+    required_mitre: [initial_access, execution]
+    required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass, Info_Leak, Injection]
+    required_service_role: [web_application, middleware, system_service, database]
+    count: 1

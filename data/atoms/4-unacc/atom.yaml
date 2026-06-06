@@ -1,7 +1,7 @@
+version: 2
 cve_id: 4-unacc
 category: redis
 description: ' Redis Post Exploitation Due to Master and Slave Synchronisation'
-vulnerability_type: RCE
 docker_image: vulhub/redis:4.0.14
 ports:
 - 6379
@@ -9,7 +9,8 @@ services:
 - name: redis
   image: vulhub/redis:4.0.14
   is_target: true
-verified: true
+vuln_category: RCE
+primary_mitre_phase: execution
 mitre_mapping:
   initial_access:
   - T1078
@@ -18,6 +19,22 @@ mitre_mapping:
   - T1505
   command_and_control:
   - T1571
+service_role: database
+exploit_complexity: complex
+attack_method: service_protocol
+vulnerability_type: RCE
+network_requirements:
+  needs_callback: false
+  callback_type: none
+  needs_ssh: false
+  needs_tool_download: true
+default_credentials: null
+flag_injection:
+  method: env_var
+flag_verify_command: echo $FLAG
+service_startup:
+  wait_seconds: 10
+verified: true
 requirements:
   network_access: TCP to Redis port 6379 on target, and target must be able to reach
     attacker's rogue master port

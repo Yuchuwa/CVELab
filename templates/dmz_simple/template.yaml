@@ -1,0 +1,28 @@
+name: dmz_simple
+description: "单层 DMZ 网络，attacker 直连目标区域"
+difficulty: easy
+
+transits:
+  - subnet: "10.255.255.0/30"
+    endpoints: [attacker, edge-router]
+
+zones:
+  dmz: {subnet: "192.168.100.0/24", type: dmz, router: edge-router}
+
+routers:
+  edge-router: {image: frrouting/frr:latest, connects: [attacker, dmz]}
+
+isolation_rules:
+  - {from: attacker, to: dmz, action: accept}
+
+noise_levels:
+  none: []
+
+injection_points:
+  - id: dmz-target-1
+    zone: dmz
+    role_description: "面向攻击者的目标服务"
+    required_mitre: [initial_access, execution]
+    required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass, Info_Leak]
+    required_service_role: [web_application, middleware, framework, database, system_service, file_service]
+    count: 1

@@ -68,8 +68,7 @@ env/
 Thumbs.db
 
 # Project specific
-clab_out/
-output/
+
 logs/
 htmlcov/
 coverage.xml

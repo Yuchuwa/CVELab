@@ -4,7 +4,7 @@ description: ' Wordpress 4.6 Remote Code Execution Vulnerability (PwnScriptum)'
 vulnerability_type: ''
 docker_image: vulhub/wordpress:4.6
 ports:
-- 8080
+- 80
 services:
 - name: web
   image: vulhub/wordpress:4.6

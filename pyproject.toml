@@ -12,6 +12,8 @@ dependencies = [
     "requests>=2.31.0",
     "click>=8.0.0",
     "claude-agent-sdk>=0.2.87",
+    "pandas>=2.3.3",
+    "pyarrow>=24.0.0",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +26,7 @@ dev = [
 
 [project.scripts]
 clab-builder = "clab_builder.cli:main"
+cvelab = "clab_builder.cli:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]

@@ -1,0 +1,11 @@
+name: dmz_simple_base
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+  links:
+    - endpoints: ["attacker:eth1", "edge-router:eth1"]

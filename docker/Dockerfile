@@ -21,7 +21,7 @@ RUN apt-get update && \
     sqlmap nikto hydra john \
     openssh-client \
     impacket-scripts \
-    net-tools dnsutils tcpdump iputils-ping \
+    net-tools dnsutils tcpdump iputils-ping iproute2 \
     jq vim sudo \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

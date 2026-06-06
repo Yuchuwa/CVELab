@@ -41,10 +41,14 @@ class AgentOutput:
     mitre_mapping: Dict[str, List[str]]
     vulnerability_type: str = ""
     requirements: Dict[str, Any] = None
+    # v2 额外字段（agent 明确输出时优先，缺失时 pipeline 走推断）
+    extra_fields: Dict[str, Any] = None
 
     def __post_init__(self):
         if self.requirements is None:
             self.requirements = {}
+        if self.extra_fields is None:
+            self.extra_fields = {}
 
 
 class SecurityResearcherAgent:
@@ -204,6 +208,17 @@ class SecurityResearcherAgent:
             mitre_mapping=output_data.get("mitre_mapping", {}),
             vulnerability_type=output_data.get("vulnerability_type", ""),
             requirements=output_data.get("requirements", {}),
+            extra_fields={
+                k: output_data[k]
+                for k in [
+                    "vuln_category", "primary_mitre_phase", "service_role",
+                    "exploit_complexity", "attack_method",
+                    "needs_callback", "callback_type", "needs_ssh", "needs_tool_download",
+                    "default_username", "default_password",
+                    "flag_verify_command", "health_check", "init_tasks",
+                ]
+                if k in output_data
+            },
         )
 
     def stop(self):

@@ -66,7 +66,7 @@ class TestBuildPrompt:
             "target_ports": [8983],
             "writeup": "## Vulnerability Details\nJNDI injection...",
         })
-        assert "Writeup" in prompt
+        assert "Bug Report" in prompt
         assert "JNDI" in prompt
 
     def test_prompt_with_exploit_files(self):

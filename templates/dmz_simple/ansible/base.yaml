@@ -1,0 +1,11 @@
+- name: Configure edge-router
+  hosts: edge-router
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Enable IP forwarding
+      ansible.builtin.shell: sysctl -w net.ipv4.ip_forward=1
+      changed_when: false
+    - name: Allow all forwarding
+      ansible.builtin.shell: iptables -P FORWARD ACCEPT
+      changed_when: false

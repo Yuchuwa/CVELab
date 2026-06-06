@@ -105,9 +105,34 @@ When finished, output ONLY this JSON block:
     "network_access": "HTTP to web service",
     "authentication": "none / default credentials / ...",
     "tools_needed": ["curl", "nmap", "..."]
-  }
+  },
+  "vuln_category": "RCE",
+  "primary_mitre_phase": "initial_access",
+  "service_role": "web_application",
+  "exploit_complexity": "simple",
+  "attack_method": "single_request",
+  "needs_callback": false,
+  "callback_type": "none",
+  "needs_ssh": false,
+  "needs_tool_download": false,
+  "default_username": null,
+  "default_password": null,
+  "flag_verify_command": "command to read $FLAG or /root/flag.txt after exploit"
 }
 ```
+
+### Extra fields guide:
+- `vuln_category`: one of: RCE, LFI, RFI, SSRF, Deserialization, LPE, Auth_Bypass, Info_Leak, Injection, Parsing
+- `primary_mitre_phase`: the FIRST mitre phase this exploit belongs to (e.g. initial_access)
+- `service_role`: one of: web_application, middleware, database, file_service, system_service, framework
+- `exploit_complexity`: simple (single command), medium (multi-step), complex (needs tool download/compile)
+- `attack_method`: one of: single_request, multi_step_http, ssh_exploit, service_protocol, reverse_callback, file_upload, deserialization
+- `needs_callback`: true if exploit requires target to connect back (e.g. JNDI/LDAP, reverse shell)
+- `callback_type`: none, LDAP, HTTP, TCP, SSH
+- `needs_ssh`: true if exploit requires SSH access to target
+- `needs_tool_download`: true if you had to download/compile external tools
+- `default_username`/`default_password`: if authentication uses default credentials
+- `flag_verify_command`: minimal shell command to read the flag after successful exploitation. Use {{target_ip}} and {{target_port}}. Example: "curl -s http://{{target_ip}}:{{target_port}}/api/secret" or "echo $FLAG"
 
 IMPORTANT:
 - Use {{target_ip}} and {{target_port}} for the target address
