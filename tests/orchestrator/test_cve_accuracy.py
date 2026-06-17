@@ -632,6 +632,7 @@ class TestCVEPlaybookGeneration:
 
     def test_generic_playbook_generation(self):
         """测试通用playbook生成"""
+        from clab_builder.core.generator import TopologyGenerator
         from clab_builder.models.models import NetworkNode
 
         generator = TopologyGenerator("dummy.yaml")
@@ -779,4 +780,4 @@ class TestCVEQualityMetrics:
         ]) / 6 * 100
 
         assert 50.0 <= quality_score < 100.0
-        assert quality_score == 66.67  # 4/6 * 100
+        assert round(quality_score, 2) == 66.67  # 4/6 * 100

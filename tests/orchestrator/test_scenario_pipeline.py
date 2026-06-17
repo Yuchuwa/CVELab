@@ -7,6 +7,65 @@ from pathlib import Path
 from clab_builder.orchestrator.composer.scenario import ScenarioPipeline
 
 
+def _write_pipeline_atom(
+    atoms_dir: Path,
+    cve_id: str,
+    *,
+    requires_pivot_host: bool = False,
+):
+    atom_dir = atoms_dir / cve_id
+    atom_dir.mkdir(parents=True)
+    (atom_dir / "atom.yaml").write_text(
+        yaml.dump(
+            {
+                "cve_id": cve_id,
+                "category": "test",
+                "description": "test atom",
+                "docker_image": "vulhub/test:latest",
+                "ports": [8080],
+                "services": [{"name": "web", "image": "vulhub/test:latest"}],
+                "vuln_category": "RCE",
+                "primary_mitre_phase": "initial_access",
+                "mitre_mapping": {"initial_access": ["T1190"]},
+                "service_role": "web_application",
+                "exploit_complexity": "simple",
+                "attack_method": "single_request",
+                "flag_injection": {"method": "env_var", "env_var_name": "FLAG"},
+                "flag_verify_command": "echo $FLAG",
+                "service_startup": {"wait_seconds": 5},
+                "post_exploit": {
+                    "pivot_capability": (
+                        "full_toolbox" if requires_pivot_host else "none"
+                    ),
+                    "requires_pivot_host": requires_pivot_host,
+                },
+                "verified": True,
+            },
+            sort_keys=False,
+        )
+    )
+    playbook_dir = atom_dir / "playbook"
+    playbook_dir.mkdir()
+    (playbook_dir / "sysfield.yaml").write_text(
+        yaml.dump(
+            {
+                "steps": [
+                    {
+                        "id": "trigger",
+                        "stage": "initial_access",
+                        "description": "Trigger test exploit",
+                        "mitre": {"tactic": "initial_access", "technique": "T1190"},
+                        "executor": {
+                            "command": "curl http://{{ target_ip }}:{{ target_port }}/poc",
+                        },
+                    }
+                ]
+            },
+            sort_keys=False,
+        )
+    )
+
+
 class TestScenarioPipelineGenerate:
     @pytest.fixture
     def pipeline(self):
@@ -30,6 +89,8 @@ class TestScenarioPipelineGenerate:
         out = Path(tmp_path) / result["name"]
         assert (out / "clab.yaml").exists()
         assert (out / "ground_truth.json").exists()
+        assert (out / "sysfield" / "playbook.yaml").exists()
+        assert result["sysfield_playbook"] == str(out / "sysfield" / "playbook.yaml")
 
     def test_generate_with_specific_cve(self, pipeline, tmp_path):
         """指定 CVE 生成"""
@@ -195,6 +256,7 @@ class TestScenarioPipelineMultiTemplate:
         assert (out / "scenario.yaml").exists()
         assert (out / "ansible" / "base.yaml").exists()
         assert (out / "ansible" / "cve-setup.yaml").exists()
+        assert (out / "sysfield" / "playbook.yaml").exists()
 
     def test_enterprise_3tier_three_unique_cves(self, pipeline, tmp_path):
         result = pipeline.generate(
@@ -204,6 +266,40 @@ class TestScenarioPipelineMultiTemplate:
         )
         cve_ids = [inj["cve_id"] for inj in result["injections"]]
         assert len(set(cve_ids)) == 3  # all unique
+
+    def test_dmz_simple_pivot_atom_writes_sysfield_playbook(self, tmp_path):
+        atoms_dir = tmp_path / "atoms"
+        _write_pipeline_atom(
+            atoms_dir,
+            "CVE-PIVOT-0001",
+            requires_pivot_host=True,
+        )
+        pipeline = ScenarioPipeline(
+            templates_dir="templates",
+            atoms_dir=str(atoms_dir),
+        )
+
+        result = pipeline.generate(
+            template_name="dmz_simple",
+            cve_ids=["CVE-PIVOT-0001"],
+            scenario_name="pivot-sysfield",
+            output_dir=str(tmp_path / "scenarios"),
+        )
+
+        out = Path(result["sysfield_playbook"])
+        playbook = yaml.safe_load(out.read_text())
+        nodes = result["clab"]["topology"]["nodes"]
+
+        assert nodes["target-1"]["image"] == "cvelab-pivot-base:latest"
+        assert nodes["target-1-service"]["network-mode"] == (
+            "container:clab-pivot-sysfield-target-1"
+        )
+        assert result["ground_truth"]["attack_path"][0]["service_node"] == (
+            "target-1-service"
+        )
+        assert playbook["steps"][0]["id"].endswith("cve-pivot-0001-target-1-trigger")
+        assert "curl http://" in playbook["steps"][0]["executor"]["command"]
+        assert "echo $FLAG" not in playbook["steps"][0]["executor"]["command"]
 
 
 class TestCLIIntegration:

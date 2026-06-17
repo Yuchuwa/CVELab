@@ -256,6 +256,65 @@ def atom_list(output):
         click.echo(f"  {cve_id}  [{status}]")
 
 
+@atom.command("sysfield")
+@click.argument("cve_id", nargs=-1)
+@click.option("--output", "-o", default="data/atoms", help="Atoms directory")
+def atom_sysfield(cve_id, output):
+    """Generate SysField playbooks for existing atoms."""
+    from clab_builder.atomizer.output.sysfield_playbook import SysFieldPlaybookGenerator
+
+    atoms_dir = Path(output)
+    targets = list(cve_id) if cve_id else [
+        d.name for d in sorted(atoms_dir.iterdir())
+        if d.is_dir() and (d / "atom.yaml").exists()
+    ]
+    gen = SysFieldPlaybookGenerator()
+    written = []
+    for atom_name in targets:
+        atom_dir = atoms_dir / atom_name
+        if not (atom_dir / "atom.yaml").exists():
+            click.echo(f"Skip: {atom_name} (atom.yaml not found)")
+            continue
+        try:
+            written.append(gen.write_atom_playbook(str(atom_dir)))
+        except Exception as e:
+            click.echo(f"Failed: {atom_name} - {e}")
+            continue
+    for path in written:
+        click.echo(f"Written: {path}")
+
+
+# ── SysField integration ─────────────────────────────────────────────────
+
+@main.group()
+def sysfield():
+    """Export/run scenarios with SysField."""
+    pass
+
+
+@sysfield.command("export")
+@click.argument("scenario_dir")
+@click.option("--output", "-o", help="Output playbook path")
+@click.option("--atoms-dir", default="data/atoms", help="Atoms directory")
+@click.option("--actor-node", default="attacker", help="SysField actor node name")
+def sysfield_export(scenario_dir, output, atoms_dir, actor_node):
+    """Export a generated CVELab scenario as a SysField playbook."""
+    from clab_builder.orchestrator.composer.sysfield_exporter import SysFieldExporter
+
+    exporter = SysFieldExporter(atoms_dir=atoms_dir)
+    try:
+        out = exporter.export(
+            scenario_dir=scenario_dir,
+            output_file=output,
+            actor_node=actor_node,
+        )
+    except (FileNotFoundError, ValueError) as e:
+        click.echo(f"Error: {e}")
+        raise SystemExit(1)
+
+    click.echo(f"SysField playbook: {out}")
+
+
 def _resolve_vulhub_path(path: str) -> str | None:
     if os.path.isdir(path):
         return path

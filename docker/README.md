@@ -34,6 +34,16 @@ cd agent_container
 docker build -t security-researcher-agent:latest .
 ```
 
+### 构建 Pivot Host 镜像
+
+多阶段场景中，如果 CVE 服务容器本身缺少 shell、Python、curl、socat 等基础能力，可以让 CVE 服务共享一个 pivot host 容器的网络命名空间。pivot host 镜像用下面的 Dockerfile 构建：
+
+```bash
+docker build -f pivot-base.Dockerfile -t cvelab-pivot-base:latest .
+```
+
+该镜像用于 `post_exploit.requires_pivot_host: true` 的 atom；原始 CVE 服务镜像保持不变，只共享 pivot host 的网络。
+
 ## 使用镜像
 
 ```bash

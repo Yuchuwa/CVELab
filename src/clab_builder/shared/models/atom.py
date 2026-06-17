@@ -87,6 +87,15 @@ class CallbackType(str, Enum):
     SSH = "SSH"
 
 
+class PivotCapability(str, Enum):
+    """攻陷后可作为中间节点的能力"""
+    NONE = "none"
+    CREDENTIAL = "credential"
+    PORT_FORWARD = "port_forward"
+    SHELL = "shell"
+    FULL_TOOLBOX = "full_toolbox"
+
+
 # ── 子模型 ──────────────────────────────────────────
 
 class ServiceInfo(BaseModel):
@@ -135,6 +144,13 @@ class ServiceStartup(BaseModel):
     init_files: List[InitFileMapping] = Field(default_factory=list)
 
 
+class PostExploit(BaseModel):
+    """漏洞利用后的横向移动能力"""
+    pivot_capability: PivotCapability = PivotCapability.NONE
+    requires_pivot_host: bool = False
+    pivot_host_image: str = "cvelab-pivot-base:latest"
+
+
 # ── 主模型 ──────────────────────────────────────────
 
 class AtomConfig(BaseModel):
@@ -178,6 +194,9 @@ class AtomConfig(BaseModel):
 
     # 服务启动
     service_startup: ServiceStartup = Field(default_factory=ServiceStartup)
+
+    # 攻陷后的 pivot / 横向移动能力
+    post_exploit: PostExploit = Field(default_factory=PostExploit)
 
     # 验证状态
     verified: bool = False

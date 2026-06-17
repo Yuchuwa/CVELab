@@ -13,7 +13,7 @@ class NetworkNode(BaseModel):
     image: str = Field(..., description="Docker镜像")
     networks: List[str] = Field(default_factory=list, description="连接的网络")
     role: str = Field(default="endpoint", description="节点角色")
-    ports: List[str] = Field(default_factory=list, description="端口列表")
+    ports: List[Any] = Field(default_factory=list, description="端口列表")
     cve_injection: Optional[Dict[str, Any]] = Field(None, description="CVE注入信息")
     routing: Optional[Dict[str, Any]] = Field(None, description="路由信息")
     vars: Dict[str, Any] = Field(default_factory=dict, description="其他变量")

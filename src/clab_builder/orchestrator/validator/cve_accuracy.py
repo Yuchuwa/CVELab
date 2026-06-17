@@ -12,7 +12,7 @@ from datetime import datetime
 import hashlib
 
 
-class CVESeverity(Enum):
+class CVESeverity(str, Enum):
     """CVE严重程度"""
     CRITICAL = "CRITICAL"  # 9.0-10.0
     HIGH = "HIGH"         # 7.0-8.9
@@ -20,7 +20,7 @@ class CVESeverity(Enum):
     LOW = "LOW"          # 0.1-3.9
 
 
-class CVEAttackComplexity(Enum):
+class CVEAttackComplexity(str, Enum):
     """CVE攻击复杂度"""
     LOW = "LOW"           # 易于利用
     MEDIUM = "MEDIUM"     # 需要一些条件
@@ -80,6 +80,10 @@ class CVEValidationResult:
     validation_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     issues: List[str] = field(default_factory=list)
     recommendations: List[str] = field(default_factory=list)
+
+    def __contains__(self, key: str) -> bool:
+        """Allow legacy dict-style membership checks in tests and callers."""
+        return hasattr(self, key)
 
 
 class CVEDatabaseValidator:
@@ -312,9 +316,10 @@ class CVEEnvironmentValidator:
         """从CVE信息提取所需的服务"""
         services = []
 
-        if 'log4j' in cve_info.cve_id.lower():
+        description = cve_info.description.lower()
+        if 'log4j' in cve_info.cve_id.lower() or 'log4j' in description:
             services.append('java')
-        elif 'nginx' in cve_info.description.lower():
+        elif 'nginx' in description:
             services.append('nginx')
 
         return services
@@ -347,7 +352,7 @@ class CVEExploitGenerator:
         return [
             ExploitStep(
                 step_number=1,
-                description="检查目标服务运行状态",
+                description="侦察目标服务运行状态",
                 command=f"curl -s http://{target_ip}:{target_port}/",
                 expected_output="HTTP",
                 validation_method="output_match",
@@ -609,6 +614,10 @@ class CVEAccuracyValidator:
                         return True
 
         return len(exploit_steps) > 0
+
+    def _generate_mock_exploit_steps(self, cve_id: str) -> List[ExploitStep]:
+        """Legacy helper retained for older tests and callers."""
+        return self.exploit_generator._generate_generic_exploit_steps(cve_id, {})
 
     def _validate_reproducibility(
         self,

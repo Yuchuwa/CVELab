@@ -7,6 +7,7 @@ from clab_builder.orchestrator.composer.template_loader import TemplateLoader
 from clab_builder.orchestrator.composer.atom_loader import AtomLoader
 from clab_builder.orchestrator.composer.cve_matcher import match as cve_match, pick_random
 from clab_builder.orchestrator.composer.scenario_assembler import ScenarioAssembler
+from clab_builder.orchestrator.composer.sysfield_exporter import SysFieldExporter
 
 
 class ScenarioPipeline:
@@ -88,7 +89,9 @@ class ScenarioPipeline:
         )
 
         # Write output
-        self.assembler.write_output(scenario, output_dir)
+        scenario_dir = self.assembler.write_output(scenario, output_dir)
+        sysfield_playbook = SysFieldExporter(atoms_dir=self.atoms_dir).export(scenario_dir)
+        scenario["sysfield_playbook"] = sysfield_playbook
 
         return scenario
 

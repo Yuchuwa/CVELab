@@ -101,7 +101,7 @@ class TopologyGenerator:
         links = self._generate_links()
 
         # 构建ContainerLab配置（完全符合DNS要求：只包含字母数字和连字符）
-        lab_name = self.specification.lab_name.replace('-', '').replace('_', '').replace('.', '').lower()
+        lab_name = self.specification.lab_name.replace('_', '').replace('.', '').lower()
         clab_config = {
             'name': lab_name,
             'topology': {
@@ -279,7 +279,7 @@ class TopologyGenerator:
 
 - name: Configure network infrastructure
   hosts: routers
-      become: true
+  become: true
   tasks:
     - name: Enable IP forwarding
       ansible.builtin.sysctl:

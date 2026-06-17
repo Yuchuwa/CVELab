@@ -8,7 +8,7 @@ from .atom import (
     AtomConfig, VulnCategory, MitrePhase, ServiceRole,
     ExploitComplexity, AttackMethod, FlagMethod, FlagInjection,
     ServiceInfo, NetworkRequirements, DefaultCredentials, ServiceStartup,
-    InitFileMapping,
+    InitFileMapping, PostExploit, PivotCapability,
 )
 from .template import (
     TopologyTemplate, ZoneDef, RouterDef, IsolationRule,
@@ -21,7 +21,7 @@ __all__ = [
     "AtomConfig", "VulnCategory", "MitrePhase", "ServiceRole",
     "ExploitComplexity", "AttackMethod", "FlagMethod", "FlagInjection",
     "ServiceInfo", "NetworkRequirements", "DefaultCredentials", "ServiceStartup",
-    "InitFileMapping",
+    "InitFileMapping", "PostExploit", "PivotCapability",
     "TopologyTemplate", "ZoneDef", "RouterDef", "IsolationRule",
     "InjectionPoint", "NoiseService", "TransitDef",
 ]

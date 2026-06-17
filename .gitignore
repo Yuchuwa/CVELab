@@ -88,3 +88,4 @@ packages/*/.eggs/
 packages/*/*.egg-info/
 data/scenarios/
 data/vulhub/
+src/sysfield/

@@ -26,6 +26,7 @@ class ScenarioVerifier:
 
     def __init__(self, max_turns: int = DEFAULT_AGENT_TURNS):
         self.max_turns = max_turns
+        self.agent_image = "clab-agent:latest"
 
     def run_full(
         self,
@@ -310,6 +311,15 @@ class ScenarioVerifier:
             "all_captured": all(v["match"] for v in per_target.values()),
             "per_target": per_target,
         }
+
+    def verify_flags(self, agent_result: dict, ground_truth: dict) -> dict:
+        """Public wrapper for flag verification."""
+        return self._verify_flags(agent_result, ground_truth)
+
+    def _get_node_ports(self, clab_data: dict, node_name: str) -> list[int]:
+        """Extract configured ports from a clab node definition."""
+        node = clab_data.get("topology", {}).get("nodes", {}).get(node_name, {})
+        return node.get("ports", [])
 
     def _save_result(self, scenario_path: Path, result: dict, ground_truth: dict) -> dict:
         """保存验证结果到场景目录"""

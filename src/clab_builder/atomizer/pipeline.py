@@ -5,7 +5,7 @@
 2. 启动 CVE 环境（docker-compose）
 3. 启动 Agent 容器，传入 writeup
 4. Agent 自主执行 exploit 并验证
-5. 生成 playbook/exploit.yaml
+5. 生成 playbook/sysfield.yaml
 6. 保存到 data/atoms/CVE-XXXX/
 """
 
@@ -19,7 +19,7 @@ from typing import Dict, List, Any
 from dataclasses import dataclass, field
 
 from .output.vulhub_converter import VulhubParser, AnsiblePlaybookGenerator
-from .output.exploit_playbook import ExploitPlaybookGenerator
+from .output.sysfield_playbook import SysFieldPlaybookGenerator
 from .agent.researcher import SecurityResearcherAgent, CVEInput
 from .environment.container import CVEEnvironmentManager, ContainerInfo
 
@@ -98,8 +98,8 @@ class AtomizerPipeline:
                 network_name=cve_network,
             )
 
-            # Step 4: 生成 playbook/exploit.yaml
-            print(f"\n[4/5] Generating playbook/exploit.yaml")
+            # Step 4: 生成 playbook/sysfield.yaml
+            print(f"\n[4/5] Generating playbook/sysfield.yaml")
             self._generate_exploit_playbook(atom_dir, agent_output, cve_info)
 
             # Step 5: 保存 atom 元数据
@@ -417,25 +417,22 @@ class AtomizerPipeline:
         return agent.run(cve_input, str(workspace))
 
     def _generate_exploit_playbook(self, atom_dir: Path, agent_output, cve_info):
-        """从 Agent 结果生成 exploit playbook"""
+        """从 Agent 结果生成 SysField playbook"""
         playbook_dir = atom_dir / "playbook"
         playbook_dir.mkdir(parents=True, exist_ok=True)
 
-        gen = ExploitPlaybookGenerator()
-        playbook = gen.generate(
+        sysfield_playbook = SysFieldPlaybookGenerator().generate(
             cve_id=self.env.cve_id,
             exploit_steps=agent_output.exploit_steps,
             mitre_mapping=agent_output.mitre_mapping,
-            target_ip=cve_info.container_ip,
+            target_ip="{{ target_ip }}",
             target_port=cve_info.ports[0] if cve_info.ports else 80,
-            evidence=agent_output.evidence,
             vulnerability_type=agent_output.vulnerability_type,
             requirements=agent_output.requirements,
         )
-
-        playbook_path = playbook_dir / "exploit.yaml"
-        playbook_path.write_text(playbook)
-        print(f"  Written: {playbook_path}")
+        sysfield_path = playbook_dir / "sysfield.yaml"
+        sysfield_path.write_text(sysfield_playbook)
+        print(f"  Written: {sysfield_path}")
 
     def _save_atom(self, atom_dir: Path, agent_output=None):
         """保存 atom.yaml v2 元数据"""

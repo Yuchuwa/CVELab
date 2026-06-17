@@ -36,6 +36,13 @@ class ContainerLabParser:
         # 解析节点
         topology_nodes = self.raw_data.get('topology', {}).get('nodes', {})
         for node_name, node_config in topology_nodes.items():
+            if not isinstance(node_config, dict):
+                raise ValueError(f"Invalid node config for {node_name}: expected mapping")
+            if not any(k in node_config for k in ("kind", "image", "labels")):
+                raise ValueError(
+                    f"Invalid node config for {node_name}: missing kind/image/labels"
+                )
+
             # 从labels提取元数据
             labels = node_config.get('labels', {})
             role = labels.get('role', 'endpoint')
