@@ -150,6 +150,21 @@ class TestAssemblerDMZSimple:
         assert result["name"] == "my-scenario"
         assert result["clab"]["name"] == "my-scenario"
 
+    def test_base_yaml_generation_preserves_route_metadata(self, assembler):
+        atoms = [
+            _make_atom("CVE-TEST-0001"),
+            _make_atom("CVE-TEST-0002"),
+            _make_atom("CVE-TEST-0003"),
+        ]
+        result = assembler.assemble("enterprise_3tier", atoms)
+
+        router_allocations = [
+            config
+            for node, config in result["ip_allocations"].items()
+            if node.endswith("-router")
+        ]
+        assert any(config.get("routes") for config in router_allocations)
+
 
 class TestAssemblerOutput:
     """测试 write_output"""

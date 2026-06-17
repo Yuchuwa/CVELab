@@ -131,13 +131,13 @@ class ScenarioVerifier:
             # Fallback: auto-generated inventory name
             inventory = scenario_path / f"{lab_name}-inventory.yaml"
 
-        cmd = ["ansible-playbook", str(pb_path)]
+        cmd = ["ansible-playbook", str(pb_path.resolve())]
         if inventory.exists():
-            cmd.extend(["-i", str(inventory)])
+            cmd.extend(["-i", str(inventory.resolve())])
 
         result = subprocess.run(
             cmd, capture_output=True, text=True, timeout=timeout,
-            cwd=str(scenario_path),
+            cwd=str(scenario_path.resolve()),
         )
         if result.returncode != 0:
             print(f"  Ansible {playbook} warning: {result.stderr[:300]}")

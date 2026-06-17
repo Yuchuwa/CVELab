@@ -333,10 +333,11 @@ class ScenarioAssembler:
                         net.overlaps(ipaddress.ip_network(s, strict=False))
                         for s in local_subnets
                     ):
-                        # 需要找到 first_hop 的 transit IP
+                        # 需要找到 first_hop 在 transit link 上的 IP（对端 IP）
                         hop_iface = self._find_link_iface(iface_map, router_name, first_hop)
                         if hop_iface:
-                            hop_ip = ip_alloc.get(router_name, {}).get(hop_iface, "")
+                            peer_iface = self._find_link_iface(iface_map, first_hop, router_name)
+                            hop_ip = ip_alloc.get(first_hop, {}).get(peer_iface, "") if peer_iface else ""
                             if hop_ip:
                                 router_routes[router_name].append({
                                     "dst": subnet,
@@ -356,13 +357,24 @@ class ScenarioAssembler:
         ip_alloc: dict,
         scenario_name: str = "",
     ) -> str:
-        """生成完整的 base.yaml：用 docker exec 配置所有节点"""
+        """生成完整的 base.yaml：用 nsenter 配置所有节点（不依赖容器内工具）"""
         tasks = []
 
-        def docker_exec(node: str, cmd: str) -> dict:
+        def nsenter_cmd(node: str, cmd: str) -> dict:
+            """用 sudo nsenter 从宿主机进入容器网络命名空间执行命令
+
+            多命令用 sh -c 包裹，确保都在命名空间内执行。
+            """
+            container = f"clab-{scenario_name}-{node}"
+            # 用 sh -c 包裹命令，避免分号导致部分命令在宿主机执行
+            shell_cmd = (
+                "sudo nsenter -t $(docker inspect -f '{{.State.Pid}}' "
+                + container
+                + ") -n sh -c '" + cmd + "'"
+            )
             return {
                 "name": f"Configure {node}: {cmd[:60]}",
-                "ansible.builtin.shell": f"docker exec -u root clab-{scenario_name}-{node} bash -c '{cmd}'",
+                "ansible.builtin.shell": "{% raw %}" + shell_cmd + "{% endraw %}",
                 "changed_when": False,
             }
 
@@ -376,23 +388,23 @@ class ScenarioAssembler:
         # 1. Routers: 接口 IP + ip_forward + iptables + static routes
         for router_name in template.routers:
             router_config = ip_alloc.get(router_name, {})
-            routes = router_config.pop("routes", [])  # 取出 routes，不作为接口
+            routes = router_config.get("routes", [])
 
             for iface, addr in router_config.items():
-                if iface == "gateway":
+                if iface in ("gateway", "routes"):
                     continue
-                tasks.append(docker_exec(
+                tasks.append(nsenter_cmd(
                     router_name,
                     f"ip addr replace {addr} dev {iface} 2>/dev/null; ip link set {iface} up"
                 ))
 
-            tasks.append(docker_exec(router_name, "sysctl -w net.ipv4.ip_forward=1"))
-            tasks.append(docker_exec(router_name, "iptables -P FORWARD ACCEPT"))
+            tasks.append(nsenter_cmd(router_name, "sysctl -w net.ipv4.ip_forward=1"))
+            tasks.append(nsenter_cmd(router_name, "iptables -P FORWARD ACCEPT"))
             if router_name == attacker_router:
-                tasks.append(docker_exec(router_name, "iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"))
+                tasks.append(nsenter_cmd(router_name, "iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"))
 
             for route in routes:
-                tasks.append(docker_exec(
+                tasks.append(nsenter_cmd(
                     router_name,
                     f"ip route replace {route['dst']} via {route['via']}"
                 ))
@@ -401,28 +413,28 @@ class ScenarioAssembler:
         for node_name, config in ip_alloc.items():
             if not node_name.startswith("target-"):
                 continue
-            tasks.append(docker_exec(
+            tasks.append(nsenter_cmd(
                 node_name,
                 f"ip addr replace {config['eth1']} dev eth1 2>/dev/null; ip link set eth1 up"
             ))
-            tasks.append(docker_exec(
+            tasks.append(nsenter_cmd(
                 node_name,
                 f"ip route replace default via {config['gateway']}"
             ))
-            tasks.append(docker_exec(node_name, "ip addr flush dev eth0"))
+            tasks.append(nsenter_cmd(node_name, "ip addr flush dev eth0"))
 
         # 3. Attacker: IP + route + flush eth0
         attacker_config = ip_alloc.get("attacker", {})
         if attacker_config:
-            tasks.append(docker_exec(
+            tasks.append(nsenter_cmd(
                 "attacker",
                 f"ip addr replace {attacker_config['eth1']} dev eth1 2>/dev/null; ip link set eth1 up"
             ))
-            tasks.append(docker_exec(
+            tasks.append(nsenter_cmd(
                 "attacker",
                 f"ip route replace default via {attacker_config['gateway']}"
             ))
-            tasks.append(docker_exec("attacker", "ip addr flush dev eth0"))
+            tasks.append(nsenter_cmd("attacker", "ip addr flush dev eth0"))
 
         playbook = [{
             "name": "Configure data plane network",
