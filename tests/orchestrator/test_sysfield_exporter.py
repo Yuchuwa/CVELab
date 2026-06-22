@@ -75,15 +75,11 @@ def test_export_sysfield_playbook(tmp_path):
     assert len(playbook["steps"]) == 1
 
     step = playbook["steps"][0]
-    assert step["id"] == "01-01-cve-test-0001-target-1-verify-flag-command"
+    assert step["id"] == "01-01-target-1-verify-flag-command"
     assert step["stage"] == "initial_access"
     assert step["mitre"]["technique"] == "T1190"
-    assert "192.168.100.2:8080" in step["executor"]["command"]
-    assert (
-        "/tmp/cvelab-sysfield/01-01-cve-test-0001-target-1-verify-flag-command.out"
-        in step["executor"]["command"]
-    )
-    assert step["postconditions"]["files"][0]["op"] == "write"
+    assert step["executor"]["command"] == "curl -s http://192.168.100.2:8080/health"
+    assert "postconditions" not in step
 
 
 def test_export_prefers_atom_sysfield_steps_over_local_flag_probe(tmp_path):

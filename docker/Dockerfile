@@ -15,14 +15,14 @@ RUN sed -i 's|http://http.kali.org/kali|http://mirrors.tuna.tsinghua.edu.cn/kali
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential gcc \
-    ca-certificates curl wget \
+    ca-certificates curl wget git unzip \
     python3 python3-pip python3-dev \
-    nmap netcat-openbsd smbclient \
+    nmap netcat-openbsd smbclient sshpass \
     sqlmap nikto hydra john \
     openssh-client \
     impacket-scripts \
     net-tools dnsutils tcpdump iputils-ping iproute2 \
-    jq vim sudo \
+    jq vim sudo xxd \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -36,6 +36,10 @@ RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
 RUN pip3 install --no-cache-dir \
     claude-agent-sdk>=0.2.87 \
     requests \
+    pexpect \
+    paramiko \
+    pysmb \
+    pycryptodome \
     pyyaml
 
 # agent_runner.py is mounted from host via volume at runtime

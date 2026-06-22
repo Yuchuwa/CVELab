@@ -65,9 +65,13 @@ class VulhubParser:
 
         # 从路径提取 cve_id 和 category
         parts = vulhub_path.resolve().parts
-        idx = list(parts).index("vulhub")
-        category = parts[idx + 1]
-        cve_id = parts[idx + 2]
+        if "vulhub" in parts:
+            idx = list(parts).index("vulhub")
+            category = parts[idx + 1]
+            cve_id = parts[idx + 2]
+        else:
+            category = vulhub_path.parent.name
+            cve_id = vulhub_path.name
 
         # 解析服务
         services = []

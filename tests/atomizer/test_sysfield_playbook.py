@@ -1,7 +1,6 @@
 """Tests for atom-level SysField playbook generation."""
 
 import json
-from pathlib import Path
 
 import yaml
 from click.testing import CliRunner
@@ -31,10 +30,11 @@ def test_generate_sysfield_playbook_from_exploit_steps():
     assert data["playbook"]["id"] == "cve-test-0001"
     assert data["actors"]["attacker"]["node"] == "attacker"
     step = data["steps"][0]
+    assert step["id"] == "01-trigger-bug"
     assert step["stage"] == "initial_access"
     assert step["mitre"]["technique"] == "T1190"
-    assert "curl http://{{ target_ip }}:8080/poc" in step["executor"]["command"]
-    assert step["postconditions"]["files"][0]["op"] == "write"
+    assert step["executor"]["command"] == "curl http://{{ target_ip }}:8080/poc"
+    assert "postconditions" not in step
 
 
 def test_steps_from_session_generalizes_target_ip(tmp_path):
@@ -62,6 +62,37 @@ def test_steps_from_session_generalizes_target_ip(tmp_path):
 
     assert steps[0]["name"] == "Probe target"
     assert steps[0]["command"] == "curl -s http://{{ target_ip }}:80/"
+
+
+def test_steps_from_raw_sdk_session_shape(tmp_path):
+    session = [
+        {
+            "type": "assistant",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "name": "Bash",
+                    "input": {
+                        "command": "curl http://172.18.0.2:8080/",
+                        "description": "Probe target",
+                    },
+                }
+            ],
+            "sdk_extra": {"kept": True},
+        }
+    ]
+    session_path = tmp_path / "session.json"
+    session_path.write_text(json.dumps(session))
+
+    steps = SysFieldPlaybookGenerator().steps_from_session(str(session_path))
+
+    assert steps == [
+        {
+            "name": "Probe target",
+            "description": "Probe target",
+            "command": "curl http://{{ target_ip }}:8080/",
+        }
+    ]
 
 
 def test_atom_sysfield_cli_generates_existing_atom_playbook(tmp_path):

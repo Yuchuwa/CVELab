@@ -82,10 +82,13 @@ claude_code_env.sh
 !.claude/skills/install-gstack.sh
 
 # Mono repository specific
+data/generated/
 packages/*/dist/
 packages/*/build/
 packages/*/.eggs/
 packages/*/*.egg-info/
 data/scenarios/
 data/vulhub/
+data/atoms/**/.workspace/
+data/atoms/**/node_modules/
 src/sysfield/

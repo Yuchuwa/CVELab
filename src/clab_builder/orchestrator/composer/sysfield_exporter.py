@@ -14,8 +14,34 @@ from clab_builder.shared.models.atom import AtomConfig
 _TEMPLATE_RE = re.compile(r"{{\s*([^{}\s]+)\s*}}")
 
 
-def _slug(value: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]+", "-", value).strip("-").lower() or "step"
+def _slug(value: str, max_len: int = 0) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", value).strip("-").lower() or "step"
+    if max_len and len(slug) > max_len:
+        cut = slug.rfind("-", 0, max_len)
+        slug = slug[:cut if cut > 0 else max_len].rstrip("-")
+    return slug
+
+
+class _PlaybookDumper(yaml.SafeDumper):
+    pass
+
+
+def _represent_playbook_str(dumper: yaml.Dumper, value: str):
+    style = "|" if "\n" in value else None
+    return dumper.represent_scalar("tag:yaml.org,2002:str", value, style=style)
+
+
+_PlaybookDumper.add_representer(str, _represent_playbook_str)
+
+
+def _dump_playbook(playbook: dict[str, Any]) -> str:
+    return yaml.dump(
+        playbook,
+        Dumper=_PlaybookDumper,
+        default_flow_style=False,
+        sort_keys=False,
+        allow_unicode=True,
+    )
 
 
 class SysFieldExporter:
@@ -63,10 +89,9 @@ class SysFieldExporter:
             atom_steps = self._select_steps(atom, target, scenario_meta, step_actor_node)
             for sub_index, atom_step in enumerate(atom_steps, start=1):
                 step_id = (
-                    f"{index:02d}-{sub_index:02d}-{_slug(cve_id)}-"
-                    f"{_slug(target['target_node'])}-{_slug(atom_step['id'])}"
+                    f"{index:02d}-{sub_index:02d}-{_slug(target['target_node'])}-"
+                    f"{_slug(atom_step['id'], max_len=30)}"
                 )
-                output_path = f"/tmp/cvelab-sysfield/{step_id}.out"
 
                 step = {
                     "id": step_id,
@@ -80,12 +105,9 @@ class SysFieldExporter:
                     "mitre": atom_step.get("mitre") or self._mitre(atom),
                     "executor": {
                         "type": "direct",
-                        "command": self._wrap_command(atom_step["command"], output_path),
+                        "command": atom_step["command"],
                     },
                     "expected_output": {"exit_code": 0},
-                    "postconditions": {
-                        "files": [{"path": output_path, "op": "write"}],
-                    },
                     "timeout": max(atom.service_startup.wait_seconds, 30),
                 }
                 if previous_step_id:
@@ -120,7 +142,7 @@ class SysFieldExporter:
 
         out = Path(output_file) if output_file else scenario_path / "sysfield" / "playbook.yaml"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(yaml.dump(playbook, default_flow_style=False, sort_keys=False))
+        out.write_text(_dump_playbook(playbook))
         return str(out)
 
     def _select_steps(
@@ -264,15 +286,6 @@ class SysFieldExporter:
 
     def _has_unresolved_template(self, command: str) -> bool:
         return bool(_TEMPLATE_RE.search(command))
-
-    def _wrap_command(self, command: str, output_path: str) -> str:
-        return (
-            "mkdir -p /tmp/cvelab-sysfield\n"
-            f"({command}) > {output_path} 2>&1\n"
-            "status=$?\n"
-            f"cat {output_path}\n"
-            "exit $status"
-        )
 
     def _mitre(self, atom: AtomConfig) -> dict[str, str]:
         tactic = atom.primary_mitre_phase.value

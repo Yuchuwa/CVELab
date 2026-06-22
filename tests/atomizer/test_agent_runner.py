@@ -3,10 +3,16 @@
 测试 agent_runner.py 中的 JSON 提取和 prompt 构建。
 """
 
-import pytest
 import json
 
-from clab_builder.atomizer.agent.agent_runner import extract_json, build_prompt
+import pytest
+
+from clab_builder.atomizer.agent.agent_runner import (
+    extract_json,
+    build_prompt,
+    extract_flag,
+    _extract_json_from_native_session,
+)
 
 
 @pytest.mark.unit
@@ -40,6 +46,45 @@ class TestExtractJson:
         text = "I couldn't exploit this target."
         result = extract_json(text)
         assert result is None
+
+    def test_extract_flag_from_text(self):
+        text = "The exploit printed flag{cve-2024-0001-deadbeef} in the response."
+        assert extract_flag(text) == "flag{cve-2024-0001-deadbeef}"
+
+    def test_native_session_extracts_final_assistant_json(self, tmp_path):
+        """Recover final JSON from SDK session without taking earlier templates."""
+        session = tmp_path / "session.json"
+        events = [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": 'Example only:\n```json\n{"success": false, "evidence": ["template"]}\n```',
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": 'Final:\n```json\n{"success": true, "evidence": ["confirmed"]}\n```',
+                        }
+                    ],
+                }
+            },
+        ]
+        session.write_text("\n".join(json.dumps(event) for event in events))
+
+        result = _extract_json_from_native_session(session)
+
+        assert result is not None
+        assert result["success"] is True
+        assert result["evidence"] == ["confirmed"]
 
 
 @pytest.mark.unit
@@ -79,3 +124,39 @@ class TestBuildPrompt:
         })
         assert "poc.py" in prompt
         assert "print('pwned')" in prompt
+
+    def test_prompt_with_environment_context_and_guidance(self):
+        """包含运行环境上下文和 exploit 指引"""
+        prompt = build_prompt({
+            "cve_id": "CVE-2019-7609",
+            "target_ip": "172.18.0.2",
+            "target_ports": [5601],
+            "environment_context": {
+                "docker_network": "cve-net",
+                "services": [
+                    {"service": "kibana", "running": True, "is_target": True},
+                    {"service": "elasticsearch", "running": True, "is_target": False},
+                ],
+                "readiness_warnings": ["setup wizard pending"],
+            },
+            "exploit_guidance": "- Complete setup first.",
+            "flag_hint": "flag lives in /flag",
+        })
+        assert "Running Environment Context" in prompt
+        assert "elasticsearch" in prompt
+        assert "Exploit Guidance" in prompt
+        assert "Complete setup first" in prompt
+        assert "Info_Leak" in prompt
+        assert "do not waste turns trying unrelated flag paths" in prompt
+
+    def test_prompt_without_flag_hint_uses_native_objective(self):
+        """无 flag 任务应明确禁止偏到无关 RCE/flag hunting。"""
+        prompt = build_prompt({
+            "cve_id": "CVE-2017-12635",
+            "target_ip": "172.24.0.2",
+            "target_ports": [5984],
+            "writeup": "Create a user with duplicate roles to gain admin privileges.",
+        })
+        assert "No flag has been planted" in prompt
+        assert "do not pivot to unrelated" in prompt
+        assert "Leave `captured_flag` empty" in prompt

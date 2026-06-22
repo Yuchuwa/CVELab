@@ -191,6 +191,7 @@ class AtomConfig(BaseModel):
     # FLAG
     flag_injection: FlagInjection = Field(default_factory=FlagInjection)
     flag_verify_command: str = ""
+    flag_value: Optional[str] = None  # ground-truth flag injected at atomization time
 
     # 服务启动
     service_startup: ServiceStartup = Field(default_factory=ServiceStartup)
@@ -202,5 +203,6 @@ class AtomConfig(BaseModel):
     verified: bool = False
     requirements: Dict[str, Any] = Field(default_factory=dict)
     evidence: List[str] = Field(default_factory=list)
+    llm_check: Dict[str, Any] = Field(default_factory=dict)
     timestamp: str = ""
     source: str = ""

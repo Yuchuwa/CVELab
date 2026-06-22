@@ -50,6 +50,103 @@ class TestAtomMeta:
         assert meta.mitre_mapping == {}
 
 
+@pytest.mark.unit
+def test_save_init_files_copies_directory_volume_without_shutil_scope_error(tmp_path):
+    """Directory volumes used to hit UnboundLocalError from a local shutil import."""
+    cve_dir = tmp_path / "vulhub" / "test" / "CVE-2024-0001"
+    www_dir = cve_dir / "www"
+    www_dir.mkdir(parents=True)
+    (www_dir / "index.php").write_text("ok")
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({
+            "services": {
+                "web": {
+                    "image": "vulhub/test:latest",
+                    "ports": ["8080:80"],
+                    "volumes": ["./www:/var/www/html"],
+                }
+            }
+        })
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0001\n")
+
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    mapping = pipeline._save_init_files(tmp_path / "atoms" / "CVE-2024-0001")
+
+    assert mapping["/var/www/html"] == "www"
+    assert (tmp_path / "atoms" / "CVE-2024-0001" / "init" / "www" / "index.php").read_text() == "ok"
+
+
+@pytest.mark.unit
+def test_cleanup_compose_project_removes_orphans_and_project_networks(tmp_path):
+    """Cleanup should target only the current compose project instead of global prune."""
+    cve_dir = tmp_path / "vulhub" / "test" / "CVE-2024-0002"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"web": {"image": "vulhub/test:latest", "ports": ["8080:80"]}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0002\n")
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[:3] == ["docker", "network", "ls"]:
+            return MagicMock(returncode=0, stdout="net-a\nnet-b\n", stderr="")
+        return MagicMock(returncode=0, stdout="", stderr="")
+
+    with patch("clab_builder.atomizer.pipeline.subprocess.run", side_effect=fake_run):
+        pipeline._cleanup_compose_project(cve_dir, "docker-compose.yml", "cve-2024-0002")
+
+    assert [
+        "docker", "compose", "-p", "cve-2024-0002", "-f", "docker-compose.yml",
+        "down", "-v", "--remove-orphans",
+    ] in calls
+    assert [
+        "docker", "network", "ls", "-q",
+        "--filter", "label=com.docker.compose.project=cve-2024-0002",
+    ] in calls
+    assert ["docker", "network", "rm", "net-a"] in calls
+    assert ["docker", "network", "rm", "net-b"] in calls
+
+
+@pytest.mark.unit
+def test_missing_env_file_is_materialized_from_readme(tmp_path):
+    """Vulhub samples that require manual .env should not fail compose parsing."""
+    cve_dir = tmp_path / "vulhub" / "phpmailer" / "CVE-2024-0003"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({
+            "services": {
+                "web": {
+                    "image": "vulhub/phpmailer:test",
+                    "ports": ["8080:80"],
+                    "env_file": [".env"],
+                }
+            }
+        })
+    )
+    (cve_dir / "README.md").write_text(
+        "# CVE-2024-0003\n\n"
+        "```env\n"
+        "SMTP_SERVER=smtp.example.com\n"
+        "SMTP_PORT=587\n"
+        "SMTP_EMAIL=your_email@example.com\n"
+        "SMTP_PASSWORD=secret\n"
+        "```\n"
+    )
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    svc = {"env_file": [".env"]}
+
+    pipeline._materialize_missing_env_files("web", svc, cve_dir)
+
+    generated = Path(svc["env_file"][0])
+    assert generated.exists()
+    assert generated.parent.name == ".atomizer-env"
+    assert "SMTP_SERVER=smtp.example.com" in generated.read_text()
+
+
 # ── 集成测试: skip-agent 模式 ──────────────────────────────────────
 
 

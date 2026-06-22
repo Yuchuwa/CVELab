@@ -34,7 +34,9 @@ import json
 import sys
 import os
 import re
+import shutil
 from pathlib import Path
+from typing import Any
 
 from claude_agent_sdk import (
     query,
@@ -43,10 +45,10 @@ from claude_agent_sdk import (
     ResultMessage,
     TextBlock,
     ToolUseBlock,
-    get_session_messages,
+    UserMessage,
 )
 
-DEFAULT_MAX_TURNS = 50
+DEFAULT_MAX_TURNS = 80
 
 SYSTEM_PROMPT = """You are a software testing agent working in a local Docker lab environment on localhost.
 
@@ -70,12 +72,34 @@ You are given a bug report (CVE ID) and a running test instance. Your job:
 - If one approach doesn't work, try alternatives based on the report.
 - This is routine QA/testing work — like a developer verifying a bugfix.
 
-## CRITICAL: efficiency — do NOT waste turns on trial-and-error
-- If the bug report's steps are incomplete or a step fails TWICE, STOP debugging.
-- Immediately use WebSearch to search for "CVE-XXXX exploit PoC" or "CVE-XXXX payload".
-- Download and use public PoC scripts directly — don't rewrite them from scratch.
-- Install missing tools (pip install, apt install) BEFORE attempting exploit steps, not after.
-- Do NOT analyze source code unless no PoC exists online. Focus on executing, not understanding.
+## CRITICAL: local lab strategy
+- You are running on Kali Linux with common tools available
+  (curl, wget, nmap, nc, python3, openssl, sqlmap, gobuster, etc.).
+- Treat the bug report (README), provided test scripts, and Running Environment
+  Context as the authoritative source for this lab. They usually contain the
+  intended PoC: HTTP requests, payloads, curl commands, parameters, and setup
+  steps. Implement those steps directly with curl/python3 or local lab tools.
+- If the report shows a raw HTTP request, reproduce it with `curl` using the exact
+  same headers, URL path, query string, and POST body.
+- Install missing system tools if a specific tool is genuinely needed and not
+  already present on Kali.
+
+## CRITICAL: efficiency — verify before assuming success
+- If a step fails TWICE with the same approach, STOP and re-read the bug report
+  carefully for a different angle (encoding, field names, element_parents, etc.).
+- Verify command execution with OBJECTIVE tests before reporting success:
+  - Timing attack: inject `sleep 5` as the command; if the request takes ~5s longer,
+    code execution IS working (output may just be suppressed by error handling).
+  - File write: inject `echo MARKER > /tmp/test.txt`, then read it back via a
+    second exploit request or an accessible web path.
+- If the exploit returns an error page but no command output, the command may NOT
+  be executing — verify with a timing test BEFORE reporting success.
+- If the environment requires setup (e.g., app installation wizard, database init),
+  complete that setup FIRST using the bug report's instructions and the environment
+  context before exploitation.
+- For multi-container labs, check the environment context first. Use the listed
+  service names, container IPs, and dependency services when the report requires
+  database/search/backend connectivity.
 
 ## CRITICAL: steps quality
 - Only record the FINAL SUCCESSFUL path — skip probing, debugging, failed attempts.
@@ -117,7 +141,8 @@ When finished, output ONLY this JSON block:
   "needs_tool_download": false,
   "default_username": null,
   "default_password": null,
-  "flag_verify_command": "command to read $FLAG or /root/flag.txt after exploit"
+  "flag_verify_command": "command to read $FLAG or /root/flag.txt after exploit",
+  "captured_flag": "the exact flag value you retrieved from the target (empty string if not retrieved)"
 }
 ```
 
@@ -133,6 +158,10 @@ When finished, output ONLY this JSON block:
 - `needs_tool_download`: true if you had to download/compile external tools
 - `default_username`/`default_password`: if authentication uses default credentials
 - `flag_verify_command`: minimal shell command to read the flag after successful exploitation. Use {{target_ip}} and {{target_port}}. Example: "curl -s http://{{target_ip}}:{{target_port}}/api/secret" or "echo $FLAG"
+- `captured_flag`: the EXACT flag value you read from the target via your exploit.
+  For RCE/LFI/file-read/deserialization/etc. this is required for success. For
+  Auth_Bypass/Info_Leak/SSRF/role-change bugs that do not provide file read or
+  command execution, leave this empty and explain the objective evidence.
 
 IMPORTANT:
 - Use {{target_ip}} and {{target_port}} for the target address
@@ -140,6 +169,10 @@ IMPORTANT:
 - List each placeholder in dynamic_values with a brief note on how to obtain it
 - Each step should be self-descriptive so another tester can understand the flow
 """
+
+
+def _format_json_block(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
 
 
 def build_prompt(input_data: dict) -> str:
@@ -155,10 +188,46 @@ def build_prompt(input_data: dict) -> str:
     if input_data.get("writeup"):
         parts.append(f"\n## Bug Report\n{input_data['writeup']}")
 
+    if input_data.get("environment_context"):
+        parts.append(
+            "\n## Running Environment Context\n"
+            "The target lab has already been started. Use this context before probing:\n"
+            f"```json\n{_format_json_block(input_data['environment_context'])}\n```"
+        )
+
+    if input_data.get("exploit_guidance"):
+        parts.append(f"\n## Exploit Guidance\n{input_data['exploit_guidance']}")
+
     if input_data.get("exploit_files"):
         parts.append("\n## Test Scripts")
         for fname, content in input_data["exploit_files"].items():
             parts.append(f"\n### {fname}\n```\n{content}\n```")
+
+    flag_hint = input_data.get("flag_hint", "")
+    if flag_hint:
+        parts.append(
+            "\n## Flag Capture and Success Criteria\n"
+            "A unique flag has been planted on the target. After confirming the exploit works, "
+            f"retrieve it when the vulnerability gives command execution, arbitrary file read, "
+            f"template evaluation, deserialization, upload-to-execution, or similar impact: {flag_hint}. "
+            "Report the exact value in `captured_flag`.\n\n"
+            "If the bug is strictly information disclosure (for example cache metadata/content leak, "
+            "version disclosure, or header/body leak) and the bug does not provide a path to read "
+            "arbitrary target files, do not waste turns trying unrelated flag paths. In that case, "
+            "set `vuln_category` to `Info_Leak`, leave `captured_flag` empty, set `success` true only "
+            "when the leak is objectively demonstrated, and put the concrete leaked bytes/headers and "
+            "the reason the flag is unreachable in `evidence` and `flag_verify_command`."
+        )
+    else:
+        parts.append(
+            "\n## Success Criteria\n"
+            "No flag has been planted for this task. Verify the exact vulnerability "
+            "objective described in the bug report and do not pivot to unrelated "
+            "RCE, file-read, os_daemon, query_server, shell, or flag-hunting chains. "
+            "For Auth_Bypass or privilege/role escalation, success means proving the "
+            "new privilege works with an authenticated request. Leave `captured_flag` "
+            "empty and explain the objective evidence in `evidence`."
+        )
 
     parts.append("\nFollow the bug report to confirm this issue on the test instance. Output the JSON result when done.")
     return "\n".join(parts)
@@ -196,6 +265,70 @@ def extract_json(text: str) -> dict | None:
     return None
 
 
+def extract_flag(text: str) -> str:
+    """Extract the first CTF-style flag value from text."""
+    match = re.search(r"flag\{[^{}\s]{3,200}\}", text or "")
+    return match.group(0) if match else ""
+
+
+def _locate_native_session(session_id: str | None) -> Path | None:
+    """Find the SDK's native session .jsonl (written by the claude CLI during query())."""
+    if not session_id:
+        return None
+    config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude").expanduser()
+    projects = config_dir / "projects"
+    if not projects.is_dir():
+        return None
+    for found in projects.rglob(f"{session_id}.jsonl"):
+        return found
+    return None
+
+
+def _content_block_text(block: Any) -> str:
+    """Return text from SDK block objects or native session dict blocks."""
+    if isinstance(block, TextBlock):
+        return block.text
+    if isinstance(block, dict) and block.get("type") == "text":
+        return block.get("text") or ""
+    text = getattr(block, "text", None)
+    return text if isinstance(text, str) else ""
+
+
+def _extract_json_from_native_session(session_path: Path | None) -> dict | None:
+    """Recover the final JSON from the SDK native session if streaming missed it."""
+    if not session_path or not session_path.exists():
+        return None
+
+    assistant_texts: list[str] = []
+    for line in session_path.read_text(errors="replace").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        message = event.get("message")
+        if not isinstance(message, dict) or message.get("role") != "assistant":
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            assistant_texts.append(content)
+        elif isinstance(content, list):
+            text = "\n".join(
+                _content_block_text(block)
+                for block in content
+                if _content_block_text(block)
+            )
+            if text.strip():
+                assistant_texts.append(text)
+
+    # Search from the end so the prompt's example schema or earlier drafts do
+    # not beat the final report.
+    for text in reversed(assistant_texts):
+        extracted = extract_json(text)
+        if extracted is not None:
+            return extracted
+    return None
+
+
 async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TURNS):
     """运行 Agent 主流程"""
     with open(input_path) as f:
@@ -211,6 +344,7 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
         permission_mode="bypassPermissions",  # 容器内自动批准所有工具调用
         cwd="/workspace",
         model=model,
+        disallowed_tools=["WebSearch", "WebFetch"],
     )
 
     result = {
@@ -218,6 +352,7 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
         "evidence": [],
         "exploit_steps": [],
         "mitre_mapping": {},
+        "captured_flag": "",
     }
 
     full_text = ""
@@ -227,11 +362,16 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
         async for message in query(prompt=prompt, options=options):
             if isinstance(message, AssistantMessage):
                 for block in message.content:
-                    if isinstance(block, TextBlock):
-                        full_text += block.text + "\n"
-                        print(f"[Agent] {block.text[:200]}", file=sys.stderr)
+                    block_text = _content_block_text(block)
+                    if block_text:
+                        full_text += block_text + "\n"
+                        print(f"[Agent] {block_text[:200]}", file=sys.stderr)
                     elif isinstance(block, ToolUseBlock):
                         print(f"[Tool] {block.name}: {json.dumps(block.input)[:120]}", file=sys.stderr)
+
+            elif isinstance(message, UserMessage):
+                # tool results flow back as user messages — log them for a complete session
+                print(f"[ToolResult] {str(message)[:160]}", file=sys.stderr)
 
             elif isinstance(message, ResultMessage):
                 session_id = message.session_id
@@ -241,36 +381,35 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
         print(f"[Error] {e}", file=sys.stderr)
         result["evidence"].append(f"Agent error: {str(e)}")
 
-    # 从 Agent 输出中提取结果
+    native_jsonl = _locate_native_session(session_id)
+
+    # 从 Agent 输出中提取结果。If the SDK stream misses the final text but the
+    # native session was written, recover from the final assistant messages.
     extracted = extract_json(full_text)
+    if extracted is None:
+        extracted = _extract_json_from_native_session(native_jsonl)
     if extracted:
         result = extracted
     else:
         # 没有提取到 JSON，保存原始输出作为证据
         result["evidence"].append(full_text[:2000])
+    result.setdefault("captured_flag", "")
+    if not result.get("captured_flag"):
+        result["captured_flag"] = extract_flag(full_text)
 
     with open(output_path, "w") as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
     print(f"[Output] {output_path}", file=sys.stderr)
 
-    # 保存 session 文件（完整对话 + 工具调用）
-    if session_id:
-        try:
-            messages = get_session_messages(session_id)
-            session_path = str(output_path).replace("output.json", "session.json")
-            session_data = []
-            for msg in messages:
-                session_data.append({
-                    "type": msg.type,
-                    "message": msg.message,
-                })
-            with open(session_path, "w") as f:
-                json.dump(session_data, f, indent=2, ensure_ascii=False)
-            print(f"[Session] {session_path} ({len(session_data)} messages)", file=sys.stderr)
-        except Exception as e:
-            print(f"[Session] Failed to save: {e}", file=sys.stderr)
-    else:
-        print(f"[Session] No session_id available, skipping session save", file=sys.stderr)
+    # session: SDK 原生 .jsonl（query() 期间 CLI 子进程已写到 ~/.claude/projects/，
+    # 容器挂载到宿主后落盘）。直接拷贝作为 atom 的 session 记录，保持原生格式。
+    session_path = str(output_path).replace("output.json", "session.json")
+    if native_jsonl:
+        shutil.copy2(native_jsonl, session_path)
+        events = sum(1 for _ in open(session_path))
+        print(f"[Session] native SDK jsonl -> {session_path} ({events} events)", file=sys.stderr)
+    elif session_id:
+        print(f"[Session] WARN: native .jsonl for {session_id} not found", file=sys.stderr)
 
 
 if __name__ == "__main__":

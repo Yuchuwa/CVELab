@@ -5,6 +5,7 @@
 
 import pytest
 import json
+import subprocess as real_subprocess
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -25,6 +26,8 @@ class TestCVEInput:
                        target_ip="10.0.0.1", target_ports=[80])
         assert inp.writeup == ""
         assert inp.exploit_files == {}
+        assert inp.environment_context == {}
+        assert inp.exploit_guidance == ""
 
     def test_with_exploit_files(self):
         inp = CVEInput(cve_id="CVE-2021-TEST", description="test",
@@ -52,7 +55,7 @@ class TestSecurityResearcherAgent:
         mock_subprocess.run.return_value = MagicMock(returncode=0, stdout="abc123\n")
 
         agent = SecurityResearcherAgent()
-        assert agent.max_turns == 50
+        assert agent.max_turns == 80
         cid = agent.start("cve-network", "/tmp/workspace", "sk-test-key")
 
         assert cid == "abc123"
@@ -64,6 +67,11 @@ class TestSecurityResearcherAgent:
         assert "docker" in cmd
         assert "run" in cmd
         assert "--network=cve-network" in cmd
+        assert "--user" not in cmd
+        assert "HOME=/home/agent" in cmd
+        assert "--cap-add" in cmd
+        assert "NET_RAW" in cmd
+        assert "NET_ADMIN" in cmd
         # agent_runner.py 挂载到 /opt/agent_runner.py
         assert any("/opt/agent_runner.py:ro" in arg for arg in cmd)
         # API key 作为 ANTHROPIC_API_KEY
@@ -135,6 +143,8 @@ class TestSecurityResearcherAgent:
         # 验证 input.json 被写入
         input_data = json.loads((tmp_path / "input.json").read_text())
         assert input_data["cve_id"] == "CVE-2021-TEST"
+        assert input_data["environment_context"] == {}
+        assert input_data["exploit_guidance"] == ""
 
     @patch("clab_builder.atomizer.agent.researcher.subprocess")
     def test_run_agent_failure(self, mock_subprocess, tmp_path):
@@ -159,9 +169,26 @@ class TestSecurityResearcherAgent:
     @patch("clab_builder.atomizer.agent.researcher.subprocess")
     def test_stop(self, mock_subprocess):
         """停止容器"""
+        mock_subprocess.run.return_value = MagicMock(returncode=0, stderr="")
+
         agent = SecurityResearcherAgent()
         agent.container_id = "fake123"
 
         agent.stop()
         assert agent.container_id is None
         mock_subprocess.run.assert_called()
+
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_stop_timeout_is_best_effort(self, mock_subprocess):
+        """docker rm timeout should not mask the original agent failure."""
+        mock_subprocess.TimeoutExpired = real_subprocess.TimeoutExpired
+        mock_subprocess.run.side_effect = real_subprocess.TimeoutExpired(
+            ["docker", "rm", "-f", "test-container"], 30
+        )
+
+        agent = SecurityResearcherAgent()
+        agent.container_name = "test-container"
+        agent.container_id = "fake123"
+
+        assert agent.stop(timeout=30) is False
+        assert agent.container_id == "fake123"

@@ -179,7 +179,7 @@ def atom():
 @click.option("--model", envvar="LLM_MODEL", default="claude-sonnet-4-6", help="LLM model")
 @click.option("--skip-agent", is_flag=True, help="Skip Agent, only generate config")
 @click.option("--force", is_flag=True, help="Overwrite existing atom")
-@click.option("--max-turns", type=int, default=50, help="Max agent turns")
+@click.option("--max-turns", type=int, default=80, help="Max agent turns")
 def atom_run(cve_path, output, api_key, base_url, model, skip_agent, force, max_turns):
     """Run atomizer on a vulhub CVE directory.
 
@@ -282,6 +282,82 @@ def atom_sysfield(cve_id, output):
             continue
     for path in written:
         click.echo(f"Written: {path}")
+
+
+@atom.command("scale")
+@click.option("--vulhub-dir", default="data/vulhub", help="Vulhub data directory")
+@click.option("--raw-records", multiple=True, help="raw_records_*.json file; can be repeated")
+@click.option("--output", "-o", default="data/atoms", help="Atoms directory")
+@click.option("--state-dir", default="data/atom_scale", help="Manifest/dataset output directory")
+@click.option("--generated-sources-dir", default="data/generated",
+              help="Generated compose sources for raw_records rows")
+@click.option("--api-key", envvar="LLM_API_KEY", help="LLM API key")
+@click.option("--base-url", envvar="LLM_BASE_URL", default="", help="LLM API base URL")
+@click.option("--model", envvar="LLM_MODEL", default="claude-sonnet-4-6", help="LLM model")
+@click.option("--skip-agent", is_flag=True, help="Skip Agent, only generate atom config")
+@click.option("--force", is_flag=True, help="Re-run existing atoms")
+@click.option("--retry-failed", is_flag=True, help="Retry records explicitly marked failed")
+@click.option("--limit", type=int, help="Maximum number of queued jobs to run")
+@click.option("--cve", "cve_filter", multiple=True,
+              help="Restrict to specific CVE ids (e.g. --cve CVE-2014-6271); repeatable")
+@click.option("--max-turns", type=int, default=80, help="Max agent turns")
+@click.option("--workers", "-w", type=int, default=1,
+              help="Parallel worker count for atom generation (1 = sequential)")
+@click.option("--discover-only", is_flag=True, help="Only write deduplicated manifest/dataset")
+@click.option("--no-parquet", is_flag=True, help="Do not export HuggingFace parquet dataset")
+@click.option("--min-disk-gb", type=float, default=5.0,
+              help="Pause spawning new builds when free disk (GB) on /var drops below this")
+def atom_scale(vulhub_dir, raw_records, output, state_dir, generated_sources_dir,
+               api_key, base_url, model, skip_agent, force, retry_failed, limit,
+               cve_filter, max_turns, workers, min_disk_gb, discover_only, no_parquet):
+    """Scale first-stage atom generation from Vulhub and raw CVE records."""
+    from clab_builder.atomizer.scaling import AtomScaleRunner
+
+    runner = AtomScaleRunner(
+        vulhub_dir=vulhub_dir,
+        raw_records=tuple(raw_records),
+        output_dir=output,
+        state_dir=state_dir,
+        generated_sources_dir=generated_sources_dir,
+    )
+
+    records = runner.discover()
+    click.echo(f"Discovered {len(records)} unique CVE atom candidates.")
+    click.echo(f"Workers: {max(1, workers)} ({'sequential' if workers <= 1 else 'parallel'})")
+    click.echo(f"Manifest: {runner.manifest_path}")
+    click.echo(f"Dataset JSONL: {runner.dataset_jsonl_path}")
+
+    if discover_only:
+        if not no_parquet:
+            runner.write_outputs(records, export_parquet=True)
+            click.echo(f"Dataset parquet: {runner.dataset_parquet_path}")
+        return
+
+    if not skip_agent and not api_key:
+        click.echo("Error: API key required unless --skip-agent is used")
+        raise SystemExit(1)
+
+    results = runner.run(
+        api_key=api_key or "",
+        base_url=base_url or "",
+        model=model,
+        skip_agent=skip_agent,
+        force=force,
+        limit=limit,
+        max_turns=max_turns,
+        export_parquet=not no_parquet,
+        workers=max(1, workers),
+        min_disk_gb=min_disk_gb,
+        cve_filter=cve_filter,
+        retry_failed=retry_failed,
+    )
+    counts = {}
+    for record in results:
+        counts[record.status] = counts.get(record.status, 0) + 1
+    click.echo(f"Done: {counts}")
+    click.echo(f"Dataset JSONL: {runner.dataset_jsonl_path}")
+    if not no_parquet:
+        click.echo(f"Dataset parquet: {runner.dataset_parquet_path}")
 
 
 # ── SysField integration ─────────────────────────────────────────────────

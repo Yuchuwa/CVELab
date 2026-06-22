@@ -11,8 +11,12 @@ import yaml
 _TEMPLATE_RE = re.compile(r"{{\s*([^{}\s]+)\s*}}")
 
 
-def _slug(value: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]+", "-", value).strip("-").lower() or "step"
+def _slug(value: str, max_len: int = 0) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", value).strip("-").lower() or "step"
+    if max_len and len(slug) > max_len:
+        cut = slug.rfind("-", 0, max_len)
+        slug = slug[:cut if cut > 0 else max_len].rstrip("-")
+    return slug
 
 
 def _literal(text: str) -> str:
@@ -45,8 +49,7 @@ class SysFieldPlaybookGenerator:
                 target_ip=target_ip,
                 target_port=target_port,
             )
-            step_id = f"{index:02d}-{_slug(cve_id)}-{_slug(step.get('name', 'step'))}"
-            output_path = f"/tmp/cvelab-sysfield/{step_id}.out"
+            step_id = f"{index:02d}-{_slug(step.get('name', 'step'), max_len=40)}"
             mitre = self._mitre_for_step(step, mitre_mapping)
             sysfield_step = {
                 "id": step_id,
@@ -56,12 +59,9 @@ class SysFieldPlaybookGenerator:
                 "mitre": mitre,
                 "executor": {
                     "type": "direct",
-                    "command": self._wrap_command(command, output_path),
+                    "command": command,
                 },
                 "expected_output": {"exit_code": 0},
-                "postconditions": {
-                    "files": [{"path": output_path, "op": "write"}],
-                },
                 "timeout": 120,
             }
             if previous_id:
@@ -134,7 +134,7 @@ class SysFieldPlaybookGenerator:
         data = json.loads(Path(session_path).read_text())
         steps = []
         for entry in data:
-            message = entry.get("message", {})
+            message = entry.get("message", entry) if isinstance(entry, dict) else {}
             for block in message.get("content", []) or []:
                 if not isinstance(block, dict):
                     continue
@@ -184,15 +184,6 @@ class SysFieldPlaybookGenerator:
 
     def _generalize_observed_command(self, command: str) -> str:
         return re.sub(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", "{{ target_ip }}", command)
-
-    def _wrap_command(self, command: str, output_path: str) -> str:
-        return (
-            "mkdir -p /tmp/cvelab-sysfield\n"
-            f"({command}) > {output_path} 2>&1\n"
-            "status=$?\n"
-            f"cat {output_path}\n"
-            "exit $status"
-        )
 
     def _stage_for_step(self, mitre_mapping: dict[str, list[str]]) -> str:
         return next(iter(mitre_mapping.keys()), "execution")

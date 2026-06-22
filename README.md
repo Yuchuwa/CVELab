@@ -113,9 +113,24 @@ LLM_MODEL=claude-sonnet-4-6
 
 ### 单 CVE 原子化
 
+部分 Vulhub 环境依赖宿主机内核参数。Elasticsearch/Kibana 相关 CVE 在启动前需要：
+
+```bash
+sudo sysctl -w vm.max_map_count=262144
+```
+
+如需持久化到重启后仍生效：
+
+```bash
+echo 'vm.max_map_count=262144' | sudo tee /etc/sysctl.d/99-elasticsearch.conf
+sudo sysctl --system
+```
+
 ```bash
 # Agent 驱动验证单个 CVE
 cvelab atom run data/vulhub/bash/CVE-2014-6271
+
+# XSS/Auth_Bypass/Info_Leak 等无 flag 成功样本会默认经过二级 LLM checker
 
 # 跳过 Agent，仅生成配置
 cvelab atom run data/vulhub/bash/CVE-2014-6271 --skip-agent
