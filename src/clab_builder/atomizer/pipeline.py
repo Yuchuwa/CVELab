@@ -21,7 +21,11 @@ from pathlib import Path
 from typing import Dict, List, Any
 from dataclasses import dataclass, field
 
-from .output.vulhub_converter import VulhubParser, AnsiblePlaybookGenerator
+from .output.vulhub_converter import (
+    VulhubParser,
+    AnsiblePlaybookGenerator,
+    container_port_from_spec,
+)
 from .output.sysfield_playbook import SysFieldPlaybookGenerator
 from .agent.researcher import SecurityResearcherAgent, CVEInput
 from .environment.container import CVEEnvironmentManager, ContainerInfo
@@ -416,7 +420,9 @@ class AtomizerPipeline:
             ports = svc.get("ports", [])
             for p in ports:
                 # "8080:80" → 80, "8080" → 8080
-                internal = int(str(p).split(":")[-1]) if ":" in str(p) else int(p)
+                internal = container_port_from_spec(p)
+                if internal is None:
+                    continue
                 if svc.get("image", "") == self.env.main_image or name == (self.env.main_service.name if self.env.main_service else ""):
                     internal_ports.append(internal)
             # 去掉端口映射 — Agent 在同一 Docker 网络内直接访问容器端口
@@ -485,12 +491,27 @@ class AtomizerPipeline:
                 up_cmd.append("--build")
         else:
             up_cmd.append("--build")
-        result = subprocess.run(
-            up_cmd,
-            cwd=str(vulhub_path),
-            capture_output=True, text=True, timeout=600,
-        )
+        try:
+            result = subprocess.run(
+                up_cmd,
+                cwd=str(vulhub_path),
+                capture_output=True, text=True, timeout=600,
+            )
+        except Exception:
+            self._cleanup_compose_project(
+                vulhub_path,
+                ".compose-no-ports.yml",
+                project_name,
+                context="compose-up-error",
+            )
+            raise
         if result.returncode != 0:
+            self._cleanup_compose_project(
+                vulhub_path,
+                ".compose-no-ports.yml",
+                project_name,
+                context="compose-up-failed",
+            )
             raise RuntimeError(f"docker compose up failed: {result.stderr}")
 
         print(f"  CVE containers started (no host port mapping)")
@@ -663,6 +684,25 @@ class AtomizerPipeline:
         except Exception as exc:
             print(f"  [{context}] compose down failed: {exc}")
 
+        # Compose can time out while stopping a large project. Force-remove any
+        # containers still owned by this project before removing its networks.
+        try:
+            ps = subprocess.run(
+                [
+                    "docker", "ps", "-aq",
+                    "--filter", f"label=com.docker.compose.project={project_name}",
+                ],
+                capture_output=True, text=True, timeout=15,
+            )
+            container_ids = [line.strip() for line in ps.stdout.splitlines() if line.strip()]
+            if container_ids:
+                subprocess.run(
+                    ["docker", "rm", "-f", *container_ids],
+                    capture_output=True, text=True, timeout=60,
+                )
+        except Exception as exc:
+            print(f"  [{context}] forced container cleanup failed: {exc}")
+
         try:
             self._remove_compose_networks(project_name)
         except Exception as exc:
@@ -684,12 +724,30 @@ class AtomizerPipeline:
         if not container_ids:
             raise RuntimeError(f"No containers found for compose project {project_name}")
 
-        inspected = subprocess.run(
-            ["docker", "inspect", *container_ids],
-            capture_output=True, text=True, timeout=20,
-        )
+        inspected = None
+        last_error = ""
+        for attempt in range(1, 4):
+            try:
+                inspected = subprocess.run(
+                    ["docker", "inspect", *container_ids],
+                    capture_output=True, text=True, timeout=20,
+                )
+            except subprocess.TimeoutExpired:
+                last_error = "docker inspect timed out after 20 seconds"
+            else:
+                if inspected.returncode == 0:
+                    break
+                last_error = (inspected.stderr or inspected.stdout or "").strip()
+            time.sleep(attempt)
+
+        if inspected is None:
+            raise RuntimeError(
+                f"docker inspect failed for compose project {project_name}: {last_error}"
+            )
         if inspected.returncode != 0:
-            raise RuntimeError(f"docker inspect failed for compose project {project_name}: {inspected.stderr}")
+            raise RuntimeError(
+                f"docker inspect failed for compose project {project_name}: {last_error}"
+            )
 
         raw_items = json.loads(inspected.stdout)
         services: list[dict[str, Any]] = []
@@ -743,7 +801,10 @@ class AtomizerPipeline:
         services = self._inspect_compose_services(project_name)
         bad_services = [
             svc for svc in services
-            if not svc.get("running") or svc.get("health") == "unhealthy"
+            if (
+                (not svc.get("running") and not self._is_completed_init_service(svc))
+                or svc.get("health") == "unhealthy"
+            )
         ]
         if not bad_services:
             print(f"  Compose services healthy/running: {len(services)}")
@@ -773,6 +834,17 @@ class AtomizerPipeline:
         raise RuntimeError(
             "compose service dependency failed before agent start:\n" + "\n\n".join(details)
         )
+
+    @staticmethod
+    def _is_completed_init_service(service: dict[str, Any]) -> bool:
+        """Accept explicitly named non-target one-shot setup services that exit 0."""
+        if service.get("is_target") or service.get("exit_code") != 0:
+            return False
+        name = " ".join([
+            str(service.get("service", "")),
+            str(service.get("container_name", "")),
+        ]).lower()
+        return bool(re.search(r"(^|[-_])(init|setup|bootstrap|migrate|migration|install)([-_]|$)", name))
 
     def _build_agent_environment_context(self, cve_info: ContainerInfo,
                                          network_name: str) -> dict[str, Any]:
@@ -887,6 +959,10 @@ class AtomizerPipeline:
                    api_key: str, base_url: str, model: str,
                    network_name: str = ""):
         """启动 Agent 容器并执行"""
+        # Interrupted runs can leave output/session/cache files that must not be
+        # treated as the result of this run.
+        if workspace.exists():
+            shutil.rmtree(workspace)
         workspace.mkdir(parents=True, exist_ok=True)
 
         # 准备 exploit files（从 vulhub 目录读取 poc 文件）
@@ -926,6 +1002,7 @@ class AtomizerPipeline:
 
         agent = SecurityResearcherAgent(agent_image=self.agent_image,
                                          max_turns=self.max_turns)
+        self._agent = agent  # cleanup must see containers created by a timed-out start
         agent.start(
             network_name=network_name or self.network_name,
             workspace_dir=str(workspace),
@@ -933,8 +1010,6 @@ class AtomizerPipeline:
             base_url=url,
             model=mdl,
         )
-        self._agent = agent  # 保存引用用于 cleanup
-
         return agent.run(cve_input, str(workspace))
 
     def _generate_exploit_playbook(self, atom_dir: Path, agent_output, cve_info):
@@ -978,7 +1053,9 @@ class AtomizerPipeline:
             agent_extra = agent_output.extra_fields or {}
 
         vuln_type = agent_output.vulnerability_type if agent_output else ""
-        inferred_vuln_category = agent_extra.get("vuln_category") or self._infer_vuln_category(vuln_type)
+        inferred_vuln_category = self._normalize_vuln_category(
+            agent_extra.get("vuln_category") or self._infer_vuln_category(vuln_type)
+        )
 
         # 客观验证：是否需要 flag 只由本次是否实际注入 flag 决定。
         ground_truth = getattr(self, "_flag", "")
@@ -1023,8 +1100,9 @@ class AtomizerPipeline:
 
         # 推断 v2 枚举字段（agent 明确输出时优先，否则走规则推断）
         vuln_category = VulnCategory(inferred_vuln_category)
-        primary_phase = MitrePhase(agent_extra.get("primary_mitre_phase")
-                                   or self._infer_primary_phase(mitre_mapping))
+        primary_phase = MitrePhase(self._normalize_mitre_phase(
+            agent_extra.get("primary_mitre_phase") or self._infer_primary_phase(mitre_mapping)
+        ))
         service_role = ServiceRole(agent_extra.get("service_role")
                                    or self._infer_service_role(self.env.main_image))
         exploit_complexity = ExploitComplexity(agent_extra.get("exploit_complexity")
@@ -1117,8 +1195,16 @@ class AtomizerPipeline:
 
     def _cleanup(self):
         """清理 CVE 容器和 Agent 容器"""
-        # 每步独立 try/except：compose down/rmi 超时或失败时不能跳过 agent.stop()，
-        # 否则 agent 容器泄漏（曾导致并行时出现 >workers 个 agent 容器）。
+        # Agent is attached to the Compose network. Stop it first; otherwise
+        # compose down cannot remove the network and long batches exhaust
+        # Docker's predefined address pools.
+        agent = getattr(self, "_agent", None)
+        if agent:
+            try:
+                agent.stop()
+            except Exception as exc:
+                print(f"  [cleanup] agent stop failed: {exc}")
+
         vulhub_path = Path(self.vulhub_dir).resolve()
         compose_tmp = vulhub_path / ".compose-no-ports.yml"
         compose_file = str(compose_tmp) if compose_tmp.exists() else "docker-compose.yml"
@@ -1127,7 +1213,11 @@ class AtomizerPipeline:
 
         # 删除本 CVE 专属镜像（释放 /var 空间）；保留基础镜像供后续复用
         main_img = getattr(self.env, "main_image", "") or ""
-        if main_img:
+        # raw_records images are locally verified build artefacts and generally
+        # do not exist in a public registry. Removing them makes the dataset
+        # impossible to rerun without restoring the original build archive.
+        preserve_local_image = self.env.category == "raw_records"
+        if main_img and not preserve_local_image:
             try:
                 subprocess.run(
                     ["docker", "rmi", main_img],
@@ -1135,14 +1225,6 @@ class AtomizerPipeline:
                 )
             except Exception as exc:
                 print(f"  [cleanup] rmi failed: {exc}")
-
-        # 停止 Agent 容器（务必执行，不受前面步骤成败影响）
-        agent = getattr(self, "_agent", None)
-        if agent:
-            try:
-                agent.stop()
-            except Exception as exc:
-                print(f"  [cleanup] agent stop failed: {exc}")
 
     # ── v2 字段推断辅助 ─────────────────────────────────
 
@@ -1170,6 +1252,46 @@ class AtomizerPipeline:
         return "RCE"
 
     @staticmethod
+    def _normalize_vuln_category(value: str) -> str:
+        """Normalize common agent aliases to AtomConfig VulnCategory values."""
+        raw = (value or "").strip()
+        compact = raw.lower().replace("-", "_").replace(" ", "_")
+        aliases = {
+            "sqli": "Injection",
+            "sql_injection": "Injection",
+            "nosqli": "Injection",
+            "nosql_injection": "Injection",
+            "command_injection": "RCE",
+            "code_execution": "RCE",
+            "remote_code_execution": "RCE",
+            "rce": "RCE",
+            "xss": "Injection",
+            "xxe": "LFI",
+            "path_traversal": "LFI",
+            "directory_traversal": "LFI",
+            "file_read": "LFI",
+            "information_disclosure": "Info_Leak",
+            "info_disclosure": "Info_Leak",
+            "info_leak": "Info_Leak",
+            "auth_bypass": "Auth_Bypass",
+            "authentication_bypass": "Auth_Bypass",
+            "privilege_escalation": "LPE",
+            "lpe": "LPE",
+            "deserialization": "Deserialization",
+            "parsing": "Parsing",
+            "ssrf": "SSRF",
+            "lfi": "LFI",
+            "rfi": "RFI",
+        }
+        if compact in aliases:
+            return aliases[compact]
+        valid = {
+            "RCE", "LFI", "RFI", "SSRF", "Deserialization", "LPE",
+            "Auth_Bypass", "Info_Leak", "Injection", "Parsing",
+        }
+        return raw if raw in valid else "RCE"
+
+    @staticmethod
     def _evaluate_agent_success(agent_output, expected_flag: str = "") -> SuccessEvaluation:
         """Evaluate success using one compact rule set.
 
@@ -1181,9 +1303,6 @@ class AtomizerPipeline:
             return SuccessEvaluation(False, False, reason="missing agent output")
 
         captured = (agent_output.captured_flag or "").strip()
-        if not agent_output.success:
-            return SuccessEvaluation(False, False, captured, "agent reported failure")
-
         if expected_flag:
             flag_matched = captured == expected_flag
             reason = "flag matched" if flag_matched else (
@@ -1191,11 +1310,13 @@ class AtomizerPipeline:
             )
             return SuccessEvaluation(flag_matched, flag_matched, captured, reason)
 
+        if not agent_output.success:
+            return SuccessEvaluation(False, False, captured, "agent reported failure")
+
         has_evidence = bool(agent_output.evidence)
         reason = "objective evidence present" if has_evidence else "missing objective evidence"
         return SuccessEvaluation(has_evidence, False, captured, reason)
 
-    @staticmethod
     def _run_llm_checker(
         self,
         *,
@@ -1330,6 +1451,34 @@ class AtomizerPipeline:
             if techniques:
                 return phase
         return "initial_access"
+
+    @staticmethod
+    def _normalize_mitre_phase(value: str) -> str:
+        """Normalize common agent phase aliases to MitrePhase values."""
+        raw = (value or "").strip()
+        compact = raw.lower().replace("-", "_").replace(" ", "_")
+        aliases = {
+            "recon": "discovery",
+            "reconnaissance": "discovery",
+            "resource_development": "initial_access",
+            "initialaccess": "initial_access",
+            "privilege_escalation": "privilege_escalation",
+            "privilegeescalation": "privilege_escalation",
+            "defense_evasion": "defense_evasion",
+            "credential_access": "credential_access",
+            "lateral_movement": "lateral_movement",
+            "command_control": "command_and_control",
+            "command_and_control": "command_and_control",
+        }
+        if compact in aliases:
+            return aliases[compact]
+        valid = {
+            "initial_access", "execution", "persistence", "privilege_escalation",
+            "defense_evasion", "credential_access", "discovery",
+            "lateral_movement", "collection", "command_and_control",
+            "exfiltration", "impact",
+        }
+        return compact if compact in valid else "initial_access"
 
     @staticmethod
     def _infer_service_role(image: str) -> str:

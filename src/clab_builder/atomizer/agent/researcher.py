@@ -7,6 +7,8 @@ Agent 使用 Claude Agent SDK，自带 Bash/Read/Write 工具。
 import subprocess
 import json
 import os
+import shutil
+import time
 import uuid
 from pathlib import Path
 from typing import Dict, List, Any
@@ -81,11 +83,8 @@ class SecurityResearcherAgent:
         Returns:
             container_id
         """
-        # 移除旧容器
-        subprocess.run(
-            ["docker", "rm", "-f", self.container_name],
-            capture_output=True, timeout=10,
-        )
+        # Remove any container left by a previous timed-out create/start call.
+        self._remove_container_by_name(timeout=10)
 
         workspace_dir = str(Path(workspace_dir).resolve())
         agent_runner_src = str(AGENT_RUNNER_SRC.resolve())
@@ -119,14 +118,95 @@ class SecurityResearcherAgent:
         cmd.append(self.agent_image)
 
         print(f"Starting agent container: {self.agent_image}")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        last_error = ""
+        result = None
+        for attempt in range(1, 4):
+            try:
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=60,
+                )
+            except subprocess.TimeoutExpired:
+                last_error = "docker run timed out after 60 seconds"
+                adopted = self._adopt_started_container()
+                if adopted:
+                    return adopted
+            else:
+                if result.returncode == 0:
+                    break
+                last_error = (result.stderr or result.stdout or "").strip()
+                if "already in use" in last_error.lower():
+                    adopted = self._adopt_started_container()
+                    if adopted:
+                        return adopted
+                else:
+                    break
 
-        if result.returncode != 0:
-            raise RuntimeError(f"Failed to start agent container: {result.stderr}")
+            self._remove_container_by_name(timeout=15)
+            time.sleep(attempt)
+        else:
+            result = None
+
+        if result is None or result.returncode != 0:
+            raise RuntimeError(f"Failed to start agent container: {last_error}")
 
         self.container_id = result.stdout.strip()
         print(f"Agent container started: {self.container_id[:12]}")
         return self.container_id
+
+    def _adopt_started_container(self) -> str | None:
+        """Recover a container created by a docker run whose client call timed out."""
+        for attempt in range(3):
+            try:
+                inspected = subprocess.run(
+                    [
+                        "docker", "inspect", self.container_name,
+                        "--format", "{{.Id}}\t{{.State.Status}}",
+                    ],
+                    capture_output=True, text=True, timeout=10,
+                )
+            except subprocess.TimeoutExpired:
+                inspected = None
+
+            if inspected is not None and inspected.returncode == 0:
+                container_id, _, status = inspected.stdout.strip().partition("\t")
+                if status == "created":
+                    try:
+                        started = subprocess.run(
+                            ["docker", "start", self.container_name],
+                            capture_output=True, text=True, timeout=30,
+                        )
+                    except subprocess.TimeoutExpired:
+                        started = None
+                    if started is not None and started.returncode == 0:
+                        status = "running"
+                if status == "running" and container_id:
+                    self.container_id = container_id
+                    print(f"Agent container recovered: {container_id[:12]}")
+                    return container_id
+
+            if attempt < 2:
+                time.sleep(attempt + 1)
+        return None
+
+    def _remove_container_by_name(self, timeout: int = 30) -> bool:
+        """Remove the named Agent even when start never returned a container id."""
+        for attempt in range(3):
+            try:
+                result = subprocess.run(
+                    ["docker", "rm", "-f", self.container_name],
+                    capture_output=True, text=True, timeout=timeout,
+                )
+            except subprocess.TimeoutExpired:
+                result = None
+
+            if result is not None:
+                message = ((result.stderr or "") + (result.stdout or "")).lower()
+                if result.returncode == 0 or "no such container" in message:
+                    self.container_id = None
+                    return True
+            if attempt < 2:
+                time.sleep(attempt + 1)
+        return False
 
     def run(self, cve_input: CVEInput, workspace_dir: str) -> AgentOutput:
         """
@@ -200,12 +280,14 @@ class SecurityResearcherAgent:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 pass
+            self._recover_native_session(workspace)
             if not self.stop(timeout=30):
                 stderr_chunks.append(
                     f"\nWarning: timed out removing agent container {self.container_name}; "
                     "it may require manual docker cleanup."
                 )
 
+        self._recover_native_session(workspace)
         returncode = proc.returncode if proc.returncode is not None else -1
         stderr_text = "".join(stderr_chunks)
 
@@ -257,6 +339,26 @@ class SecurityResearcherAgent:
             },
         )
 
+    @staticmethod
+    def _recover_native_session(workspace: Path) -> Path | None:
+        """Recover the SDK JSONL when agent_runner exits before copying it."""
+        session_path = workspace / "session.json"
+        if session_path.exists():
+            return session_path
+
+        projects_dir = workspace / ".claude_cache" / "projects"
+        if not projects_dir.is_dir():
+            return None
+
+        candidates = list(projects_dir.rglob("*.jsonl"))
+        if not candidates:
+            return None
+
+        source = max(candidates, key=lambda path: path.stat().st_mtime_ns)
+        shutil.copy2(source, session_path)
+        print(f"Recovered native Agent session: {session_path}")
+        return session_path
+
     def stop(self, timeout: int = 30) -> bool:
         """停止并移除容器。
 
@@ -264,27 +366,14 @@ class SecurityResearcherAgent:
         active exec session. Cleanup must be best-effort so it does not mask the
         real agent failure reason.
         """
-        if self.container_id:
-            try:
-                result = subprocess.run(
-                    ["docker", "rm", "-f", self.container_name],
-                    capture_output=True, text=True, timeout=timeout,
-                )
-            except subprocess.TimeoutExpired:
-                print(
-                    f"Warning: timed out removing agent container "
-                    f"{self.container_name} after {timeout}s"
-                )
-                return False
+        had_container = bool(self.container_id)
+        if self._remove_container_by_name(timeout=timeout):
+            if had_container:
+                print("Agent container stopped")
+            return True
 
-            if result.returncode != 0:
-                stderr = (result.stderr or "").strip()
-                print(
-                    f"Warning: failed to remove agent container "
-                    f"{self.container_name}: {stderr}"
-                )
-                return False
-
-            self.container_id = None
-            print("Agent container stopped")
-        return True
+        print(
+            f"Warning: failed to remove agent container "
+            f"{self.container_name} after retries"
+        )
+        return False

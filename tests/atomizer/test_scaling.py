@@ -570,6 +570,13 @@ def test_success_evaluation_is_flag_or_evidence():
     assert no_flag.verified is True
     assert no_flag.flag_matched is False
 
+    # A runner can be interrupted after retrieving the flag but before emitting
+    # a clean success result. Exact ground-truth match remains authoritative.
+    out.success = False
+    recovered = AtomizerPipeline._evaluate_agent_success(out, "flag{ok}")
+    assert recovered.verified is True
+    assert recovered.flag_matched is True
+
 
 def test_info_leak_success_can_use_leak_evidence_without_flag(tmp_path, monkeypatch):
     """Info_Leak atoms can be verified by objective leak evidence when flag retrieval is not applicable."""
@@ -725,6 +732,80 @@ def test_llm_checker_can_reject_non_flag_success(tmp_path, monkeypatch):
     assert "missing rendered payload" in atom_data["llm_check"]["issues"]
 
 
+def test_llm_checker_bound_method_handles_missing_api_key(tmp_path):
+    """The checker must be a normal instance method, not a broken staticmethod."""
+    from clab_builder.atomizer.pipeline import AtomizerPipeline
+    from clab_builder.atomizer.agent.researcher import AgentOutput
+
+    cve_dir = tmp_path / "vulhub" / "openssh" / "CVE-2018-15473"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"sshd": {"image": "vulhub/openssh:7.7", "ports": ["22:22"]}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2018-15473\n")
+    agent_out = AgentOutput(
+        cve_id="CVE-2018-15473",
+        success=True,
+        exploit_steps=[],
+        evidence=["Observed different server behavior for valid and invalid users."],
+        mitre_mapping={},
+        vulnerability_type="Username Enumeration",
+        captured_flag="",
+    )
+
+    p = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    result = p._run_llm_checker(
+        agent_output=agent_out,
+        vuln_category="Info_Leak",
+        api_key="",
+        model="checker",
+    )
+
+    assert result.accepted is False
+    assert "no API key" in result.reason
+
+
+def test_atom_metadata_normalizes_agent_enum_aliases(tmp_path, monkeypatch):
+    """Agent aliases like SQLi/reconnaissance should not break atom saving."""
+    from clab_builder.atomizer.pipeline import AtomizerPipeline
+    from clab_builder.atomizer.agent.researcher import AgentOutput
+
+    cve_dir = tmp_path / "vulhub" / "db" / "CVE-2024-0005"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"web": {"image": "vulhub/test:latest", "ports": ["8080:80"]}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0005 SQL injection\n")
+    agent_out = AgentOutput(
+        cve_id="CVE-2024-0005",
+        success=True,
+        exploit_steps=[],
+        evidence=["SQL injection confirmed with boolean response difference."],
+        mitre_mapping={},
+        vulnerability_type="SQLi",
+        captured_flag="",
+        extra_fields={"vuln_category": "SQLi", "primary_mitre_phase": "reconnaissance"},
+    )
+
+    p = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    monkeypatch.setattr(p, "_flag", "", raising=False)
+    atom_dir = tmp_path / "atoms" / "CVE-2024-0005"
+    atom_dir.mkdir(parents=True)
+
+    verified, flag_matched = p._save_atom(
+        atom_dir,
+        agent_output=agent_out,
+        llm_checker=False,
+    )
+
+    assert verified is True
+    assert flag_matched is False
+    import yaml as _yaml
+    atom_data = _yaml.safe_load((tmp_path / "atoms" / "CVE-2024-0005" / "atom.yaml").read_text())
+    assert atom_data["vuln_category"] == "Injection"
+    assert atom_data["primary_mitre_phase"] == "discovery"
+
+
 def test_compose_dependency_failure_reports_service_logs_and_hint(tmp_path, monkeypatch):
     """Dependency containers that exit after compose up must stop the run before agent starts."""
     import pytest
@@ -842,3 +923,67 @@ def test_cve_filter_restricts_runnable(tmp_path, monkeypatch):
     runner.run(force=True, export_parquet=False, workers=1,
                cve_filter=("CVE-2024-7001", "CVE-2024-7003"))
     assert sorted(executed) == ["CVE-2024-7001", "CVE-2024-7003"]
+
+
+def test_missing_verified_raw_build_asset_is_reported(tmp_path, monkeypatch):
+    """A verified raw source is not invalid when its local build artefact is absent."""
+    from clab_builder.atomizer.scaling import AtomScaleRecord
+
+    runner = AtomScaleRunner(
+        vulhub_dir="",
+        output_dir=str(tmp_path / "atoms"),
+        state_dir=str(tmp_path / "state"),
+    )
+    record = AtomScaleRecord(
+        cve_id="CVE-2024-9999",
+        source_type="raw_records",
+        source_path=str(tmp_path / "generated" / "CVE-2024-9999"),
+        image="cve-2024-9999:vuln",
+        metadata={"archive_exists": False},
+    )
+    monkeypatch.setattr(
+        "clab_builder.atomizer.scaling.subprocess.run",
+        lambda *args, **kwargs: type("Result", (), {"returncode": 1, "stderr": "missing"})(),
+    )
+
+    result = runner._run_one(
+        record,
+        api_key="key",
+        base_url="",
+        model="model",
+        skip_agent=False,
+        force=False,
+        max_turns=80,
+        llm_checker=True,
+    )
+
+    assert result.status == "missing_build_asset"
+    assert "verified raw-record Docker image is missing" in result.error
+
+
+def test_raw_record_source_archive_does_not_replace_local_image(tmp_path, monkeypatch):
+    """The raw-record archive is source context, not a docker-loadable image."""
+    from clab_builder.atomizer.scaling import AtomScaleRecord
+
+    archive = tmp_path / "source.tar.gz"
+    archive.write_bytes(b"archive")
+    record = AtomScaleRecord(
+        cve_id="CVE-2024-9998",
+        source_type="raw_records",
+        source_path=str(tmp_path / "generated" / "CVE-2024-9998"),
+        image="cve-2024-9998:vuln",
+        metadata={"archive_path": str(archive), "archive_exists": True},
+    )
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return type("Result", (), {"returncode": 1, "stderr": ""})()
+
+    monkeypatch.setattr("clab_builder.atomizer.scaling.subprocess.run", fake_run)
+
+    error = AtomScaleRunner._prepare_raw_record_image(record)
+
+    assert "verified raw-record Docker image is missing" in error
+    assert str(archive) in error
+    assert calls == [["docker", "image", "inspect", "cve-2024-9998:vuln"]]

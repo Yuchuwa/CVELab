@@ -10,6 +10,25 @@ from typing import Dict, List, Any
 from dataclasses import dataclass, field
 
 
+def container_port_from_spec(port_spec: Any) -> int | None:
+    """Return the container/internal port from a Docker Compose port spec."""
+    if isinstance(port_spec, dict):
+        target = port_spec.get("target") or port_spec.get("container")
+        if target is None:
+            return None
+        port_text = str(target)
+    else:
+        port_text = str(port_spec).split(":")[-1]
+
+    port_text = port_text.split("/", 1)[0].strip()
+    if not port_text:
+        return None
+    try:
+        return int(port_text)
+    except ValueError:
+        return None
+
+
 @dataclass
 class VulhubService:
     """解析后的单个服务"""
@@ -45,7 +64,9 @@ class VulhubEnvironment:
         result = []
         for p in svc.ports:
             # "8080:80" → 80 (container port), "8080" → 8080
-            result.append(int(str(p).split(":")[-1]))
+            port = container_port_from_spec(p)
+            if port is not None:
+                result.append(port)
         return result
 
 

@@ -24,7 +24,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from clab_builder.atomizer.pipeline import AtomizerPipeline, AtomMeta
-from clab_builder.atomizer.output.vulhub_converter import VulhubParser
+from clab_builder.atomizer.output.vulhub_converter import VulhubParser, container_port_from_spec
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -92,6 +92,8 @@ def test_cleanup_compose_project_removes_orphans_and_project_networks(tmp_path):
 
     def fake_run(cmd, **kwargs):
         calls.append(cmd)
+        if cmd[:3] == ["docker", "ps", "-aq"]:
+            return MagicMock(returncode=0, stdout="container-a\n", stderr="")
         if cmd[:3] == ["docker", "network", "ls"]:
             return MagicMock(returncode=0, stdout="net-a\nnet-b\n", stderr="")
         return MagicMock(returncode=0, stdout="", stderr="")
@@ -107,8 +109,241 @@ def test_cleanup_compose_project_removes_orphans_and_project_networks(tmp_path):
         "docker", "network", "ls", "-q",
         "--filter", "label=com.docker.compose.project=cve-2024-0002",
     ] in calls
+    assert ["docker", "rm", "-f", "container-a"] in calls
     assert ["docker", "network", "rm", "net-a"] in calls
     assert ["docker", "network", "rm", "net-b"] in calls
+
+
+@pytest.mark.unit
+def test_cleanup_stops_agent_before_removing_compose_network(tmp_path, monkeypatch):
+    """The Agent must disconnect before Compose can remove its project network."""
+    cve_dir = tmp_path / "vulhub" / "test" / "CVE-2024-0007"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"web": {"image": "vulhub/test:latest"}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0007\n")
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    events = []
+
+    class FakeAgent:
+        def stop(self):
+            events.append("agent-stop")
+            return True
+
+    pipeline._agent = FakeAgent()
+    monkeypatch.setattr(
+        pipeline,
+        "_cleanup_compose_project",
+        lambda *args, **kwargs: events.append("compose-cleanup"),
+    )
+    monkeypatch.setattr(
+        "clab_builder.atomizer.pipeline.subprocess.run",
+        lambda *args, **kwargs: MagicMock(returncode=0, stdout="", stderr=""),
+    )
+
+    pipeline._cleanup()
+
+    assert events == ["agent-stop", "compose-cleanup"]
+
+
+@pytest.mark.unit
+def test_cleanup_preserves_raw_record_local_image(tmp_path, monkeypatch):
+    """Verified raw-record images are local artefacts and must never be auto-removed."""
+    cve_dir = tmp_path / "generated" / "raw_records" / "CVE-2024-0010"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"target": {"image": "cve-2024-0010:vuln"}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0010\n")
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    calls = []
+    monkeypatch.setattr(pipeline, "_cleanup_compose_project", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "clab_builder.atomizer.pipeline.subprocess.run",
+        lambda cmd, **kwargs: calls.append(cmd) or MagicMock(returncode=0, stdout="", stderr=""),
+    )
+
+    pipeline._cleanup()
+
+    assert not any(cmd[:2] == ["docker", "rmi"] for cmd in calls)
+
+
+@pytest.mark.unit
+def test_start_environment_cleans_project_when_compose_up_fails(tmp_path):
+    """A failed compose up can leave a network; clean it before surfacing the error."""
+    cve_dir = tmp_path / "vulhub" / "test" / "CVE-2024-0004"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"web": {"image": "vulhub/test:latest", "ports": ["8080:80"]}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0004\n")
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:3] == ["docker", "image", "inspect"]:
+            return MagicMock(returncode=0, stdout="", stderr="")
+        if cmd[:5] == ["docker", "compose", "-p", "cve-2024-0004", "-f"]:
+            return MagicMock(returncode=1, stdout="", stderr="network pool exhausted")
+        return MagicMock(returncode=0, stdout="", stderr="")
+
+    with patch.object(pipeline, "_pull_image_with_retry"), \
+         patch.object(pipeline, "_cleanup_compose_project") as cleanup, \
+         patch("clab_builder.atomizer.pipeline.subprocess.run", side_effect=fake_run):
+        with pytest.raises(RuntimeError, match="docker compose up failed"):
+            pipeline._start_cve_environment()
+
+    cleanup.assert_any_call(cve_dir.resolve(), ".compose-no-ports.yml", "cve-2024-0004",
+                            context="pre-start")
+    cleanup.assert_any_call(cve_dir.resolve(), ".compose-no-ports.yml", "cve-2024-0004",
+                            context="compose-up-failed")
+
+
+@pytest.mark.unit
+def test_inspect_compose_services_retries_timeout(tmp_path, monkeypatch):
+    """A transient Docker inspect timeout should be retried."""
+    import subprocess as real_subprocess
+
+    cve_dir = tmp_path / "vulhub" / "test" / "CVE-2024-0008"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"web": {"image": "vulhub/test:latest"}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0008\n")
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    inspect_payload = [{
+        "Id": "abc123",
+        "Name": "/web",
+        "Config": {
+            "Image": "vulhub/test:latest",
+            "Labels": {"com.docker.compose.service": "web"},
+        },
+        "State": {"Running": True, "Status": "running", "ExitCode": 0},
+        "NetworkSettings": {"Networks": {}, "Ports": {}},
+    }]
+    calls = {"inspect": 0}
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:3] == ["docker", "ps", "-a"]:
+            return MagicMock(returncode=0, stdout="abc123\n", stderr="")
+        if cmd[:2] == ["docker", "inspect"]:
+            calls["inspect"] += 1
+            if calls["inspect"] == 1:
+                raise real_subprocess.TimeoutExpired(cmd, 20)
+            return MagicMock(returncode=0, stdout=json.dumps(inspect_payload), stderr="")
+        raise AssertionError(cmd)
+
+    monkeypatch.setattr("clab_builder.atomizer.pipeline.subprocess.run", fake_run)
+    monkeypatch.setattr("clab_builder.atomizer.pipeline.time.sleep", lambda _: None)
+
+    services = pipeline._inspect_compose_services("cve-2024-0008")
+
+    assert calls["inspect"] == 2
+    assert services[0]["running"] is True
+
+
+@pytest.mark.unit
+def test_validate_compose_services_accepts_successful_init_container(tmp_path, monkeypatch):
+    """A named one-shot init dependency exiting 0 is a successful service state."""
+    cve_dir = tmp_path / "vulhub" / "test" / "CVE-2024-0009"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"web": {"image": "vulhub/test:latest"}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0009\n")
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    monkeypatch.setattr(
+        pipeline,
+        "_inspect_compose_services",
+        lambda _: [
+            {
+                "service": "web",
+                "container_name": "app-web-1",
+                "is_target": True,
+                "running": True,
+                "status": "running",
+                "exit_code": 0,
+                "health": "none",
+            },
+            {
+                "service": "airflow-init",
+                "container_name": "app-airflow-init-1",
+                "is_target": False,
+                "running": False,
+                "status": "exited",
+                "exit_code": 0,
+                "health": "none",
+            },
+        ],
+    )
+
+    services = pipeline._validate_compose_services("app")
+
+    assert len(services) == 2
+
+
+@pytest.mark.unit
+def test_container_port_from_compose_spec_accepts_protocol_suffixes():
+    assert container_port_from_spec("2379/tcp") == 2379
+    assert container_port_from_spec("127.0.0.1:8080:80/tcp") == 80
+    assert container_port_from_spec({"target": 7001, "published": 17001}) == 7001
+    assert container_port_from_spec("not-a-port") is None
+
+
+@pytest.mark.unit
+def test_run_agent_recreates_workspace_before_start(tmp_path, monkeypatch):
+    """An interrupted run's output/session/cache must not leak into a retry."""
+    from clab_builder.atomizer.agent.researcher import AgentOutput
+    from clab_builder.atomizer.environment.container import ContainerInfo
+
+    cve_dir = tmp_path / "vulhub" / "test" / "CVE-2024-0006"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"web": {"image": "vulhub/test:latest", "ports": ["8080:80"]}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0006\n")
+    workspace = tmp_path / "atoms" / "CVE-2024-0006" / ".workspace"
+    (workspace / ".claude_cache").mkdir(parents=True)
+    (workspace / "output.json").write_text('{"success": true}')
+    (workspace / "session.json").write_text('{"old": true}\n')
+    (workspace / ".claude_cache" / "old.jsonl").write_text('{"old": true}\n')
+
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            pass
+
+        def start(self, **kwargs):
+            assert not (workspace / "output.json").exists()
+            assert not (workspace / "session.json").exists()
+            assert not (workspace / ".claude_cache" / "old.jsonl").exists()
+
+        def run(self, cve_input, workspace_dir):
+            return AgentOutput(
+                cve_id=cve_input.cve_id,
+                success=False,
+                exploit_steps=[],
+                evidence=["new run"],
+                mitre_mapping={},
+            )
+
+        def stop(self):
+            return True
+
+    monkeypatch.setattr("clab_builder.atomizer.pipeline.SecurityResearcherAgent", FakeAgent)
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    info = ContainerInfo(
+        container_id="fake",
+        container_name="fake",
+        container_ip="172.18.0.2",
+        image_name="vulhub/test:latest",
+        ports=[80],
+        status="running",
+        created_time="now",
+    )
+
+    result = pipeline._run_agent(info, workspace, api_key="key", base_url="", model="model")
+
+    assert result.evidence == ["new run"]
 
 
 @pytest.mark.unit

@@ -8,6 +8,7 @@ import json
 import pytest
 
 from clab_builder.atomizer.agent.agent_runner import (
+    SYSTEM_PROMPT,
     extract_json,
     build_prompt,
     extract_flag,
@@ -160,3 +161,10 @@ class TestBuildPrompt:
         assert "No flag has been planted" in prompt
         assert "do not pivot to unrelated" in prompt
         assert "Leave `captured_flag` empty" in prompt
+
+    def test_system_prompt_forbids_external_research_with_shell_tools(self):
+        """Bash is allowed for local target probing, not for Docker Hub/GitHub lookups."""
+        assert "Do not use the Internet for research or source lookup" in SYSTEM_PROMPT
+        assert "Do not fetch Docker Hub" in SYSTEM_PROMPT
+        assert "Use curl/wget only against the" in SYSTEM_PROMPT
+        assert "local target IP" in SYSTEM_PROMPT

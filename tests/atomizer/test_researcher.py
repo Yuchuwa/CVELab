@@ -5,6 +5,7 @@
 
 import pytest
 import json
+import os
 import subprocess as real_subprocess
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -110,6 +111,47 @@ class TestSecurityResearcherAgent:
         assert "ANTHROPIC_BASE_URL=https://api.example.com" in cmd
         assert "MODEL=gpt-4" in cmd
 
+    @patch("clab_builder.atomizer.agent.researcher.time.sleep")
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_start_retries_docker_run_timeout(self, mock_subprocess, mock_sleep, tmp_path):
+        """A transient Docker daemon timeout should not fail the task immediately."""
+        mock_subprocess.TimeoutExpired = real_subprocess.TimeoutExpired
+        mock_subprocess.run.side_effect = [
+            MagicMock(returncode=0, stdout="", stderr=""),  # initial stale removal
+            real_subprocess.TimeoutExpired(["docker", "run"], 60),
+            MagicMock(returncode=1, stdout="", stderr="not found"),  # inspect 1
+            MagicMock(returncode=1, stdout="", stderr="not found"),  # inspect 2
+            MagicMock(returncode=1, stdout="", stderr="not found"),  # inspect 3
+            MagicMock(returncode=0, stdout="", stderr=""),  # retry cleanup
+            MagicMock(returncode=0, stdout="abc123\n", stderr=""),
+        ]
+
+        agent = SecurityResearcherAgent()
+        cid = agent.start("net", str(tmp_path), "key")
+
+        assert cid == "abc123"
+        assert mock_sleep.call_count == 3
+
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_start_adopts_container_created_during_timeout(self, mock_subprocess, tmp_path):
+        """Do not rerun docker run when the timed-out call actually created the container."""
+        mock_subprocess.TimeoutExpired = real_subprocess.TimeoutExpired
+        mock_subprocess.run.side_effect = [
+            MagicMock(returncode=0, stdout="", stderr=""),  # initial stale removal
+            real_subprocess.TimeoutExpired(["docker", "run"], 60),
+            MagicMock(returncode=0, stdout="abc123\tcreated\n", stderr=""),
+            MagicMock(returncode=0, stdout="agent-name\n", stderr=""),
+        ]
+
+        agent = SecurityResearcherAgent()
+        cid = agent.start("net", str(tmp_path), "key")
+
+        assert cid == "abc123"
+        assert agent.container_id == "abc123"
+        commands = [call.args[0] for call in mock_subprocess.run.call_args_list]
+        assert sum(cmd[:2] == ["docker", "run"] for cmd in commands) == 1
+        assert ["docker", "start", agent.container_name] in commands
+
     @patch("clab_builder.atomizer.agent.researcher.subprocess")
     def test_run_success(self, mock_subprocess, tmp_path):
         """Agent 执行成功"""
@@ -192,3 +234,37 @@ class TestSecurityResearcherAgent:
 
         assert agent.stop(timeout=30) is False
         assert agent.container_id == "fake123"
+
+    @patch("clab_builder.atomizer.agent.researcher.subprocess")
+    def test_stop_removes_container_even_without_container_id(self, mock_subprocess):
+        """A docker run timeout may create a named container before returning its id."""
+        mock_subprocess.run.return_value = MagicMock(returncode=0, stdout="removed\n", stderr="")
+        agent = SecurityResearcherAgent()
+        agent.container_name = "agent-created-only"
+        agent.container_id = None
+
+        assert agent.stop() is True
+        mock_subprocess.run.assert_called_with(
+            ["docker", "rm", "-f", "agent-created-only"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+    def test_recover_native_session_from_workspace_cache(self, tmp_path):
+        """A killed runner should not lose the SDK session already on the host."""
+        older = tmp_path / ".claude_cache" / "projects" / "old.jsonl"
+        newer = tmp_path / ".claude_cache" / "projects" / "nested" / "new.jsonl"
+        older.parent.mkdir(parents=True)
+        newer.parent.mkdir(parents=True)
+        older.write_text('{"session":"old"}\n')
+        newer.write_text('{"session":"new"}\n')
+        older.touch()
+        newer.touch()
+        os.utime(older, (1, 1))
+        os.utime(newer, (2, 2))
+
+        recovered = SecurityResearcherAgent._recover_native_session(tmp_path)
+
+        assert recovered == tmp_path / "session.json"
+        assert recovered.read_text() == '{"session":"new"}\n'

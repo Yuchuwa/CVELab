@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import subprocess
 import threading
 import time
 from concurrent.futures import (
@@ -143,6 +144,7 @@ def discover_raw_record_candidates(
                         else False,
                         "analysis_status": row.get("analysis_status"),
                         "is_dockerizable": row.get("is_dockerizable"),
+                        "vuln_version_url": row.get("vuln_version_url"),
                         "last_test_build": row.get("last_test_build"),
                         "last_test_start": row.get("last_test_start"),
                         "host_port_map": parse_jsonish(row.get("host_port_map"), {}),
@@ -439,6 +441,12 @@ class AtomScaleRunner:
         llm_checker: bool,
     ) -> AtomScaleRecord:
         atom_dir = self.output_dir / record.cve_id
+        raw_asset_error = self._prepare_raw_record_image(record)
+        if raw_asset_error:
+            record.status = "missing_build_asset"
+            record.error = raw_asset_error
+            record.updated_at = utc_now_iso()
+            return record
         if atom_dir.joinpath("atom.yaml").exists() and not force:
             record.status = "skipped_existing"
             record.atom_path = str(atom_dir)
@@ -476,6 +484,28 @@ class AtomScaleRunner:
             record.updated_at = record.finished_at
             record.duration_seconds = round(time.monotonic() - start, 3)
         return record
+
+    @staticmethod
+    def _prepare_raw_record_image(record: AtomScaleRecord) -> str:
+        """Require the verified local raw-record Docker image to be present."""
+        if record.source_type != "raw_records":
+            return ""
+
+        try:
+            inspect = subprocess.run(
+                ["docker", "image", "inspect", record.image],
+                capture_output=True, text=True, timeout=20,
+            )
+        except subprocess.TimeoutExpired:
+            return f"timed out checking verified raw-record image: {record.image}"
+        if inspect.returncode == 0:
+            return ""
+
+        archive_value = str((record.metadata or {}).get("archive_path") or "")
+        return (
+            f"verified raw-record Docker image is missing: image={record.image}, "
+            f"source_archive={archive_value or '<none>'}; restore or rebuild the recorded image"
+        )
 
     def _load_existing_results(self) -> dict[str, AtomScaleRecord]:
         return self._load_historical_records()
