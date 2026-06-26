@@ -12,6 +12,7 @@ from clab_builder.atomizer.agent.agent_runner import (
     extract_json,
     build_prompt,
     extract_flag,
+    redact_secrets,
     _extract_json_from_native_session,
 )
 
@@ -86,6 +87,22 @@ class TestExtractJson:
         assert result is not None
         assert result["success"] is True
         assert result["evidence"] == ["confirmed"]
+
+    def test_redact_secrets_before_persisting_session(self):
+        text = (
+            "ANTHROPIC_API_KEY=sk-real-secret-value-123456\n"
+            'stdout={"llm_api_key": "sk-json-secret-value-123456"}\n'
+            "Authorization: Bearer token-secret-value-1234567890\n"
+            "raw sk-standalone-secret-value-123456"
+        )
+
+        redacted = redact_secrets(text)
+
+        assert "sk-real-secret-value" not in redacted
+        assert "sk-json-secret-value" not in redacted
+        assert "token-secret-value" not in redacted
+        assert "sk-standalone-secret" not in redacted
+        assert "ANTHROPIC_API_KEY=<redacted>" in redacted
 
 
 @pytest.mark.unit

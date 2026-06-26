@@ -34,7 +34,6 @@ import json
 import sys
 import os
 import re
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -334,6 +333,30 @@ def _extract_json_from_native_session(session_path: Path | None) -> dict | None:
     return None
 
 
+SECRET_PATTERNS = [
+    re.compile(r"(?i)\b((?:ANTHROPIC|OPENAI|LLM)_API_KEY=)([^\s\"'\\]+)"),
+    re.compile(r'(?i)("(?:anthropic_|openai_|llm_)?api_key"\s*:\s*")([^"]+)(")'),
+    re.compile(r"(?i)('(?:anthropic_|openai_|llm_)?api_key'\s*:\s*')([^']+)(')"),
+    re.compile(r"(?i)\b(Bearer\s+)([A-Za-z0-9._\-]{16,})"),
+]
+
+
+def redact_secrets(text: str) -> str:
+    """Remove API credentials before persisting agent sessions."""
+    redacted = text
+    for pattern in SECRET_PATTERNS:
+        redacted = pattern.sub(
+            lambda match: (
+                f"{match.group(1)}<redacted>{match.group(3)}"
+                if match.lastindex and match.lastindex >= 3
+                else f"{match.group(1)}<redacted>"
+            ),
+            redacted,
+        )
+    redacted = re.sub(r"\bsk-[A-Za-z0-9_\-]{16,}\b", "sk-<redacted>", redacted)
+    return redacted
+
+
 async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TURNS):
     """运行 Agent 主流程"""
     with open(input_path) as f:
@@ -407,10 +430,13 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
     print(f"[Output] {output_path}", file=sys.stderr)
 
     # session: SDK 原生 .jsonl（query() 期间 CLI 子进程已写到 ~/.claude/projects/，
-    # 容器挂载到宿主后落盘）。直接拷贝作为 atom 的 session 记录，保持原生格式。
+    # 容器挂载到宿主后落盘）。保存前脱敏，避免工具输出 env 时泄露 API key。
     session_path = str(output_path).replace("output.json", "session.json")
     if native_jsonl:
-        shutil.copy2(native_jsonl, session_path)
+        Path(session_path).write_text(
+            redact_secrets(native_jsonl.read_text(encoding="utf-8", errors="replace")),
+            encoding="utf-8",
+        )
         events = sum(1 for _ in open(session_path))
         print(f"[Session] native SDK jsonl -> {session_path} ({events} events)", file=sys.stderr)
     elif session_id:
