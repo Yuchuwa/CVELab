@@ -151,6 +151,31 @@ class PostExploit(BaseModel):
     pivot_host_image: str = "cvelab-pivot-base:latest"
 
 
+class ChainRequires(BaseModel):
+    """攻击链前置条件（由 atomizer 归纳，scenario 阶段消费）"""
+    ports: List[int] = Field(default_factory=list)
+    auth: str = "none"  # none | default | required | unknown
+    callback: bool = False
+    internet: bool = False
+
+
+class ChainGrants(BaseModel):
+    """漏洞成功利用后的能力结果"""
+    command_execution: bool = False
+    file_read: bool = False
+    outbound_network: bool = False
+    flag_capture: bool = False
+
+
+class ChainContract(BaseModel):
+    """轻量链路能力合同。roles 为派生缓存，requires/grants 才是事实来源。"""
+    requires: ChainRequires = Field(default_factory=ChainRequires)
+    grants: ChainGrants = Field(default_factory=ChainGrants)
+    relay_compatible: bool = False
+    roles: List[str] = Field(default_factory=list)
+    classifier_version: str = "chain-contract-v1"
+
+
 # ── 主模型 ──────────────────────────────────────────
 
 class AtomConfig(BaseModel):
@@ -198,6 +223,9 @@ class AtomConfig(BaseModel):
 
     # 攻陷后的 pivot / 横向移动能力
     post_exploit: PostExploit = Field(default_factory=PostExploit)
+
+    # 复杂拓扑/攻击链编排合同
+    chain_contract: ChainContract = Field(default_factory=ChainContract)
 
     # 验证状态
     verified: bool = False

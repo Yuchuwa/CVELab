@@ -253,6 +253,74 @@ def test_run_recovers_succeeded_status_from_dataset_without_discover(tmp_path, m
     }
 
 
+def test_dataset_rows_include_chain_contract_from_atom_yaml(tmp_path):
+    """Recovered atom artefacts should carry chain_contract into dataset.jsonl."""
+    vulhub = tmp_path / "vulhub"
+    write_compose(vulhub / "app" / "CVE-2024-3005")
+    runner = AtomScaleRunner(
+        vulhub_dir=str(vulhub),
+        raw_records=(),
+        output_dir=str(tmp_path / "atoms"),
+        state_dir=str(tmp_path / "state"),
+        generated_sources_dir=str(tmp_path / "generated"),
+    )
+    atom_dir = tmp_path / "atoms" / "CVE-2024-3005"
+    atom_dir.mkdir(parents=True)
+    contract = {
+        "requires": {"ports": [80], "auth": "none", "callback": False, "internet": False},
+        "grants": {
+            "command_execution": True,
+            "file_read": True,
+            "outbound_network": True,
+            "flag_capture": True,
+        },
+        "relay_compatible": True,
+        "roles": ["entry", "relay", "terminal"],
+        "classifier_version": "chain-contract-v1",
+    }
+    (atom_dir / "atom.yaml").write_text(yaml.dump({
+        "cve_id": "CVE-2024-3005",
+        "docker_image": "vulhub/test:latest",
+        "ports": [80],
+        "verified": True,
+        "chain_contract": contract,
+    }))
+
+    records = runner.discover()
+
+    record = next(row for row in records if row.cve_id == "CVE-2024-3005")
+    assert record.status == "succeeded"
+    assert record.chain_contract == contract
+    dataset = [
+        json.loads(line)
+        for line in runner.dataset_jsonl_path.read_text().splitlines()
+        if line.strip()
+    ]
+    assert dataset[0]["chain_contract"] == contract
+
+
+def test_chain_contract_backfill_for_legacy_atom_yaml():
+    contract = AtomScaleRunner._infer_chain_contract_from_atom_data({
+        "ports": [80],
+        "verified": True,
+        "vuln_category": "RCE",
+        "attack_method": "single_request",
+        "flag_value": "flag{ok}",
+        "network_requirements": {
+            "needs_callback": False,
+            "needs_tool_download": False,
+        },
+        "requirements": {"authentication": "none"},
+        "flag_verify_command": "curl http://{{target_ip}}/poc?cmd=cat%20/flag",
+    })
+
+    assert contract["requires"]["ports"] == [80]
+    assert contract["grants"]["command_execution"] is True
+    assert contract["grants"]["flag_capture"] is True
+    assert contract["relay_compatible"] is True
+    assert set(contract["roles"]) == {"entry", "relay", "terminal"}
+
+
 def test_runner_run_parallel_dispatches_all_and_persists(tmp_path, monkeypatch):
     """Parallel run() must execute every runnable record exactly once and persist results."""
     import threading
@@ -545,6 +613,11 @@ def test_objective_success_requires_flag_match(tmp_path, monkeypatch):
     ok_data = _yaml.safe_load((tmp_path / "atoms_ok" / "CVE-2021-44228" / "atom.yaml").read_text())
     assert ok_data["flag_value"] == ground_truth
     assert ok_data["verified"] is True
+    assert 8983 in ok_data["chain_contract"]["requires"]["ports"]
+    assert ok_data["chain_contract"]["grants"]["command_execution"] is True
+    assert ok_data["chain_contract"]["grants"]["flag_capture"] is True
+    assert ok_data["chain_contract"]["relay_compatible"] is True
+    assert set(ok_data["chain_contract"]["roles"]) == {"entry", "relay", "terminal"}
     bad_data = _yaml.safe_load((tmp_path / "atoms_bad" / "CVE-2021-44228" / "atom.yaml").read_text())
     assert bad_data["flag_value"] == ground_truth
     assert bad_data["verified"] is False
@@ -622,6 +695,11 @@ def test_info_leak_success_can_use_leak_evidence_without_flag(tmp_path, monkeypa
     assert atom_data["vuln_category"] == "Info_Leak"
     assert atom_data["verified"] is True
     assert "flag_value" not in atom_data
+    assert atom_data["chain_contract"]["grants"]["file_read"] is True
+    assert atom_data["chain_contract"]["grants"]["command_execution"] is False
+    assert atom_data["chain_contract"]["grants"]["flag_capture"] is False
+    assert atom_data["chain_contract"]["relay_compatible"] is False
+    assert "relay" not in atom_data["chain_contract"]["roles"]
 
 
 def test_auth_bypass_success_does_not_require_flag(tmp_path, monkeypatch):

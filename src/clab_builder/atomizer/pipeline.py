@@ -29,6 +29,7 @@ from .output.vulhub_converter import (
 from .output.sysfield_playbook import SysFieldPlaybookGenerator
 from .agent.researcher import SecurityResearcherAgent, CVEInput
 from .environment.container import CVEEnvironmentManager, ContainerInfo
+from clab_builder.shared.chain_contract import infer_chain_contract
 
 
 @dataclass
@@ -1142,6 +1143,20 @@ class AtomizerPipeline:
             init_tasks=agent_extra.get("init_tasks", []),
             init_files=init_file_mappings,
         )
+        chain_contract = infer_chain_contract(
+            ports=self.env.main_ports,
+            requirements=requirements,
+            network_requirements=net_reqs,
+            vuln_category=vuln_category,
+            attack_method=attack_method,
+            vulnerability_type=vuln_type,
+            flag_verify_command=flag_cmd,
+            evidence=agent_output.evidence if agent_output else (),
+            exploit_steps=agent_output.exploit_steps if agent_output else (),
+            verified=evaluation.verified,
+            flag_matched=evaluation.flag_matched,
+            flag_value=ground_truth,
+        )
 
         config = AtomConfig(
             cve_id=self.env.cve_id,
@@ -1166,6 +1181,7 @@ class AtomizerPipeline:
             flag_verify_command=flag_cmd,
             flag_value=ground_truth or None,
             service_startup=startup,
+            chain_contract=chain_contract,
             verified=verified,
             requirements=requirements,
             evidence=evidence[:5],

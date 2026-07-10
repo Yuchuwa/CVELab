@@ -21,6 +21,7 @@ from typing import Any, Iterable
 import yaml
 
 from clab_builder.atomizer.pipeline import AtomizerPipeline
+from clab_builder.shared.chain_contract import infer_chain_contract_from_atom_data
 
 
 CVE_RE = re.compile(r"\bCVE-\d{4}-\d{4,}\b", re.IGNORECASE)
@@ -46,6 +47,7 @@ class AtomScaleRecord:
     raw_record_id: str = ""
     image: str = ""
     ports: list[str] = field(default_factory=list)
+    chain_contract: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=utc_now_iso)
     updated_at: str = ""
     started_at: str = ""
@@ -247,6 +249,9 @@ def export_hf_dataset(path: str | Path, records: Iterable[AtomScaleRecord]) -> s
     rows = [record.to_dict() for record in records]
     for row in rows:
         row["ports"] = json.dumps(row.get("ports", []), ensure_ascii=False)
+        row["chain_contract"] = json.dumps(
+            row.get("chain_contract", {}), ensure_ascii=False, sort_keys=True
+        )
         row["metadata"] = json.dumps(row.get("metadata", {}), ensure_ascii=False, sort_keys=True)
     pd.DataFrame(rows).to_parquet(out, index=False)
     return str(out)
@@ -452,6 +457,7 @@ class AtomScaleRunner:
             record.atom_path = str(atom_dir)
             record.session_path = str(atom_dir / "session.json")
             record.has_session = (atom_dir / "session.json").exists()
+            self._refresh_record_from_atom(record)
             record.updated_at = utc_now_iso()
             return record
 
@@ -474,6 +480,7 @@ class AtomScaleRunner:
             record.atom_path = str(atom_dir)
             record.session_path = str(atom_dir / "session.json")
             record.has_session = (atom_dir / "session.json").exists()
+            self._refresh_record_from_atom(record)
             record.status = "succeeded" if result.get("success") else "failed"
             record.error = "" if result.get("success") else str(result.get("error", "agent failed"))
         except Exception as exc:
@@ -546,6 +553,7 @@ class AtomScaleRunner:
         try:
             data = yaml.safe_load(atom_yaml.read_text(encoding="utf-8")) or {}
             verified = bool(data.get("verified"))
+            self._apply_atom_data(record, data, atom_dir)
         except (OSError, yaml.YAMLError):
             verified = False
         session_path = atom_dir / "session.json"
@@ -567,6 +575,34 @@ class AtomScaleRunner:
             record.updated_at = utc_now_iso()
         self._backfill_record_time_from_session(record)
         return record
+
+    def _refresh_record_from_atom(self, record: AtomScaleRecord) -> None:
+        atom_dir = self.output_dir / record.cve_id
+        atom_yaml = atom_dir / "atom.yaml"
+        if not atom_yaml.exists():
+            return
+        try:
+            data = yaml.safe_load(atom_yaml.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            return
+        self._apply_atom_data(record, data, atom_dir)
+
+    @staticmethod
+    def _apply_atom_data(record: AtomScaleRecord, data: dict[str, Any], atom_dir: Path) -> None:
+        record.atom_path = record.atom_path or str(atom_dir)
+        chain_contract = data.get("chain_contract")
+        if isinstance(chain_contract, dict):
+            record.chain_contract = chain_contract
+        elif not record.chain_contract:
+            record.chain_contract = AtomScaleRunner._infer_chain_contract_from_atom_data(data)
+        if not record.image and data.get("docker_image"):
+            record.image = str(data["docker_image"])
+        if not record.ports and data.get("ports"):
+            record.ports = [str(port) for port in data.get("ports", [])]
+
+    @staticmethod
+    def _infer_chain_contract_from_atom_data(data: dict[str, Any]) -> dict[str, Any]:
+        return infer_chain_contract_from_atom_data(data).model_dump(mode="json")
 
     @staticmethod
     def _parse_session_timestamp(value: Any) -> datetime | None:
@@ -630,6 +666,7 @@ class AtomScaleRunner:
     def _persist(self, records: Iterable[AtomScaleRecord], export_parquet: bool = True) -> None:
         sorted_records = sorted(records, key=lambda item: item.cve_id)
         for record in sorted_records:
+            self._refresh_record_from_atom(record)
             self._backfill_record_time_from_session(record)
         # manifest retains ALL historical states (queued/running/succeeded/failed/...)
         write_jsonl(self.manifest_path, sorted_records)
