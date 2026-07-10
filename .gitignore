@@ -83,6 +83,7 @@ claude_code_env.sh
 
 # Mono repository specific
 data/generated/
+data/CVE-Factory/
 packages/*/dist/
 packages/*/build/
 packages/*/.eggs/

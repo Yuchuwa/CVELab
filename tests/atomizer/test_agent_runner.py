@@ -9,6 +9,7 @@ import pytest
 
 from clab_builder.atomizer.agent.agent_runner import (
     SYSTEM_PROMPT,
+    DISALLOWED_TOOLS,
     extract_json,
     build_prompt,
     extract_flag,
@@ -185,3 +186,10 @@ class TestBuildPrompt:
         assert "Do not fetch Docker Hub" in SYSTEM_PROMPT
         assert "Use curl/wget only against the" in SYSTEM_PROMPT
         assert "local target IP" in SYSTEM_PROMPT
+
+    def test_external_and_task_tools_are_disabled(self):
+        assert "WebSearch" in DISALLOWED_TOOLS
+        assert "WebFetch" in DISALLOWED_TOOLS
+        assert "TaskCreate" in DISALLOWED_TOOLS
+        assert "TaskUpdate" in DISALLOWED_TOOLS
+        assert "TaskOutput" in DISALLOWED_TOOLS

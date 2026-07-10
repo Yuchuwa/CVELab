@@ -135,6 +135,7 @@ def build_prompt(input_data: dict) -> str:
             f"- Ports: {t['ports']}\n"
             f"- Zone: {t['zone']}\n"
             f"- Flag location: {t.get('flag_hint', 'env:FLAG')}\n"
+            f"- Target toolbox: /opt/toolbox (use /opt/toolbox/busybox or /opt/toolbox/socat if the shell lacks tools)\n"
         )
         if t.get("flag_verify_command"):
             desc += f"- Flag read hint: {t['flag_verify_command']}\n"

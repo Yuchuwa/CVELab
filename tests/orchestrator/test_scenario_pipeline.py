@@ -267,7 +267,7 @@ class TestScenarioPipelineMultiTemplate:
         cve_ids = [inj["cve_id"] for inj in result["injections"]]
         assert len(set(cve_ids)) == 3  # all unique
 
-    def test_dmz_simple_pivot_atom_writes_sysfield_playbook(self, tmp_path):
+    def test_dmz_simple_pivot_metadata_writes_sysfield_playbook(self, tmp_path):
         atoms_dir = tmp_path / "atoms"
         _write_pipeline_atom(
             atoms_dir,
@@ -290,14 +290,11 @@ class TestScenarioPipelineMultiTemplate:
         playbook = yaml.safe_load(out.read_text())
         nodes = result["clab"]["topology"]["nodes"]
 
-        assert nodes["target-1"]["image"] == "cvelab-pivot-base:latest"
-        assert nodes["target-1-service"]["network-mode"] == (
-            "container:clab-pivot-sysfield-target-1"
-        )
-        assert result["ground_truth"]["attack_path"][0]["service_node"] == (
-            "target-1-service"
-        )
-        assert playbook["steps"][0]["id"].endswith("cve-pivot-0001-target-1-trigger")
+        assert nodes["target-1"]["image"] == "vulhub/test:latest"
+        assert "target-1-service" not in nodes
+        assert "network-mode" not in nodes["target-1"]
+        assert "service_node" not in result["ground_truth"]["attack_path"][0]
+        assert playbook["steps"][0]["id"].endswith("target-1-trigger")
         assert "curl http://" in playbook["steps"][0]["executor"]["command"]
         assert "echo $FLAG" not in playbook["steps"][0]["executor"]["command"]
 

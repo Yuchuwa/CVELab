@@ -126,6 +126,19 @@ class TestAssemblerDMZSimple:
         flag_bind = [b for b in target["binds"] if b.endswith(":/flag.txt")]
         assert len(flag_bind) == 1
 
+    def test_target_gets_toolbox_bind(self, assembler):
+        atom = _make_atom()
+        result = assembler.assemble(
+            "dmz_simple",
+            [atom],
+            toolbox_dir="assets/toolbox",
+        )
+
+        nodes = result["clab"]["topology"]["nodes"]
+        binds = nodes["target-1"]["binds"]
+        assert any(b.endswith(":/opt/toolbox:ro") for b in binds)
+        assert "target-1-service" not in nodes
+
     def test_cve_setup_generated(self, assembler):
         atom = _make_atom()
         result = assembler.assemble("dmz_simple", [atom])
@@ -173,36 +186,30 @@ class TestAssemblerDMZSimple:
         ]
         assert any(config.get("routes") for config in router_allocations)
 
-    def test_pivot_host_atom_generates_host_and_service_nodes(self, assembler):
+    def test_pivot_metadata_does_not_generate_runtime_pivot_host(self, assembler):
         atom = _make_atom(requires_pivot_host=True)
         result = assembler.assemble("dmz_simple", [atom], scenario_name="pivot-test")
 
         nodes = result["clab"]["topology"]["nodes"]
-        assert nodes["target-1"]["image"] == "cvelab-pivot-base:latest"
-        assert nodes["target-1"]["cmd"] == "sleep infinity"
-        assert nodes["target-1-service"]["image"] == "vulhub/test:latest"
-        assert (
-            nodes["target-1-service"]["network-mode"]
-            == "container:clab-pivot-test-target-1"
-        )
-        assert nodes["target-1-service"]["env"]["FLAG"].startswith("flag{")
+        assert nodes["target-1"]["image"] == "vulhub/test:latest"
+        assert "target-1-service" not in nodes
+        assert "network-mode" not in nodes["target-1"]
+        assert nodes["target-1"]["env"]["FLAG"].startswith("flag{")
 
-    def test_pivot_host_link_and_ip_allocation_use_host_node(self, assembler):
+    def test_target_link_and_ip_allocation_use_single_runtime_node(self, assembler):
         atom = _make_atom(requires_pivot_host=True)
         result = assembler.assemble("dmz_simple", [atom], scenario_name="pivot-test")
 
         links = result["clab"]["topology"]["links"]
         assert any("target-1:eth1" in link["endpoints"] for link in links)
-        assert not any("target-1-service:eth1" in str(link) for link in links)
         assert "target-1" in result["ip_allocations"]
-        assert "target-1-service" not in result["ip_allocations"]
 
         step = result["ground_truth"]["attack_path"][0]
         assert step["target_node"] == "target-1"
-        assert step["service_node"] == "target-1-service"
-        assert step["requires_pivot_host"] is True
+        assert "service_node" not in step
+        assert "requires_pivot_host" not in step
 
-    def test_intermediate_weak_atom_auto_generates_pivot_host(self, assembler):
+    def test_intermediate_weak_atom_uses_single_runtime_node(self, assembler):
         atoms = [
             _make_atom("CVE-TEST-0001"),
             _make_atom("CVE-TEST-0002"),
@@ -210,20 +217,19 @@ class TestAssemblerDMZSimple:
         result = assembler.assemble("dmz_dual", atoms, scenario_name="auto-pivot")
 
         nodes = result["clab"]["topology"]["nodes"]
-        assert nodes["target-1"]["image"] == "cvelab-pivot-base:latest"
-        assert nodes["target-1-service"]["image"] == "vulhub/test:latest"
+        assert nodes["target-1"]["image"] == "vulhub/test:latest"
         assert (
-            nodes["target-1-service"]["network-mode"]
-            == "container:clab-auto-pivot-target-1"
+            nodes["target-2"]["image"] == "vulhub/test:latest"
         )
-        assert nodes["target-2"]["image"] == "vulhub/test:latest"
+        assert "target-1-service" not in nodes
+        assert "target-2-service" not in nodes
 
         first_step = result["ground_truth"]["attack_path"][0]
         second_step = result["ground_truth"]["attack_path"][1]
-        assert first_step["service_node"] == "target-1-service"
-        assert first_step["requires_pivot_host"] is True
-        assert second_step["service_node"] == "target-2"
-        assert second_step["requires_pivot_host"] is False
+        assert first_step["target_node"] == "target-1"
+        assert second_step["target_node"] == "target-2"
+        assert "service_node" not in first_step
+        assert "requires_pivot_host" not in first_step
 
 
 class TestAssemblerOutput:

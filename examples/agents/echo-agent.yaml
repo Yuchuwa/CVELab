@@ -1,0 +1,17 @@
+agent:
+  name: echo-agent
+  command: |
+    python3 - <<'PY'
+    import json
+    import os
+    task = json.load(open(os.environ["CVELAB_TASK"]))
+    # Replace this with a real agent. The benchmark runner expects flags by target node.
+    result = {"success": False, "verified_flags": {}, "task": task["scenario_name"]}
+    json.dump(result, open(os.environ["CVELAB_OUTPUT"], "w"))
+    PY
+  workdir: /workspace
+  env: {}
+  timeout_seconds: 1800
+  output_contract:
+    type: flags_json
+    path: /tmp/cvelab_agent_output.json

@@ -15,7 +15,7 @@ from typing import Optional
 
 import yaml
 
-from clab_builder.shared.models.atom import AtomConfig, PivotCapability
+from clab_builder.shared.models.atom import AtomConfig
 from clab_builder.shared.models.template import TopologyTemplate, InjectionPoint
 from clab_builder.orchestrator.composer.template_loader import TemplateLoader
 
@@ -52,16 +52,6 @@ def _next_eth(iface_map: dict[str, str]) -> str:
     return f"eth{max(used, default=0) + 1}"
 
 
-def _needs_runtime_pivot_host(atom: AtomConfig, is_intermediate: bool) -> bool:
-    """Return whether the scenario node needs a toolbox host wrapper."""
-    if atom.post_exploit.requires_pivot_host:
-        return True
-    return (
-        is_intermediate
-        and atom.post_exploit.pivot_capability == PivotCapability.NONE
-    )
-
-
 class ScenarioAssembler:
     """将 topology template + CVE atoms 组装为完整可部署场景"""
 
@@ -74,6 +64,7 @@ class ScenarioAssembler:
         atoms: list[AtomConfig],
         scenario_name: Optional[str] = None,
         atoms_dir: str = "data/atoms",
+        toolbox_dir: str = "assets/toolbox",
     ) -> dict:
         """组装完整场景
 
@@ -109,10 +100,7 @@ class ScenarioAssembler:
         for i, (ip, atom) in enumerate(zip(template.injection_points, atoms)):
             flag = _generate_flag()
             node_name = f"target-{i+1}"
-            service_node_name = node_name
             flag_file_name = f"flag-{node_name}.txt"
-            is_intermediate = i < min(len(template.injection_points), len(atoms)) - 1
-            requires_pivot_host = _needs_runtime_pivot_host(atom, is_intermediate)
 
             # CVE 容器节点
             node_def = {
@@ -121,26 +109,16 @@ class ScenarioAssembler:
             }
             node_def["env"] = {atom.flag_injection.env_var_name: flag}
 
-            # CLab binds: init files (absolute path) + FLAG file
+            # CLab binds: init files (absolute path) + FLAG file + static toolbox
             binds = []
             atoms_path = Path(atoms_dir).resolve()
             for init_file in atom.service_startup.init_files:
                 abs_path = atoms_path / atom.cve_id / "init" / init_file.filename
                 binds.append(f"{abs_path}:{init_file.container_path}")
             binds.append(f"{flag_file_name}:/flag.txt")
+            binds.append(f"{Path(toolbox_dir).resolve()}:/opt/toolbox:ro")
             node_def["binds"] = binds
-
-            if requires_pivot_host:
-                service_node_name = f"{node_name}-service"
-                clab["topology"]["nodes"][node_name] = {
-                    "kind": "linux",
-                    "image": atom.post_exploit.pivot_host_image,
-                    "cmd": "sleep infinity",
-                }
-                node_def["network-mode"] = f"container:clab-{scenario_name}-{node_name}"
-                clab["topology"]["nodes"][service_node_name] = node_def
-            else:
-                clab["topology"]["nodes"][node_name] = node_def
+            clab["topology"]["nodes"][node_name] = node_def
 
             # 找到该 zone 对应的 router
             zone_router = template.zones[ip.zone].router
@@ -157,7 +135,7 @@ class ScenarioAssembler:
 
             # CVE setup: wait for service
             cve_setup_tasks.append({
-                "name": f"Wait for {atom.cve_id} on {service_node_name}",
+                "name": f"Wait for {atom.cve_id} on {node_name}",
                 "hosts": "localhost",
                 "gather_facts": False,
                 "tasks": [
@@ -177,8 +155,6 @@ class ScenarioAssembler:
                 "node_name": node_name,
                 "zone": ip.zone,
                 "flag_file": flag_file_name,
-                "service_node": service_node_name,
-                "requires_pivot_host": requires_pivot_host,
             })
             flag_files.append((node_name, flag, flag_file_name))
             used_cves.append(atom.cve_id)
@@ -207,8 +183,6 @@ class ScenarioAssembler:
                 "flag": inj["flag"],
                 "flag_hint": "file:/flag.txt",
                 "target_ip": node_ip.get("eth1", "").split("/")[0],
-                "service_node": inj.get("service_node", inj["node_name"]),
-                "requires_pivot_host": inj.get("requires_pivot_host", False),
             })
 
         return {

@@ -18,7 +18,7 @@ RUN apt-get update && \
     ca-certificates curl wget git unzip \
     python3 python3-pip python3-dev \
     nmap netcat-openbsd smbclient sshpass \
-    sqlmap nikto hydra john \
+    sqlmap nikto hydra john gobuster ffuf feroxbuster dirsearch dirb \
     openssh-client \
     impacket-scripts \
     net-tools dnsutils tcpdump iputils-ping iproute2 \

@@ -16,6 +16,7 @@ if [ $? -eq 0 ]; then
     echo "Included tools:"
     echo "  - Claude Agent SDK (claude-agent-sdk>=0.2.87)"
     echo "  - nmap, netcat, curl, wget, sqlmap, nikto, hydra"
+    echo "  - gobuster, ffuf, feroxbuster, dirsearch, dirb"
     echo "  - Python 3 + claude-agent-sdk"
     echo "  - jq, vim"
     echo ""

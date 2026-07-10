@@ -39,6 +39,8 @@ class InjectionPoint(BaseModel):
     """漏洞注入点"""
     id: str
     zone: str
+    position: str = ""  # entry | intermediate | final; empty means infer from order
+    require_toolbox_compatible: bool = False
     role_description: str = ""
     required_mitre: List[str]
     required_vuln_category: List[str]

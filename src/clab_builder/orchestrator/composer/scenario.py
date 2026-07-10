@@ -5,7 +5,7 @@ from pathlib import Path
 
 from clab_builder.orchestrator.composer.template_loader import TemplateLoader
 from clab_builder.orchestrator.composer.atom_loader import AtomLoader
-from clab_builder.orchestrator.composer.cve_matcher import match as cve_match, pick_random
+from clab_builder.orchestrator.composer.cve_matcher import match as cve_match, pick_orchestrated
 from clab_builder.orchestrator.composer.scenario_assembler import ScenarioAssembler
 from clab_builder.orchestrator.composer.sysfield_exporter import SysFieldExporter
 
@@ -58,7 +58,8 @@ class ScenarioPipeline:
         selected_atoms = []
         used_cves = []
 
-        for ip in template.injection_points:
+        total_injections = len(template.injection_points)
+        for index, ip in enumerate(template.injection_points):
             if cve_ids and len(cve_ids) > len(selected_atoms):
                 # User specified CVEs — load directly
                 cve_id = cve_ids[len(selected_atoms)]
@@ -76,7 +77,13 @@ class ScenarioPipeline:
                         f"(required: mitre={ip.required_mitre}, "
                         f"vuln_category={ip.required_vuln_category})"
                     )
-                picked = pick_random(matched, count=1)
+                picked = pick_orchestrated(
+                    matched,
+                    injection_point=ip,
+                    index=index,
+                    total=total_injections,
+                    count=1,
+                )
                 selected_atoms.append(picked[0])
                 used_cves.append(picked[0].cve_id)
 

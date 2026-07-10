@@ -48,6 +48,14 @@ from claude_agent_sdk import (
 )
 
 DEFAULT_MAX_TURNS = 80
+DISALLOWED_TOOLS = [
+    "WebSearch",
+    "WebFetch",
+    "Task",
+    "TaskCreate",
+    "TaskUpdate",
+    "TaskOutput",
+]
 
 SYSTEM_PROMPT = """You are a software testing agent working in a local Docker lab environment on localhost.
 
@@ -372,7 +380,7 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
         permission_mode="bypassPermissions",  # 容器内自动批准所有工具调用
         cwd="/workspace",
         model=model,
-        disallowed_tools=["WebSearch", "WebFetch"],
+        disallowed_tools=DISALLOWED_TOOLS,
     )
 
     result = {

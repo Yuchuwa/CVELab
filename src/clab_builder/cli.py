@@ -391,6 +391,76 @@ def sysfield_export(scenario_dir, output, atoms_dir, actor_node):
     click.echo(f"SysField playbook: {out}")
 
 
+# ── Benchmark ────────────────────────────────────────────────────────────
+
+@main.group()
+def benchmark():
+    """Run attacker-agent benchmarks against generated scenarios."""
+    pass
+
+
+@benchmark.command("run")
+@click.option("--scenario", "scenario_dir", required=True, help="Generated scenario directory")
+@click.option("--agent-spec", required=True, help="Agent spec YAML")
+@click.option("--runs-dir", default="runs", help="Benchmark artifact output directory")
+@click.option("--atoms-dir", default="data/atoms", help="Atoms directory for runtime checks")
+@click.option("--skip-deploy", is_flag=True, help="Use an already deployed scenario")
+@click.option("--keep-running", is_flag=True, help="Do not destroy the lab after the run")
+@click.option("--skip-runtime-validation", is_flag=True, help="Skip pre-agent runtime checks")
+def benchmark_run(scenario_dir, agent_spec, runs_dir, atoms_dir, skip_deploy,
+                  keep_running, skip_runtime_validation):
+    """Deploy a scenario, run an agent in attacker, score captured flags."""
+    from clab_builder.orchestrator.benchmark import AgentSpec, BenchmarkRunner
+
+    spec = AgentSpec.load(agent_spec)
+    runner = BenchmarkRunner(
+        scenario_dir=scenario_dir,
+        agent_spec=spec,
+        runs_dir=runs_dir,
+        atoms_dir=atoms_dir,
+        skip_deploy=skip_deploy,
+        keep_running=keep_running,
+        skip_runtime_validation=skip_runtime_validation,
+    )
+    try:
+        result = runner.run()
+    except Exception as e:
+        click.echo(f"Error: {e}")
+        raise SystemExit(1)
+
+    score = result.get("score", {})
+    click.echo(f"Run: {result['run_dir']}")
+    click.echo(f"Agent: {result['agent']}")
+    click.echo(f"Scenario: {result['scenario']}")
+    if score:
+        click.echo(
+            f"Score: {score.get('captured', 0)}/{score.get('total', 0)} "
+            f"({score.get('score', 0.0):.2f})"
+        )
+    if not result.get("success"):
+        click.echo(f"Status: FAIL {result.get('error', '')}".rstrip())
+        raise SystemExit(1)
+    click.echo("Status: PASS")
+
+
+@benchmark.command("validate")
+@click.argument("scenario_dir")
+@click.option("--atoms-dir", default="data/atoms", help="Atoms directory for service port checks")
+def benchmark_validate(scenario_dir, atoms_dir):
+    """Validate a deployed scenario before running benchmark agents."""
+    from clab_builder.orchestrator.benchmark.runtime_validator import RuntimeValidator
+
+    result = RuntimeValidator(scenario_dir, atoms_dir=atoms_dir).validate()
+    click.echo(f"Scenario: {result['scenario']}")
+    click.echo(f"Status: {'PASS' if result['success'] else 'FAIL'}")
+    for check in result["checks"]:
+        status = "OK" if check["success"] else "FAIL"
+        required = "required" if check.get("required", True) else "optional"
+        click.echo(f"  {status} [{required}] {check['name']}")
+    if not result["success"]:
+        raise SystemExit(1)
+
+
 def _resolve_vulhub_path(path: str) -> str | None:
     if os.path.isdir(path):
         return path
