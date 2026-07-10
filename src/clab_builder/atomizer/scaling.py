@@ -237,7 +237,17 @@ def write_jsonl(path: str | Path, records: Iterable[AtomScaleRecord | dict[str, 
 
 def _succeeded_records(records: Iterable[AtomScaleRecord]) -> list[AtomScaleRecord]:
     """Filter records down to verified atoms for the clean dataset export."""
-    return [record for record in records if record.status == "succeeded"]
+    return [
+        record
+        for record in records
+        if record.status == "succeeded" and _has_atom_yaml(record)
+    ]
+
+
+def _has_atom_yaml(record: AtomScaleRecord) -> bool:
+    if not record.atom_path:
+        return False
+    return (Path(record.atom_path) / "atom.yaml").exists()
 
 
 def export_hf_dataset(path: str | Path, records: Iterable[AtomScaleRecord]) -> str:

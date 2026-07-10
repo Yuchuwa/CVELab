@@ -5,6 +5,7 @@ import yaml
 
 from clab_builder.atomizer.output.vulhub_converter import VulhubParser
 from clab_builder.atomizer.scaling import (
+    AtomScaleRecord,
     AtomScaleRunner,
     dedupe_candidates,
     discover_raw_record_candidates,
@@ -19,6 +20,27 @@ def write_compose(path: Path, image: str = "vulhub/test:latest"):
         yaml.dump({"services": {"web": {"image": image, "ports": ["8080:80"]}}})
     )
     (path / "README.md").write_text("# Test CVE\n")
+
+
+def write_atom_yaml(atoms_dir: Path, cve_id: str, verified: bool = True) -> Path:
+    atom_dir = atoms_dir / cve_id
+    atom_dir.mkdir(parents=True, exist_ok=True)
+    (atom_dir / "atom.yaml").write_text(yaml.dump({
+        "cve_id": cve_id,
+        "docker_image": "vulhub/test:latest",
+        "ports": [80],
+        "verified": verified,
+        "vuln_category": "RCE",
+        "attack_method": "single_request",
+        "requirements": {"authentication": "none"},
+        "network_requirements": {
+            "needs_callback": False,
+            "needs_tool_download": False,
+        },
+        "flag_value": "flag{ok}" if verified else "",
+        "flag_verify_command": "cat /flag",
+    }))
+    return atom_dir
 
 
 def test_discover_vulhub_candidates_keeps_only_explicit_cves(tmp_path):
@@ -146,14 +168,15 @@ def test_discover_preserves_historical_rows_not_in_current_sources(tmp_path):
         generated_sources_dir=str(tmp_path / "generated"),
     )
     runner.state_dir.mkdir(parents=True)
+    atom_dir = write_atom_yaml(tmp_path / "atoms", "CVE-2024-3002")
     historical = {
         "cve_id": "CVE-2024-3002",
         "source_type": "raw_records",
         "source_path": "data/generated/raw_records/CVE-2024-3002",
         "status": "succeeded",
-        "atom_path": "data/atoms/CVE-2024-3002",
+        "atom_path": str(atom_dir),
         "error": "",
-        "session_path": "data/atoms/CVE-2024-3002/session.json",
+        "session_path": str(atom_dir / "session.json"),
         "has_session": True,
         "duplicate_of": "",
         "raw_record_id": "CVE-2024-3002",
@@ -195,6 +218,7 @@ def test_discover_recovers_succeeded_status_from_dataset(tmp_path):
         generated_sources_dir=str(tmp_path / "generated"),
     )
     runner.state_dir.mkdir(parents=True)
+    atom_dir = write_atom_yaml(tmp_path / "atoms", "CVE-2024-3003")
     stale = {
         "cve_id": "CVE-2024-3003",
         "source_type": "vulhub",
@@ -204,8 +228,8 @@ def test_discover_recovers_succeeded_status_from_dataset(tmp_path):
     succeeded = dict(stale)
     succeeded.update({
         "status": "succeeded",
-        "atom_path": "data/atoms/CVE-2024-3003",
-        "session_path": "data/atoms/CVE-2024-3003/session.json",
+        "atom_path": str(atom_dir),
+        "session_path": str(atom_dir / "session.json"),
         "has_session": True,
     })
     runner.manifest_path.write_text(json.dumps(stale) + "\n")
@@ -230,6 +254,7 @@ def test_run_recovers_succeeded_status_from_dataset_without_discover(tmp_path, m
         generated_sources_dir=str(tmp_path / "generated"),
     )
     runner.state_dir.mkdir(parents=True)
+    atom_dir = write_atom_yaml(tmp_path / "atoms", "CVE-2024-3004")
     stale = {
         "cve_id": "CVE-2024-3004",
         "source_type": "vulhub",
@@ -238,6 +263,7 @@ def test_run_recovers_succeeded_status_from_dataset_without_discover(tmp_path, m
     }
     succeeded = dict(stale)
     succeeded["status"] = "succeeded"
+    succeeded["atom_path"] = str(atom_dir)
     runner.manifest_path.write_text(json.dumps(stale) + "\n")
     runner.dataset_jsonl_path.write_text(json.dumps(succeeded) + "\n")
 
@@ -321,6 +347,25 @@ def test_chain_contract_backfill_for_legacy_atom_yaml():
     assert set(contract["roles"]) == {"entry", "relay", "terminal"}
 
 
+def test_dataset_excludes_succeeded_rows_without_atom_yaml(tmp_path):
+    runner = AtomScaleRunner(
+        vulhub_dir="",
+        output_dir=str(tmp_path / "atoms"),
+        state_dir=str(tmp_path / "state"),
+    )
+    record = AtomScaleRecord(
+        cve_id="CVE-2024-3999",
+        source_type="vulhub",
+        source_path="missing",
+        status="succeeded",
+        atom_path=str(tmp_path / "atoms" / "CVE-2024-3999"),
+    )
+
+    runner.write_outputs([record], export_parquet=False)
+
+    assert runner.dataset_jsonl_path.read_text() == ""
+
+
 def test_runner_run_parallel_dispatches_all_and_persists(tmp_path, monkeypatch):
     """Parallel run() must execute every runnable record exactly once and persist results."""
     import threading
@@ -349,7 +394,7 @@ def test_runner_run_parallel_dispatches_all_and_persists(tmp_path, monkeypatch):
             assert record.key not in seen, f"{record.key} ran twice"
             seen.add(record.key)
         record.status = "succeeded"
-        record.atom_path = str(tmp_path / "atoms" / record.cve_id)
+        record.atom_path = str(write_atom_yaml(tmp_path / "atoms", record.cve_id))
         record.updated_at = "2026-06-21T00:00:00"
         return record
 
@@ -393,7 +438,10 @@ def test_manifest_keeps_all_states_dataset_only_succeeded(tmp_path, monkeypatch)
         record.status = desired[record.cve_id]
         if record.status == "failed":
             record.error = "agent failed"
-        record.atom_path = str(tmp_path / "atoms" / record.cve_id)
+        if record.status == "succeeded":
+            record.atom_path = str(write_atom_yaml(tmp_path / "atoms", record.cve_id))
+        else:
+            record.atom_path = str(tmp_path / "atoms" / record.cve_id)
         record.updated_at = "2026-06-21T00:00:00"
         return record
 
@@ -499,7 +547,7 @@ def test_run_with_backpressure(monkeypatch, tmp_path):
 
     def fake_run_one(record, **kwargs):
         record.status = "succeeded"
-        record.atom_path = str(tmp_path / "atoms" / record.cve_id)
+        record.atom_path = str(write_atom_yaml(tmp_path / "atoms", record.cve_id))
         return record
 
     monkeypatch.setattr(runner, "_run_one", fake_run_one)
@@ -538,7 +586,7 @@ def test_parallel_persists_after_each_completion(monkeypatch, tmp_path):
     def fake_run_one(record, **kwargs):
         _time.sleep(0.02)  # let workers overlap
         record.status = "succeeded"
-        record.atom_path = str(tmp_path / "atoms" / record.cve_id)
+        record.atom_path = str(write_atom_yaml(tmp_path / "atoms", record.cve_id))
         return record
 
     monkeypatch.setattr(runner, "_run_one", fake_run_one)
