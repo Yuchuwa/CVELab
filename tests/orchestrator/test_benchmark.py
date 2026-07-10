@@ -65,6 +65,7 @@ def test_agent_spec_loads_env_from_host():
     spec = AgentSpec.load("examples/agents/claude-sdk-agent.yaml")
     assert spec.name == "claude-sdk-agent"
     assert spec.task_view == "entry_ip"
+    assert "ANTHROPIC_AUTH_TOKEN" in spec.env_from_host
     assert "ANTHROPIC_API_KEY" in spec.env_from_host
     assert spec.files[0].target == "/workspace/claude-sdk-benchmark-agent.py"
 
@@ -193,6 +194,7 @@ def test_agent_env_passes_host_values(tmp_path, monkeypatch):
     assert env["STATIC"] == "1"
     assert env["ANTHROPIC_API_KEY"] == "test-key"
     assert "MISSING_ENV" not in env
+    assert "CVELAB_SCENARIO" not in env
 
 
 def test_agent_env_maps_llm_env_to_anthropic(tmp_path, monkeypatch):
@@ -209,11 +211,41 @@ def test_agent_env_maps_llm_env_to_anthropic(tmp_path, monkeypatch):
         skip_deploy=True,
         skip_runtime_validation=True,
     )
+    runner._claude_settings_env = lambda: {}
 
     env = runner._agent_env()
     assert env["ANTHROPIC_API_KEY"] == "llm-key"
     assert env["ANTHROPIC_BASE_URL"] == "https://llm.example"
     assert env["MODEL"] == "test-model"
+
+
+def test_agent_env_prefers_claude_settings_auth_token(tmp_path, monkeypatch):
+    scenario_dir = tmp_path / "scenario"
+    _write_scenario(scenario_dir)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    monkeypatch.setenv("LLM_API_KEY", "openai-style-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://openai-compatible.example")
+    runner = BenchmarkRunner(
+        scenario_dir=str(scenario_dir),
+        agent_spec=AgentSpec(name="fake", command="true"),
+        runs_dir=str(tmp_path / "runs"),
+        skip_deploy=True,
+        skip_runtime_validation=True,
+    )
+    runner._claude_settings_env = lambda: {
+        "ANTHROPIC_AUTH_TOKEN": "claude-token",
+        "ANTHROPIC_BASE_URL": "https://anthropic-compatible.example",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-model",
+    }
+
+    env = runner._agent_env()
+
+    assert env["ANTHROPIC_AUTH_TOKEN"] == "claude-token"
+    assert env["ANTHROPIC_BASE_URL"] == "https://anthropic-compatible.example"
+    assert env["MODEL"] == "claude-model"
+    assert "ANTHROPIC_API_KEY" not in env
 
 
 def test_claude_sdk_agent_extract_json():
@@ -283,4 +315,3 @@ def test_runner_collects_partial_claude_artifacts(tmp_path):
     assert "/tmp/cvelab_agent_session.json" in copied_sources
     assert "/workspace/.claude/projects" in copied_sources
     assert "/tmp/claude-1000" in copied_sources
-

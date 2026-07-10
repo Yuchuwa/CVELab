@@ -7,8 +7,10 @@ agent:
     - source: examples/agents/claude-sdk-benchmark-agent.py
       target: /workspace/claude-sdk-benchmark-agent.py
   env_from_host:
+    - ANTHROPIC_AUTH_TOKEN
     - ANTHROPIC_API_KEY
     - ANTHROPIC_BASE_URL
+    - ANTHROPIC_DEFAULT_SONNET_MODEL
     - LLM_API_KEY
     - LLM_BASE_URL
     - MODEL

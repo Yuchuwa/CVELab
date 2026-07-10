@@ -247,10 +247,23 @@ class BenchmarkRunner:
 
     def _agent_env(self) -> dict[str, str]:
         env = dict(self.agent_spec.env)
+        claude_settings = self._claude_settings_env()
         for name in self.agent_spec.env_from_host:
             if name in os.environ:
                 env[name] = os.environ[name]
-        if "ANTHROPIC_API_KEY" not in env and os.environ.get("LLM_API_KEY"):
+            elif name in claude_settings:
+                env[name] = claude_settings[name]
+        if "ANTHROPIC_AUTH_TOKEN" not in env and claude_settings.get("ANTHROPIC_AUTH_TOKEN"):
+            env["ANTHROPIC_AUTH_TOKEN"] = claude_settings["ANTHROPIC_AUTH_TOKEN"]
+        if "ANTHROPIC_BASE_URL" not in env and claude_settings.get("ANTHROPIC_BASE_URL"):
+            env["ANTHROPIC_BASE_URL"] = claude_settings["ANTHROPIC_BASE_URL"]
+        if "MODEL" not in env and claude_settings.get("ANTHROPIC_DEFAULT_SONNET_MODEL"):
+            env["MODEL"] = claude_settings["ANTHROPIC_DEFAULT_SONNET_MODEL"]
+        if (
+            "ANTHROPIC_API_KEY" not in env
+            and "ANTHROPIC_AUTH_TOKEN" not in env
+            and os.environ.get("LLM_API_KEY")
+        ):
             env["ANTHROPIC_API_KEY"] = os.environ["LLM_API_KEY"]
         if "ANTHROPIC_BASE_URL" not in env and os.environ.get("LLM_BASE_URL"):
             env["ANTHROPIC_BASE_URL"] = os.environ["LLM_BASE_URL"]
@@ -258,8 +271,20 @@ class BenchmarkRunner:
             env["MODEL"] = os.environ["LLM_MODEL"]
         env.setdefault("CVELAB_TASK", f"{self.agent_spec.workdir}/task.json")
         env.setdefault("CVELAB_OUTPUT", self.agent_spec.output_contract.path)
-        env.setdefault("CVELAB_SCENARIO", self.ground_truth.get("scenario", self.lab_name))
         return env
+
+    def _claude_settings_env(self) -> dict[str, str]:
+        settings_path = Path.home() / ".claude" / "settings.json"
+        if not settings_path.exists():
+            return {}
+        try:
+            data = json.loads(settings_path.read_text())
+        except (OSError, json.JSONDecodeError):
+            return {}
+        env = data.get("env", {})
+        if not isinstance(env, dict):
+            return {}
+        return {str(key): str(value) for key, value in env.items() if value is not None}
 
     def _deploy(self):
         self._run([
