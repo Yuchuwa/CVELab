@@ -915,6 +915,12 @@ def test_atom_metadata_normalizes_agent_enum_aliases(tmp_path, monkeypatch):
 
     p = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
     monkeypatch.setattr(p, "_flag", "", raising=False)
+    # v3 要求 native + orchestrated 双验证；单元测试里 mock orchestrated 为成功
+    monkeypatch.setattr(
+        p, "_run_orchestrated_verification",
+        lambda atom_dir, flag_value: {"success": True, "mode": "orchestrated",
+                                      "evidence": ["mocked"], "timestamp": "mock"},
+    )
     atom_dir = tmp_path / "atoms" / "CVE-2024-0005"
     atom_dir.mkdir(parents=True)
 

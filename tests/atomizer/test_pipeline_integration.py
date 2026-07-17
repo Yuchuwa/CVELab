@@ -291,6 +291,83 @@ def test_container_port_from_compose_spec_accepts_protocol_suffixes():
 
 
 @pytest.mark.unit
+def test_build_capability_contract_from_agent_v4_fields():
+    """agent 输出完整 v4 字段时，直接采用，evidence_level=verified。"""
+    from clab_builder.atomizer.pipeline import AtomizerPipeline
+    from clab_builder.shared.models.atom import CapabilityType, EvidenceLevel
+
+    ea, cg = AtomizerPipeline._build_capability_contract(
+        {
+            "exploit_principal": "root",
+            "exploit_access": {
+                "attack_vector": "network",
+                "privileges_required": "none",
+                "required_service": {"protocol": "ssh", "port": 22},
+            },
+            "capability_grants": ["execute_command", "read_file", "write_file", "network_vantage"],
+        },
+        verified=True,
+        main_ports=[22],
+    )
+    assert ea.required_service["port"] == 22
+    assert ea.required_service["protocol"] == "ssh"
+    assert [g.type for g in cg] == [
+        CapabilityType.EXECUTE_COMMAND, CapabilityType.READ_FILE,
+        CapabilityType.WRITE_FILE, CapabilityType.NETWORK_VANTAGE,
+    ]
+    assert all(g.principal == "root" for g in cg)
+    assert all(g.evidence_level == EvidenceLevel.VERIFIED for g in cg)
+
+
+@pytest.mark.unit
+def test_build_capability_contract_agent_flat_service_fields():
+    """agent 用 required_service_protocol/_port flat 字段时也能解析。"""
+    from clab_builder.atomizer.pipeline import AtomizerPipeline
+
+    ea, cg = AtomizerPipeline._build_capability_contract(
+        {
+            "exploit_access": {
+                "attack_vector": "network",
+                "required_service_protocol": "http",
+                "required_service_port": 80,
+            },
+        },
+        verified=False,
+        main_ports=[80],
+    )
+    assert ea.required_service["protocol"] == "http"
+    assert ea.required_service["port"] == 80
+    # 无 capability_grants 且无 pivot -> 空 list
+    assert cg == []
+
+
+@pytest.mark.unit
+def test_build_capability_contract_falls_back_to_port_inference():
+    """agent 无 exploit_access 时，从 main_ports 推断 protocol/port。"""
+    from clab_builder.atomizer.pipeline import AtomizerPipeline
+
+    ea, _ = AtomizerPipeline._build_capability_contract({}, verified=False, main_ports=[5432])
+    assert ea.required_service["protocol"] == "postgres"
+    assert ea.required_service["port"] == 5432
+
+
+@pytest.mark.unit
+def test_build_capability_contract_pivot_capability_compat():
+    """老 atom 无 capability_grants 时，从 pivot_capability 兼容映射。"""
+    from clab_builder.atomizer.pipeline import AtomizerPipeline
+    from clab_builder.shared.models.atom import CapabilityType
+
+    _, cg = AtomizerPipeline._build_capability_contract(
+        {"post_exploit": {"pivot_capability": "shell"}, "exploit_principal": "service_user"},
+        verified=True,
+        main_ports=[80],
+    )
+    assert {g.type for g in cg} == {CapabilityType.EXECUTE_COMMAND, CapabilityType.NETWORK_VANTAGE}
+    assert all(g.evidence_ref == "verification.native_verification.evidence" for g in cg)
+    assert all(g.principal == "service_user" for g in cg)
+
+
+@pytest.mark.unit
 def test_run_agent_recreates_workspace_before_start(tmp_path, monkeypatch):
     """An interrupted run's output/session/cache must not leak into a retry."""
     from clab_builder.atomizer.agent.researcher import AgentOutput

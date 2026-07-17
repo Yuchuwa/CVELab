@@ -5,8 +5,10 @@
 
 from enum import Enum
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pathlib import Path
+
+from clab_builder.shared.models.exploit_guide import ExploitGuideRef
 
 
 # ── 枚举类型 ──────────────────────────────────────────
@@ -94,6 +96,176 @@ class PivotCapability(str, Enum):
     PORT_FORWARD = "port_forward"
     SHELL = "shell"
     FULL_TOOLBOX = "full_toolbox"
+
+
+class CapabilityType(str, Enum):
+    EXECUTE_COMMAND = "execute_command"
+    READ_FILE = "read_file"
+    NETWORK_VANTAGE = "network_vantage"
+    READ_CREDENTIAL = "read_credential"
+    AUTHENTICATE = "authenticate"
+    WRITE_FILE = "write_file"
+
+
+class EvidenceLevel(str, Enum):
+    VERIFIED = "verified"
+    INFERRED = "inferred"
+    DECLARED = "declared"
+
+
+class ExploitAccess(BaseModel):
+    attack_vector: str = "network"
+    privileges_required: str = "none"
+    required_service: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CapabilityGrant(BaseModel):
+    type: CapabilityType
+    principal: str = "service_user"
+    evidence_level: EvidenceLevel = EvidenceLevel.INFERRED
+    evidence_ref: str = ""
+
+
+class CapabilityExecutor(BaseModel):
+    """Legacy command-channel metadata retained for compatibility.
+
+    Guided Range consumes the descriptive ``exploit_guide`` command channel.  It
+    does not mechanically substitute ``command_template`` into a downstream
+    command.  Existing SysField/exporter consumers may continue to read this
+    field during the migration period.
+    """
+    mode: str = "stateless"  # stateless | session
+    command_template: str = ""  # 必须含 {{command}} 或 {{command_b64}}
+    shell: str = "/bin/sh"
+    verified: bool = False  # 是否真实验证过可执行任意命令
+    # webshell 类通道需要先利用漏洞写入 webshell，再通过 HTTP 反复调用。
+    # established_by 标注建立通道的 playbook step id（需先完成这些步骤）。
+    established_by: List[str] = Field(default_factory=list)
+
+
+class RuntimeBuildSpec(BaseModel):
+    """Describes the derived runtime image build (batch 11).
+
+    The runtime layer adds base tools on top of the original image WITHOUT
+    modifying source_bundle. This record makes the build reproducible and
+    traceable. Range materializes runtime_image (or falls back to
+    docker_image) per docs/ATOM_RUNTIME_TO_RANGE_HANDOFF.md.
+    """
+    context: str = "runtime"
+    dockerfile: str = "runtime/Dockerfile"
+    install_script: str = "runtime/install-tools.sh"
+    base_image_digest: str = ""
+    generated_hash: str = ""
+    # For custom-Dockerfile atoms: the intermediate image the runtime
+    # Dockerfile FROMs (built from source_dockerfile), and the source
+    # Dockerfile path. Empty for image-only atoms. Lets a future Range
+    # rebuild reproduce the full two-stage build.
+    intermediate_image: str = ""
+    source_dockerfile: str = ""
+
+
+class RuntimeStatus(str, Enum):
+    NOT_REQUESTED = "not_requested"
+    PENDING = "pending"
+    READY = "ready"
+    UNSUPPORTED = "unsupported"
+    FAILED = "failed"
+
+
+class RuntimeSpec(BaseModel):
+    ports: List[int] = Field(default_factory=list)
+    services: List[Any] = Field(default_factory=list)
+    command: Optional[str] = None
+    entrypoint: Optional[str] = None
+    environment: Dict[str, str] = Field(default_factory=dict)
+    # Original image; alias of docker_image. Empty on legacy atoms.
+    source_image: Optional[str] = None
+    # Derived image with base tools installed. Empty -> Range falls back to
+    # docker_image / source_image.
+    runtime_image: Optional[str] = None
+    tool_profile: Optional[str] = None
+    tool_profile_version: Optional[str] = None
+    runtime_build: Optional[RuntimeBuildSpec] = None
+    runtime_status: RuntimeStatus = RuntimeStatus.NOT_REQUESTED
+    runtime_failure_reason: str = ""
+    # Original container user to restore after installing tools as root.
+    # Empty/None = leave the base image default (which the FROM already
+    # restored unless we override with USER root).
+    user: Optional[str] = None
+
+
+class FlagSpec(BaseModel):
+    primary_path: str = "/flag.txt"
+    injection: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ProbeType(str, Enum):
+    CONTAINER_STATE = "container_state"
+    TCP = "tcp"
+    HTTP = "http"
+
+
+class ReadinessProbe(BaseModel):
+    probe_type: ProbeType = ProbeType.CONTAINER_STATE
+    target: str = ""
+    command: Optional[str] = None
+
+
+class ValidationSpec(BaseModel):
+    readiness: List[ReadinessProbe] = Field(
+        default_factory=lambda: [ReadinessProbe()]
+    )
+    native: Dict[str, Any] = Field(default_factory=dict)
+    orchestrated: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MaterialRole(str, Enum):
+    """Role of a source-bundle file for downstream Range/agent consumption.
+
+    - runtime:         compose/dockerfile/entrypoint — rebuild the target, never agent-visible
+    - verification:    test_func.py, test logs — native/poc verifier evidence, never agent-visible
+    - exploit_reference: test_vuln.py — a working exploit reference; agent-visible only under
+                       an assisted exposure profile
+    - exploit_material: payload/key/image the guide declares as required — agent-visible
+    - solution:        solution.sh — full writeup, private by default
+    """
+
+    RUNTIME = "runtime"
+    VERIFICATION = "verification"
+    EXPLOIT_REFERENCE = "exploit_reference"
+    EXPLOIT_MATERIAL = "exploit_material"
+    SOLUTION = "solution"
+
+
+class MaterialVisibility(str, Enum):
+    """Default exposure of a material across agent exposure profiles.
+
+    - assisted: visible only under the poc_assisted profile (test_vuln.py style)
+    - always:   visible under every profile (guide-declared exploit material)
+    - private:  never visible to the agent (runtime/verification/solution)
+    """
+
+    ASSISTED = "assisted"
+    ALWAYS = "always"
+    PRIVATE = "private"
+
+
+class MaterialMetadata(BaseModel):
+    role: MaterialRole = MaterialRole.EXPLOIT_REFERENCE
+    visibility: MaterialVisibility = MaterialVisibility.ASSISTED
+
+
+class SourceBundle(BaseModel):
+    compose_file: Optional[str] = None
+    readme_file: Optional[str] = None
+    dockerfiles: List[str] = Field(default_factory=list)
+    init_files: List[str] = Field(default_factory=list)
+    poc_materials: List[str] = Field(default_factory=list)
+    hashes: Dict[str, str] = Field(default_factory=dict)
+    # Per-file role/visibility. Backward compatible: atoms without this field
+    # keep the legacy semantics where every poc_material is treated as an
+    # always-visible exploit material.
+    material_metadata: Dict[str, MaterialMetadata] = Field(default_factory=dict)
 
 
 # ── 子模型 ──────────────────────────────────────────
@@ -188,6 +360,8 @@ class AtomConfig(BaseModel):
     category: str
     description: str = ""
     version: int = Field(default=2, description="schema 版本")
+    runtime_spec: Optional[RuntimeSpec] = None
+    source_bundle: Optional[SourceBundle] = None
 
     # 容器配置
     docker_image: str
@@ -217,6 +391,14 @@ class AtomConfig(BaseModel):
     flag_injection: FlagInjection = Field(default_factory=FlagInjection)
     flag_verify_command: str = ""
     flag_value: Optional[str] = None  # ground-truth flag injected at atomization time
+    flag_spec: Optional[FlagSpec] = None
+
+    exploit_access: ExploitAccess = Field(default_factory=ExploitAccess)
+    capability_grants: List[CapabilityGrant] = Field(default_factory=list)
+    capability_executors: Dict[str, CapabilityExecutor] = Field(default_factory=dict)
+    exploit_guide: Optional[ExploitGuideRef] = None
+    verification: Dict[str, Any] = Field(default_factory=dict)
+    validation_spec: Optional[ValidationSpec] = None
 
     # 服务启动
     service_startup: ServiceStartup = Field(default_factory=ServiceStartup)
@@ -234,3 +416,50 @@ class AtomConfig(BaseModel):
     llm_check: Dict[str, Any] = Field(default_factory=dict)
     timestamp: str = ""
     source: str = ""
+
+    @model_validator(mode="after")
+    def _normalize_contract(self):
+        if self.runtime_spec is None:
+            self.runtime_spec = RuntimeSpec(ports=list(self.ports), services=list(self.services))
+        if self.flag_spec is None:
+            path = self.flag_injection.file_path or "/flag.txt"
+            self.flag_spec = FlagSpec(primary_path=path, injection=self.flag_injection.model_dump(mode="json"))
+        if self.validation_spec is None:
+            self.validation_spec = ValidationSpec()
+        if self.version >= 3 and self.verified:
+            native = self.verification.get("native_verification", {})
+            # verified reflects the native agent result (exploit reproduced +
+            # flag matched). Orchestrated environment rebuild is a separate
+            # environment-correctness check tracked via environment_ready;
+            # its failure no longer downgrades verified, so a successful
+            # native exploit is not erased by a transient compose-rebuild
+            # issue. Template-anchor eligibility is decided separately.
+            if native.get("success") is not True:
+                self.verified = False
+        return self
+
+    @property
+    def is_legacy(self) -> bool:
+        return self.version < 3
+
+    @property
+    def verified_capability_types(self) -> set[CapabilityType]:
+        if self.capability_grants:
+            return {
+                grant.type for grant in self.capability_grants
+                if grant.evidence_level == EvidenceLevel.VERIFIED
+            }
+        mapping = {
+            PivotCapability.NONE: set(),
+            PivotCapability.CREDENTIAL: {CapabilityType.READ_CREDENTIAL},
+            PivotCapability.PORT_FORWARD: {CapabilityType.NETWORK_VANTAGE},
+            PivotCapability.SHELL: {CapabilityType.EXECUTE_COMMAND, CapabilityType.NETWORK_VANTAGE},
+            PivotCapability.FULL_TOOLBOX: {
+                CapabilityType.EXECUTE_COMMAND, CapabilityType.NETWORK_VANTAGE,
+                CapabilityType.READ_FILE,
+            },
+        }
+        return mapping.get(self.post_exploit.pivot_capability, set())
+
+    def has_verified_capability(self, capability: CapabilityType) -> bool:
+        return capability in self.verified_capability_types

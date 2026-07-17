@@ -28,10 +28,46 @@ isolation_rules:
   - {from: app, to: data, action: accept}
   - {from: dmz, to: data, action: deny}
 
+assets:
+  - id: app-db-credential
+    location: {kind: file, node_ref: app-service, path: /run/secrets/db-password}
+    readable_by: [service_user, root]
+    metadata:
+      setup_command: >-
+        mkdir -p /run/secrets && printf '%s' 'postgres' > /run/secrets/db-password
+        && chmod 0640 /run/secrets/db-password
+      verify_command: >-
+        test -s /run/secrets/db-password && test "$(cat /run/secrets/db-password)"
+        = postgres
+  - id: customer-records
+    location: {kind: database, node_ref: data-store, name: customers}
+    readable_by: [db_user, root]
+    required_service_access: {protocol: postgres, port: 5432}
+    metadata:
+      setup_command: >-
+        PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d postgres -c
+        "CREATE TABLE IF NOT EXISTS customers (marker text); DELETE FROM customers;
+        INSERT INTO customers(marker) VALUES ('CVELAB-CANARY');"
+      verify_command: >-
+        PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d postgres -tAc
+        "SELECT marker FROM customers WHERE marker='CVELAB-CANARY'"
+
+objectives:
+  - id: read-customer-records
+    asset: customer-records
+    validation: canary_row_read
+    goal: "通过已建立的 app-service foothold 读取 customer-records，并提交读取到的 marker 值"
+    evidence_field: evidence
+    verification_mode: agent_evidence
+    actor_ref: app-service
+    reference_command: "PGPASSWORD=postgres psql -h {{target_ip}} -U postgres -d postgres -tAc \"SELECT marker FROM customers WHERE marker='CVELAB-CANARY'\""
+    success_pattern: "CVELAB-CANARY"
+
 injection_points:
   - id: dmz-web
     zone: dmz
     role_description: "面向公网的 Web 服务"
+    kill_chain_phase: entry
     required_mitre: [initial_access, execution]
     required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass]
     required_service_role: [web_application, middleware, framework]
@@ -40,7 +76,10 @@ injection_points:
   - id: app-service
     zone: app
     role_description: "内部应用服务，需从 DMZ 横向移动到达"
-    required_mitre: [lateral_movement, execution, persistence]
+    kill_chain_phase: foothold
+    depends_on: [dmz-web]
+    required_mitre: []
+    required_capabilities: [execute_command]
     required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection]
     required_service_role: [web_application, middleware, framework]
     count: 1
@@ -48,7 +87,11 @@ injection_points:
   - id: data-store
     zone: data
     role_description: "核心数据存储，最深层的靶标"
+    kill_chain_phase: objective
+    depends_on: [app-service]
+    required_assets: [app-db-credential]
     required_mitre: [initial_access, execution, privilege_escalation]
     required_vuln_category: [RCE, LPE, Auth_Bypass, Info_Leak, Injection]
     required_service_role: [database, file_service, system_service]
+    required_service_access: {protocol: postgres, port: 5432}
     count: 1

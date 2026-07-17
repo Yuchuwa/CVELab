@@ -5,13 +5,14 @@ import pytest
 from clab_builder.shared.models.atom import (
     AtomConfig, VulnCategory, MitrePhase, ServiceRole,
     ExploitComplexity, AttackMethod, ServiceInfo,
+    PostExploit, PivotCapability,
+    ExploitAccess,
 )
 from clab_builder.shared.models.template import InjectionPoint
 from clab_builder.orchestrator.composer.cve_matcher import (
     match,
+    match_kill_chain,
     pick_random,
-    pick_orchestrated,
-    score_for_chain_position,
 )
 
 
@@ -20,8 +21,6 @@ def _make_atom(
     vuln_category=VulnCategory.RCE,
     mitre_phase=MitrePhase.INITIAL_ACCESS,
     service_role=ServiceRole.WEB_APPLICATION,
-    exploit_complexity=ExploitComplexity.SIMPLE,
-    attack_method=AttackMethod.SINGLE_REQUEST,
 ) -> AtomConfig:
     return AtomConfig(
         cve_id=cve_id,
@@ -32,8 +31,8 @@ def _make_atom(
         vuln_category=vuln_category,
         primary_mitre_phase=mitre_phase,
         service_role=service_role,
-        exploit_complexity=exploit_complexity,
-        attack_method=attack_method,
+        exploit_complexity=ExploitComplexity.SIMPLE,
+        attack_method=AttackMethod.SINGLE_REQUEST,
         verified=True,
     )
 
@@ -131,35 +130,46 @@ class TestPickRandom:
         assert picked == []
 
 
-class TestPickOrchestrated:
-    def test_intermediate_hop_penalizes_heavy_tooling(self):
-        ip = _make_ip(
-            required_vuln_category=["RCE", "Deserialization"],
-            required_service_role=["web_application"],
-        )
-        simple = _make_atom(
-            "CVE-SIMPLE",
-            vuln_category=VulnCategory.RCE,
-            exploit_complexity=ExploitComplexity.SIMPLE,
-        )
-        heavy = _make_atom(
-            "CVE-HEAVY",
-            vuln_category=VulnCategory.DESERIALIZATION,
-            exploit_complexity=ExploitComplexity.COMPLEX,
-        )
-        heavy.requirements = {
-            "tools_needed": ["Java Runtime (JDK 8+)", "ysoserial-all.jar"]
-        }
+def test_kill_chain_phase_is_not_a_cve_phase_gate():
+    atom = _make_atom(mitre_phase=MitrePhase.INITIAL_ACCESS)
+    ip = InjectionPoint(
+        id="app-service",
+        zone="app",
+        kill_chain_phase="foothold",
+        required_mitre=["lateral_movement"],
+        required_vuln_category=["RCE"],
+    )
 
-        assert score_for_chain_position(simple, ip, index=1, total=3) > (
-            score_for_chain_position(heavy, ip, index=1, total=3)
-        )
-        assert pick_orchestrated([heavy, simple], ip, index=1, total=3)[0] == simple
+    assert match_kill_chain(ip, [atom]) == [atom]
 
-    def test_last_hop_can_accept_information_leak_more_than_intermediate(self):
-        ip = _make_ip(required_vuln_category=["Info_Leak"])
-        atom = _make_atom("CVE-LEAK", vuln_category=VulnCategory.INFO_LEAK)
 
-        assert score_for_chain_position(atom, ip, index=2, total=3) > (
-            score_for_chain_position(atom, ip, index=1, total=3)
-        )
+def test_capability_match_uses_legacy_pivot_compatibility_view():
+    atom = _make_atom()
+    atom.post_exploit = PostExploit(pivot_capability=PivotCapability.SHELL)
+    ip = InjectionPoint(
+        id="app-service",
+        zone="app",
+        required_capabilities=["execute_command"],
+    )
+
+    assert match(ip, [atom]) == [atom]
+
+
+def test_service_access_contract_matches_protocol_and_port():
+    atom = _make_atom()
+    atom.exploit_access = ExploitAccess(
+        required_service={"protocol": "postgres", "port": 5432}
+    )
+    ip = InjectionPoint(
+        id="data-store",
+        zone="data",
+        required_service_access={"protocol": "postgres", "port": 5432},
+    )
+    assert match(ip, [atom]) == [atom]
+
+    incompatible = InjectionPoint(
+        id="data-store",
+        zone="data",
+        required_service_access={"protocol": "ssh", "port": 22},
+    )
+    assert match(incompatible, [atom]) == []

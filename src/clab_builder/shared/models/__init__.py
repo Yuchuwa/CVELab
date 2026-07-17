@@ -9,10 +9,22 @@ from .atom import (
     ExploitComplexity, AttackMethod, FlagMethod, FlagInjection,
     ServiceInfo, NetworkRequirements, DefaultCredentials, ServiceStartup,
     InitFileMapping, PostExploit, PivotCapability,
+    CapabilityType, EvidenceLevel, CapabilityGrant, CapabilityExecutor, ExploitAccess,
+    RuntimeSpec, SourceBundle, FlagSpec, ValidationSpec, ReadinessProbe, ProbeType,
+    MaterialRole, MaterialVisibility, MaterialMetadata,
+    RuntimeBuildSpec, RuntimeStatus,
 )
 from .template import (
     TopologyTemplate, ZoneDef, RouterDef, IsolationRule,
     InjectionPoint, NoiseService, TransitDef,
+    ScenarioAsset, BaselineAsset, ObjectiveDef,
+)
+from .exploit_guide import (
+    ExploitGuideRef, ExploitGuide, ExploitGuideTarget,
+    ExploitGuidePreconditions, ExploitGuideStep,
+    GuideToolRequirement, GuideMaterialRequirement, ExploitGuideExecution,
+    ExploitGuidePostExploit, ExploitGuideCommandChannel,
+    ExploitGuideRequirements, validate_exploit_guide,
 )
 
 __all__ = [
@@ -22,6 +34,15 @@ __all__ = [
     "ExploitComplexity", "AttackMethod", "FlagMethod", "FlagInjection",
     "ServiceInfo", "NetworkRequirements", "DefaultCredentials", "ServiceStartup",
     "InitFileMapping", "PostExploit", "PivotCapability",
+    "CapabilityType", "EvidenceLevel", "CapabilityGrant", "CapabilityExecutor", "ExploitAccess",
+    "RuntimeSpec", "SourceBundle", "FlagSpec", "ValidationSpec", "ReadinessProbe", "ProbeType",
+    "MaterialRole", "MaterialVisibility", "MaterialMetadata",
+    "RuntimeBuildSpec", "RuntimeStatus",
     "TopologyTemplate", "ZoneDef", "RouterDef", "IsolationRule",
     "InjectionPoint", "NoiseService", "TransitDef",
+    "ScenarioAsset", "BaselineAsset", "ObjectiveDef",
+    "ExploitGuideRef", "ExploitGuide", "ExploitGuideTarget",
+    "ExploitGuidePreconditions", "ExploitGuideStep", "GuideToolRequirement",
+    "GuideMaterialRequirement", "ExploitGuideExecution", "ExploitGuidePostExploit",
+    "ExploitGuideCommandChannel", "ExploitGuideRequirements", "validate_exploit_guide",
 ]

@@ -16,6 +16,20 @@ from dataclasses import dataclass
 
 # agent_runner.py 在本包内的路径
 AGENT_RUNNER_SRC = Path(__file__).parent / "agent_runner.py"
+OPENAI_AGENT_RUNNER_SRC = Path(__file__).parent / "openai_agent_runner.py"
+
+
+def _uses_openai_protocol(model: str) -> bool:
+    """Decide which agent harness + protocol a model needs.
+
+    Models exposed only via the OpenAI-compatible /v1 endpoint (and not the
+    Anthropic/Claude protocol) must use the openai_agent_runner. GLM-5.x is
+    the current case; DeepSeek and Anthropic models keep the claude_agent_sdk
+    harness. The check is by name prefix so it covers glm-5.2 / z-ai/glm-5.2
+    / glm-5.1 etc.
+    """
+    m = (model or "").lower()
+    return m.startswith("glm-") or "glm-5" in m or m.startswith("z-ai/glm")
 
 
 @dataclass
@@ -46,6 +60,7 @@ class AgentOutput:
     exploit_steps: List[Dict[str, Any]]
     evidence: List[str]
     mitre_mapping: Dict[str, List[str]]
+    exploit_guide: Dict[str, Any] | None = None
     vulnerability_type: str = ""
     captured_flag: str = ""  # flag value the agent retrieved from the target
     requirements: Dict[str, Any] = None
@@ -67,6 +82,7 @@ class SecurityResearcherAgent:
         self.max_turns = max_turns
         self.container_id: str | None = None
         self.container_name = f"agent-{uuid.uuid4().hex[:8]}"
+        self.model: str = ""  # set by start(); read by run() to pick the harness
 
     def start(self, network_name: str, workspace_dir: str,
               api_key: str, base_url: str = "", model: str = "") -> str:
@@ -83,15 +99,24 @@ class SecurityResearcherAgent:
         Returns:
             container_id
         """
+        self.model = model
         # Remove any container left by a previous timed-out create/start call.
         self._remove_container_by_name(timeout=10)
 
         workspace_dir = str(Path(workspace_dir).resolve())
         agent_runner_src = str(AGENT_RUNNER_SRC.resolve())
+        openai_runner_src = str(OPENAI_AGENT_RUNNER_SRC.resolve())
         # 挂载一个宿主目录到容器内 ~/.claude，让 Claude Agent SDK 原生 session
         # （.jsonl，含 tool-result/sidechain 等全部事件）落盘到宿主，供回捞保存
         claude_cache_dir = str((Path(workspace_dir) / ".claude_cache").resolve())
         Path(claude_cache_dir).mkdir(parents=True, exist_ok=True)
+        # 容器内 agent 用户 (uid 1000) 与宿主用户 uid 不同，挂载目录必须
+        # world-writable 才能让 SDK 在 /home/agent/.claude 下创建 session-env
+        # 等运行时目录，否则 EACCES 中断每次工具调用。
+        os.chmod(claude_cache_dir, 0o777)
+
+        use_openai = _uses_openai_protocol(model)
+        runner_src = openai_runner_src if use_openai else agent_runner_src
 
         cmd = [
             "docker", "run", "-d",
@@ -101,17 +126,26 @@ class SecurityResearcherAgent:
             "--cap-add", "NET_ADMIN",
             # 挂载 workspace（input.json/output.json）
             "-v", f"{workspace_dir}:/workspace",
-            # 挂载 agent_runner.py（从 src 包内）
-            "-v", f"{agent_runner_src}:/opt/agent_runner.py:ro",
+            # 挂载 agent_runner.py（按协议选择）
+            "-v", f"{runner_src}:/opt/agent_runner.py:ro",
+            # openai_agent_runner 导入 agent_runner 的纯函数 helper，两个都挂上
+            "-v", f"{agent_runner_src}:/opt/agent_runner_lib.py:ro",
             # 挂载 ~/.claude 缓存：SDK 原生 session .jsonl 落盘到这里
             "-v", f"{claude_cache_dir}:/home/agent/.claude",
             "-e", "CLAUDE_CONFIG_DIR=/home/agent/.claude",
             "-e", "HOME=/home/agent",
-            # Claude Agent SDK 使用 ANTHROPIC_API_KEY
+            # API key: both protocols read it; set the env var each harness expects.
             "-e", f"ANTHROPIC_API_KEY={api_key}",
+            "-e", f"OPENAI_API_KEY={api_key}",
+            "-e", f"LLM_API_KEY={api_key}",
         ]
         if base_url:
+            # Anthropic harness reads ANTHROPIC_BASE_URL; openai harness reads
+            # OPENAI_BASE_URL (and falls back to LLM_BASE_URL). Set both so the
+            # selected runner finds its endpoint without branching here.
             cmd.extend(["-e", f"ANTHROPIC_BASE_URL={base_url}"])
+            cmd.extend(["-e", f"OPENAI_BASE_URL={base_url}"])
+            cmd.extend(["-e", f"LLM_BASE_URL={base_url}"])
         if model:
             cmd.extend(["-e", f"MODEL={model}"])
 
@@ -239,6 +273,17 @@ class SecurityResearcherAgent:
         # 实时流式输出 Agent 的 stderr（进度信息）
         print(f"Running agent for {cve_input.cve_id} (max_turns={self.max_turns})...")
         stderr_chunks = []
+        # The OpenAI-protocol runner needs the openai SDK, which the clab-agent
+        # image does not ship. Install it once before launching the runner.
+        # This is a no-op for the claude_agent_sdk runner path.
+        if _uses_openai_protocol(self.model):
+            install = subprocess.run(
+                ["docker", "exec", self.container_name,
+                 "pip3", "install", "--quiet", "--disable-pip-version-check", "openai"],
+                capture_output=True, text=True, timeout=120,
+            )
+            if install.returncode != 0:
+                print(f"  [setup] pip install openai failed: {(install.stderr or '')[:200]}")
         try:
             proc = subprocess.Popen(
                 [
@@ -294,13 +339,27 @@ class SecurityResearcherAgent:
         if returncode != 0:
             print(f"Agent exited with code {returncode}")
             if not output_path.exists():
-                return AgentOutput(
-                    cve_id=cve_input.cve_id,
-                    success=False,
-                    exploit_steps=[],
-                    evidence=[f"Agent failed: {stderr_text[:500]}"],
-                    mitre_mapping={},
+                # agent 被强杀（SIGKILL/超时）时 output.json 可能没写成功，
+                # 但 SDK 原生 session .jsonl 里通常已有最终 JSON。尝试恢复，
+                # 否则像 CVE-2017-8386 这样 agent 实际成功却因 -9 被判失败。
+                from clab_builder.atomizer.agent.agent_runner import (
+                    _extract_json_from_native_session,
                 )
+                recovered = _extract_json_from_native_session(workspace / "session.json")
+                if recovered is not None:
+                    output_path.write_text(
+                        json.dumps(recovered, ensure_ascii=False, indent=2)
+                    )
+                    print(f"Recovered agent output from native session: {output_path}")
+                else:
+                    return AgentOutput(
+                        cve_id=cve_input.cve_id,
+                        success=False,
+                        exploit_steps=[],
+                        exploit_guide=None,
+                        evidence=[f"Agent failed (code={returncode}): {stderr_text[:500]}"],
+                        mitre_mapping={},
+                    )
 
         # 读取输出
         try:
@@ -310,6 +369,7 @@ class SecurityResearcherAgent:
                 cve_id=cve_input.cve_id,
                 success=False,
                 exploit_steps=[],
+                exploit_guide=None,
                 evidence=[f"Failed to read agent output: {e}"],
                 mitre_mapping={},
             )
@@ -320,6 +380,7 @@ class SecurityResearcherAgent:
             cve_id=cve_input.cve_id,
             success=output_data.get("success", False),
             exploit_steps=output_data.get("exploit_steps", []),
+            exploit_guide=output_data.get("exploit_guide"),
             evidence=output_data.get("evidence", []),
             mitre_mapping=output_data.get("mitre_mapping", {}),
             vulnerability_type=output_data.get("vulnerability_type", ""),
@@ -334,6 +395,8 @@ class SecurityResearcherAgent:
                     "default_username", "default_password",
                     "flag_verify_command", "health_check", "init_tasks",
                     "captured_flag",
+                    "exploit_principal", "exploit_access", "capability_grants",
+                    "exploit_guide",
                 ]
                 if k in output_data
             },

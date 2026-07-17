@@ -35,10 +35,14 @@ class VulhubService:
     name: str
     image: str
     ports: List[str] = field(default_factory=list)
+    expose: List[str] = field(default_factory=list)
     environment: Dict[str, str] = field(default_factory=dict)
     volumes: List[str] = field(default_factory=list)
     depends_on: List[str] = field(default_factory=list)
+    command: str | None = None
+    entrypoint: str | None = None
     is_main_target: bool = False
+    user: str | None = None
 
 
 @dataclass
@@ -57,7 +61,11 @@ class VulhubEnvironment:
 
     @property
     def main_ports(self) -> List[int]:
-        """容器内部端口（供 CLab 内部网络访问用，非宿主机映射端口）"""
+        """容器内部端口（供 CLab 内部网络访问用，非宿主机映射端口）
+
+        优先取 compose ``ports`` 的容器侧端口；当 ``ports`` 为空时回退到
+        ``expose``（CVE-Factory task 常用 expose 而非 host 映射）。
+        """
         svc = self.main_service
         if not svc:
             return []
@@ -67,6 +75,11 @@ class VulhubEnvironment:
             port = container_port_from_spec(p)
             if port is not None:
                 result.append(port)
+        if not result:
+            for p in svc.expose:
+                port = container_port_from_spec(str(p))
+                if port is not None:
+                    result.append(port)
         return result
 
 
@@ -121,9 +134,13 @@ class VulhubParser:
                 name=name,
                 image=image,
                 ports=[str(p) for p in cfg.get("ports", [])],
+                expose=[str(e) for e in (cfg.get("expose") or [])],
                 environment=self._parse_env(cfg.get("environment")),
                 volumes=cfg.get("volumes", []),
                 depends_on=cfg.get("depends_on", []),
+                command=self._normalize_command(cfg.get("command")),
+                entrypoint=self._normalize_command(cfg.get("entrypoint")),
+                user=cfg.get("user"),
             )
             if "vulhub/" in svc.image:
                 svc.is_main_target = True
@@ -159,6 +176,19 @@ class VulhubParser:
                 for parts in [str(item).split("=", 1)]
             }
         return {}
+
+    @staticmethod
+    def _normalize_command(value: Any) -> str | None:
+        """Normalize Compose string/list command forms for the atom contract."""
+        if value is None:
+            return None
+        if isinstance(value, list):
+            # Compose exec-form commands need argument boundaries preserved when
+            # they are later rendered into a ContainerLab shell command.
+            import shlex
+            return shlex.join(str(item) for item in value)
+        text = str(value).strip()
+        return text or None
 
 
 class AnsiblePlaybookGenerator:
@@ -196,6 +226,10 @@ class AnsiblePlaybookGenerator:
                 docker_cfg["env"] = svc.environment
             if svc.volumes:
                 docker_cfg["volumes"] = svc.volumes
+            if svc.command:
+                docker_cfg["command"] = svc.command
+            if svc.entrypoint:
+                docker_cfg["entrypoint"] = svc.entrypoint
 
             tasks.append({
                 "name": f"Start {svc.name} ({svc.image})",

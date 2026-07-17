@@ -44,6 +44,46 @@ class TestExtractJson:
         assert result is not None
         assert result["success"] is True
 
+    def test_over_escaped_quotes_in_command_repaired(self):
+        """LLM 把多层转义的 Python payload 塞进 command 字段导致 json.loads 失败时，
+        _repair_json_strings 应能把字符串内非法结束的引号转义回来。"""
+        bad = (
+            '```json\n'
+            '{\n'
+            '  "success": true,\n'
+            '  "exploit_steps": [\n'
+            '    {\n'
+            '      "name": "upload",\n'
+            '      "command": "python3 -c \\"name=\\\\\\\\\\"file_upload\\\\\\\\\\"; pass\\"",\n'
+            '      "dynamic_values": {}\n'
+            '    }\n'
+            '  ],\n'
+            '  "capability_grants": ["execute_command", "read_file"]\n'
+            '}\n'
+            '```'
+        )
+        result = extract_json(bad)
+        assert result is not None
+        assert result["success"] is True
+        assert result["capability_grants"] == ["execute_command", "read_file"]
+        assert "upload" in result["exploit_steps"][0]["name"]
+
+    def test_repair_preserves_well_formed_json(self):
+        """正常 JSON 不应被 _repair_json_strings 破坏。"""
+        text = (
+            '```json\n'
+            '{"success": true, "exploit_principal": "root", '
+            '"capability_grants": ["execute_command", "read_file", "write_file", "network_vantage"]}\n'
+            '```'
+        )
+        result = extract_json(text)
+        assert result is not None
+        assert result["success"] is True
+        assert result["exploit_principal"] == "root"
+        assert result["capability_grants"] == [
+            "execute_command", "read_file", "write_file", "network_vantage"
+        ]
+
     def test_no_json(self):
         """无 JSON 返回 None"""
         text = "I couldn't exploit this target."

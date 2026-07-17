@@ -1,7 +1,7 @@
 """Dataset Saver — 验证通过的场景持久化到 parquet / HuggingFace
 
 流程:
-  1. 收集验证通过的场景 (agent_result.success + flags all captured)
+  1. 收集验证通过的场景 (Guided trial/objective 或 SysField reference path)
   2. 按 scenario hash 去重
   3. 保存为 parquet 格式到本地
   4. 可选 push 到 HuggingFace Hub
@@ -45,6 +45,42 @@ def _scenario_to_record(
         "attack_path": json.dumps(attack_path, ensure_ascii=False),
         "ground_truth": json.dumps(gt, ensure_ascii=False),
         "agent_success": agent_result.get("success", False),
+        "reference_path_verified": verify_result.get("reference_path_verified")
+        if verify_result.get("validation_mode", "sysfield") == "sysfield" else None,
+        "validation_mode": verify_result.get("validation_mode", "sysfield"),
+        "guide_integrity_valid": verify_result.get(
+            "guide_integrity", {}
+        ).get("valid"),
+        "guide_advisory_status": verify_result.get(
+            "guide_advisories", {}
+        ).get("overall_status", "not_evaluated"),
+        "guide_compatibility_status": verify_result.get(
+            "guide_advisories", verify_result.get("guide_compatibility", {})
+        ).get("overall_status", "not_evaluated"),
+        "guide_agent_allowed": verify_result.get(
+            "guide_advisories", verify_result.get("guide_compatibility", {})
+        ).get("agent_allowed"),
+        "guide_compatibility": json.dumps(
+            verify_result.get(
+                "guide_advisories", verify_result.get("guide_compatibility", {})
+            ), ensure_ascii=False
+        ),
+        "attack_graph_valid": verify_result.get("attack_graph_valid", False),
+        "range_build_verified": verify_result.get("range_build_verified", False),
+        "guided_trial_evaluated": verify_result.get("guided_trial_evaluated", False),
+        "guided_trial_success": verify_result.get("guided_trial_success", False),
+        "objective_achieved": verify_result.get("objective_achieved", False),
+        "failure_stage": verify_result.get("failure_stage", ""),
+        "agent_transport": json.dumps(
+            verify_result.get("agent_transport", {}), ensure_ascii=False
+        ),
+        # Compatibility aliases for records written before the result-model
+        # rename.  New code must consume guided_trial_*.
+        "guided_reference_success": verify_result.get("guided_trial_success",
+                                                        verify_result.get("guided_reference_success", False)),
+        "objective_verification": json.dumps(
+            verify_result.get("objective_verification", {}), ensure_ascii=False
+        ),
         "agent_evidence": json.dumps(agent_result.get("evidence", []), ensure_ascii=False),
         "verified_at": datetime.utcnow().isoformat(),
         "clab_yaml": json.dumps(scenario.get("clab", {}), ensure_ascii=False),
@@ -149,6 +185,22 @@ class DatasetManager:
         Returns:
             是否为新记录（非重复）
         """
+        mode = verify_result.get("validation_mode", "sysfield")
+        if mode == "guided_agent":
+            if not verify_result.get("guided_trial_success",
+                                     verify_result.get("guided_reference_success", False)):
+                print(f"[Dataset] Skipping {scenario['name']}: guided trial failed")
+                return False
+            if not verify_result.get("attack_graph_valid", False):
+                print(f"[Dataset] Skipping {scenario['name']}: invalid attack graph")
+                return False
+            if not verify_result.get("objective_achieved",
+                                     verify_result.get("objective_verification", {}).get("all_satisfied", False)):
+                print(f"[Dataset] Skipping {scenario['name']}: objective not achieved")
+                return False
+        elif verify_result.get("reference_path_verified") is False:
+            print(f"[Dataset] Skipping {scenario['name']}: deterministic reference path failed")
+            return False
         if not verify_result.get("flag_verification", {}).get("all_captured", False):
             print(f"[Dataset] Skipping {scenario['name']}: not all flags captured")
             return False
