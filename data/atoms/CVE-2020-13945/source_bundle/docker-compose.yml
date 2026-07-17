@@ -1,0 +1,19 @@
+services:
+  apisix:
+    image: vulhub/apisix:2.11.0
+    volumes:
+      - ./config.yml:/usr/local/apisix/conf/config.yaml:ro
+    depends_on:
+      - etcd
+    ports:
+      - "9080:9080"
+      - "9091:9091"
+      - "9443:9443"
+  etcd:
+    image: gcr.io/etcd-development/etcd:v3.4.15
+    command:
+      - /usr/local/bin/etcd
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://0.0.0.0:2379
+    ports:
+      - "2379:2379/tcp"
