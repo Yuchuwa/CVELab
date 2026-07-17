@@ -107,6 +107,22 @@ class TestVulhubParser:
         env = VulhubParser().parse(vulhub_dir)
         assert env.services[0].volumes == ["./config.ini:/etc/config.ini"]
 
+    def test_runtime_command_entrypoint_and_environment(self, tmp_path):
+        vulhub_dir = self._make_compose(tmp_path, {
+            "web": {
+                "image": "vulhub/test:latest",
+                "command": ["php", "-S", "0.0.0.0:8080"],
+                "entrypoint": "/usr/local/bin/start.sh",
+                "environment": {"DB_PASSWORD": "postgres"},
+            }
+        })
+
+        env = VulhubParser().parse(vulhub_dir)
+        service = env.main_service
+        assert service.command == "php -S 0.0.0.0:8080"
+        assert service.entrypoint == "/usr/local/bin/start.sh"
+        assert service.environment == {"DB_PASSWORD": "postgres"}
+
     def test_readme_content(self, tmp_path):
         """README 读取"""
         vulhub_dir = self._make_compose(
@@ -174,6 +190,21 @@ class TestAnsiblePlaybookGenerator:
         container_cfg = docker_task["community.docker.docker_container"]
         assert container_cfg["image"] == "vulhub/log4j:2.14.1"
         assert container_cfg["published_ports"] == ["8983:8983"]
+
+    def test_generate_runtime_command_and_entrypoint(self):
+        env = self._make_env()
+        env.main_service.command = "php -S 0.0.0.0:8080"
+        env.main_service.entrypoint = "/usr/local/bin/start.sh"
+        env.main_service.environment = {"DB_PASSWORD": "postgres"}
+        env.services[0].command = env.main_service.command
+        env.services[0].entrypoint = env.main_service.entrypoint
+        env.services[0].environment = env.main_service.environment
+
+        playbook = yaml.safe_load(AnsiblePlaybookGenerator().generate(env))
+        cfg = playbook[0]["tasks"][1]["community.docker.docker_container"]
+        assert cfg["command"] == "php -S 0.0.0.0:8080"
+        assert cfg["entrypoint"] == "/usr/local/bin/start.sh"
+        assert cfg["env"] == {"DB_PASSWORD": "postgres"}
 
     def test_topo_sort(self):
         """依赖排序: mysql 在 web 之前"""

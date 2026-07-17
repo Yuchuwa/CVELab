@@ -5,9 +5,15 @@ import pytest
 from clab_builder.shared.models.atom import (
     AtomConfig, VulnCategory, MitrePhase, ServiceRole,
     ExploitComplexity, AttackMethod, ServiceInfo,
+    PostExploit, PivotCapability,
+    ExploitAccess,
 )
 from clab_builder.shared.models.template import InjectionPoint
-from clab_builder.orchestrator.composer.cve_matcher import match, pick_random
+from clab_builder.orchestrator.composer.cve_matcher import (
+    match,
+    match_kill_chain,
+    pick_random,
+)
 
 
 def _make_atom(
@@ -122,3 +128,48 @@ class TestPickRandom:
     def test_pick_from_empty(self):
         picked = pick_random([], count=3)
         assert picked == []
+
+
+def test_kill_chain_phase_is_not_a_cve_phase_gate():
+    atom = _make_atom(mitre_phase=MitrePhase.INITIAL_ACCESS)
+    ip = InjectionPoint(
+        id="app-service",
+        zone="app",
+        kill_chain_phase="foothold",
+        required_mitre=["lateral_movement"],
+        required_vuln_category=["RCE"],
+    )
+
+    assert match_kill_chain(ip, [atom]) == [atom]
+
+
+def test_capability_match_uses_legacy_pivot_compatibility_view():
+    atom = _make_atom()
+    atom.post_exploit = PostExploit(pivot_capability=PivotCapability.SHELL)
+    ip = InjectionPoint(
+        id="app-service",
+        zone="app",
+        required_capabilities=["execute_command"],
+    )
+
+    assert match(ip, [atom]) == [atom]
+
+
+def test_service_access_contract_matches_protocol_and_port():
+    atom = _make_atom()
+    atom.exploit_access = ExploitAccess(
+        required_service={"protocol": "postgres", "port": 5432}
+    )
+    ip = InjectionPoint(
+        id="data-store",
+        zone="data",
+        required_service_access={"protocol": "postgres", "port": 5432},
+    )
+    assert match(ip, [atom]) == [atom]
+
+    incompatible = InjectionPoint(
+        id="data-store",
+        zone="data",
+        required_service_access={"protocol": "ssh", "port": 22},
+    )
+    assert match(incompatible, [atom]) == []

@@ -111,6 +111,61 @@ You are given a bug report (CVE ID) and a running test instance. Your job:
 - Each command should use {{target_ip}}, {{target_port}}, and {{placeholder}} for variable parts.
 - Note any {{placeholder}} in dynamic_values with how to obtain it.
 - Keep it minimal: the shortest sequence of commands to confirm this bug.
+- CRITICAL JSON escaping: the ``command`` field MUST be a single valid JSON
+  string. For complex payloads (multi-line Python, HTTP requests, shell
+  scripts), keep the command SHORT — a one-liner or a brief curl invocation.
+  Put the full payload in ``dynamic_values`` under a placeholder like
+  ``{{payload}}`` instead of inlining a huge escaped blob into ``command``.
+  Never nest Python ``\\\"`` escapes multiple layers deep; if a command needs
+  quoting, prefer a heredoc-free single-line form.
+
+## CRITICAL: capability capture — record what the exploit actually grants
+After confirming the exploit works, you MUST determine the security context of
+your access on the target:
+- Run `id` or `whoami` on the target (via the RCE / shell / SQL injection you
+  just used). Record the raw output in `evidence`.
+- Record `exploit_principal` (the identity you gained):
+  - "root" if uid=0
+  - "service_user" for non-root service accounts (www-data, nobody, daemon,
+    postgres, etc.)
+  - "application_admin" for application-level admin sessions
+  - "unknown" if you cannot determine
+- Record `exploit_access` (the PRECONDITION to trigger this exploit, NOT the
+  post-exploit effect):
+  - attack_vector: "network" or "local"
+  - privileges_required: "none" (unauthenticated) / "low" (need a low-priv
+    session) / "high" (need admin)
+  - required_service: {"protocol": "http|ssh|postgres|...", "port": <number>}
+- Record `capability_grants`: a list of what you VERIFIED you can DO after
+  exploitation. Include only what you actually confirmed, using these EXACT
+  string values (any other spelling is silently dropped):
+  - "execute_command" if you can run arbitrary OS commands on the target
+  - "read_file" if you can read files on the target (via LFI, path traversal,
+    or command execution)
+  - "write_file" if you can write files on the target
+  - "network_vantage" if you can make the target initiate network requests to
+    other hosts (SSRF, or shell with outbound connectivity used for pivoting)
+  - "read_credential" if you can read credentials/secrets from the target
+    (e.g. dumped /etc/shadow, DB creds, API keys)
+  - "authenticate" if you obtained an authenticated session (via auth bypass /
+    default creds) but no command execution
+
+## exploit_guide / capability_grants alignment
+The `exploit_guide` you emit should describe what you observed. Range treats
+the atom's `capability_grants` and `exploit_principal` as authoritative for
+matching and execution; the guide's `post_exploit.capabilities` and
+`principal` are advisory. Keep them aligned where you can, but the guide is
+NOT rejected for a capability or principal mismatch — Range records the
+difference as an advisory diagnostic.
+The one hard rule the guide MUST satisfy internally:
+- `post_exploit.command_channel.reusable` MUST be `true` ONLY when
+  `capability_grants` contains "execute_command". A reusable command channel
+  means an attacker can run ARBITRARY commands through it, which requires
+  command execution. For LFI / SSRF / auth-bypass / info-leak bugs that do
+  NOT grant command execution, set `command_channel.reusable=false` and
+  `command_channel.type="none"`.
+- `command_channel.established_by` MUST reference step ids that exist in
+  `steps`, and must be empty when `reusable=false`.
 
 ## Output Format
 When finished, output ONLY this JSON block:
@@ -128,6 +183,31 @@ When finished, output ONLY this JSON block:
       "mitre_technique_id": "TXXXX"
     }
   ],
+  "exploit_guide": {
+    "version": 2,
+    "summary": "Short description of the final successful exploit path",
+    "target": {"protocol": "http", "port": 80, "service_role": "web_application", "endpoints": []},
+    "preconditions": {"attack_vector": "network", "privileges_required": "none", "required_service": {"protocol": "http", "port": 80}},
+    "steps": [{
+      "id": "exploit",
+      "action": "trigger vulnerability",
+      "procedure": "Describe the exact successful action and why it works",
+      "command_hint": "optional command using {{target_ip}}/{{target_port}}",
+      "depends_on": [],
+      "success_signal": "Concrete response or effect proving exploitation",
+      "materials": [],
+      "execution": {
+        "scope": "actor",
+        "tools": [{"id": "curl", "kind": "executable", "name": "curl", "required": true}],
+        "materials": [],
+        "external_download": false,
+        "fallback_ids": []
+      }
+    }],
+    "post_exploit": {"principal": "root | service_user | application_admin | unknown (MUST match exploit_principal)", "capabilities": ["execute_command (MUST be subset of capability_grants)"], "command_channel": {"type": "webshell | ssh | api | none", "established_by": ["exploit"], "invocation_hint": "How the channel is used after establishment", "reusable": "true ONLY if capability_grants has execute_command; otherwise false"}},
+    "requirements": {"tools": ["curl"], "materials": [], "authentication": "none", "callback": "none"},
+    "evidence_refs": ["native_verification.evidence[0]"]
+  },
   "mitre_mapping": {"initial_access": ["TXXXX"], "execution": ["TXXXX"]},
   "requirements": {
     "network_access": "HTTP to web service",
@@ -146,7 +226,14 @@ When finished, output ONLY this JSON block:
   "default_username": null,
   "default_password": null,
   "flag_verify_command": "command to read $FLAG or /root/flag.txt after exploit",
-  "captured_flag": "the exact flag value you retrieved from the target (empty string if not retrieved)"
+  "captured_flag": "the exact flag value you retrieved from the target (empty string if not retrieved)",
+  "exploit_principal": "root | service_user | application_admin | unknown",
+  "exploit_access": {
+    "attack_vector": "network",
+    "privileges_required": "none",
+    "required_service": {"protocol": "http", "port": 80}
+  },
+  "capability_grants": ["execute_command", "read_file"]
 }
 ```
 
@@ -166,12 +253,44 @@ When finished, output ONLY this JSON block:
   For RCE/LFI/file-read/deserialization/etc. this is required for success. For
   Auth_Bypass/Info_Leak/SSRF/role-change bugs that do not provide file read or
   command execution, leave this empty and explain the objective evidence.
+- `exploit_principal`: the identity you gained on the target after exploitation.
+  Run `id`/`whoami` via the exploit and record the result here as one of:
+  root / service_user / application_admin / unknown.
+- `exploit_access`: the precondition to trigger the exploit (NOT the
+  post-exploit effect). attack_vector is "network" or "local";
+  privileges_required is none/low/high; required_service is
+  {"protocol": ..., "port": ...} for network-vector exploits.
+- `capability_grants`: list of capabilities you VERIFIED (ran a confirming
+  command for), using exact values: execute_command, read_file, write_file,
+  network_vantage, read_credential, authenticate.
 
 IMPORTANT:
 - Use {{target_ip}} and {{target_port}} for the target address
 - Use {{placeholder}} for any runtime values (session IDs, tokens, cookies, file paths)
 - List each placeholder in dynamic_values with a brief note on how to obtain it
 - Each step should be self-descriptive so another tester can understand the flow
+- `exploit_guide` must summarize only the final successful path in 1-10 ordered
+  steps. Do not copy failed probes, reconnaissance, or unrelated flag hunting.
+  It is descriptive guidance for a later attack agent, not a static playbook.
+- Emit `exploit_guide.version=2`. Every step MUST include an `execution` block:
+  `scope` is the logical execution host (`actor` or `target`), `tools` lists
+  typed executable/module requirements, and `materials` lists only
+  `source_bundle` references with a delivery mode (`mounted`, `inline`, or
+  `channel_transfer`). Use `fallback_ids` when an explicitly supported
+  alternative exists.
+- Set `external_download=false`. Do not make a Guide depend on apt, pip,
+  package registries, or other network downloads. If a dependency is needed,
+  identify its offline artifact in `tools[].artifact` and describe how it is
+  transferred through the declared foothold channel.
+- `execution.scope=actor` means the current foothold/attacker executes the
+  step; `execution.scope=target` means the exploit causes the target service
+  to execute it. Do not infer this scope from the command text alone.
+- Do not put the exact captured flag, API keys, host absolute paths, or native
+  lab IPs in `exploit_guide`. Use placeholders and explain the success signal.
+- `exploit_guide` must satisfy its internal command-channel rule: a
+  `reusable` command_channel requires "execute_command" in
+  `capability_grants`. Capability/principal mismatch with `capability_grants`
+  is advisory, not a rejection.
 """
 
 
@@ -237,6 +356,67 @@ def build_prompt(input_data: dict) -> str:
     return "\n".join(parts)
 
 
+def _repair_json_strings(s: str) -> str:
+    """Rewrite a candidate JSON string, fixing over-escaped quotes that the LLM
+    commonly emits inside ``exploit_steps[].command`` values.
+
+    The LLM often produces Python/HTTP payloads with extra backslash layers
+    (e.g. ``\\\\\\\\"`` instead of ``\\\\"``). When such a value sits inside a JSON
+    string, an even run of backslashes followed by ``"`` is parsed as a string
+    terminator, which breaks ``json.loads`` even though the overall structure
+    is intact. We scan char-by-char tracking string state: when an apparent
+    string-closing quote is followed by a non-structural character (not one of
+    ``,:}]`` or end-of-text), we treat that quote as belonging inside the
+    string and add one backslash so it becomes an escaped quote.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(s)
+    in_str = False
+    while i < n:
+        ch = s[i]
+        if not in_str:
+            out.append(ch)
+            if ch == '"':
+                in_str = True
+            i += 1
+            continue
+        if ch == '\\':
+            j = i
+            while j < n and s[j] == '\\':
+                j += 1
+            backslashes = j - i
+            if j < n and s[j] == '"':
+                if backslashes % 2 == 1:
+                    out.append(s[i:j + 1])
+                    i = j + 1
+                    continue
+                k = j + 1
+                while k < n and s[k] in ' \t\n\r':
+                    k += 1
+                nxt = s[k] if k < n else ''
+                if nxt in ',:}]':
+                    out.append(s[i:j + 1])
+                    i = j + 1
+                    in_str = False
+                    continue
+                out.append(s[i:j])
+                out.append('\\"')
+                i = j + 1
+                continue
+            out.append(s[i:j + 1])
+            i = j + 1
+            continue
+        if ch == '"':
+            out.append(ch)
+            in_str = False
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return ''.join(out)
+
+
 def extract_json(text: str) -> dict | None:
     """从文本中提取 JSON 结果"""
     # ```json ... ```
@@ -252,20 +432,41 @@ def extract_json(text: str) -> dict | None:
     if start >= 0:
         depth = 0
         for i in range(start, len(text)):
-            if text[i] == '{':
+            if text[i] == "{":
                 depth += 1
-            elif text[i] == '}':
+            elif text[i] == "}":
                 depth -= 1
                 if depth == 0:
                     candidate = text[start:i+1]
                     try:
                         return json.loads(candidate)
                     except json.JSONDecodeError:
-                        cleaned = re.sub(r',\s*([}\]])', r'\1', candidate)
+                        cleaned = re.sub(r',\s*([}\]])', r"\1", candidate)
                         try:
                             return json.loads(cleaned)
                         except json.JSONDecodeError:
                             break
+
+    # LLM 常把复杂 payload 直接塞进 JSON 字符串，导致过度转义、json.loads 失败。
+    # 用状态机重写字符串内的非法引号转义后再试一次。
+    if match:
+        try:
+            return json.loads(_repair_json_strings(match.group(1)))
+        except json.JSONDecodeError:
+            pass
+    if start >= 0:
+        depth = 0
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start:i+1]
+                    try:
+                        return json.loads(_repair_json_strings(candidate))
+                    except json.JSONDecodeError:
+                        break
     return None
 
 
@@ -379,6 +580,7 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
         "success": False,
         "evidence": [],
         "exploit_steps": [],
+        "exploit_guide": {},
         "mitre_mapping": {},
         "captured_flag": "",
     }
@@ -417,7 +619,20 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
     if extracted is None:
         extracted = _extract_json_from_native_session(native_jsonl)
     if extracted:
-        result = extracted
+        # Merge instead of replace: keep the initial result's structural
+        # defaults for any key the Agent's JSON omitted (e.g. a truncated
+        # output missing exploit_guide/evidence), and union evidence lists so
+        # an earlier "Agent error" note is not lost when extraction succeeds.
+        prior_evidence = list(result.get("evidence") or [])
+        merged = dict(result)
+        merged.update(extracted)
+        extracted_evidence = list(extracted.get("evidence") or [])
+        # De-dup while preserving order.
+        combined = prior_evidence + [
+            e for e in extracted_evidence if e not in prior_evidence
+        ]
+        merged["evidence"] = combined
+        result = merged
     else:
         # 没有提取到 JSON，保存原始输出作为证据
         result["evidence"].append(full_text[:2000])

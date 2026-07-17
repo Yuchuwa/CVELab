@@ -5,11 +5,12 @@
 2. 启动 CVE 环境（docker-compose）
 3. 启动 Agent 容器，传入 writeup
 4. Agent 自主执行 exploit 并验证
-5. 生成 playbook/sysfield.yaml
+5. 生成 exploit_guide.yaml（SysField 仅保留兼容产物）
 6. 保存到 data/atoms/CVE-XXXX/
 """
 
 import subprocess
+import copy
 import json
 import yaml
 import time
@@ -18,7 +19,7 @@ import hashlib
 import shutil
 import re
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
 from .output.vulhub_converter import (
@@ -27,8 +28,10 @@ from .output.vulhub_converter import (
     container_port_from_spec,
 )
 from .output.sysfield_playbook import SysFieldPlaybookGenerator
+from .output.exploit_guide import ExploitGuideGenerator
 from .agent.researcher import SecurityResearcherAgent, CVEInput
 from .environment.container import CVEEnvironmentManager, ContainerInfo
+from clab_builder.shared.models.atom import RuntimeSpec
 
 
 @dataclass
@@ -83,6 +86,7 @@ class AtomizerPipeline:
         self.output_dir = Path(output_dir)
         self.network_name = network_name
         self.max_turns = max_turns
+        self._build_runtime = False
 
         # 解析 vulhub 环境
         self.parser = VulhubParser()
@@ -94,7 +98,8 @@ class AtomizerPipeline:
         self._readiness_warnings: list[str] = []
 
     def run(self, api_key: str = "", base_url: str = "", model: str = "",
-            skip_agent: bool = False, llm_checker: bool = True) -> Dict[str, Any]:
+            skip_agent: bool = False, llm_checker: bool = True,
+            force: bool = False) -> Dict[str, Any]:
         """
         执行完整流程
 
@@ -104,6 +109,7 @@ class AtomizerPipeline:
             model: LLM model name
             skip_agent: 跳过 Agent 步骤（仅生成 ansible 配置）
             llm_checker: 对无 flag 成功样本启用 LLM 二级仲裁
+            force: 覆盖已有 atom；失败时回滚旧版本
 
         Returns:
             结果字典
@@ -118,6 +124,19 @@ class AtomizerPipeline:
         print(f"  Vulhub: {self.vulhub_dir}")
         print(f"  Output: {atom_dir}")
 
+        # Transactional protection: when force-overwriting an existing atom,
+        # snapshot it first so a failed run restores the previous good
+        # version instead of leaving a half-written atom that loses verified
+        # truth and a working source_bundle.
+        backup_dir: Optional[Path] = None
+        if force and atom_dir.exists():
+            backup_dir = atom_dir.parent / f".{atom_dir.name}.bak"
+            if backup_dir.exists():
+                self._force_rmtree(backup_dir)
+            atom_dir.rename(backup_dir)
+            atom_dir.mkdir(parents=True)
+
+        succeeded = False
         try:
             # Step 1: 生成 ansible/deploy.yaml
             print(f"\n[1/5] Generating ansible/deploy.yaml")
@@ -129,7 +148,16 @@ class AtomizerPipeline:
 
             if skip_agent:
                 print("\n[SKIP] Agent step skipped (--skip-agent)")
+                # Structure-only backfill must NOT inherit verified=True. A
+                # verified atom means the exploit was reproduced by the native
+                # agent; --skip-agent never runs the agent, so the result is
+                # structurally complete but unverified. Force this explicitly
+                # so the contract does not depend on the implicit
+                # _evaluate_agent_success(None) path and cannot regress.
+                self._flag_required = False
+                self._flag = ""
                 self._save_atom(atom_dir)
+                succeeded = True
                 return {"success": True, "cve_id": cve_id, "output": str(atom_dir), "agent_skipped": True}
 
             # Step 3: 准备 Agent 输入并执行（使用 CVE 的网络）
@@ -140,9 +168,13 @@ class AtomizerPipeline:
                 network_name=cve_network,
             )
 
-            # Step 4: 生成 playbook/sysfield.yaml
-            print(f"\n[4/5] Generating playbook/sysfield.yaml")
-            self._generate_exploit_playbook(atom_dir, agent_output, cve_info)
+            # Step 4: guide 在 _save_atom 中依据结构化 Agent 输出生成。
+            # SysField 仅作为旧消费者的兼容产物，失败不影响 Atom 保存。
+            print(f"\n[4/5] Generating exploit guide")
+            try:
+                self._generate_exploit_playbook(atom_dir, agent_output, cve_info)
+            except (OSError, ValueError, TypeError) as exc:
+                print(f"  Legacy SysField skipped: {exc}")
 
             # Step 5: 保存 atom 元数据
             print(f"\n[5/5] Saving atom")
@@ -158,6 +190,7 @@ class AtomizerPipeline:
             # success 与 atom.yaml.verified 同源，避免重复计算导致 manifest / atom 不一致
             success = verified
             print(f"\n=== Done: {cve_id} (success={success}, flag_matched={flag_matched}) ===")
+            succeeded = True
             return {
                 "success": success,
                 "cve_id": cve_id,
@@ -176,6 +209,16 @@ class AtomizerPipeline:
         finally:
             # 清理环境
             self._cleanup()
+            # Transactional backup resolution.
+            if backup_dir is not None and backup_dir.exists():
+                if succeeded:
+                    # New atom written successfully; discard the old backup.
+                    self._force_rmtree(backup_dir)
+                else:
+                    # Run failed: restore the previous good atom.
+                    if atom_dir.exists():
+                        self._force_rmtree(atom_dir)
+                    backup_dir.rename(atom_dir)
 
     def _generate_ansible(self, atom_dir: Path) -> str:
         """从 vulhub docker-compose 生成 Ansible deploy playbook
@@ -457,19 +500,24 @@ class AtomizerPipeline:
         # 预拉 compose 镜像 / build 所需的基础镜像（带重试），尽早暴露网络/镜像问题。
         for name, svc in compose_data.get("services", {}).items():
             image = svc.get("image")
-            if image:
+            has_build = bool(svc.get("build"))
+            if image and not has_build:
+                # Pure image reference (Vulhub style) — pull from registry.
                 self._pull_image_with_retry(image)
-            if svc.get("build") and not svc.get("image"):
-                # 从 Dockerfile 提取 FROM 镜像
+            if has_build:
+                # Compose with a build section (CVE-Factory style): the
+                # image field, if present, is the local tag the build will
+                # produce — it must NOT be pulled. Pre-pull the base image
+                # declared in the Dockerfile's FROM so the build does not
+                # fail on a missing base layer.
                 build_ctx = svc["build"] if isinstance(svc["build"], str) else svc["build"].get("context", ".")
                 dockerfile_path = vulhub_path / build_ctx / "Dockerfile"
                 if dockerfile_path.exists():
+                    base_image = None
                     for line in dockerfile_path.read_text().splitlines():
                         if line.strip().startswith("FROM "):
                             base_image = line.strip().split()[1]
                             break
-                    else:
-                        base_image = None
                     if base_image:
                         print(f"  Pre-pulling base image: {base_image}")
                         self._pull_image_with_retry(base_image)
@@ -960,10 +1008,15 @@ class AtomizerPipeline:
                    network_name: str = ""):
         """启动 Agent 容器并执行"""
         # Interrupted runs can leave output/session/cache files that must not be
-        # treated as the result of this run.
+        # treated as the result of this run. Agent container (uid 1000) writes
+        # .claude_cache subdirs that the host user cannot rmtree, so fall back
+        # to a root container to wipe them.
         if workspace.exists():
-            shutil.rmtree(workspace)
+            self._force_rmtree(workspace)
         workspace.mkdir(parents=True, exist_ok=True)
+        # 容器内 agent 用户 (uid 1000) 与宿主用户 uid 不同，挂载的 /workspace
+        # 必须 world-writable 才能让 agent_runner 写 output.json。
+        os.chmod(workspace, 0o777)
 
         # 准备 exploit files（从 vulhub 目录读取 poc 文件）
         exploit_files = {}
@@ -1013,22 +1066,143 @@ class AtomizerPipeline:
         return agent.run(cve_input, str(workspace))
 
     def _generate_exploit_playbook(self, atom_dir: Path, agent_output, cve_info):
-        """从 Agent 结果生成 SysField playbook"""
+        """从 Agent 结果生成 SysField playbook。
+
+        数据源优先级：agent 自报 exploit_steps → transcript 实际命令 → session。
+        agent 自报为空或质量差时自动回退 transcript，不再硬性要求 agent 必须输出 steps。
+        """
         playbook_dir = atom_dir / "playbook"
         playbook_dir.mkdir(parents=True, exist_ok=True)
 
+        transcript_path = atom_dir / "agent_transcript.log"
+        session_path = atom_dir / "session.json"
+        exploit_steps = agent_output.exploit_steps if agent_output else []
+
         sysfield_playbook = SysFieldPlaybookGenerator().generate(
             cve_id=self.env.cve_id,
-            exploit_steps=agent_output.exploit_steps,
-            mitre_mapping=agent_output.mitre_mapping,
+            exploit_steps=exploit_steps,
+            mitre_mapping=agent_output.mitre_mapping if agent_output else {},
             target_ip="{{ target_ip }}",
             target_port=cve_info.ports[0] if cve_info.ports else 80,
-            vulnerability_type=agent_output.vulnerability_type,
-            requirements=agent_output.requirements,
+            vulnerability_type=agent_output.vulnerability_type if agent_output else "",
+            requirements=agent_output.requirements if agent_output else {},
+            session_path=str(session_path) if session_path.exists() else None,
+            transcript_path=str(transcript_path) if transcript_path.exists() else None,
         )
+        SysFieldPlaybookGenerator.validate(sysfield_playbook, require_steps=True)
         sysfield_path = playbook_dir / "sysfield.yaml"
         sysfield_path.write_text(sysfield_playbook)
         print(f"  Written: {sysfield_path}")
+
+    def _generate_exploit_guide(
+        self,
+        atom_dir: Path,
+        agent_output,
+        *,
+        service_role: str,
+        exploit_access: dict,
+        capabilities: list[str],
+        requirements: dict,
+        source_bundle,
+        evidence: list[str],
+        forbidden_values: list[str] | None = None,
+    ):
+        """Write a descriptive guide when the Agent supplied one.
+
+        Missing/invalid guides are recorded as a Range usability warning; they
+        do not rewrite native/orchestrated Atom verification truth. When the
+        Agent's guide is structurally valid but inconsistent with the verified
+        capability contract (e.g. a LFI bug declaring a reusable command
+        channel), we attempt an automatic downgrade before rejecting, so a
+        usable guide is preserved instead of being silently dropped.
+
+        ``forbidden_values`` carries the native ground-truth flag so the guide
+        validator can reject a guide that leaks it. Both the primary generate
+        and the reusable-channel downgrade retry pass it through.
+        """
+        if not agent_output:
+            return None
+        raw_guide = getattr(agent_output, "exploit_guide", None)
+        if not raw_guide:
+            print("  Guide skipped: Agent did not return exploit_guide")
+            return None
+        materials = getattr(source_bundle, "poc_materials", []) if source_bundle else []
+        evidence_refs = [f"native_verification.evidence[{i}]" for i in range(min(len(evidence), 5))]
+        forbidden = list(forbidden_values or [])
+        try:
+            guide = ExploitGuideGenerator().generate(
+                cve_id=self.env.cve_id,
+                agent_output=agent_output,
+                service_role=service_role,
+                exploit_access=exploit_access,
+                capabilities=capabilities,
+                requirements=requirements,
+                source_bundle_materials=materials,
+                evidence_refs=evidence_refs,
+                forbidden_values=forbidden,
+            )
+            ref = ExploitGuideGenerator().write(atom_dir, guide)
+            print(f"  Written: {atom_dir / ref.path}")
+            return ref
+        except (OSError, ValueError, TypeError) as exc:
+            # Common inconsistency: the Agent declared a reusable command
+            # channel for a bug that does not grant execute_command (LFI,
+            # SSRF, auth-bypass). Downgrade the channel to non-reusable and
+            # retry once, instead of dropping the whole guide.
+            if "reusable command channel requires execute_command" in str(exc):
+                patched = self._downgrade_reusable_channel(raw_guide)
+                if patched is not None:
+                    try:
+                        guide = ExploitGuideGenerator().generate(
+                            cve_id=self.env.cve_id,
+                            agent_output=patched,
+                            service_role=service_role,
+                            exploit_access=exploit_access,
+                            capabilities=capabilities,
+                            requirements=requirements,
+                            source_bundle_materials=materials,
+                            evidence_refs=evidence_refs,
+                            forbidden_values=forbidden,
+                        )
+                        ref = ExploitGuideGenerator().write(atom_dir, guide)
+                        print(f"  Written (after reusable downgrade): {atom_dir / ref.path}")
+                        return ref
+                    except (OSError, ValueError, TypeError) as exc2:
+                        exc = exc2
+            print(f"  Guide skipped: {exc}")
+            if agent_output and hasattr(agent_output, "evidence"):
+                agent_output.evidence.append(f"exploit_guide rejected: {exc}")
+            return None
+
+    @staticmethod
+    def _downgrade_reusable_channel(raw_guide) -> Any:
+        """Return a copy of raw_guide with command_channel.reusable=false.
+
+        Used when the Agent declared a reusable channel without
+        execute_command. The copy preserves every other field so the guide
+        stays usable as a non-pivoting exploit description.
+        """
+        if isinstance(raw_guide, dict):
+            guide = copy.deepcopy(raw_guide)
+            post = guide.get("post_exploit") or {}
+            channel = post.get("command_channel") or {}
+            channel["reusable"] = False
+            if not channel.get("type"):
+                channel["type"] = "none"
+            # established_by must be empty when not reusable (model validator).
+            channel["established_by"] = []
+            post["command_channel"] = channel
+            guide["post_exploit"] = post
+            return guide
+        # ExploitGuide model instance
+        if hasattr(raw_guide, "model_copy"):
+            guide = raw_guide.model_copy(deep=True)
+            guide.post_exploit.command_channel.reusable = False
+            guide.post_exploit.command_channel.established_by = []
+            if not guide.post_exploit.command_channel.type:
+                guide.post_exploit.command_channel.type = "none"
+            return guide
+        return None
 
     def _save_atom(
         self,
@@ -1045,6 +1219,8 @@ class AtomizerPipeline:
             AtomConfig, VulnCategory, MitrePhase, ServiceRole,
             ExploitComplexity, AttackMethod, FlagMethod, FlagInjection,
             ServiceInfo, NetworkRequirements, DefaultCredentials, ServiceStartup,
+            CapabilityType, ProbeType, ReadinessProbe, ValidationSpec,
+            EvidenceLevel,
         )
 
         # Agent v2 输出的额外字段（向后兼容：缺失时走推断）
@@ -1072,18 +1248,31 @@ class AtomizerPipeline:
             skipped=True,
             model=model or os.environ.get("LLM_MODEL", ""),
         )
-        if agent_output and verified and not ground_truth and llm_checker:
-            llm_check = self._run_llm_checker(
-                agent_output=agent_output,
-                vuln_category=inferred_vuln_category,
-                api_key=api_key,
-                base_url=base_url,
-                model=model,
-            )
-            verified = bool(llm_check.accepted)
-            if not verified:
+        if agent_output and not ground_truth and llm_checker:
+            # For objective-evidence bugs (no planted flag), the agent's
+            # self-reported ``success`` boolean is the only gate. When the
+            # agent JSON is truncated or its success field is lost during
+            # extraction, a verified exploit is wrongly downgraded. Run the
+            # LLM checker whenever objective evidence is present — on
+            # verified=True it confirms the agent claim, and on
+            # verified=False with non-empty evidence it can rescue a real
+            # exploit that the success flag failed to capture.
+            if verified or (agent_output.evidence and not agent_output.success):
+                llm_check = self._run_llm_checker(
+                    agent_output=agent_output,
+                    vuln_category=inferred_vuln_category,
+                    api_key=api_key,
+                    base_url=base_url,
+                    model=model,
+                )
+                verified = bool(llm_check.accepted)
+                if not verified:
+                    agent_output.evidence.append(
+                        f"LLM checker rejected objective evidence: {llm_check.reason}"
+                    )
+            elif not verified:
                 agent_output.evidence.append(
-                    f"LLM checker rejected objective evidence: {llm_check.reason}"
+                    "Verification failed: no objective evidence and agent reported failure"
                 )
         mitre_mapping = agent_output.mitre_mapping if agent_output else {}
         requirements = agent_output.requirements if agent_output else {}
@@ -1134,6 +1323,39 @@ class AtomizerPipeline:
         # FLAG 验证命令
         flag_cmd = agent_extra.get("flag_verify_command", "")
 
+        # ── v4: exploit_access + capability_grants（从 agent 输出提取）──
+        exploit_access, capability_grants = self._build_capability_contract(
+            agent_extra, verified, self.env.main_ports,
+            env=self.env, vulhub_dir=self.vulhub_dir,
+        )
+        # Surface capability names the Agent emitted that were dropped because
+        # they were not valid CapabilityType values. Previously this was a
+        # silent `except: pass`, which hid why an atom ended up with empty
+        # grants. We record the dropped names as evidence so the loss is
+        # observable and debuggable.
+        raw_caps = agent_extra.get("capability_grants") or []
+        if isinstance(raw_caps, list):
+            valid_types = {c.value for c in CapabilityType}
+            accepted = {grant.type.value for grant in capability_grants}
+            dropped = [
+                str(cap) for cap in raw_caps
+                if isinstance(cap, str) and cap not in valid_types
+                and cap not in accepted
+            ]
+            if dropped and agent_output and hasattr(agent_output, "evidence"):
+                agent_output.evidence.append(
+                    f"capability_grants dropped invalid values: {', '.join(sorted(set(dropped)))}"
+                )
+
+        # ── v4: capability_executors（从 agent 轨迹提取可复用命令执行通道）──
+        # 只有 agent 真实跑通且轨迹里有"同一通道执行 2+ 不同命令"证据的才生成。
+        # 通道不适合 stateless 调用的（需上传文件/探测参数）不会生成。
+        capability_executors = {}
+        if verified and capability_grants:
+            has_exec = any(g.type == CapabilityType.EXECUTE_COMMAND for g in capability_grants)
+            if has_exec:
+                capability_executors = self._extract_capability_executors(atom_dir)
+
         # 服务启动（从 deploy.yaml 提取）
         init_file_mappings = self._load_init_file_mappings(atom_dir)
         startup = ServiceStartup(
@@ -1142,8 +1364,198 @@ class AtomizerPipeline:
             init_tasks=agent_extra.get("init_tasks", []),
             init_files=init_file_mappings,
         )
+        readiness_probes = [ReadinessProbe(probe_type=ProbeType.CONTAINER_STATE)]
+        if self.env.main_ports:
+            readiness_probes.append(
+                ReadinessProbe(
+                    probe_type=ProbeType.TCP,
+                    target=str(self.env.main_ports[0]),
+                )
+            )
+        if startup.health_check:
+            readiness_probes.append(
+                ReadinessProbe(command=startup.health_check)
+            )
+        validation_spec = ValidationSpec(readiness=readiness_probes)
+
+        # Preserve the effective main-service runtime contract from the
+        # original Compose definition.  Range assembly must not have to parse
+        # source_bundle/docker-compose.yml or guess an image's command.
+        main_service = self.env.main_service
+        runtime_spec = RuntimeSpec(
+            ports=list(self.env.main_ports),
+            services=[
+                {
+                    "name": service.name,
+                    "image": service.image,
+                    "is_target": service.is_main_target,
+                }
+                for service in self.env.services
+            ],
+            command=main_service.command if main_service else None,
+            entrypoint=main_service.entrypoint if main_service else None,
+            environment=dict(main_service.environment) if main_service else {},
+            user=main_service.user if main_service else None,
+            source_image=self.env.main_image,
+        )
+
+        # ── verification: native (agent 跑通) + orchestrated (环境重建) ──
+        # The native_verification structure is the single shared record both
+        # the Agent path and the CVE-Factory PoC path write into. The Agent
+        # path records provenance="native_agent"; the PoC backend records
+        # provenance="cve_factory_poc" plus witnesses/source_hash/test_results.
+        # flag_recovery records whether the planted flag was actually
+        # recovered through the exploit, distinct from the boolean verified
+        # (which can be true for objective-evidence bugs with no flag).
+        timestamp = datetime.now().isoformat()
+        flag_attempted = getattr(self, "_flag_required", False) or bool(agent_output and getattr(agent_output, "captured_flag", ""))
+        native_verification = {
+            "success": bool(verified),
+            "mode": "native",
+            "provenance": "native_agent",
+            "evidence": evidence[:5],
+            "captured_flag": evaluation.captured_flag,
+            "flag_matched": flag_matched,
+            "reason": evaluation.reason,
+            "flag_recovery": {
+                "attempted": flag_attempted,
+                "success": bool(flag_matched),
+                "method": "agent_captured_flag" if flag_matched else (
+                    "no_flag_required" if not flag_attempted else "flag_not_recovered"
+                ),
+            },
+            "timestamp": timestamp,
+        }
+        # orchestrated: 用 atom 的 ansible/deploy.yaml 重建最小环境，
+        # 验证 runtime_spec 能正确实例化（容器 running + 端口 readiness）。
+        # 不重新利用漏洞，只验证环境语义。
+        if native_verification["success"]:
+            orch = self._run_orchestrated_verification(atom_dir, ground_truth)
+        else:
+            orch = {
+                "success": False,
+                "mode": "orchestrated",
+                "evidence": ["skipped: native verification failed"],
+                "timestamp": timestamp,
+            }
+        orchestrated_verification = orch
+        verification = {
+            "native_verification": native_verification,
+            "orchestrated_verification": orchestrated_verification,
+        }
+
+        # ── source_bundle: capture from the vulhub source tree BEFORE
+        # orchestrated verification, so the environment rebuild check can
+        # actually use the bundle. Fresh builds no longer depend on a
+        # pre-existing source_bundle/ dir; they capture it here. The bundle
+        # is self-contained (compose/Dockerfile/init/poc) and hashed.
+        #
+        # Source-kind detection: CVE-Factory prepared staging dirs carry
+        # tests/test_vuln.py and task.yaml. For those, test_vuln.py is
+        # classified as an exploit_reference (assisted visibility) rather
+        # than a generic exploit material.
+        from clab_builder.shared.source_bundle import capture_source_bundle
+        vulhub_src = Path(self.vulhub_dir).resolve()
+        is_cve_factory = (vulhub_src / "tests" / "test_vuln.py").is_file() or \
+                         (vulhub_src / "task.yaml").is_file()
+        source_kind = "cve_factory" if is_cve_factory else "vulhub"
+        source_bundle = capture_source_bundle(
+            vulhub_src, atom_dir, source_kind=source_kind,
+        )
+        if source_bundle is None:
+            source_bundle = self._build_source_bundle_manifest(atom_dir)
+
+        exploit_guide_ref = self._generate_exploit_guide(
+            atom_dir,
+            agent_output,
+            service_role=service_role.value,
+            exploit_access=exploit_access.model_dump(mode="json"),
+            # Only verified grants constrain the guide: inferred/unknown grants
+            # are not proof the capability was achieved, so they must not be
+            # allowed to appear in the guide's post_exploit.capabilities.
+            capabilities=[grant.type.value for grant in capability_grants
+                          if grant.evidence_level == EvidenceLevel.VERIFIED],
+            requirements=requirements,
+            source_bundle=source_bundle,
+            evidence=evidence,
+            forbidden_values=[ground_truth] if ground_truth else [],
+        )
+
+        # verified reflects the native agent result (exploit reproduced +
+        # flag matched). Orchestrated environment rebuild is a separate
+        # environment-correctness check; its failure used to downgrade
+        # verified, which erased the higher-value "native exploit succeeded"
+        # fact whenever a compose rebuild hit a transient timing/network issue.
+        # We now keep them separate: orchestrated success is recorded in
+        # verification.orchestrated_verification and surfaced as
+        # environment_ready, but no longer flips verified to False.
+        environment_ready = bool(orchestrated_verification.get("success"))
+        verification["environment_ready"] = environment_ready
+
+        # ── runtime tool layer (batch 11) ──
+        # Build a derived runtime image with base tools on top of the original
+        # image. This is an INDEPENDENT stage: its failure never rewrites the
+        # native exploit truth (verified) or the orchestrated environment
+        # result. runtime_verification is recorded separately so a tool-layer
+        # build problem does not masquerade as a native verification failure.
+        # Guarded by --build-runtime so the default atomize path is not
+        # slowed by a docker build on every run.
+        if getattr(self, "_build_runtime", False):
+            from clab_builder.atomizer.runtime_builder import (
+                build_runtime_image, runtime_verification_record,
+            )
+            from clab_builder.shared.models.atom import RuntimeStatus, RuntimeBuildSpec
+            try:
+                # Build runtime with the full atom context (source_bundle +
+                # requirements + runtime_spec) so custom-Dockerfile atoms
+                # get a real intermediate-image build instead of a FROM
+                # docker_image that drops the Dockerfile semantics.
+                rt = build_runtime_image(
+                    AtomConfig(
+                        version=3, cve_id=self.env.cve_id, category=self.env.category,
+                        description=short_desc, docker_image=self.env.main_image,
+                        ports=self.env.main_ports, vuln_category=vuln_category,
+                        primary_mitre_phase=primary_phase, service_role=service_role,
+                        exploit_complexity=exploit_complexity, attack_method=attack_method,
+                        runtime_spec=runtime_spec, requirements=requirements,
+                        source_bundle=source_bundle,
+                    ),
+                    atom_dir,
+                )
+                if rt.status == RuntimeStatus.READY:
+                    runtime_spec.runtime_image = rt.runtime_image
+                    runtime_spec.runtime_status = RuntimeStatus.READY
+                    runtime_spec.tool_profile = ",".join(rt.artifacts.tool_profiles) if rt.artifacts else None
+                    runtime_spec.tool_profile_version = "1"
+                    if rt.resolved_user:
+                        runtime_spec.user = rt.resolved_user
+                    m = rt.artifacts.manifest if rt.artifacts else {}
+                    runtime_spec.runtime_build = RuntimeBuildSpec(
+                        context="runtime",
+                        dockerfile="runtime/Dockerfile",
+                        install_script="runtime/install-tools.sh",
+                        base_image_digest=rt.base_image_digest,
+                        generated_hash=m.get("generated_hash", ""),
+                        intermediate_image=rt.artifacts.base_image_for_runtime,
+                        source_dockerfile=rt.artifacts.source_dockerfile,
+                    )
+                else:
+                    runtime_spec.runtime_status = rt.status
+                    runtime_spec.runtime_failure_reason = rt.failure_reason
+                verification["runtime_verification"] = runtime_verification_record(rt)
+            except Exception as exc:  # never let runtime break atom save
+                runtime_spec.runtime_status = RuntimeStatus.FAILED
+                runtime_spec.runtime_failure_reason = f"runtime build raised: {exc}"
+                verification["runtime_verification"] = {
+                    "status": "failed",
+                    "failure_reason": str(exc),
+                }
+        else:
+            from clab_builder.shared.models.atom import RuntimeStatus as _RS
+            runtime_spec.runtime_status = _RS.NOT_REQUESTED
 
         config = AtomConfig(
+            version=3,
             cve_id=self.env.cve_id,
             category=self.env.category,
             description=short_desc,
@@ -1165,13 +1577,21 @@ class AtomizerPipeline:
             flag_injection=flag_inj,
             flag_verify_command=flag_cmd,
             flag_value=ground_truth or None,
+            runtime_spec=runtime_spec,
             service_startup=startup,
+            validation_spec=validation_spec,
             verified=verified,
             requirements=requirements,
             evidence=evidence[:5],
             llm_check=llm_check.to_dict(),
             timestamp=datetime.now().isoformat(),
             source=str(self.vulhub_dir),
+            exploit_access=exploit_access,
+            capability_grants=capability_grants,
+            capability_executors=capability_executors,
+            verification=verification,
+            source_bundle=source_bundle,
+            exploit_guide=exploit_guide_ref,
         )
 
         atom_path = atom_dir / "atom.yaml"
@@ -1189,7 +1609,7 @@ class AtomizerPipeline:
             if session_src.exists():
                 shutil.copy2(str(session_src), str(atom_dir / "session.json"))
                 print(f"  Session saved: {atom_dir / 'session.json'}")
-            shutil.rmtree(workspace, ignore_errors=True)
+            self._force_rmtree(workspace)
 
         return verified, flag_matched
 
@@ -1227,6 +1647,529 @@ class AtomizerPipeline:
                 print(f"  [cleanup] rmi failed: {exc}")
 
     # ── v2 字段推断辅助 ─────────────────────────────────
+
+    @staticmethod
+    def _container_port_listening(container: str, port: int) -> tuple[bool, str]:
+        """Check TCP LISTEN state from inside the container via /proc/net/tcp.
+
+        This mirrors the orchestrator verifier's probe and avoids the per-call
+        `docker run busybox nc` overhead + flakiness of the previous
+        orchestrated-verification probe. Reading /proc/net/tcp needs no tools
+        installed in the target image.
+        """
+        wanted = f"{port:04X}".upper()
+        for proc_file in ("/proc/net/tcp", "/proc/net/tcp6"):
+            result = subprocess.run(
+                ["docker", "exec", container, "cat", proc_file],
+                capture_output=True, text=True, timeout=15,
+            )
+            if result.returncode != 0:
+                continue
+            for line in result.stdout.splitlines()[1:]:
+                fields = line.split()
+                if len(fields) >= 4 and fields[1].rsplit(":", 1)[-1].upper() == wanted:
+                    if fields[3].upper() == "0A":  # TCP_LISTEN
+                        return True, f"port {port} listening"
+        return False, f"port {port} not listening"
+
+    @staticmethod
+    def _is_slow_init_port(port: int) -> bool:
+        """Database/search services commonly need longer to accept connections."""
+        return port in {3306, 5432, 9200, 9300, 27017, 9042, 1521, 1433, 6379, 11211}
+
+    def _run_orchestrated_verification(self, atom_dir: Path, flag_value: str) -> dict:
+        """用 atom 的 source_bundle/docker-compose.yml 重建最小环境，验证 runtime_spec。
+
+        这个验证测的是"atom 抽取出的环境契约能否被重新实例化"——即 Range
+        编排时用同一份 compose/runtime_spec 部署能否成功。不重新利用漏洞，
+        只验证容器能起、服务能监听端口。
+
+        稳定性优化（避免用环境抖动抹掉 native 成功事实）：
+        - 端口探测改用容器内 /proc/net/tcp 读 LISTEN 状态，替代每次 docker
+          run busybox nc 的开销与偶发失败。
+        - DB/搜索类慢启动服务给更长探测窗口。
+        - 整体失败时重试一次（compose down 后重来），过滤单次时序抖动。
+        """
+        from datetime import datetime
+        timestamp = datetime.now().isoformat()
+
+        compose_src = atom_dir / "source_bundle" / "docker-compose.yml"
+        if not compose_src.exists():
+            return {
+                "success": False, "mode": "orchestrated",
+                "evidence": [f"missing {compose_src}"], "timestamp": timestamp,
+            }
+
+        for attempt in range(2):  # 最多 2 次：首次 + 一次重试
+            result = self._run_orchestrated_attempt(
+                atom_dir, compose_src, flag_value, timestamp,
+            )
+            if result.get("success"):
+                if attempt > 0:
+                    result["evidence"].insert(0, f"orchestrated passed on retry (attempt {attempt+1})")
+                return result
+            if attempt == 0:
+                print(f"  [orchestrated] attempt 1 failed, retrying: {result.get('evidence', ['?'])[-1:]}")
+                # 清理上次尝试残留容器，避免重试时端口冲突
+                self._cleanup_orch_project(atom_dir, compose_src, flag_value)
+        return result
+
+    def _run_orchestrated_attempt(
+        self, atom_dir: Path, compose_src: Path, flag_value: str, timestamp: str,
+    ) -> dict:
+        """One orchestrated-verification attempt (compose up + readiness probe)."""
+        cve_id = self.env.cve_id
+        project_name = f"orch{cve_id.replace('-', '').lower()}"[:40]
+
+        # 读取 compose，注入 flag（在主服务环境变量里加 FLAG=flag_value）
+        compose_text = compose_src.read_text()
+        compose_data = yaml.safe_load(compose_text) or {}
+        services = compose_data.get("services", {})
+        main_service = None
+        for svc_name, svc in services.items():
+            if main_service is None:
+                main_service = svc_name
+            env = svc.setdefault("environment", {})
+            if isinstance(env, list):
+                if f"FLAG={flag_value}" not in env:
+                    env.append(f"FLAG={flag_value}")
+            elif isinstance(env, dict):
+                env["FLAG"] = flag_value
+
+        evidence: list[str] = []
+        tmp_compose = atom_dir / "source_bundle" / ".orch-compose.yml"
+        try:
+            tmp_compose.write_text(yaml.safe_dump(compose_data, sort_keys=False))
+        except OSError as exc:
+            return {
+                "success": False, "mode": "orchestrated",
+                "evidence": [f"failed to write temp compose: {exc}"], "timestamp": timestamp,
+            }
+
+        try:
+            result = subprocess.run(
+                ["docker", "compose", "-p", project_name, "-f", str(tmp_compose), "up", "-d"],
+                capture_output=True, text=True, timeout=180,
+            )
+            if result.returncode != 0:
+                evidence.append(f"compose up failed: {result.stderr[-400:]}")
+                return {"success": False, "mode": "orchestrated", "evidence": evidence, "timestamp": timestamp}
+            evidence.append("docker compose up succeeded")
+
+            time.sleep(3)  # 等容器稳定
+            ps = subprocess.run(
+                ["docker", "compose", "-p", project_name, "-f", str(tmp_compose), "ps", "--format", "{{.Name}}\t{{.Status}}"],
+                capture_output=True, text=True, timeout=30,
+            )
+            containers = [l for l in ps.stdout.strip().splitlines() if l]
+            if not containers:
+                evidence.append("no container found after compose up")
+                return {"success": False, "mode": "orchestrated", "evidence": evidence, "timestamp": timestamp}
+
+            main_name = None
+            main_running = False
+            for line in containers:
+                name, status = line.split("\t", 1)
+                evidence.append(f"container {name}: {status}")
+                if main_service and main_service in name:
+                    main_name = name
+                    main_running = "Up" in status
+            if not main_name:
+                main_name = containers[0].split("\t")[0]
+                main_running = "Up" in containers[0]
+            if not main_running:
+                evidence.append(f"main container {main_name} not running")
+                return {"success": False, "mode": "orchestrated", "evidence": evidence, "timestamp": timestamp}
+            evidence.append(f"main container {main_name} running")
+
+            # 端口 readiness：读容器内 /proc/net/tcp 的 LISTEN 状态。比每次
+            # docker run busybox nc 更可靠、更快，且不依赖目标镜像装 nc/curl。
+            ports = self.env.main_ports or []
+            if ports:
+                port = ports[0]
+                # DB/搜索类慢启动服务给更长窗口：最多 60 次 × 5s = 300s；
+                # 普通服务 24 次 × 5s = 120s。
+                attempts = 60 if self._is_slow_init_port(port) else 24
+                ready = False
+                detail = ""
+                for _ in range(attempts):
+                    ready, detail = self._container_port_listening(main_name, port)
+                    if ready:
+                        break
+                    time.sleep(5)
+                if ready:
+                    evidence.append(f"port {port}: {detail}")
+                else:
+                    evidence.append(f"port {port} not listening after {attempts*5}s ({detail})")
+                    return {"success": False, "mode": "orchestrated", "evidence": evidence, "timestamp": timestamp}
+
+            return {"success": True, "mode": "orchestrated", "evidence": evidence, "timestamp": timestamp}
+
+        except subprocess.TimeoutExpired:
+            evidence.append("orchestrated verification timed out")
+            return {"success": False, "mode": "orchestrated", "evidence": evidence, "timestamp": timestamp}
+        except Exception as exc:
+            evidence.append(f"orchestrated verification error: {exc}")
+            return {"success": False, "mode": "orchestrated", "evidence": evidence, "timestamp": timestamp}
+        finally:
+            self._cleanup_orch_project(atom_dir, compose_src, flag_value, tmp_compose, project_name)
+
+    def _cleanup_orch_project(
+        self, atom_dir: Path, compose_src: Path, flag_value: str,
+        tmp_compose: Path | None = None, project_name: str | None = None,
+    ) -> None:
+        """Tear down one orchestrated-verification compose project."""
+        if tmp_compose is None:
+            tmp_compose = atom_dir / "source_bundle" / ".orch-compose.yml"
+        if project_name is None:
+            cve_id = self.env.cve_id
+            project_name = f"orch{cve_id.replace('-', '').lower()}"[:40]
+        try:
+            if tmp_compose.exists():
+                subprocess.run(
+                    ["docker", "compose", "-p", project_name, "-f", str(tmp_compose), "down", "-v"],
+                    capture_output=True, text=True, timeout=60,
+                )
+        except Exception:
+            pass
+        if tmp_compose and tmp_compose.exists():
+            try:
+                tmp_compose.unlink()
+            except OSError:
+                pass
+
+    @staticmethod
+    def _build_source_bundle_manifest(atom_dir: Path):
+        """扫描 atom_dir/source_bundle/ 生成 SourceBundle manifest + sha256。
+
+        Delegates to the shared scan_source_bundle so all callers get the
+        same material-metadata classification. Kept for backward
+        compatibility with tests and scripts that call this name directly.
+        """
+        from clab_builder.shared.source_bundle import scan_source_bundle
+        return scan_source_bundle(atom_dir, source_kind="vulhub")
+
+    @staticmethod
+    def _force_rmtree(path) -> None:
+        """Remove a directory tree, surviving files owned by another uid.
+
+        The agent container (uid 1000) writes .claude_cache subdirs as its own
+        uid. When the host user is a different uid, shutil.rmtree raises
+        PermissionError on those entries and the whole pipeline aborts. Fall
+        back to a root docker container (alpine) to wipe them, then retry.
+        """
+        path = Path(path)
+        if not path.exists():
+            return
+        try:
+            shutil.rmtree(path)
+            return
+        except (PermissionError, OSError) as exc:
+            print(f"  [cleanup] host cannot rmtree {path} ({exc}); wiping via root container")
+        abs_path = str(path.resolve())
+        try:
+            subprocess.run(
+                ["docker", "run", "--rm", "-v", f"{abs_path}:/wipe:rw", "alpine:latest",
+                 "sh", "-c", "rm -rf /wipe && mkdir -p /wipe"],
+                capture_output=True, text=True, timeout=60,
+            )
+            shutil.rmtree(path)
+        except Exception as exc:
+            print(f"  [cleanup] forced rmtree failed for {path}: {exc}")
+
+    @staticmethod
+    def _extract_capability_executors(atom_dir) -> dict:
+        """从 agent 轨迹（session.json）提取可复用命令执行通道。
+
+        扫描 agent 的 Bash 工具调用，找"命令执行锚点"（shell_exec/FROM PROGRAM/
+        Runtime.exec/webshell ?cmd=/exploit.py "命令"）。如果 2+ 个调用通过同一
+        锚点类型执行了不同命令，说明通道可复用，生成 capability_executor。
+
+        只对真实验证过"可执行任意命令"的 atom 生成 verified=true executor。
+        通道不适合 stateless 调用的（需上传文件/探测参数）不会匹配，自然不生成。
+        """
+        import json as _json
+        from clab_builder.shared.models.atom import CapabilityExecutor
+
+        session_path = atom_dir / "session.json"
+        if not session_path.exists():
+            return {}
+
+        # 加载 agent 的 Bash 命令
+        raw = session_path.read_text(encoding="utf-8", errors="replace")
+        entries: list = []
+        try:
+            parsed = _json.loads(raw)
+            entries = parsed if isinstance(parsed, list) else [parsed]
+        except _json.JSONDecodeError:
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(_json.loads(line))
+                except _json.JSONDecodeError:
+                    continue
+
+        commands: list[str] = []
+        for entry in entries:
+            message = entry.get("message", entry) if isinstance(entry, dict) else {}
+            for block in message.get("content", []) or []:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") != "tool_use" or block.get("name") != "Bash":
+                    continue
+                cmd = (block.get("input") or {}).get("command", "")
+                if cmd:
+                    commands.append(cmd)
+
+        if len(commands) < 2:
+            return {}
+
+        # 命令执行锚点：(正则, template替换形式)
+        # 正则的 group(1) 匹配"被执行的具体命令"
+        anchors = [
+            (re.compile(r'shell_exec\(["\'](.*?)["\']\)'),
+             'shell_exec("{{command_b64}} | base64 -d")'),
+            (re.compile(r"FROM\s+PROGRAM\s+'(.*?)'"),
+             "FROM PROGRAM '{{command}}'"),
+            (re.compile(r'Runtime\.getRuntime\(\)\.exec\(\\*["\'](.*?)\\*["\']\)'),
+             'Runtime.getRuntime().exec("{{command_b64}} | base64 -d")'),
+            (re.compile(r'[?&]cmd=([^&"\s\\]*)'),
+             "?cmd={{command_b64}}"),
+            (re.compile(r'(python3?\s+\S+\.py\s+[\d.]+\s+\d+\s+)"([^"]*)"'),
+             r'\1"{{command}}"'),
+        ]
+
+        for anchor_re, template_form in anchors:
+            matched: list[tuple[str, str]] = []
+            for cmd in commands:
+                for m in anchor_re.finditer(cmd):
+                    extracted = m.group(1).strip()
+                    # 过滤占位符、空、过长的（>200 字符不像命令）
+                    if extracted and not extracted.startswith("{") and len(extracted) < 200:
+                        matched.append((cmd, extracted))
+            if len(matched) < 2:
+                continue
+            unique_commands = {c for _, c in matched}
+            if len(unique_commands) < 2:
+                continue  # 所有命令相同，没有"不同命令"证据
+
+            # 用第一个匹配的完整命令作为 template 基础
+            base_cmd = matched[0][0]
+            # IP 模板化
+            base_cmd = re.sub(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", "{{target_ip}}", base_cmd)
+            # 替换第一个锚点匹配为 template 形式
+            first_match = anchor_re.search(base_cmd)
+            if not first_match:
+                continue
+            template = base_cmd[:first_match.start()] + template_form + base_cmd[first_match.end():]
+
+            # 验证 template 含 {{command}} 或 {{command_b64}}
+            if "{{command}}" not in template and "{{command_b64}}" not in template:
+                continue
+
+            # 质量过滤：只保留可安全参数化的单行 stateless 通道。
+            # 去掉开头的注释行（agent 常在命令前加 # 说明）
+            lines = template.split("\n")
+            while lines and lines[0].lstrip().startswith("#"):
+                lines = lines[1:]
+            template = "\n".join(lines).strip()
+            if not template:
+                continue
+            # 无法安全参数化的通道直接放弃（不生成 executor）：
+            # - heredoc / 写文件：结构依赖 << 标记，参数化会破坏
+            # - python -c 多行脚本：换行是语法的一部分，不能压缩
+            # - 需要先获取 session token 的复杂前置
+            if " << " in template or template.startswith("cat >"):
+                continue
+            if template.startswith(("python3 -c", "python -c")):
+                continue
+            if template.startswith(("JSESSIONID=", "TOKEN=")):
+                continue
+            if len(template) > 500:
+                continue
+            if template.count(";") > 8:
+                continue
+            # 必须是 curl/psql 等单行命令开头（stateless 可调用）
+            if not template.startswith(("curl ", "curl\t", "PGPASSWORD=", "psql ")):
+                continue
+            # 压缩多余空格但保留换行结构（单行命令无换行，不受影响）
+            template = re.sub(r"[ \t]+", " ", template).strip()
+
+            # 自动提取只生成候选（verified=false）。
+            # verified=true 必须由专门的 sentinel 验证流程确认：
+            # 先跑 exploit steps 建立通道，再执行随机无害命令验证。
+            executor = CapabilityExecutor(
+                mode="stateless",
+                command_template=template,
+                shell="/bin/sh",
+                verified=False,
+            )
+            print(f"  [capability_executor] candidate (verified=false): {len(unique_commands)} unique commands via {anchor_re.pattern[:30]}")
+            return {"execute_command": executor.model_dump(mode="json")}
+
+        return {}
+
+    @staticmethod
+    def _infer_protocol(port) -> str:
+        """从端口号推断协议，用于兼容构建 exploit_access。"""
+        try:
+            p = int(port)
+        except (TypeError, ValueError):
+            return "tcp"
+        return {
+            21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns",
+            80: "http", 110: "pop3", 143: "imap", 443: "https", 445: "smb",
+            1433: "mssql", 1521: "oracle", 2049: "nfs", 3306: "mysql",
+            5432: "postgres", 5900: "vnc", 6379: "redis", 7001: "http",
+            8080: "http", 8443: "https", 8888: "http", 9042: "cassandra",
+            9200: "elasticsearch", 9300: "elasticsearch", 11211: "memcached",
+            27017: "mongodb", 50070: "hadoop",
+        }.get(p, "tcp")
+
+    @staticmethod
+    def _build_capability_contract(agent_extra, verified, main_ports,
+                                   env=None, vulhub_dir: str = ""):
+        """从 agent 输出构建 (exploit_access, capability_grants)。
+
+        agent 在新 prompt 下输出 exploit_access / capability_grants /
+        exploit_principal。缺失时（老 prompt 兼容）：从已知端口推断
+        exploit_access，从 pivot_capability 兼容映射 grants。
+
+        当 agent 返回的 required_service 不完整或为空、且 main_ports 也
+        为空时（CVE-Factory task 的 compose 常无 ports 映射），用共享
+        service resolver 从 Dockerfile EXPOSE / test endpoint 推断补齐，
+        不再回退成空的 required_service: {}。
+        """
+        from clab_builder.shared.models.atom import (
+            ExploitAccess as _ExploitAccess,
+            CapabilityGrant as _CapabilityGrant,
+            CapabilityType as _CapabilityType,
+            EvidenceLevel as _EvidenceLevel,
+            PivotCapability as _PivotCapability,
+        )
+
+        ea_data = agent_extra.get("exploit_access")
+        exploit_access = None
+        if isinstance(ea_data, dict):
+            required_service = ea_data.get("required_service")
+            if not isinstance(required_service, dict) or not required_service:
+                # agent 用 flat 字段 required_service_protocol / _port
+                required_service = {
+                    "protocol": ea_data.get("required_service_protocol"),
+                    "port": ea_data.get("required_service_port"),
+                }
+            exploit_access = _ExploitAccess(
+                attack_vector=ea_data.get("attack_vector", "network"),
+                privileges_required=ea_data.get("privileges_required", "none"),
+                required_service=required_service,
+            )
+        elif main_ports:
+            port = main_ports[0]
+            exploit_access = _ExploitAccess(
+                attack_vector="network",
+                privileges_required="none",
+                required_service={
+                    "protocol": AtomizerPipeline._infer_protocol(port),
+                    "port": port,
+                },
+            )
+
+        # If the agent returned an incomplete required_service (missing
+        # protocol or port) or produced none at all, resolve the authoritative
+        # service contract from the source tree instead of leaving it empty.
+        # This is the core fix for the 211 atoms with required_service: {}.
+        from clab_builder.shared.service_resolver import resolve_service_contract
+        from pathlib import Path as _Path
+        src_dir = _Path(vulhub_dir).resolve() if vulhub_dir else None
+        resolved = resolve_service_contract(env, src_dir)
+        if exploit_access is not None:
+            rs = exploit_access.required_service or {}
+            has_proto = bool(rs.get("protocol"))
+            has_port = rs.get("port") is not None
+            if (not has_proto or not has_port) and resolved is not None:
+                rs = dict(rs)
+                if not has_proto:
+                    rs["protocol"] = resolved[0]
+                if not has_port:
+                    rs["port"] = resolved[1]
+                exploit_access = _ExploitAccess(
+                    attack_vector=exploit_access.attack_vector,
+                    privileges_required=exploit_access.privileges_required,
+                    required_service=rs,
+                )
+        elif resolved is not None:
+            exploit_access = _ExploitAccess(
+                attack_vector="network",
+                privileges_required="none",
+                required_service={"protocol": resolved[0], "port": resolved[1]},
+            )
+
+        # Evidence level: only the capabilities the agent actually verified
+        # get VERIFIED. Without per-capability witness mapping (which the
+        # current agent output schema does not provide), we cannot prove a
+        # specific capability independently — but we can at least point the
+        # evidence_ref at the real native evidence record so it is resolvable
+        # by the qualification function and audit, instead of an opaque label
+        # like "native-replay-01" that nothing can verify.
+        #
+        # Randomized per-capability witnesses (random command, random file,
+        # random credential) are produced by the CVE-Factory PoC backend
+        # (batches 7-9), which has the setup to inject and observe them.
+        ev_level = _EvidenceLevel.VERIFIED if verified else _EvidenceLevel.INFERRED
+        ev_ref = "verification.native_verification.evidence" if verified else \
+                 "verification.native_verification.evidence"
+        principal = agent_extra.get("exploit_principal") or "service_user"
+        cap_list = agent_extra.get("capability_grants") or []
+        capability_grants: list[_CapabilityGrant] = []
+        if cap_list and isinstance(cap_list, list):
+            for cap in cap_list:
+                try:
+                    capability_grants.append(_CapabilityGrant(
+                        type=_CapabilityType(cap),
+                        principal=principal,
+                        evidence_level=ev_level,
+                        evidence_ref=ev_ref,
+                    ))
+                except (ValueError, KeyError):
+                    pass
+        if not capability_grants:
+            post_exploit = agent_extra.get("post_exploit") or {}
+            pivot_raw = post_exploit.get("pivot_capability", "none") if isinstance(post_exploit, dict) else "none"
+            try:
+                pivot = _PivotCapability(pivot_raw)
+            except ValueError:
+                pivot = _PivotCapability.NONE
+            compat_map = {
+                _PivotCapability.SHELL: [
+                    _CapabilityType.EXECUTE_COMMAND, _CapabilityType.NETWORK_VANTAGE,
+                ],
+                _PivotCapability.FULL_TOOLBOX: [
+                    _CapabilityType.EXECUTE_COMMAND, _CapabilityType.NETWORK_VANTAGE,
+                    _CapabilityType.READ_FILE,
+                ],
+                _PivotCapability.PORT_FORWARD: [_CapabilityType.NETWORK_VANTAGE],
+                _PivotCapability.CREDENTIAL: [_CapabilityType.READ_CREDENTIAL],
+            }
+            for cap_type in compat_map.get(pivot, []):
+                capability_grants.append(_CapabilityGrant(
+                    type=cap_type,
+                    principal=principal,
+                    evidence_level=ev_level,
+                    evidence_ref="verification.native_verification.evidence",
+                ))
+        # Fallback: when the agent emitted no exploit_access and the env has no
+        # declared ports (e.g. CVE-Factory tasks whose compose lacks a ports
+        # mapping), synthesize a minimal network-vector contract so downstream
+        # code that calls exploit_access.model_dump() does not crash on None.
+        if exploit_access is None:
+            exploit_access = _ExploitAccess(
+                attack_vector="network",
+                privileges_required="none",
+                required_service={},
+            )
+        return exploit_access, capability_grants
 
     @staticmethod
     def _infer_vuln_category(vuln_type: str) -> str:
@@ -1365,31 +2308,64 @@ class AtomizerPipeline:
 
         checker_model = model or os.environ.get("LLM_MODEL", "claude-sonnet-4-6")
         try:
-            from anthropic import Anthropic
-
-            kwargs: dict[str, Any] = {"api_key": api_key}
+            # Prefer the anthropic SDK when available; fall back to the
+            # OpenAI-compatible endpoint (the deploy API exposes both
+            # /v1 and the Anthropic protocol on the same host). Using
+            # openai keeps the checker working in environments where the
+            # anthropic package is not installed but the OpenAI-compatible
+            # /v1 endpoint is reachable.
             checker_base_url = base_url or os.environ.get("LLM_BASE_URL", "")
-            if checker_base_url:
-                kwargs["base_url"] = checker_base_url
-            client = Anthropic(**kwargs)
-            response = client.messages.create(
-                model=checker_model,
-                max_tokens=1000,
-                temperature=0,
-                messages=[{
-                    "role": "user",
-                    "content": (
-                        "You are a strict dataset quality checker. "
-                        "Respond with JSON only.\n\n"
-                        + json.dumps(prompt, ensure_ascii=False, indent=2)
-                    ),
-                }],
-            )
-            text = "\n".join(
-                getattr(block, "text", "")
-                for block in getattr(response, "content", [])
-                if getattr(block, "text", "")
-            )
+            text = ""
+            try:
+                from anthropic import Anthropic
+                kwargs: dict[str, Any] = {"api_key": api_key}
+                if checker_base_url:
+                    kwargs["base_url"] = checker_base_url
+                client = Anthropic(**kwargs)
+                response = client.messages.create(
+                    model=checker_model,
+                    max_tokens=1000,
+                    temperature=0,
+                    messages=[{
+                        "role": "user",
+                        "content": (
+                            "You are a strict dataset quality checker. "
+                            "Respond with JSON only.\n\n"
+                            + json.dumps(prompt, ensure_ascii=False, indent=2)
+                        ),
+                    }],
+                )
+                text = "\n".join(
+                    getattr(block, "text", "")
+                    for block in getattr(response, "content", [])
+                    if getattr(block, "text", "")
+                )
+            except ImportError:
+                import openai
+                endpoint = checker_base_url.rstrip("/") if checker_base_url else ""
+                if endpoint and not endpoint.endswith("/v1"):
+                    endpoint = endpoint + "/v1"
+                client = openai.OpenAI(api_key=api_key, base_url=endpoint)
+                response = client.chat.completions.create(
+                    model=checker_model,
+                    max_tokens=4000,
+                    temperature=0,
+                    messages=[{
+                        "role": "user",
+                        "content": (
+                            "You are a strict dataset quality checker. "
+                            "Respond with JSON only.\n\n"
+                            + json.dumps(prompt, ensure_ascii=False, indent=2)
+                        ),
+                    }],
+                )
+                content = response.choices[0].message.content
+                if isinstance(content, list):
+                    content = "".join(
+                        str(c.get("text", "")) if isinstance(c, dict) else str(c)
+                        for c in content
+                    )
+                text = str(content or "")
             data = self._extract_checker_json(text)
             return LLMCheckResult(
                 accepted=bool(data.get("accepted")),

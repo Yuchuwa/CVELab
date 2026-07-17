@@ -44,7 +44,7 @@ class TestAtomLoaderAllVerified:
         assert len(atoms) >= 10  # we have 18+ verified atoms
         for atom in atoms:
             assert atom.verified is True
-            assert atom.version == 2
+            assert atom.version >= 2  # v2 legacy or v3 high-confidence
 
     def test_single_service_filter(self, loader):
         atoms = loader.load_all_verified(single_service_only=True)

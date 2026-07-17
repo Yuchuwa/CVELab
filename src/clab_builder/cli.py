@@ -29,7 +29,11 @@ def main():
 @click.option("--seed", type=int, help="Random seed")
 @click.option("--templates-dir", default="templates", help="Templates directory")
 @click.option("--atoms-dir", default="data/atoms", help="Atoms directory")
-def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir):
+@click.option("--validation-mode", type=click.Choice(["guided_agent", "sysfield"]),
+              default="guided_agent", show_default=True,
+              help="Range validation artifact to generate")
+def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir,
+             validation_mode):
     """Generate scenario files from topology template.
 
     TEMPLATE_NAME is the template directory name (e.g. dmz_simple).
@@ -47,6 +51,7 @@ def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir):
             scenario_name=name,
             output_dir=output,
             seed=seed,
+            validation_mode=validation_mode,
         )
     except (FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}")
@@ -74,8 +79,22 @@ def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir):
 @click.option("--base-url", envvar="LLM_BASE_URL", default="", help="LLM API base URL")
 @click.option("--model", envvar="LLM_MODEL", default="", help="LLM model")
 @click.option("--max-turns", type=int, default=80, help="Max agent turns")
+@click.option(
+    "--environment-only",
+    is_flag=True,
+    help="Validate deploy/readiness/attack graph without invoking an Agent",
+)
+@click.option(
+    "--strict-guide-compatibility/--allow-legacy-guide",
+    default=False,
+    help="Deprecated compatibility flag; Guide alignment warnings never block the Agent",
+)
+@click.option("--validation-mode", type=click.Choice(["guided_agent", "sysfield"]),
+              default="guided_agent", show_default=True,
+              help="Reference validation mode")
 def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
-           api_key, base_url, model, max_turns):
+           api_key, base_url, model, max_turns, environment_only, strict_guide_compatibility,
+           validation_mode):
     """Generate + deploy + agent verify + destroy + save (all-in-one).
 
     TEMPLATE_NAME is the template directory name (e.g. dmz_simple).
@@ -83,7 +102,7 @@ def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
     from clab_builder.orchestrator.composer.scenario import ScenarioPipeline
     from clab_builder.orchestrator.composer.verifier import ScenarioVerifier
 
-    if not api_key:
+    if not api_key and not environment_only:
         click.echo("Error: API key required (set LLM_API_KEY or use --api-key)")
         raise SystemExit(1)
 
@@ -99,6 +118,7 @@ def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
             scenario_name=name,
             output_dir=output,
             seed=seed,
+            validation_mode=validation_mode,
         )
     except (FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}")
@@ -110,17 +130,25 @@ def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
 
     # 2. Deploy + configure + agent + destroy + save
     click.echo("[2/4] Running full pipeline...")
-    verifier = ScenarioVerifier(max_turns=max_turns)
+    verifier = ScenarioVerifier(
+        max_turns=max_turns,
+        validation_mode=validation_mode,
+        strict_guide_compatibility=strict_guide_compatibility,
+    )
     result = verifier.run_full(
         scenario_dir=scenario_dir,
         api_key=api_key,
         base_url=base_url,
         model=model,
+        environment_only=environment_only,
     )
 
     # 3. Summary
     click.echo("[3/4] Results:")
-    if "flag_verification" in result:
+    if environment_only:
+        status = "PASS" if result.get("range_build_verified") else "FAIL"
+        click.echo(f"  Environment status: {status}")
+    elif "flag_verification" in result:
         fv = result["flag_verification"]
         status = "PASS" if fv["all_captured"] else "FAIL"
         click.echo(f"  Status: {status}")
@@ -180,7 +208,9 @@ def atom():
 @click.option("--skip-agent", is_flag=True, help="Skip Agent, only generate config")
 @click.option("--force", is_flag=True, help="Overwrite existing atom")
 @click.option("--max-turns", type=int, default=80, help="Max agent turns")
-def atom_run(cve_path, output, api_key, base_url, model, skip_agent, force, max_turns):
+@click.option("--build-runtime", is_flag=True,
+              help="Build the derived runtime image with base tools (batch 11)")
+def atom_run(cve_path, output, api_key, base_url, model, skip_agent, force, max_turns, build_runtime):
     """Run atomizer on a vulhub CVE directory.
 
     CVE_PATH can be a vulhub directory (e.g. data/vulhub/log4j/CVE-2021-44228)
@@ -208,11 +238,13 @@ def atom_run(cve_path, output, api_key, base_url, model, skip_agent, force, max_
             output_dir=output,
             max_turns=max_turns,
         )
+        pipeline._build_runtime = build_runtime
         result = pipeline.run(
             api_key=api_key or "",
             base_url=base_url or "",
             model=model,
             skip_agent=skip_agent,
+            force=force,
         )
 
         if result.get("success"):

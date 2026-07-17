@@ -12,6 +12,10 @@ def _write_pipeline_atom(
     cve_id: str,
     *,
     requires_pivot_host: bool = False,
+    with_guide: bool = False,
+    guide_principal: str = "unknown",
+    guide_capabilities: list[str] | None = None,
+    capability_grants: list[dict] | None = None,
 ):
     atom_dir = atoms_dir / cve_id
     atom_dir.mkdir(parents=True)
@@ -31,7 +35,7 @@ def _write_pipeline_atom(
                 "exploit_complexity": "simple",
                 "attack_method": "single_request",
                 "flag_injection": {"method": "env_var", "env_var_name": "FLAG"},
-                "flag_verify_command": "echo $FLAG",
+                "flag_verify_command": "cat /flag.txt",
                 "service_startup": {"wait_seconds": 5},
                 "post_exploit": {
                     "pivot_capability": (
@@ -40,6 +44,8 @@ def _write_pipeline_atom(
                     "requires_pivot_host": requires_pivot_host,
                 },
                 "verified": True,
+                **({"capability_grants": capability_grants} if capability_grants is not None else {}),
+                **({"exploit_guide": {"path": "exploit_guide.yaml", "status": "ready"}} if with_guide else {}),
             },
             sort_keys=False,
         )
@@ -49,6 +55,7 @@ def _write_pipeline_atom(
     (playbook_dir / "sysfield.yaml").write_text(
         yaml.dump(
             {
+                "playbook": {"id": cve_id.lower()},
                 "steps": [
                     {
                         "id": "trigger",
@@ -64,6 +71,21 @@ def _write_pipeline_atom(
             sort_keys=False,
         )
     )
+    if with_guide:
+        (atom_dir / "exploit_guide.yaml").write_text(yaml.safe_dump({
+            "version": 1,
+            "cve_id": cve_id,
+            "summary": "test guide",
+            "target": {"protocol": "http", "port": 8080, "service_role": "web_application"},
+            "steps": [{
+                "id": "exploit", "action": "trigger", "procedure": "send request",
+                "depends_on": [], "success_signal": "command output",
+            }],
+            "post_exploit": {
+                "principal": guide_principal,
+                "capabilities": guide_capabilities or [],
+            },
+        }, sort_keys=False))
 
 
 class TestScenarioPipelineGenerate:
@@ -72,6 +94,7 @@ class TestScenarioPipelineGenerate:
         return ScenarioPipeline(
             templates_dir="templates",
             atoms_dir="data/atoms",
+            default_validation_mode="sysfield",
         )
 
     def test_generate_auto_match(self, pipeline, tmp_path):
@@ -91,6 +114,51 @@ class TestScenarioPipelineGenerate:
         assert (out / "ground_truth.json").exists()
         assert (out / "sysfield" / "playbook.yaml").exists()
         assert result["sysfield_playbook"] == str(out / "sysfield" / "playbook.yaml")
+
+    def test_generate_guided_agent_copies_guides(self, tmp_path):
+        atoms_dir = tmp_path / "atoms"
+        _write_pipeline_atom(atoms_dir, "CVE-GUIDED-0001", with_guide=True)
+        pipeline = ScenarioPipeline(templates_dir="templates", atoms_dir=str(atoms_dir))
+        result = pipeline.generate(
+            template_name="dmz_simple",
+            cve_ids=["CVE-GUIDED-0001"],
+            output_dir=str(tmp_path / "scenarios"),
+            validation_mode="guided_agent",
+        )
+        out = Path(tmp_path / "scenarios" / result["name"])
+        assert result["validation_mode"] == "guided_agent"
+        assert (out / "exploit_guides" / "dmz-target-1.yaml").exists()
+        assert "sysfield_playbook" not in result
+        assert result["guide_compatibility"]["overall_status"] == "unknown_legacy"
+        assert yaml.safe_load((out / "scenario.yaml").read_text())["guide_compatibility"]["overall_status"] == "unknown_legacy"
+
+    def test_guide_alignment_difference_is_advisory(self, tmp_path):
+        atoms_dir = tmp_path / "atoms"
+        _write_pipeline_atom(
+            atoms_dir,
+            "CVE-GUIDED-MISMATCH",
+            with_guide=True,
+            guide_principal="guide-user",
+            capability_grants=[{
+                "type": "execute_command",
+                "principal": "verified-user",
+                "evidence_level": "verified",
+            }],
+        )
+        pipeline = ScenarioPipeline(templates_dir="templates", atoms_dir=str(atoms_dir))
+        result = pipeline.generate(
+            template_name="dmz_simple",
+            cve_ids=["CVE-GUIDED-MISMATCH"],
+            output_dir=str(tmp_path / "scenarios"),
+            validation_mode="guided_agent",
+        )
+
+        assert result["guide_compatibility"]["overall_status"] == "unknown_legacy"
+        codes = {
+            item["code"]
+            for item in result["guide_compatibility"]["entries"][0]["advisories"]
+        }
+        assert "principal_mismatch" in codes
 
     def test_generate_with_specific_cve(self, pipeline, tmp_path):
         """指定 CVE 生成"""
@@ -146,6 +214,7 @@ class TestScenarioPipelineBatch:
         return ScenarioPipeline(
             templates_dir="templates",
             atoms_dir="data/atoms",
+            default_validation_mode="sysfield",
         )
 
     def test_batch_generates_multiple(self, pipeline, tmp_path):
@@ -177,6 +246,7 @@ class TestScenarioPipelineMultiTemplate:
         return ScenarioPipeline(
             templates_dir="templates",
             atoms_dir="data/atoms",
+            default_validation_mode="sysfield",
         )
 
     def test_dmz_dual_generates_two_targets(self, pipeline, tmp_path):
@@ -215,57 +285,43 @@ class TestScenarioPipelineMultiTemplate:
         assert gt["attack_path"][1]["step"] == 2
 
     def test_enterprise_3tier_three_targets(self, pipeline, tmp_path):
-        result = pipeline.generate(
-            template_name="enterprise_3tier",
-            output_dir=str(tmp_path),
-            seed=42,
-        )
-        assert len(result["injections"]) == 3
-        zones = [inj["zone"] for inj in result["injections"]]
-        assert zones == ["dmz", "app", "data"]
+        with pytest.raises(ValueError, match="execution_adapter"):
+            pipeline.generate(
+                template_name="enterprise_3tier",
+                output_dir=str(tmp_path),
+                seed=42,
+            )
 
     def test_enterprise_3tier_three_links(self, pipeline, tmp_path):
-        result = pipeline.generate(
-            template_name="enterprise_3tier",
-            output_dir=str(tmp_path),
-            seed=42,
-        )
-        # 3 base links + 3 target links
-        links = result["clab"]["topology"]["links"]
-        assert len(links) == 6
+        with pytest.raises(ValueError, match="execution_adapter"):
+            pipeline.generate(
+                template_name="enterprise_3tier",
+                output_dir=str(tmp_path),
+                seed=42,
+            )
 
     def test_enterprise_3tier_cve_setup_three_playbooks(self, pipeline, tmp_path):
-        result = pipeline.generate(
-            template_name="enterprise_3tier",
-            output_dir=str(tmp_path),
-            seed=42,
-        )
-        assert len(result["cve_setup"]) == 3
-        # All cve-setup tasks run on localhost (init files mounted via CLab binds)
-        for cs in result["cve_setup"]:
-            assert cs["hosts"] == "localhost"
+        with pytest.raises(ValueError, match="execution_adapter"):
+            pipeline.generate(
+                template_name="enterprise_3tier",
+                output_dir=str(tmp_path),
+                seed=42,
+            )
 
     def test_enterprise_3tier_output_files(self, pipeline, tmp_path):
-        result = pipeline.generate(
-            template_name="enterprise_3tier",
-            output_dir=str(tmp_path),
-        )
-        out = Path(tmp_path) / result["name"]
-        assert (out / "clab.yaml").exists()
-        assert (out / "ground_truth.json").exists()
-        assert (out / "scenario.yaml").exists()
-        assert (out / "ansible" / "base.yaml").exists()
-        assert (out / "ansible" / "cve-setup.yaml").exists()
-        assert (out / "sysfield" / "playbook.yaml").exists()
+        with pytest.raises(ValueError, match="execution_adapter"):
+            pipeline.generate(
+                template_name="enterprise_3tier",
+                output_dir=str(tmp_path),
+            )
 
     def test_enterprise_3tier_three_unique_cves(self, pipeline, tmp_path):
-        result = pipeline.generate(
-            template_name="enterprise_3tier",
-            output_dir=str(tmp_path),
-            seed=42,
-        )
-        cve_ids = [inj["cve_id"] for inj in result["injections"]]
-        assert len(set(cve_ids)) == 3  # all unique
+        with pytest.raises(ValueError, match="execution_adapter"):
+            pipeline.generate(
+                template_name="enterprise_3tier",
+                output_dir=str(tmp_path),
+                seed=42,
+            )
 
     def test_dmz_simple_pivot_atom_writes_sysfield_playbook(self, tmp_path):
         atoms_dir = tmp_path / "atoms"
@@ -284,6 +340,7 @@ class TestScenarioPipelineMultiTemplate:
             cve_ids=["CVE-PIVOT-0001"],
             scenario_name="pivot-sysfield",
             output_dir=str(tmp_path / "scenarios"),
+            validation_mode="sysfield",
         )
 
         out = Path(result["sysfield_playbook"])
@@ -316,6 +373,7 @@ class TestCLIIntegration:
             "--cve", "CVE-2014-6271",
             "--name", "cli-test",
             "--output", str(tmp_path),
+            "--validation-mode", "sysfield",
         ])
         assert result.exit_code == 0, result.output
         assert "cli-test" in result.output

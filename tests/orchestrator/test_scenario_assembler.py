@@ -9,10 +9,15 @@ from clab_builder.shared.models.atom import (
     AtomConfig, VulnCategory, MitrePhase, ServiceRole,
     ExploitComplexity, AttackMethod, ServiceInfo, FlagInjection,
     ServiceStartup, NetworkRequirements, PostExploit, PivotCapability,
+    RuntimeSpec,
+    RuntimeBuildSpec,
+    RuntimeStatus,
+    SourceBundle,
+    ExploitAccess,
 )
 from clab_builder.shared.models.template import InjectionPoint
 from clab_builder.orchestrator.composer.scenario_assembler import (
-    ScenarioAssembler, _generate_flag, _generate_scenario_hash,
+    ScenarioAssembler, _generate_flag, _generate_scenario_hash, _zone_bridge_name,
 )
 from clab_builder.orchestrator.composer.template_loader import TemplateLoader
 
@@ -31,6 +36,13 @@ def _make_atom(cve_id="CVE-TEST-0001", ports=None, requires_pivot_host=False) ->
         attack_method=AttackMethod.SINGLE_REQUEST,
         flag_injection=FlagInjection(method="env_var", env_var_name="FLAG"),
         service_startup=ServiceStartup(wait_seconds=5),
+        exploit_access=ExploitAccess(
+            required_service=(
+                {"protocol": "postgres", "port": 5432}
+                if 5432 in (ports or [8080])
+                else {"protocol": "http", "port": (ports or [8080])[0]}
+            )
+        ),
         post_exploit=PostExploit(
             pivot_capability=(
                 PivotCapability.FULL_TOOLBOX
@@ -84,6 +96,30 @@ class TestAssemblerDMZSimple:
         assert result["injections"][0]["cve_id"] == "CVE-TEST-0001"
         assert result["injections"][0]["flag"].startswith("flag{")
 
+    def test_objectives_have_private_and_agent_views(self, assembler):
+        atoms = [
+            _make_atom("CVE-1", ports=[80]),
+            _make_atom("CVE-2", ports=[8080]),
+            _make_atom("CVE-3", ports=[5432]),
+        ]
+        result = assembler.assemble(
+            "enterprise_3tier", atoms, scenario_name="objective-contract"
+        )
+
+        private = result["objectives"]
+        public = result["agent_objectives"]
+        assert [item["id"] for item in private] == ["read-customer-records"]
+        assert private[0]["target_node"] == "target-3"
+        assert private[0]["actor_node"] == "target-2"
+        assert private[0]["reference_command"]
+        assert private[0]["success_pattern"]
+        assert public[0]["id"] == "read-customer-records"
+        assert public[0]["target_node"] == "target-3"
+        assert public[0]["actor_node"] == "target-2"
+        assert "reference_command" not in public[0]
+        assert "success_pattern" not in public[0]
+        assert result["ground_truth"]["objectives"] == private
+
     def test_clab_has_attacker_and_target(self, assembler):
         atom = _make_atom()
         result = assembler.assemble("dmz_simple", [atom])
@@ -114,6 +150,220 @@ class TestAssemblerDMZSimple:
         target = result["clab"]["topology"]["nodes"]["target-1"]
         assert target["image"] == "vulhub/test:latest"
 
+    def test_multi_target_zone_uses_router_bridge(self, assembler):
+        """Multiple targets in one zone form one shared router-side LAN."""
+        atoms = [
+            _make_atom("CVE-TEST-WEB", ports=[8080]),
+            _make_atom("CVE-TEST-DB", ports=[5432]),
+        ]
+        result = assembler.assemble("dmz_dual", atoms, scenario_name="bridge-dual")
+        router = result["ip_allocations"]["edge-router"]
+        bridge = router["bridges"][0]
+        base = result["ansible_base"]
+
+        assert bridge["interfaces"] == ["eth2", "eth3"]
+        assert bridge["address"] == "192.168.100.1/24"
+        assert bridge["name"] == _zone_bridge_name("edge-router", "dmz")
+        assert "eth2" not in {key for key in router if key not in {"routes", "bridges"}}
+        assert "eth3" not in {key for key in router if key not in {"routes", "bridges"}}
+        assert result["ip_allocations"]["target-1"]["eth1"] == "192.168.100.2/24"
+        assert result["ip_allocations"]["target-2"]["eth1"] == "192.168.100.3/24"
+        assert result["ip_allocations"]["target-1"]["gateway"] == "192.168.100.1"
+        assert result["ip_allocations"]["target-2"]["gateway"] == "192.168.100.1"
+        assert {
+            check["target_node"] for check in result["ground_truth"]["network_policy_checks"]
+        } == {"target-1", "target-2"}
+        assert base.index(f"ip link add name {bridge['name']} type bridge") < base.index(
+            f"ip link set eth2 master {bridge['name']}"
+        ) < base.index(f"ip addr replace {bridge['address']} dev {bridge['name']}")
+        assert f"ip addr replace {bridge['address']} dev eth2" not in base
+        assert f"ip addr replace {bridge['address']} dev eth3" not in base
+
+    def test_single_target_zone_keeps_point_to_point_gateway(self, assembler):
+        result = assembler.assemble("dmz_simple", [_make_atom()], scenario_name="bridge-single")
+        router = result["ip_allocations"]["edge-router"]
+        assert "bridges" not in router
+        assert router["eth2"] == "192.168.100.1/24"
+        assert "type bridge" not in result["ansible_base"]
+
+    def test_router_zone_bridge_names_are_stable_and_distinct(self):
+        assert _zone_bridge_name("edge-router", "dmz") == _zone_bridge_name(
+            "edge-router", "dmz"
+        )
+        assert _zone_bridge_name("edge-router", "dmz") != _zone_bridge_name(
+            "edge-router", "app"
+        )
+        assert len(_zone_bridge_name("long-router-name", "long-zone-name")) <= 15
+
+    def test_runtime_spec_is_rendered_into_node(self, assembler):
+        atom = _make_atom()
+        atom.runtime_spec = RuntimeSpec(
+            ports=[8080],
+            services=[],
+            command="php -S 0.0.0.0:8080",
+            environment={"DB_PASSWORD": "postgres"},
+        )
+        result = assembler.assemble("dmz_simple", [atom])
+        target = result["clab"]["topology"]["nodes"]["target-1"]
+        assert target["cmd"] == "php -S 0.0.0.0:8080"
+        assert target["env"]["DB_PASSWORD"] == "postgres"
+        assert target["env"]["FLAG"].startswith("flag{")
+
+    def test_declared_dockerfile_becomes_runtime_build_manifest(self, assembler, tmp_path):
+        atom = _make_atom("CVE-BUILD-0001")
+        atom.source_bundle = SourceBundle(dockerfiles=["source_bundle/Dockerfile"])
+        bundle = tmp_path / atom.cve_id / "source_bundle"
+        bundle.mkdir(parents=True)
+        (bundle / "Dockerfile").write_text("FROM test:latest\n")
+
+        result = assembler.assemble(
+            "dmz_simple", [atom], atoms_dir=str(tmp_path), scenario_name="build-contract"
+        )
+        assert len(result["runtime_builds"]) == 1
+        build = result["runtime_builds"][0]
+        assert build["cve_id"] == atom.cve_id
+        assert result["clab"]["topology"]["nodes"]["target-1"]["image"] == build["image"]
+        selection = result["runtime_images"][0]
+        assert selection["selection"] == "legacy_source_bundle_build"
+        assert selection["fallback_reason"] == "runtime_status_not_requested"
+
+    @pytest.mark.parametrize(
+        ("runtime_status", "runtime_image", "verification_status", "expected_image", "selection", "reason"),
+        [
+            (RuntimeStatus.READY, "cvelab-runtime-ready:1", "ready",
+             "cvelab-runtime-ready:1", "runtime_image", ""),
+            (RuntimeStatus.FAILED, "cvelab-runtime-failed:1", "failed",
+             "vulhub/test:latest", "source_image", "runtime_status_failed"),
+            (RuntimeStatus.UNSUPPORTED, None, "unsupported",
+             "vulhub/test:latest", "source_image", "runtime_status_unsupported"),
+            (RuntimeStatus.NOT_REQUESTED, None, "missing",
+             "vulhub/test:latest", "source_image", "runtime_status_not_requested"),
+        ],
+        ids=["ready", "failed", "unsupported", "legacy"],
+    )
+    def test_runtime_image_selection_states(
+        self, assembler, runtime_status, runtime_image, verification_status,
+        expected_image, selection, reason,
+    ):
+        """Range consumes only an Atom runtime image with two ready records."""
+        atom = _make_atom()
+        atom.runtime_spec = RuntimeSpec(
+            ports=[8080],
+            source_image="vulhub/test:latest",
+            runtime_image=runtime_image,
+            runtime_status=runtime_status,
+            runtime_build=RuntimeBuildSpec(
+                base_image_digest="sha256:base",
+                generated_hash="runtime-build-hash",
+            ),
+        )
+        atom.verification["runtime_verification"] = {
+            "status": verification_status,
+            "runtime_image_digest": "sha256:runtime",
+        }
+
+        result = assembler.assemble("dmz_simple", [atom])
+        target = result["clab"]["topology"]["nodes"]["target-1"]
+        record = result["runtime_images"][0]
+
+        assert target["image"] == expected_image
+        assert record["selected_image"] == expected_image
+        assert record["selection"] == selection
+        assert record["fallback_reason"] == reason
+        assert record["source_image"] == "vulhub/test:latest"
+        assert record["base_image_digest"] == "sha256:base"
+        assert record["runtime_build_generated_hash"] == "runtime-build-hash"
+
+    def test_ready_runtime_without_ready_verification_falls_back(self, assembler):
+        atom = _make_atom()
+        atom.runtime_spec = RuntimeSpec(
+            ports=[8080], source_image="vulhub/test:latest",
+            runtime_image="cvelab-runtime-unverified:1",
+            runtime_status=RuntimeStatus.READY,
+        )
+        result = assembler.assemble("dmz_simple", [atom])
+        record = result["runtime_images"][0]
+        assert record["selection"] == "source_image"
+        assert record["fallback_reason"] == "runtime_verification_missing"
+
+    def test_runtime_image_selection_is_written_to_scenario_metadata(self, assembler, tmp_path):
+        atom = _make_atom()
+        atom.runtime_spec = RuntimeSpec(
+            ports=[8080], source_image="vulhub/test:latest",
+            runtime_image="cvelab-runtime-ready:1",
+            runtime_status=RuntimeStatus.READY,
+            runtime_build=RuntimeBuildSpec(
+                base_image_digest="sha256:base",
+                generated_hash="runtime-build-hash",
+            ),
+        )
+        atom.verification["runtime_verification"] = {
+            "status": "ready", "runtime_image_digest": "sha256:runtime",
+        }
+        result = assembler.assemble("dmz_simple", [atom], scenario_name="runtime-meta")
+        out_dir = assembler.write_output(result, str(tmp_path))
+
+        meta = yaml.safe_load(Path(out_dir, "scenario.yaml").read_text())
+        assert meta["runtime_images"] == result["runtime_images"]
+        assert meta["runtime_images"][0]["selected_image"] == "cvelab-runtime-ready:1"
+
+    def test_ready_runtime_without_digest_falls_back(self, assembler):
+        atom = _make_atom()
+        atom.runtime_spec = RuntimeSpec(
+            ports=[8080], source_image="vulhub/test:latest",
+            runtime_image="cvelab-runtime-unpinned:1",
+            runtime_status=RuntimeStatus.READY,
+            runtime_build=RuntimeBuildSpec(
+                base_image_digest="sha256:base",
+                generated_hash="runtime-build-hash",
+            ),
+        )
+        atom.verification["runtime_verification"] = {"status": "ready"}
+
+        result = assembler.assemble("dmz_simple", [atom])
+
+        record = result["runtime_images"][0]
+        assert record["selection"] == "source_image"
+        assert record["fallback_reason"] == "runtime_image_digest_missing"
+
+    def test_asset_service_contract_rejects_incompatible_atom(self, assembler):
+        atom = _make_atom("CVE-SSH-0001", ports=[22])
+        atom.exploit_access = atom.exploit_access.model_copy(
+            update={"required_service": {"protocol": "ssh", "port": 22}}
+        )
+        atoms = [_make_atom("CVE-1"), _make_atom("CVE-2"), atom]
+        with pytest.raises(ValueError, match="does not satisfy asset"):
+            assembler.assemble("enterprise_3tier", atoms)
+
+    def test_legacy_compose_runtime_is_migrated_without_cve_special_case(self, assembler, tmp_path):
+        atom = _make_atom("CVE-LEGACY-0001")
+        atom.runtime_spec = RuntimeSpec(ports=[8080], services=[])
+        atom.source_bundle = SourceBundle(compose_file="source_bundle/docker-compose.yml")
+        bundle = tmp_path / atom.cve_id / "source_bundle"
+        bundle.mkdir(parents=True)
+        (bundle / "docker-compose.yml").write_text(yaml.safe_dump({
+            "services": {
+                "web": {
+                    "image": "vulhub/test:latest",
+                    "command": "php -S 0.0.0.0:8080",
+                    "environment": {"DB_PASSWORD": "postgres"},
+                }
+            }
+        }))
+
+        result = assembler.assemble(
+            "dmz_simple", [atom], atoms_dir=str(tmp_path), scenario_name="legacy-runtime"
+        )
+        target = result["clab"]["topology"]["nodes"]["target-1"]
+        assert target["cmd"] == "php -S 0.0.0.0:8080"
+        assert target["env"]["DB_PASSWORD"] == "postgres"
+
+    def test_ground_truth_contains_service_readiness_probe(self, assembler):
+        atom = _make_atom(ports=[8080])
+        result = assembler.assemble("dmz_simple", [atom])
+        probes = result["ground_truth"]["attack_path"][0]["readiness_probes"]
+        assert any(p["probe_type"] == "tcp" and p["target"] == "8080" for p in probes)
+
     def test_target_has_binds_for_flag(self, assembler):
         """Target should have CLab binds including flag file"""
         atom = _make_atom(ports=[8080, 8443])
@@ -126,6 +376,18 @@ class TestAssemblerDMZSimple:
         flag_bind = [b for b in target["binds"] if b.endswith(":/flag.txt")]
         assert len(flag_bind) == 1
 
+    def test_file_flag_uses_atom_declared_path(self, assembler):
+        atom = _make_atom()
+        atom.flag_injection = FlagInjection(method="file", file_path="/flag")
+        atom.flag_spec = None
+        # Re-run model normalization for the manually replaced field.
+        atom.flag_spec = atom.model_validate(atom.model_dump()).flag_spec
+        result = assembler.assemble("dmz_simple", [atom])
+
+        target = result["clab"]["topology"]["nodes"]["target-1"]
+        assert any(bind.endswith(":/flag") for bind in target["binds"])
+        assert result["ground_truth"]["attack_path"][0]["flag_hint"] == "file:/flag"
+
     def test_cve_setup_generated(self, assembler):
         atom = _make_atom()
         result = assembler.assemble("dmz_simple", [atom])
@@ -134,6 +396,10 @@ class TestAssemblerDMZSimple:
         # cve-setup runs on localhost (init files already mounted via CLab binds)
         assert setup["hosts"] == "localhost"
         assert len(setup["tasks"]) >= 1  # at least the wait task
+        assert any("Probe TCP 8080" in task["name"] for task in setup["tasks"])
+        assert all(task.get("failed_when") is False for task in setup["tasks"] if "Probe TCP" in task["name"])
+        probe = next(task for task in setup["tasks"] if "Probe TCP" in task["name"])
+        assert probe["register"] == "readiness_target_1_8080"
 
     def test_ground_truth_structure(self, assembler):
         atom = _make_atom()
@@ -162,7 +428,7 @@ class TestAssemblerDMZSimple:
         atoms = [
             _make_atom("CVE-TEST-0001"),
             _make_atom("CVE-TEST-0002"),
-            _make_atom("CVE-TEST-0003"),
+            _make_atom("CVE-TEST-0003", ports=[5432]),
         ]
         result = assembler.assemble("enterprise_3tier", atoms)
 
@@ -172,6 +438,56 @@ class TestAssemblerDMZSimple:
             if node.endswith("-router")
         ]
         assert any(config.get("routes") for config in router_allocations)
+
+    def test_ground_truth_contains_dependency_and_capability_metadata(self, assembler):
+        atoms = [
+            _make_atom("CVE-TEST-0001"),
+            _make_atom("CVE-TEST-0002"),
+            _make_atom("CVE-TEST-0003", ports=[5432]),
+        ]
+        result = assembler.assemble("enterprise_3tier", atoms, scenario_name="dag-meta")
+
+        path = result["ground_truth"]["attack_path"]
+        assert path[0]["kill_chain_phase"] == "entry"
+        assert path[1]["depends_on"] == ["dmz-web"]
+        assert path[1]["depends_on_nodes"] == ["target-1"]
+        assert path[1]["execution_host"] == "dmz-web"
+        assert path[1]["execution_host_node"] == "target-1"
+        assert path[2]["required_assets"] == ["app-db-credential"]
+        assert path[0]["mitre_phase"] == "initial_access"
+        assert "provides" in path[0]
+
+    def test_ground_truth_contains_runtime_network_policy_checks(self, assembler):
+        atoms = [
+            _make_atom("CVE-TEST-0001"),
+            _make_atom("CVE-TEST-0002"),
+            _make_atom("CVE-TEST-0003", ports=[5432]),
+        ]
+        result = assembler.assemble("enterprise_3tier", atoms, scenario_name="policy-meta")
+
+        checks = result["ground_truth"]["network_policy_checks"]
+        assert any(
+            check["source_node"] == "target-1"
+            and check["target_node"] == "target-2"
+            and check["expected_reachable"] is True
+            for check in checks
+        )
+        assert any(
+            check["source_node"] == "attacker"
+            and check["target_node"] == "target-2"
+            and check["expected_reachable"] is False
+            for check in checks
+        )
+
+    def test_generated_network_setup_does_not_mask_address_failures(self, assembler):
+        result = assembler.assemble("dmz_simple", [_make_atom()], scenario_name="fail-fast")
+
+        assert "ip addr replace" in result["ansible_base"]
+        assert "&& ip link set" in result["ansible_base"]
+        assert "2>/dev/null; ip link set" not in result["ansible_base"]
+        assert "docker exec -u 0" in result["ansible_base"]
+        assert "command -v ip" in result["ansible_base"]
+        assert "sudo -n nsenter" in result["ansible_base"]
 
     def test_pivot_host_atom_generates_host_and_service_nodes(self, assembler):
         atom = _make_atom(requires_pivot_host=True)
@@ -202,7 +518,7 @@ class TestAssemblerDMZSimple:
         assert step["service_node"] == "target-1-service"
         assert step["requires_pivot_host"] is True
 
-    def test_intermediate_weak_atom_auto_generates_pivot_host(self, assembler):
+    def test_intermediate_weak_atom_does_not_auto_generate_pivot_host(self, assembler):
         atoms = [
             _make_atom("CVE-TEST-0001"),
             _make_atom("CVE-TEST-0002"),
@@ -210,18 +526,14 @@ class TestAssemblerDMZSimple:
         result = assembler.assemble("dmz_dual", atoms, scenario_name="auto-pivot")
 
         nodes = result["clab"]["topology"]["nodes"]
-        assert nodes["target-1"]["image"] == "cvelab-pivot-base:latest"
-        assert nodes["target-1-service"]["image"] == "vulhub/test:latest"
-        assert (
-            nodes["target-1-service"]["network-mode"]
-            == "container:clab-auto-pivot-target-1"
-        )
+        assert nodes["target-1"]["image"] == "vulhub/test:latest"
+        assert "target-1-service" not in nodes
         assert nodes["target-2"]["image"] == "vulhub/test:latest"
 
         first_step = result["ground_truth"]["attack_path"][0]
         second_step = result["ground_truth"]["attack_path"][1]
-        assert first_step["service_node"] == "target-1-service"
-        assert first_step["requires_pivot_host"] is True
+        assert first_step["service_node"] == "target-1"
+        assert first_step["requires_pivot_host"] is False
         assert second_step["service_node"] == "target-2"
         assert second_step["requires_pivot_host"] is False
 
@@ -272,3 +584,19 @@ class TestAssemblerOutput:
         assert meta["name"] == "test-meta"
         assert meta["template"] == "dmz_simple"
         assert len(meta["injections"]) == 1
+
+    def test_enterprise_asset_playbooks_are_written(self, assembler, tmp_path):
+        atoms = [
+            _make_atom("CVE-TEST-0001"),
+            _make_atom("CVE-TEST-0002"),
+            _make_atom("CVE-TEST-0003", ports=[5432]),
+        ]
+        result = assembler.assemble("enterprise_3tier", atoms, scenario_name="asset-meta")
+        out_dir = assembler.write_output(result, str(tmp_path))
+
+        setup = Path(out_dir, "ansible", "asset-setup.yaml")
+        verify = Path(out_dir, "ansible", "asset-verify.yaml")
+        assert setup.exists()
+        assert verify.exists()
+        assert "clab-asset-meta-target-3" in setup.read_text()
+        assert "CVELAB-CANARY" in verify.read_text()

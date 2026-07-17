@@ -2,7 +2,7 @@
 
 生命周期:
   1. clab deploy -t <scenario>/clab.yaml
-  2. ansible-playbook base.yaml  (IP 配置 + 路由 + 管理网络禁用)
+  2. ansible-playbook base.yaml  (IP 配置 + 数据面路由)
   3. ansible-playbook cve-setup.yaml (等待服务就绪)
   4. 在 attacker 容器内运行 scenario_runner.py
   5. 收集结果 → 与 ground_truth 比对
@@ -11,12 +11,23 @@
 """
 
 import json
+import ipaddress
+import re
+import secrets
+import shlex
+import socket
 import subprocess
+import sys
+import time
+from urllib.parse import urlparse
 from pathlib import Path
+from typing import Any
 
 from clab_builder.orchestrator.composer.scenario_runner import (
     DEFAULT_MAX_TURNS as DEFAULT_AGENT_TURNS,
+    extract_observed_progress,
 )
+from clab_builder.orchestrator.composer.sysfield_runner import SysFieldRunner
 
 SCENARIO_RUNNER_SRC = Path(__file__).parent / "scenario_runner.py"
 
@@ -24,9 +35,705 @@ SCENARIO_RUNNER_SRC = Path(__file__).parent / "scenario_runner.py"
 class ScenarioVerifier:
     """场景验证器：一条命令完成全流程"""
 
-    def __init__(self, max_turns: int = DEFAULT_AGENT_TURNS):
+    def __init__(
+        self,
+        max_turns: int = DEFAULT_AGENT_TURNS,
+        agent_timeout: int = 1800,
+        require_agent_success: bool = False,
+        atoms_dir: str = "data/atoms",
+        sysfield_bin: str | None = None,
+        validation_mode: str = "guided_agent",
+        strict_guide_compatibility: bool = False,
+    ):
+        if validation_mode not in {"guided_agent", "sysfield"}:
+            raise ValueError("validation_mode must be guided_agent or sysfield")
         self.max_turns = max_turns
+        self.agent_timeout = agent_timeout
+        self.require_agent_success = require_agent_success
+        self.atoms_dir = Path(atoms_dir)
+        self.sysfield_runner = SysFieldRunner(binary=sysfield_bin)
         self.agent_image = "clab-agent:latest"
+        self.validation_mode = validation_mode
+        # Kept as a compatibility parameter for existing callers.  Guide
+        # alignment/runtime differences are advisory; only Guide integrity
+        # can prevent Agent startup.
+        self.strict_guide_compatibility = strict_guide_compatibility
+
+    @staticmethod
+    def _agent_endpoint(base_url: str) -> tuple[str, int]:
+        """Return the host/port the attacker must reach for the LLM API."""
+        endpoint = (base_url or "https://api.anthropic.com").strip()
+        if "://" not in endpoint:
+            endpoint = f"https://{endpoint}"
+        parsed = urlparse(endpoint)
+        if not parsed.hostname:
+            raise ValueError(f"Invalid LLM base URL: {base_url!r}")
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        return parsed.hostname, port
+
+    @staticmethod
+    def _resolve_endpoint(host: str, port: int) -> list[str]:
+        """Resolve IPv4 addresses on the host, before entering the CLab netns."""
+        if re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", host):
+            return [host]
+        addresses = {
+            item[4][0]
+            for item in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+            if item[0] == socket.AF_INET
+        }
+        return sorted(addresses)
+
+    @staticmethod
+    def _run_command(command: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            command, capture_output=True, text=True, timeout=timeout,
+        )
+
+    def _prepare_agent_transport(self, scenario_dir: str, base_url: str = "") -> dict[str, Any]:
+        """Create a scoped egress path from attacker to the LLM API.
+
+        The scenario's data-plane default route intentionally cannot reach the
+        host-side LLM service.  A per-run Docker bridge is attached only to the
+        attacker and a host-specific route is installed; target isolation is
+        left unchanged.
+        """
+        import yaml
+
+        scenario_path = Path(scenario_dir)
+        clab_data = yaml.safe_load((scenario_path / "clab.yaml").read_text()) or {}
+        scenario_meta = {}
+        meta_path = scenario_path / "scenario.yaml"
+        if meta_path.exists():
+            scenario_meta = yaml.safe_load(meta_path.read_text()) or {}
+        reserved_subnets = []
+        for value in scenario_meta.get("network_subnets", []) or []:
+            try:
+                reserved_subnets.append(ipaddress.ip_network(str(value), strict=False))
+            except ValueError:
+                continue
+        lab_name = clab_data.get("name", scenario_path.name)
+        attacker = f"clab-{lab_name}-attacker"
+        try:
+            host, port = self._agent_endpoint(base_url)
+            addresses = self._resolve_endpoint(host, port)
+            if not addresses:
+                raise RuntimeError(f"LLM API host did not resolve: {host}")
+
+            suffix = secrets.token_hex(4)
+            network = f"cvelab-agent-control-{re.sub(r'[^a-zA-Z0-9_.-]', '-', str(lab_name))[:35]}-{suffix}"
+            # Docker's automatic /20 allocator can overlap a scenario zone
+            # (the batch failure used 192.168.96.0/20, covering 192.168.100.0/24).
+            # Try small, reserved control subnets explicitly and let Docker
+            # reject a candidate that is already in use.
+            control_candidates = [
+                f"172.31.{octet}.0/28" for octet in range(240, 256)
+            ] + [f"10.254.{octet}.0/28" for octet in range(240, 256)]
+            created = None
+            control_subnet = ""
+            create_error = ""
+            for candidate in control_candidates:
+                candidate_net = ipaddress.ip_network(candidate)
+                if any(candidate_net.overlaps(network) for network in reserved_subnets):
+                    continue
+                gateway_candidate = str(next(ipaddress.ip_network(candidate).hosts()))
+                attempt = self._run_command([
+                    "docker", "network", "create", "--driver", "bridge",
+                    "--subnet", candidate, "--gateway", gateway_candidate,
+                    # ContainerLab already owns eth0/eth1 in the attacker netns.
+                    # Docker's default eth prefix would try to reuse eth1 when the
+                    # second network is joined, so use a dedicated control iface.
+                    "--opt", "com.docker.network.container_iface_prefix=ctl",
+                    "--label", "cvelab.role=agent-control",
+                    "--label", f"cvelab.scenario={lab_name}",
+                    network,
+                ])
+                if attempt.returncode == 0:
+                    created = attempt
+                    control_subnet = candidate
+                    break
+                create_error = attempt.stderr.strip()[-1000:]
+            if created is None:
+                return {
+                    "ok": False,
+                    "stage": "network_create",
+                    "error": create_error or "no disjoint control subnet available",
+                    "endpoint_host": host,
+                    "endpoint_port": port,
+                }
+
+            connected = self._run_command(["docker", "network", "connect", network, attacker])
+            if connected.returncode != 0:
+                self._run_command(["docker", "network", "rm", network])
+                return {
+                    "ok": False,
+                    "stage": "network_connect",
+                    "error": connected.stderr.strip()[-1000:],
+                    "endpoint_host": host,
+                    "endpoint_port": port,
+                    "network_name": network,
+                    "network_created": True,
+                }
+
+            inspected = self._run_command(["docker", "inspect", attacker])
+            if inspected.returncode != 0:
+                raise RuntimeError(inspected.stderr.strip() or "attacker inspect failed")
+            container_data = json.loads(inspected.stdout)[0]
+            network_info = container_data["NetworkSettings"]["Networks"][network]
+            gateway = network_info.get("Gateway")
+            attacker_ip = network_info.get("IPAddress")
+            container_pid = container_data.get("State", {}).get("Pid")
+            if not gateway or not attacker_ip:
+                raise RuntimeError("agent control network has no gateway or attacker address")
+            if not container_pid:
+                raise RuntimeError("attacker container has no network namespace pid")
+
+            ip_output = self._run_command([
+                "docker", "exec", "-u", "0", attacker, "ip", "-o", "-4", "addr", "show",
+            ])
+            if ip_output.returncode != 0:
+                raise RuntimeError(ip_output.stderr.strip() or "cannot inspect attacker interfaces")
+            interface = ""
+            for line in ip_output.stdout.splitlines():
+                fields = line.split()
+                if len(fields) < 4 or not fields[1]:
+                    continue
+                address_index = next(
+                    (index for index, value in enumerate(fields) if value == "inet"),
+                    None,
+                )
+                if address_index is None or address_index + 1 >= len(fields):
+                    continue
+                address = fields[address_index + 1].split("/", 1)[0]
+                if address == attacker_ip:
+                    interface = fields[1].split("@", 1)[0]
+                    break
+            if not interface:
+                raise RuntimeError(f"cannot find interface for {attacker_ip}")
+
+            for address in addresses:
+                route = self._run_command([
+                    "docker", "exec", "-u", "0", attacker, "ip", "route", "replace",
+                    f"{address}/32", "via", gateway, "dev", interface,
+                ])
+                if route.returncode != 0:
+                    # ContainerLab nodes commonly lack CAP_NET_ADMIN.  The
+                    # verifier itself runs on the host (normally via sudo),
+                    # so enter the same netns from the host as a fallback.
+                    route = self._run_command([
+                        "nsenter", "-t", str(container_pid), "-n", "ip", "route", "replace",
+                        f"{address}/32", "via", gateway, "dev", interface,
+                    ])
+                    if route.returncode != 0:
+                        raise RuntimeError(
+                            route.stderr.strip() or f"route install failed for {address}"
+                        )
+
+            probe_code = (
+                "import socket,sys; "
+                "s=socket.create_connection((sys.argv[1],int(sys.argv[2])),5); "
+                "s.close()"
+            )
+            probe = self._run_command([
+                "docker", "exec", "-u", "0", attacker, "python3", "-c", probe_code,
+                addresses[0], str(port),
+            ], timeout=15)
+            if probe.returncode != 0:
+                raise RuntimeError(
+                    f"LLM API TCP probe failed: {probe.stderr.strip() or probe.stdout.strip()}"
+                )
+
+            return {
+                "ok": True,
+                "network_name": network,
+                "network_created": True,
+                "control_subnet": control_subnet,
+                "container": attacker,
+                "interface": interface,
+                "gateway": gateway,
+                "endpoint_host": host,
+                "endpoint_port": port,
+                "resolved_addresses": addresses,
+            }
+        except (
+            OSError, ValueError, KeyError, IndexError, RuntimeError,
+            json.JSONDecodeError, subprocess.SubprocessError,
+        ) as exc:
+            return {
+                "ok": False,
+                "stage": "network_prepare",
+                "error": str(exc),
+                "endpoint_host": locals().get("host", ""),
+                "endpoint_port": locals().get("port"),
+                "network_name": locals().get("network", ""),
+                "network_created": bool(locals().get("created")) and locals()["created"].returncode == 0,
+            }
+
+    def _cleanup_agent_transport(self, transport: dict[str, Any]) -> None:
+        """Remove the per-run control network after the CLab lab is destroyed."""
+        network = transport.get("network_name")
+        if not network or not transport.get("network_created"):
+            return
+        container = transport.get("container")
+        if container:
+            self._run_command(["docker", "network", "disconnect", "-f", network, container])
+        self._run_command(["docker", "network", "rm", network])
+
+    def _load_scenario_context(self, scenario_dir: str):
+        scenario_path = Path(scenario_dir)
+        gt_file = scenario_path / "ground_truth.json"
+        if not gt_file.exists():
+            raise FileNotFoundError(f"ground_truth.json not found in {scenario_dir}")
+        ground_truth = json.loads(gt_file.read_text())
+        meta = {}
+        scenario_meta = scenario_path / "scenario.yaml"
+        if scenario_meta.exists():
+            import yaml
+            meta = yaml.safe_load(scenario_meta.read_text()) or {}
+        return ground_truth, meta.get("ip_allocations", {}), meta
+
+    @staticmethod
+    def _public_objectives(meta: dict) -> list[dict]:
+        """Return the oracle-free objective view, including legacy scenarios."""
+        public = meta.get("agent_objectives")
+        if isinstance(public, list) and public:
+            return public
+
+        objectives = meta.get("objectives") or []
+        assets = {
+            item.get("id"): item
+            for item in (meta.get("assets") or [])
+            if isinstance(item, dict)
+        }
+        injections = {
+            item.get("ip_id"): item
+            for item in (meta.get("injections") or [])
+            if isinstance(item, dict)
+        }
+        ip_alloc = meta.get("ip_allocations") or {}
+        result = []
+        for objective in objectives:
+            if not isinstance(objective, dict):
+                continue
+            asset_id = str(objective.get("asset") or "")
+            asset = assets.get(asset_id, {})
+            location = asset.get("location") or {}
+            target_ref = str(location.get("node_ref") or "")
+            target_injection = injections.get(target_ref, {})
+            target_node = target_injection.get(
+                "service_node", target_injection.get("node_name", target_ref)
+            )
+            actor_ref = str(objective.get("actor_ref") or "")
+            actor_injection = injections.get(actor_ref, {})
+            if actor_ref:
+                actor_node = actor_injection.get(
+                    "service_node", actor_injection.get("node_name", actor_ref)
+                )
+            else:
+                actor_ref = str(target_injection.get("execution_host") or "attacker")
+                actor_injection = injections.get(actor_ref, {})
+                actor_node = actor_injection.get(
+                    "service_node", actor_injection.get("node_name", actor_ref)
+                )
+            target_ip = str(
+                ip_alloc.get(target_injection.get("node_name", ""), {})
+                .get("eth1", "")
+            ).split("/", 1)[0]
+            objective_id = str(objective.get("id") or "").strip() or re.sub(
+                r"[^A-Za-z0-9_.-]+", "-",
+                f"{asset_id}-{objective.get('validation', '')}",
+            ).strip("-").lower()
+            result.append({
+                "id": objective_id,
+                "asset": asset_id,
+                "validation": objective.get("validation", ""),
+                "goal": objective.get("goal") or (
+                    f"Complete {objective.get('validation', 'the declared validation')} "
+                    f"for asset {asset_id} and report the obtained evidence"
+                ),
+                "evidence_field": objective.get("evidence_field", "evidence"),
+                "verification_mode": objective.get("verification_mode", "agent_evidence"),
+                "target_node": target_node,
+                "target_ip": target_ip,
+                "actor_node": actor_node,
+            })
+        return result
+
+    def _run_reference_path(self, scenario_dir: str) -> dict[str, Any]:
+        """Execute the generated SysField playbook on the deployed topology."""
+        result = self.sysfield_runner.run(scenario_dir)
+        return {
+            "ok": bool(result.get("ok")),
+            "returncode": result.get("returncode"),
+            "command": result.get("command", []),
+            "stdout": result.get("stdout", ""),
+            "stderr": result.get("stderr", ""),
+            "error": result.get("error", ""),
+            "steps_succeeded": result.get("steps_succeeded"),
+            "steps_total": result.get("steps_total"),
+        }
+
+    @staticmethod
+    def _parse_probe_port(target: object) -> int | None:
+        text = str(target or "").strip()
+        if not text:
+            return None
+        if ":" in text and not text.isdigit():
+            text = text.rsplit(":", 1)[-1]
+        try:
+            port = int(text)
+        except ValueError:
+            return None
+        return port if 1 <= port <= 65535 else None
+
+    def _container_port_listening(self, container: str, port: int) -> tuple[bool, str]:
+        """Check LISTEN state without assuming nc/ss/netstat exists in the image."""
+        output = self._run_command(["docker", "exec", container, "cat", "/proc/net/tcp"])
+        output6 = self._run_command(["docker", "exec", container, "cat", "/proc/net/tcp6"])
+        if output.returncode != 0 and output6.returncode != 0:
+            error = output.stderr.strip() or output6.stderr.strip() or "procfs unavailable"
+            return False, error
+        wanted = f"{port:04X}".upper()
+        for proc in (output.stdout, output6.stdout):
+            for line in proc.splitlines()[1:]:
+                fields = line.split()
+                if len(fields) >= 4 and fields[1].rsplit(":", 1)[-1].upper() == wanted:
+                    if fields[3].upper() == "0A":  # TCP_LISTEN
+                        return True, "listening"
+        return False, f"port {port} is not listening"
+
+    def _container_http_ready(self, container: str, port: int, path: str = "/") -> tuple[bool, str]:
+        """Perform an HTTP request using a client already present in the target."""
+        url = f"http://127.0.0.1:{port}{path if path.startswith('/') else '/'+path}"
+        command = (
+            "if command -v curl >/dev/null 2>&1; then "
+            f"curl -fsS --max-time 5 {shlex.quote(url)} >/dev/null; "
+            "elif command -v wget >/dev/null 2>&1; then "
+            f"wget -q -O /dev/null -T 5 {shlex.quote(url)}; "
+            "else exit 125; fi"
+        )
+        probe = self._run_command(["docker", "exec", container, "sh", "-c", command], timeout=15)
+        if probe.returncode == 0:
+            return True, "HTTP request succeeded"
+        if probe.returncode == 125:
+            return False, "target image has neither curl nor wget for HTTP readiness"
+        return False, probe.stderr.strip() or f"HTTP request failed for {url}"
+
+    def _run_readiness_probe(self, container: str, probe: dict[str, Any]) -> dict[str, Any]:
+        probe_type = str(probe.get("probe_type", "container_state")).lower()
+        command = probe.get("command")
+        if command:
+            result = self._run_command(["docker", "exec", container, "sh", "-c", str(command)], timeout=30)
+            return {
+                "probe_type": probe_type,
+                "target": probe.get("target", ""),
+                "ok": result.returncode == 0,
+                "detail": result.stderr.strip() or result.stdout.strip(),
+            }
+        if probe_type == "container_state":
+            state = self._run_command(["docker", "inspect", "-f", "{{.State.Running}}", container])
+            return {
+                "probe_type": probe_type,
+                "target": probe.get("target", ""),
+                "ok": state.returncode == 0 and state.stdout.strip().lower() == "true",
+                "detail": state.stderr.strip() or state.stdout.strip(),
+            }
+        port = self._parse_probe_port(probe.get("target"))
+        if port is None:
+            return {
+                "probe_type": probe_type,
+                "target": probe.get("target", ""),
+                "ok": False,
+                "detail": "readiness probe has no valid port",
+            }
+        if probe_type == "tcp":
+            ok, detail = self._container_port_listening(container, port)
+        elif probe_type == "http":
+            ok, detail = self._container_http_ready(container, port, str(probe.get("path", "/")))
+        else:
+            ok, detail = False, f"unsupported readiness probe type: {probe_type}"
+        return {
+            "probe_type": probe_type,
+            "target": probe.get("target", ""),
+            "ok": ok,
+            "detail": detail,
+        }
+
+    def _verify_environment(self, ground_truth: dict, scenario_dir: str) -> dict[str, Any]:
+        """Check container state and service readiness for every attack target."""
+        import yaml
+        clab_data = yaml.safe_load((Path(scenario_dir) / "clab.yaml").read_text())
+        lab_name = clab_data.get("name", "")
+        targets = ground_truth.get("attack_path", [])
+        states = {}
+        details = {}
+        for item in targets:
+            node = item.get("service_node") or item.get("target_node")
+            container = f"clab-{lab_name}-{node}"
+            probe = subprocess.run(
+                ["docker", "inspect", "-f", "{{.State.Running}}", container],
+                capture_output=True, text=True, timeout=30,
+            )
+            running = probe.returncode == 0 and probe.stdout.strip().lower() == "true"
+            readiness = list(item.get("readiness_probes", []))
+            if not readiness:
+                # Backward-compatible scenarios without the new metadata still
+                # get a service-level TCP gate from ground truth or the Atom
+                # contract.  This also upgrades an already-generated Range
+                # without editing its data files.
+                atom = self._load_atom_config(item.get("cve_id", ""))
+                ports = list(item.get("ports", []))
+                if not ports and atom is not None:
+                    ports = list(getattr(atom, "ports", []) or [])
+                readiness = [
+                    {"probe_type": "tcp", "target": str(port)}
+                    for port in ports
+                ]
+            probe_results = []
+            if running:
+                probe_results = [self._run_readiness_probe(container, p) for p in readiness]
+            ready = running and all(result.get("ok", False) for result in probe_results)
+            # A legacy target with no declared service probe retains the state
+            # check; new generated scenarios always carry a TCP/HTTP probe.
+            if running and not readiness:
+                ready = True
+            states[node] = ready
+            details[node] = {
+                "container": container,
+                "running": running,
+                "probes": probe_results,
+            }
+        return {
+            "all_targets_verified": all(states.values()) if states else False,
+            "targets": states,
+            "target_details": details,
+        }
+
+    def _probe_network_edge(
+        self,
+        lab_name: str,
+        source_node: str,
+        target_ip: str,
+        port: int,
+    ) -> dict[str, Any]:
+        """Probe one TCP edge from the source node's real network namespace."""
+        container = f"clab-{lab_name}-{source_node}"
+        probe_code = (
+            "import socket,sys; "
+            "s=socket.create_connection((sys.argv[1],int(sys.argv[2])),3); "
+            "s.close()"
+        )
+        interpreter = self._run_command([
+            "docker", "exec", "-u", "0", container, "sh", "-c",
+            "command -v python3 || command -v python",
+        ], timeout=10)
+        if interpreter.returncode == 0 and interpreter.stdout.strip():
+            probe = self._run_command([
+                "docker", "exec", "-u", "0", container,
+                interpreter.stdout.strip().splitlines()[0], "-c", probe_code,
+                target_ip, str(port),
+            ], timeout=10)
+        else:
+            inspected = self._run_command([
+                "docker", "inspect", "-f", "{{.State.Pid}}", container,
+            ])
+            if inspected.returncode != 0 or not inspected.stdout.strip().isdigit():
+                return {
+                    "port": port,
+                    "reachable": False,
+                    "detail": inspected.stderr.strip() or "source container PID unavailable",
+                }
+            probe = self._run_command([
+                "nsenter", "-t", inspected.stdout.strip(), "-n",
+                sys.executable, "-c", probe_code, target_ip, str(port),
+            ], timeout=10)
+        return {
+            "port": port,
+            "reachable": probe.returncode == 0,
+            "detail": probe.stderr.strip() or probe.stdout.strip()
+            or ("connected" if probe.returncode == 0 else "connection failed"),
+        }
+
+    def _verify_attack_path_reachability(
+        self,
+        ground_truth: dict,
+        scenario_dir: str,
+        ip_alloc: dict,
+    ) -> dict[str, Any]:
+        """Validate allowed attack edges and declared isolation rules at runtime."""
+        import yaml
+
+        scenario_path = Path(scenario_dir)
+        clab_data = yaml.safe_load((scenario_path / "clab.yaml").read_text()) or {}
+        lab_name = clab_data.get("name", scenario_path.name)
+        checks = []
+
+        for step in ground_truth.get("attack_path", []):
+            target_node = step.get("target_node", "")
+            ports = list(step.get("ports", []) or [])
+            if not ports:
+                ports = [
+                    port
+                    for probe in step.get("readiness_probes", [])
+                    if (port := self._parse_probe_port(probe.get("target"))) is not None
+                ]
+            checks.append({
+                "kind": "attack_edge",
+                "source_node": step.get("execution_host_node", "attacker"),
+                "target_node": target_node,
+                "target_ip": (
+                    ip_alloc.get(target_node, {}).get("eth1", "").split("/", 1)[0]
+                    or step.get("target_ip", "")
+                ),
+                "ports": ports,
+                "expected_reachable": True,
+            })
+
+        for policy in ground_truth.get("network_policy_checks", []):
+            checks.append({"kind": "isolation_rule", **policy})
+
+        unique_checks = []
+        seen = set()
+        for check in checks:
+            key = (
+                check.get("source_node"), check.get("target_node"),
+                tuple(check.get("ports", [])), bool(check.get("expected_reachable")),
+            )
+            if key not in seen:
+                seen.add(key)
+                unique_checks.append(check)
+
+        results = []
+        for check in unique_checks:
+            expected = bool(check.get("expected_reachable", True))
+            target_ip = str(check.get("target_ip", ""))
+            ports = [
+                parsed
+                for port in check.get("ports", [])
+                if (parsed := self._parse_probe_port(port)) is not None
+            ]
+            probes = []
+            if target_ip and ports:
+                probes = [
+                    self._probe_network_edge(
+                        lab_name, str(check.get("source_node", "")), target_ip, port
+                    )
+                    for port in ports
+                ]
+            all_reachable = bool(probes) and all(probe["reachable"] for probe in probes)
+            any_reachable = any(probe["reachable"] for probe in probes)
+            item = dict(check)
+            item["probes"] = probes
+            item["ok"] = all_reachable if expected else bool(probes) and not any_reachable
+            if not target_ip or not ports:
+                item["ok"] = False
+                item["error"] = "network check has no target IP or declared port"
+            results.append(item)
+
+        return {
+            "all_edges_verified": bool(results) and all(item["ok"] for item in results),
+            "edges": results,
+        }
+
+    def run_environment(self, scenario_dir: str) -> dict:
+        """Deploy, configure, and execute only the deterministic SysField path.
+
+        This legacy API is intentionally kept deterministic.  The new
+        ``guided_agent`` behavior is implemented by :meth:`run_full`.
+        """
+        scenario_path = Path(scenario_dir)
+        ground_truth, _ip_alloc, _meta = self._load_scenario_context(scenario_dir)
+        result: dict[str, Any] = {
+            "validation_mode": "sysfield",
+            "environment_verified": False,
+            "environment_success": False,
+            "range_build_verified": False,
+            "failure_stage": "",
+            "reference_path_verified": False,
+            "attack_graph_valid": False,
+            "attack_path_reachable": False,
+            "guided_trial_evaluated": False,
+            "guided_trial_success": False,
+            "objective_achieved": False,
+            "guided_reference_evaluated": False,
+            "guided_reference_success": False,
+            "agent_evaluated": False,
+            "agent_success": False,
+            "success": False,
+        }
+        try:
+            runtime_materialization = self._materialize_runtime_images(scenario_dir)
+            result["runtime_materialization"] = runtime_materialization
+            if not runtime_materialization.get("ok"):
+                result["failure_stage"] = "runtime_materialization"
+                return self._save_result(scenario_path, result)
+            if not self._deploy(scenario_dir):
+                result["error"] = "Deploy failed"
+                result["failure_stage"] = "deploy"
+                return self._save_result(scenario_path, result)
+            base = self._run_ansible(scenario_dir, "base.yaml")
+            assets_required = bool(_meta.get("assets") or _meta.get("objectives"))
+            asset = self._run_ansible(
+                scenario_dir, "asset-setup.yaml", required=assets_required
+            )
+            asset_verify = self._run_ansible(
+                scenario_dir, "asset-verify.yaml", required=assets_required
+            )
+            cve = self._run_ansible(scenario_dir, "cve-setup.yaml")
+            environment = self._verify_environment(ground_truth, scenario_dir)
+            result["environment_verified"] = bool(environment.get("all_targets_verified"))
+            result["environment_verification"] = environment
+            result["setup_results"] = {"base": base, "asset_setup": asset,
+                                        "asset_verify": asset_verify, "cve_setup": cve}
+            result["environment_success"] = bool(result["environment_verified"] and all(
+                item.get("ok", True) for item in (base, asset, asset_verify, cve)
+            ))
+            if not result["environment_success"]:
+                for name, setup_result in (
+                    ("base", base),
+                    ("asset_setup", asset),
+                    ("asset_verify", asset_verify),
+                    ("cve_setup", cve),
+                ):
+                    if not setup_result.get("ok", True):
+                        result["failure_stage"] = f"setup:{name}"
+                        break
+                if not result["failure_stage"]:
+                    result["failure_stage"] = "readiness"
+            if result["environment_success"]:
+                result["attack_graph_valid"] = bool(self._validate_attack_graph(ground_truth))
+                path_reachability = self._verify_attack_path_reachability(
+                    ground_truth, scenario_dir, _ip_alloc
+                )
+                result["attack_path_reachability"] = path_reachability
+                result["attack_path_reachable"] = bool(
+                    path_reachability.get("all_edges_verified")
+                )
+            if (
+                result["environment_success"]
+                and result["attack_graph_valid"]
+                and result["attack_path_reachable"]
+            ):
+                reference = self._run_reference_path(scenario_dir)
+                result["reference_path_verification"] = reference
+                result["reference_path_verified"] = bool(reference.get("ok"))
+                result["range_build_verified"] = bool(
+                    result["environment_success"]
+                    and result["attack_graph_valid"]
+                    and result["attack_path_reachable"]
+                )
+                result["success"] = bool(
+                    result["environment_success"] and result["reference_path_verified"]
+                )
+                if not result["reference_path_verified"]:
+                    result["failure_stage"] = "reference_path"
+            elif result["environment_success"]:
+                result["failure_stage"] = (
+                    "attack_graph" if not result["attack_graph_valid"]
+                    else "attack_path_reachability"
+                )
+            return self._save_result(scenario_path, result)
+        finally:
+            self._destroy(scenario_dir)
 
     def run_full(
         self,
@@ -34,58 +741,326 @@ class ScenarioVerifier:
         api_key: str,
         base_url: str = "",
         model: str = "",
+        environment_only: bool = False,
     ) -> dict:
-        """单命令完整流程：deploy → ansible → agent → verify → destroy → save
+        """Run deployment validation, optionally followed by Agent evaluation.
 
-        Returns:
-            完整验证结果
+        environment_only proves Range construction, readiness, attack-graph
+        legality, and path reachability without creating an Agent result.  It
+        is intended for controlled Range compatibility experiments; it never
+        treats a skipped Agent as an Agent failure.
         """
         scenario_path = Path(scenario_dir)
 
-        # 读取 ground_truth 和 ip_allocations
-        gt_file = scenario_path / "ground_truth.json"
-        if not gt_file.exists():
-            raise FileNotFoundError(f"ground_truth.json not found in {scenario_dir}")
-        ground_truth = json.loads(gt_file.read_text())
-
-        ip_alloc = {}
-        scenario_meta = scenario_path / "scenario.yaml"
-        if scenario_meta.exists():
-            import yaml
-            meta = yaml.safe_load(scenario_meta.read_text())
-            ip_alloc = meta.get("ip_allocations", {})
+        ground_truth, ip_alloc, _meta = self._load_scenario_context(scenario_dir)
+        scenario_mode = _meta.get("validation_mode")
+        if scenario_mode in {"guided_agent", "sysfield"}:
+            self.validation_mode = scenario_mode
+        agent_transport: dict[str, Any] = {
+            "ok": False,
+            "stage": "not_evaluated",
+        }
+        guide_preflight: dict[str, Any] = {
+            "evaluated": False,
+            "overall_status": "not_evaluated",
+            "integrity_valid": True,
+            "agent_allowed": True,
+            "entries": [],
+        }
 
         try:
-            # 1. Deploy
+            # 1. Materialize Atom-declared runtime images, then deploy.
+            runtime_materialization = self._materialize_runtime_images(scenario_dir)
+            if not runtime_materialization.get("ok"):
+                return self._save_result(scenario_path, {
+                    "success": False,
+                    "error": "Runtime image materialization failed",
+                    "runtime_materialization": runtime_materialization,
+                    "environment_verified": False,
+                    "environment_success": False,
+                    "range_build_verified": False,
+                    "failure_stage": "runtime_materialization",
+                    "reference_path_verified": False if self.validation_mode == "sysfield" else None,
+                    "attack_graph_valid": False,
+                    "attack_path_reachable": False,
+                    "guided_trial_evaluated": False,
+                    "guided_trial_success": False,
+                    "objective_achieved": False,
+                    "guided_reference_evaluated": False,
+                    "guided_reference_success": False,
+                    "agent_evaluated": False,
+                    "agent_success": False,
+                    "guide_integrity": {
+                        "evaluated": False, "valid": True, "entries": []
+                    },
+                    "guide_advisories": guide_preflight,
+                    "guide_compatibility": guide_preflight,
+                    "agent_transport": agent_transport,
+                })
+
+            # 2. Deploy
             print("[1/5] Deploying...")
             if not self._deploy(scenario_dir):
                 return self._save_result(scenario_path, {
                     "success": False, "error": "Deploy failed",
-                }, ground_truth)
+                    "runtime_materialization": runtime_materialization,
+                    "environment_verified": False,
+                    "environment_success": False,
+                    "range_build_verified": False,
+                    "failure_stage": "deploy",
+                    "reference_path_verified": False if self.validation_mode == "sysfield" else None,
+                    "attack_graph_valid": False,
+                    "attack_path_reachable": False,
+                    "guided_trial_evaluated": False,
+                    "guided_trial_success": False,
+                    "objective_achieved": False,
+                    "guided_reference_evaluated": False,
+                    "guided_reference_success": False,
+                    "agent_evaluated": False,
+                    "agent_success": False,
+                    "guide_integrity": {
+                        "evaluated": False, "valid": True, "entries": []
+                    },
+                    "guide_advisories": guide_preflight,
+                    "guide_compatibility": guide_preflight,
+                    "agent_transport": agent_transport,
+                })
 
-            # 2. Ansible base (IP config + routing)
+            # 3. Ansible base (IP config + routing)
             print("[2/5] Configuring network (ansible base)...")
-            self._run_ansible(scenario_dir, "base.yaml")
+            base = self._run_ansible(scenario_dir, "base.yaml")
 
-            # 3. Ansible cve-setup (wait for services)
+            # 4. Ansible cve-setup (wait for services)
             print("[3/5] Waiting for services (ansible cve-setup)...")
-            self._run_ansible(scenario_dir, "cve-setup.yaml")
-
-            # 4. Run agent
-            print("[4/5] Running agent verification...")
-            agent_result = self._run_agent(
-                scenario_dir, ground_truth, ip_alloc,
-                api_key=api_key, base_url=base_url, model=model,
+            assets_required = bool(_meta.get("assets") or _meta.get("objectives"))
+            asset = self._run_ansible(
+                scenario_dir, "asset-setup.yaml", required=assets_required
             )
+            asset_verify = self._run_ansible(
+                scenario_dir, "asset-verify.yaml", required=assets_required
+            )
+            cve = self._run_ansible(scenario_dir, "cve-setup.yaml")
 
-            # 5. Verify flags + save
-            print("[5/5] Verifying results...")
-            flag_result = self._verify_flags(agent_result, ground_truth)
+            environment = self._verify_environment(ground_truth, scenario_dir)
+            environment_success = bool(environment.get("all_targets_verified")) and all(
+                item.get("ok", True) for item in (base, asset, asset_verify, cve)
+            )
+            attack_graph_valid = bool(self._validate_attack_graph(ground_truth))
+            path_reachability = {
+                "all_edges_verified": False,
+                "edges": [],
+                "error": "not evaluated because the environment is not ready",
+            }
+            if environment_success and attack_graph_valid:
+                path_reachability = self._verify_attack_path_reachability(
+                    ground_truth, scenario_dir, ip_alloc
+                )
+            attack_path_reachable = bool(path_reachability.get("all_edges_verified"))
+            if (
+                not environment_only
+                and self.validation_mode == "guided_agent"
+                and environment_success
+                and attack_graph_valid
+                and attack_path_reachable
+            ):
+                guide_preflight = self._run_guide_runtime_preflight(
+                    scenario_dir, ground_truth
+                )
+            reference = {"ok": False, "error": "not evaluated in guided_agent mode"}
+            reference_verified = False
+            if (
+                environment_success
+                and attack_graph_valid
+                and attack_path_reachable
+                and not environment_only
+                and self.validation_mode == "sysfield"
+            ):
+                reference = self._run_reference_path(scenario_dir)
+                reference_verified = bool(reference.get("ok"))
+
+            # 4. In guided mode the Agent supplies a stochastic executable
+            # witness; environment correctness remains a separate result.
+            # SysField remains an explicit compatibility mode.
+            agent_result = {}
+            flag_result = {"all_captured": False, "per_target": {}}
+            objective_result = {"all_satisfied": not bool(_meta.get("objectives")), "per_objective": {}}
+            agent_success = False
+            agent_evaluated = False
+            # Graph legality is independent of runtime readiness.  Keeping it
+            # separate lets a result distinguish a valid DAG from a target
+            # whose service never started.
+            guided_reference_evaluated = False
+            guided_reference_success = False
+            range_build_verified = bool(
+                environment_success and attack_graph_valid and attack_path_reachable
+            )
+            if environment_only:
+                print("[4/5] Skipping Agent: environment-only validation requested")
+                agent_transport = {
+                    "ok": False,
+                    "stage": "not_requested",
+                    "reason": "environment_only",
+                }
+            elif environment_success and attack_graph_valid and attack_path_reachable and (
+                self.validation_mode == "guided_agent" or reference_verified
+            ):
+                guide_blocked = False
+                if (
+                    self.validation_mode == "guided_agent"
+                    and not guide_preflight.get("integrity_valid", True)
+                ):
+                    guide_blocked = True
+                    print(
+                        "[4/5] Skipping Agent: Guide runtime preflight "
+                        f"{guide_preflight.get('overall_status', 'failed')}"
+                    )
+                    agent_result = {
+                        "success": False,
+                        "verified_flags": {},
+                        "attack_log": [],
+                        "evidence": [
+                        "Guide integrity checks did not permit Agent execution"
+                        ],
+                        "failed_targets": [
+                            item.get("target_node")
+                            for item in ground_truth.get("attack_path", [])
+                        ],
+                        "termination_reason": "guide_runtime_preflight",
+                    }
+                    agent_transport = {
+                        "ok": False,
+                        "stage": "guide_runtime_preflight",
+                        "error": guide_preflight.get("overall_status", "failed"),
+                    }
+                elif not guide_blocked:
+                    agent_transport = self._prepare_agent_transport(scenario_dir, base_url)
+                if not guide_blocked and agent_transport.get("ok"):
+                    # The control network is attached after the first graph
+                    # probe.  Re-probe now: Docker's route selection can make
+                    # an overlapping control subnet steal a data-plane edge.
+                    post_transport_path = self._verify_attack_path_reachability(
+                        ground_truth, scenario_dir, ip_alloc
+                    )
+                    agent_transport["post_transport_path_reachability"] = post_transport_path
+                    attack_path_reachable = bool(
+                        post_transport_path.get("all_edges_verified")
+                    )
+                    path_reachability = post_transport_path
+                    if attack_path_reachable:
+                        print("[4/5] Running agent verification...")
+                        agent_result = self._run_agent(
+                            scenario_dir, ground_truth, ip_alloc,
+                            api_key=api_key, base_url=base_url, model=model,
+                            objectives=self._public_objectives(_meta),
+                            guide_preflight=guide_preflight,
+                        )
+                        agent_evaluated = True
+                        guided_reference_evaluated = self.validation_mode == "guided_agent"
+                        print("[5/5] Verifying results...")
+                        flag_result = self._verify_flags(agent_result, ground_truth)
+                        objective_result = self._verify_objectives(agent_result, _meta.get("objectives", []))
+                        agent_success = bool(flag_result["all_captured"])
+                        guided_reference_success = bool(agent_success)
+                    else:
+                        agent_transport["stage"] = "attack_path_reachability_after_transport"
+                        print("[4/5] Skipping Agent: data-plane reachability changed after control network setup")
+                elif not guide_blocked:
+                    print(
+                        "[4/5] Skipping Agent: LLM API transport unavailable "
+                        f"({agent_transport.get('error', 'unknown error')})"
+                    )
+                    agent_result = {
+                        "success": False,
+                        "verified_flags": {},
+                        "attack_log": [],
+                        "evidence": [
+                            f"Agent transport failed: {agent_transport.get('error', 'unknown error')}"
+                        ],
+                        "failed_targets": [item.get("target_node") for item in ground_truth.get("attack_path", [])],
+                    }
+            else:
+                print("[4/5] Skipping Agent: environment, attack path, or reference path failed")
+            failure_stage = (
+                ""
+                if environment_only and range_build_verified
+                else self._failure_stage(
+                    environment_success=environment_success,
+                    setup_results={"base": base, "asset_setup": asset,
+                                   "asset_verify": asset_verify, "cve_setup": cve},
+                    environment=environment,
+                    validation_mode=self.validation_mode,
+                    reference_verified=reference_verified,
+                    agent_transport=agent_transport,
+                    guide_preflight=guide_preflight,
+                    agent_evaluated=agent_evaluated,
+                    attack_graph_valid=attack_graph_valid,
+                    attack_path_reachable=attack_path_reachable,
+                    agent_termination_reason=agent_result.get("termination_reason", ""),
+                    guided_trial_success=guided_reference_success,
+                    objective_achieved=bool(objective_result["all_satisfied"]),
+                )
+            )
             result = self._save_result(scenario_path, {
+                "validation_mode": self.validation_mode,
+                "environment_only": environment_only,
+                "runtime_materialization": runtime_materialization,
+                "environment_verified": bool(environment.get("all_targets_verified")),
+                "environment_success": environment_success,
+                "range_build_verified": range_build_verified,
+                "environment_verification": environment,
+                "setup_results": {"base": base, "asset_setup": asset,
+                                   "asset_verify": asset_verify, "cve_setup": cve},
+                "guide_integrity": {
+                    "evaluated": guide_preflight.get("evaluated", False),
+                    "valid": guide_preflight.get("integrity_valid", True),
+                    "entries": [
+                        {
+                            "injection_point": entry.get("injection_point", ""),
+                            "cve_id": entry.get("cve_id", ""),
+                            "valid": entry.get("integrity_valid", False),
+                        }
+                        for entry in guide_preflight.get("entries", [])
+                    ],
+                },
+                "guide_advisories": guide_preflight,
+                # Migration alias; this field is diagnostic only and is not
+                # used to decide whether the Agent starts.
+                "guide_compatibility": guide_preflight,
+                "agent_transport": agent_transport,
+                "reference_path_verification": reference,
+                "reference_path_verified": reference_verified if self.validation_mode == "sysfield" else None,
+                "attack_graph_valid": attack_graph_valid,
+                "attack_path_reachability": path_reachability,
+                "attack_path_reachable": attack_path_reachable,
+                "guided_trial_evaluated": agent_evaluated if self.validation_mode == "guided_agent" else False,
+                "guided_trial_success": guided_reference_success if self.validation_mode == "guided_agent" else False,
+                "objective_achieved": bool(objective_result["all_satisfied"]),
+                "failure_stage": failure_stage,
+                "guided_reference_evaluated": guided_reference_evaluated,
+                "guided_reference_success": guided_reference_success,
+                "agent_evaluated": agent_evaluated,
+                "agent_success": agent_success,
+                "agent_termination_reason": agent_result.get("termination_reason", ""),
                 "agent_result": agent_result,
                 "flag_verification": flag_result,
-                "success": flag_result["all_captured"],
-            }, ground_truth)
+                "objective_verification": objective_result,
+                "success": (
+                    range_build_verified
+                    if environment_only
+                    else bool(
+                        environment_success
+                        and attack_graph_valid
+                        and attack_path_reachable
+                        and (
+                            guided_reference_success
+                            if self.validation_mode == "guided_agent"
+                            else reference_verified
+                        )
+                        and objective_result["all_satisfied"]
+                        and (agent_success if self.require_agent_success else True)
+                    )
+                ),
+            })
 
             return result
 
@@ -93,8 +1068,63 @@ class ScenarioVerifier:
             # Always destroy
             print("[Cleanup] Destroying...")
             self._destroy(scenario_dir)
+            self._cleanup_agent_transport(agent_transport)
 
     # ── 内部步骤 ──────────────────────────────────────
+
+    @staticmethod
+    def _failure_stage(
+        *,
+        environment_success: bool,
+        setup_results: dict,
+        environment: dict,
+        validation_mode: str,
+        reference_verified: bool,
+        agent_transport: dict,
+        agent_evaluated: bool,
+        attack_graph_valid: bool,
+        attack_path_reachable: bool,
+        agent_termination_reason: str,
+        guided_trial_success: bool,
+        objective_achieved: bool,
+        guide_preflight: dict | None = None,
+    ) -> str:
+        """Return a stable failure category for research result analysis."""
+        if not environment_success:
+            for name in ("base", "asset_setup", "asset_verify", "cve_setup"):
+                if not setup_results.get(name, {}).get("ok", True):
+                    return f"setup:{name}"
+            if not environment.get("all_targets_verified", False):
+                return "readiness"
+            return "environment"
+        if not attack_graph_valid:
+            return "attack_graph"
+        if not attack_path_reachable:
+            return "attack_path_reachability"
+        if validation_mode == "sysfield" and not reference_verified:
+            return "reference_path"
+        if validation_mode == "guided_agent" and not agent_transport.get("ok") and not agent_evaluated:
+            guide_preflight = guide_preflight or {}
+            if guide_preflight.get("integrity_valid", True) is False:
+                return "guide_runtime_preflight"
+            return "agent_transport"
+        if (
+            validation_mode == "guided_agent"
+            and (guide_preflight or {}).get("integrity_valid", True) is False
+            and not agent_evaluated
+        ):
+            return "guide_runtime_preflight"
+        if validation_mode == "guided_agent" and agent_termination_reason == "agent_timeout":
+            return "agent_timeout"
+        if validation_mode == "guided_agent" and agent_termination_reason == "max_turns_reached":
+            return "agent_turn_limit"
+        if validation_mode == "guided_agent" and agent_termination_reason == "agent_api_protocol":
+            return "agent_api_protocol"
+        if validation_mode == "guided_agent" and agent_evaluated and not guided_trial_success:
+            return "agent"
+        if not objective_achieved:
+            return "objective"
+        return ""
 
     def _deploy(self, scenario_dir: str, timeout: int = 300) -> bool:
         """clab deploy"""
@@ -114,7 +1144,216 @@ class ScenarioVerifier:
         print("  Deployed OK")
         return True
 
-    def _run_ansible(self, scenario_dir: str, playbook: str, timeout: int = 300):
+    @staticmethod
+    def _resolve_runtime_path(value: str, scenario_dir: str) -> Path:
+        """Resolve a generated build path without relying on a CVE-specific path."""
+        path = Path(value)
+        if path.is_absolute():
+            return path
+        candidates = [
+            Path.cwd() / path,
+            Path(__file__).resolve().parents[4] / path,
+            Path(scenario_dir) / path,
+        ]
+        return next((candidate for candidate in candidates if candidate.exists()), candidates[0])
+
+    def _inspect_image_identity(self, image: str) -> dict[str, Any]:
+        """Return the local image identities that can satisfy a pinned record."""
+        check = self._run_command(["docker", "image", "inspect", image], timeout=30)
+        result = {
+            "present": check.returncode == 0,
+            "image_id": "",
+            "repo_digests": [],
+            "error": "",
+        }
+        if check.returncode != 0:
+            result["error"] = check.stderr.strip() or "selected runtime image is unavailable locally"
+            return result
+        try:
+            payload = json.loads(check.stdout)
+            item = payload[0] if isinstance(payload, list) and payload else {}
+            result["image_id"] = str(item.get("Id") or "")
+            result["repo_digests"] = [
+                str(value) for value in item.get("RepoDigests") or [] if value
+            ]
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            result["error"] = "docker image inspect returned invalid metadata"
+        return result
+
+    def _rebuild_runtime_image(self, selection: dict[str, Any]) -> dict[str, Any]:
+        """Rebuild a missing runtime image with the shared Atom builder.
+
+        The Atomizer builder is the single implementation of the custom
+        Dockerfile, smoke, and service-readiness contracts. Range only invokes
+        it after an already-ready image is missing or fails its identity check.
+        """
+        import yaml
+
+        cve_id = str(selection.get("cve_id") or "").strip()
+        if not cve_id or Path(cve_id).name != cve_id:
+            return {"ok": False, "error": "invalid runtime Atom identifier"}
+        atom_dir = self.atoms_dir / cve_id
+        atom_path = atom_dir / "atom.yaml"
+        if not atom_path.is_file():
+            return {"ok": False, "error": f"runtime Atom is missing: {atom_path}"}
+        try:
+            raw = yaml.safe_load(atom_path.read_text()) or {}
+            from clab_builder.shared.models.atom import AtomConfig
+            atom = AtomConfig(**raw)
+        except Exception as exc:
+            return {"ok": False, "error": f"runtime Atom is unreadable: {exc}"}
+
+        runtime = atom.runtime_spec
+        runtime_status = getattr(runtime.runtime_status, "value", runtime.runtime_status)
+        verification = raw.get("verification") or {}
+        runtime_verification = verification.get("runtime_verification") or {}
+        build = runtime.runtime_build
+        expected_image = str(selection.get("selected_image") or "")
+        expected_source = str(selection.get("source_image") or "")
+        expected_hash = str(selection.get("runtime_build_generated_hash") or "")
+        expected_base_digest = str(selection.get("base_image_digest") or "")
+        expected_runtime_digest = str(selection.get("runtime_image_digest") or "")
+        source_image = runtime.source_image or atom.docker_image
+
+        if (
+            runtime_status != "ready"
+            or runtime.runtime_image != expected_image
+            or source_image != expected_source
+            or not isinstance(runtime_verification, dict)
+            or runtime_verification.get("status") != "ready"
+            or runtime_verification.get("runtime_image_digest") != expected_runtime_digest
+            or build is None
+            or build.generated_hash != expected_hash
+            or build.base_image_digest != expected_base_digest
+        ):
+            return {"ok": False, "error": "runtime contract changed since scenario generation"}
+
+        from clab_builder.atomizer.runtime_builder import build_runtime_image
+        from clab_builder.atomizer.runtime_generator import generate_runtime_artifacts
+
+        artifacts = generate_runtime_artifacts(atom, source_image, atom_dir=atom_dir)
+        if artifacts.unsupported_reason:
+            return {"ok": False, "error": artifacts.unsupported_reason}
+        if artifacts.manifest["generated_hash"] != expected_hash:
+            return {"ok": False, "error": "runtime build inputs changed since scenario generation"}
+
+        rebuilt = build_runtime_image(atom, atom_dir, source_image=source_image)
+        status = getattr(rebuilt.status, "value", rebuilt.status)
+        if status != "ready":
+            return {
+                "ok": False,
+                "error": rebuilt.failure_reason or f"runtime rebuild returned {status}",
+                "runtime_status": status,
+            }
+        if rebuilt.runtime_image != expected_image:
+            return {"ok": False, "error": "runtime rebuild produced an unexpected image tag"}
+        if rebuilt.base_image_digest != expected_base_digest:
+            return {"ok": False, "error": "runtime rebuild base image digest mismatch"}
+        return {
+            "ok": True,
+            "action": "rebuilt_and_reverified",
+            "actual_runtime_image_digest": rebuilt.runtime_image_digest,
+            "actual_base_image_digest": rebuilt.base_image_digest,
+            "runtime_digest_changed": rebuilt.runtime_image_digest != expected_runtime_digest,
+        }
+
+    def _materialize_runtime_images(self, scenario_dir: str) -> dict[str, Any]:
+        """Build Atom-declared Dockerfiles before ContainerLab deploy.
+
+        ContainerLab consumes images, not Compose build sections.  The
+        generated Range therefore carries a generic build manifest and this
+        verifier materializes those images before deployment.
+        """
+        import yaml
+
+        meta_path = Path(scenario_dir) / "scenario.yaml"
+        if not meta_path.exists():
+            return {"ok": True, "builds": []}
+        try:
+            metadata = yaml.safe_load(meta_path.read_text()) or {}
+        except (OSError, yaml.YAMLError) as exc:
+            return {"ok": False, "builds": [], "error": str(exc)}
+
+        builds = metadata.get("runtime_builds") or []
+        selections = metadata.get("runtime_images") or []
+        results = []
+        image_checks = []
+        for selection in selections:
+            if not isinstance(selection, dict) or selection.get("selection") != "runtime_image":
+                continue
+            image = str(selection.get("selected_image") or "").strip()
+            expected_digest = str(selection.get("runtime_image_digest") or "")
+            identity = self._inspect_image_identity(image)
+            identities = [identity["image_id"], *identity["repo_digests"]]
+            check = {
+                "cve_id": selection.get("cve_id", ""),
+                "image": image,
+                "expected_runtime_image_digest": expected_digest,
+                "actual_runtime_image_id": identity["image_id"],
+                "actual_repo_digests": identity["repo_digests"],
+                "ok": False,
+                "error": "",
+            }
+            if image and expected_digest and expected_digest in identities:
+                check["ok"] = True
+                check["action"] = "verified_local_image"
+            else:
+                check["identity_error"] = identity["error"] or "runtime image digest mismatch"
+                check.update(self._rebuild_runtime_image(selection))
+            image_checks.append(check)
+            if not image_checks[-1]["ok"]:
+                break
+        if not all(item.get("ok") for item in image_checks):
+            return {"ok": False, "builds": results, "runtime_images": image_checks}
+
+        for spec in builds:
+            if not isinstance(spec, dict):
+                results.append({"ok": False, "error": "invalid runtime build entry"})
+                continue
+            image = str(spec.get("image") or "").strip()
+            context = self._resolve_runtime_path(str(spec.get("context") or ""), scenario_dir)
+            dockerfile = self._resolve_runtime_path(
+                str(spec.get("dockerfile") or ""), scenario_dir
+            )
+            if not image or not context.is_dir() or not dockerfile.is_file():
+                results.append({
+                    "ok": False,
+                    "cve_id": spec.get("cve_id", ""),
+                    "image": image,
+                    "context": str(context),
+                    "dockerfile": str(dockerfile),
+                    "error": "runtime build context or Dockerfile is missing",
+                })
+                continue
+            command = [
+                "docker", "build", "--file", str(dockerfile),
+                "--tag", image, str(context),
+            ]
+            build = self._run_command(command, timeout=900)
+            results.append({
+                "ok": build.returncode == 0,
+                "cve_id": spec.get("cve_id", ""),
+                "image": image,
+                "context": str(context),
+                "dockerfile": str(dockerfile),
+                "stdout": build.stdout[-4000:],
+                "stderr": build.stderr[-4000:],
+            })
+            if build.returncode != 0:
+                break
+        return {
+            "ok": all(item.get("ok") for item in results),
+            "builds": results,
+            "runtime_images": image_checks,
+        }
+
+    def _run_ansible(
+        self,
+        scenario_dir: str,
+        playbook: str,
+        timeout: int = 300,
+        required: bool = False,
+    ):
         """运行 ansible playbook"""
         scenario_path = Path(scenario_dir)
         import yaml
@@ -124,7 +1363,12 @@ class ScenarioVerifier:
 
         pb_path = scenario_path / "ansible" / playbook
         if not pb_path.exists():
-            return
+            return {
+                "ok": not required,
+                "skipped": True,
+                "playbook": playbook,
+                "error": "required playbook is missing" if required else "",
+            }
 
         # CLab generates inventory in the topology directory
         inventory = scenario_path / f"clab-{lab_name}" / "inventory" / "hosts.yaml"
@@ -136,14 +1380,338 @@ class ScenarioVerifier:
         if inventory.exists():
             cmd.extend(["-i", str(inventory.resolve())])
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout,
-            cwd=str(scenario_path.resolve()),
-        )
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout,
+                cwd=str(scenario_path.resolve()),
+            )
+        except subprocess.TimeoutExpired as exc:
+            print(f"  Ansible {playbook} timed out after {timeout}s")
+            return {
+                "ok": False,
+                "skipped": False,
+                "timed_out": True,
+                "termination_reason": "ansible_timeout",
+                "playbook": playbook,
+                "stdout": (exc.stdout or "")[-4000:] if isinstance(exc.stdout, str) else "",
+                "stderr": (exc.stderr or "")[-4000:] if isinstance(exc.stderr, str) else "",
+                "error": f"ansible-playbook timed out after {timeout}s",
+            }
         if result.returncode != 0:
             print(f"  Ansible {playbook} warning: {result.stderr[:300]}")
         else:
             print(f"  Ansible {playbook} OK")
+        return {
+            "ok": result.returncode == 0,
+            "skipped": False,
+            "playbook": playbook,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+
+    def _run_guide_runtime_preflight(
+        self,
+        scenario_dir: str,
+        ground_truth: dict,
+    ) -> dict[str, Any]:
+        """Diagnose Guide hints against the actual execution hosts.
+
+        This is deliberately read-only.  Missing tools and unavailable
+        foothold materials are advisory runtime differences; malformed Guide
+        documents and missing source-bundle files remain integrity failures.
+        No package manager or network download is invoked.
+        """
+        import yaml
+
+        scenario_path = Path(scenario_dir)
+        clab_path = scenario_path / "clab.yaml"
+        try:
+            lab_name = str((yaml.safe_load(clab_path.read_text()) or {}).get("name", ""))
+        except (OSError, yaml.YAMLError) as exc:
+            return {
+                "evaluated": False,
+                "overall_status": "error",
+                "integrity_valid": False,
+                "checks": [],
+                "error": str(exc),
+            }
+
+        entries = []
+        for step in ground_truth.get("attack_path", []):
+            injection_point = str(step.get("injection_point", step.get("target_node", "")))
+            guide_path = scenario_path / "exploit_guides" / f"{injection_point}.yaml"
+            entry = {
+                "injection_point": injection_point,
+                "cve_id": step.get("cve_id", ""),
+                "actor_node": step.get("execution_host_node", "attacker"),
+                "checks": [],
+                "adaptations": [],
+                "integrity_valid": True,
+            }
+            try:
+                guide_data = yaml.safe_load(guide_path.read_text()) or {}
+            except (OSError, yaml.YAMLError) as exc:
+                entry["status"] = "invalid"
+                entry["integrity_valid"] = False
+                entry["checks"].append({"status": "failed", "reason": str(exc)})
+                entries.append(entry)
+                continue
+
+            if not isinstance(guide_data, dict) or str(
+                guide_data.get("cve_id", "")
+            ) != str(step.get("cve_id", "")):
+                entry["status"] = "invalid"
+                entry["integrity_valid"] = False
+                entry["checks"].append({
+                    "status": "failed",
+                    "reason": "guide_cve_mismatch_or_invalid_document",
+                })
+                entries.append(entry)
+                continue
+
+            guide_version = int(guide_data.get("version", 1) or 1)
+            entry["guide_version"] = guide_version
+            if guide_version < 2:
+                entry["status"] = "unknown_legacy"
+                entry["checks"].append({
+                    "status": "unknown",
+                    "reason": "guide_has_no_step_execution_scope",
+                })
+                entries.append(entry)
+                continue
+
+            target_node = str(step.get("target_node", ""))
+            actor_node = str(step.get("execution_host_node", "attacker"))
+            for guide_step in guide_data.get("steps", []) or []:
+                if not isinstance(guide_step, dict):
+                    entry["checks"].append({
+                        "status": "failed",
+                        "required": True,
+                        "error": "Guide step is not an object",
+                    })
+                    entry["integrity_valid"] = False
+                    continue
+                execution_data = guide_step.get("execution")
+                if not isinstance(execution_data, dict):
+                    entry["checks"].append({
+                        "step_id": guide_step.get("id", ""),
+                        "status": "failed",
+                        "required": True,
+                        "error": "Guide v2 step has no execution context",
+                    })
+                    entry["integrity_valid"] = False
+                    continue
+                execution = execution_data
+                scope = str(execution.get("scope", "actor"))
+                if scope not in {"actor", "target"}:
+                    entry["checks"].append({
+                        "step_id": guide_step.get("id", ""),
+                        "status": "failed",
+                        "required": True,
+                        "error": f"unsupported execution scope: {scope}",
+                    })
+                    entry["integrity_valid"] = False
+                    continue
+                if execution.get("external_download"):
+                    entry["checks"].append({
+                        "step_id": guide_step.get("id", ""),
+                        "status": "failed",
+                        "required": True,
+                        "error": "Guide requires an external download",
+                    })
+                    entry["integrity_valid"] = False
+                    continue
+                check_node = target_node if scope == "target" else actor_node
+                container = f"clab-{lab_name}-{check_node}"
+                for material in execution.get("materials", []) or []:
+                    if not isinstance(material, dict):
+                        entry["checks"].append({
+                            "step_id": guide_step.get("id", ""),
+                            "kind": "material",
+                            "status": "failed",
+                            "required": True,
+                            "error": "material requirement is not an object",
+                        })
+                        entry["integrity_valid"] = False
+                        continue
+                    ref = str(material.get("ref") or "").strip()
+                    material_scope = str(material.get("scope", "actor"))
+                    delivery = str(material.get("delivery", "mounted"))
+                    material_check = {
+                        "step_id": guide_step.get("id", ""),
+                        "kind": "material",
+                        "material": ref,
+                        "scope": material_scope,
+                        "delivery": delivery,
+                        "required": True,
+                    }
+                    exists = bool(ref) and self._guide_artifact_exists(
+                        str(step.get("cve_id", "")), ref
+                    )
+                    if not exists:
+                        material_check.update({
+                            "ok": False,
+                            "status": "failed",
+                            "error": "source_bundle material is missing",
+                        })
+                        entry["integrity_valid"] = False
+                    elif material_scope not in {"attacker", "actor", "target"}:
+                        material_check.update({
+                            "ok": False,
+                            "status": "failed",
+                            "error": f"unsupported material scope: {material_scope}",
+                        })
+                        entry["integrity_valid"] = False
+                    elif delivery not in {"mounted", "inline", "channel_transfer"}:
+                        material_check.update({
+                            "ok": False,
+                            "status": "failed",
+                            "error": f"unsupported material delivery: {delivery}",
+                        })
+                        entry["integrity_valid"] = False
+                    elif delivery == "inline" or material_scope == "attacker":
+                        material_check.update({"ok": True, "status": "ok"})
+                    elif material_scope == "actor" and check_node == "attacker":
+                        material_check.update({"ok": True, "status": "ok"})
+                    elif delivery == "channel_transfer":
+                        material_check.update({
+                            "ok": False,
+                            "status": "adaptation_required",
+                            "error": "material is not mounted on this execution host",
+                        })
+                        entry["adaptations"].append({
+                            "step_id": guide_step.get("id", ""),
+                            "material": ref,
+                            "strategy": "channel_transfer_material",
+                            "actor_node": check_node,
+                        })
+                    else:
+                        material_check.update({
+                            "ok": False,
+                            "status": "warning",
+                            "required": False,
+                            "error": "mounted material is unavailable on this execution host",
+                        })
+                    entry["checks"].append(material_check)
+                for tool in execution.get("tools", []) or []:
+                    if not isinstance(tool, dict):
+                        entry["checks"].append({
+                            "step_id": guide_step.get("id", ""),
+                            "kind": "tool",
+                            "status": "failed",
+                            "required": True,
+                            "error": "tool requirement is not an object",
+                        })
+                        entry["integrity_valid"] = False
+                        continue
+                    kind = str(tool.get("kind", "executable"))
+                    name = str(tool.get("name", "")).strip()
+                    required = bool(tool.get("required", True))
+                    check = self._check_guide_tool(container, kind, name, tool)
+                    check.update({
+                        "step_id": guide_step.get("id", ""),
+                        "scope": scope,
+                        "actor_node": check_node,
+                        "tool": name,
+                        "kind": kind,
+                        # Tool availability is an advisory runtime fact.  A
+                        # missing Guide-suggested tool must not block the Agent.
+                        "required": False,
+                    })
+                    entry["checks"].append(check)
+                    if not check.get("ok") and required:
+                        transfer_material = any(
+                            str(material.get("delivery", "")) == "channel_transfer"
+                            for material in execution.get("materials", []) or []
+                        )
+                        artifact = str(tool.get("artifact") or "").strip()
+                        artifact_exists = self._guide_artifact_exists(
+                            str(step.get("cve_id", "")), artifact
+                        ) if artifact else False
+                        if transfer_material and artifact and artifact_exists:
+                            entry["adaptations"].append({
+                                "step_id": guide_step.get("id", ""),
+                                "tool": name,
+                                "strategy": "channel_transfer",
+                                "artifact": artifact,
+                                "actor_node": check_node,
+                            })
+
+            if not entry["integrity_valid"]:
+                entry["status"] = "invalid"
+            elif any(not check.get("ok", True) for check in entry["checks"]):
+                entry["status"] = "warnings"
+            elif entry.get("adaptations"):
+                entry["status"] = "warnings"
+            else:
+                entry["status"] = "compatible"
+            entries.append(entry)
+
+        statuses = {entry.get("status") for entry in entries}
+        integrity_valid = all(entry.get("integrity_valid", False) for entry in entries)
+        if "invalid" in statuses:
+            overall = "invalid"
+        elif "unknown_legacy" in statuses:
+            overall = "unknown_legacy"
+        elif "warnings" in statuses:
+            overall = "warnings"
+        elif statuses and statuses <= {"compatible"}:
+            overall = "compatible"
+        else:
+            overall = "error"
+        return {
+            "evaluated": True,
+            "overall_status": overall,
+            "integrity_valid": integrity_valid,
+            # Compatibility alias retained for old result readers.  It is no
+            # longer a semantic gate; only integrity_valid controls startup.
+            "agent_allowed": integrity_valid,
+            "entries": entries,
+        }
+
+    @staticmethod
+    def _check_guide_tool(
+        container: str,
+        kind: str,
+        name: str,
+        tool: dict,
+    ) -> dict[str, Any]:
+        if not name:
+            return {"ok": False, "error": "tool name is empty"}
+        quoted = shlex.quote(name)
+        if kind == "executable":
+            command = ["docker", "exec", container, "sh", "-lc", f"command -v -- {quoted}"]
+        elif kind == "python_module":
+            runtime = str(tool.get("runtime") or "python3")
+            code = (
+                "import importlib.util,sys; "
+                f"sys.exit(0 if importlib.util.find_spec({name!r}) else 1)"
+            )
+            command = ["docker", "exec", container, runtime, "-c", code]
+        elif kind == "php_extension":
+            command = ["docker", "exec", container, "sh", "-lc", f"php -m | grep -i -- {quoted}"]
+        elif kind == "perl_module":
+            command = ["docker", "exec", container, "perl", f"-M{name}", "-e", "1"]
+        else:
+            return {"ok": False, "error": f"unsupported tool kind: {kind}"}
+        try:
+            result = subprocess.run(
+                command, capture_output=True, text=True, timeout=15,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return {"ok": False, "error": str(exc)}
+        return {
+            "ok": result.returncode == 0,
+            "stdout": result.stdout[-1000:],
+            "stderr": result.stderr[-1000:],
+            "error": "" if result.returncode == 0 else "tool check failed",
+        }
+
+    def _guide_artifact_exists(self, cve_id: str, artifact: str) -> bool:
+        """Resolve only source_bundle-relative offline artifacts."""
+        if not artifact.startswith("source_bundle/") or ".." in Path(artifact).parts:
+            return False
+        return (self.atoms_dir / cve_id / artifact).is_file()
 
     def _run_agent(
         self,
@@ -153,6 +1721,8 @@ class ScenarioVerifier:
         api_key: str,
         base_url: str = "",
         model: str = "",
+        objectives: list[dict] | None = None,
+        guide_preflight: dict[str, Any] | None = None,
     ) -> dict:
         """在 attacker 容器内运行 scenario_runner.py"""
         import threading
@@ -174,11 +1744,71 @@ class ScenarioVerifier:
             node_name = step["target_node"]
             cve_id = step["cve_id"]
 
-            playbook_text = self._load_atom_playbook(cve_id)
+            injection_point = step.get("injection_point", node_name)
+            guide_text = self._load_scenario_guide(scenario_path, injection_point)
+            legacy_playbook = "" if guide_text else self._load_atom_playbook(cve_id)
             flag_cmd = self._load_atom_flag_command(cve_id)
             atom_config = self._load_atom_config(cve_id)
             internal_ports = atom_config.ports if atom_config else []
+            materials = {}
+            if atom_config and atom_config.source_bundle:
+                for material in atom_config.source_bundle.poc_materials:
+                    materials[material] = f"/vulhub/{cve_id}__{Path(material).name}"
             flag_hint = step.get("flag_hint", "file:/flag.txt")
+
+            guide_data = {}
+            if guide_text:
+                try:
+                    guide_data = yaml.safe_load(guide_text) or {}
+                except yaml.YAMLError:
+                    guide_data = {}
+            guide_requirements = guide_data.get("requirements", {}) or {}
+            atom_requirements = getattr(atom_config, "requirements", {}) or {}
+            environment_tools = sorted({
+                str(tool)
+                for tool in list(atom_requirements.get("tools_needed", []) or [])
+                if str(tool).strip()
+            })
+            guide_suggested_tools = {
+                str(tool).strip()
+                for tool in list(guide_requirements.get("tools", []) or [])
+                if str(tool).strip()
+            }
+            for guide_step in guide_data.get("steps", []) or []:
+                execution = (
+                    guide_step.get("execution", {})
+                    if isinstance(guide_step, dict) else {}
+                ) or {}
+                for tool in execution.get("tools", []) or []:
+                    name = (
+                        str(tool.get("name") or tool.get("id") or "").strip()
+                        if isinstance(tool, dict) else str(tool).strip()
+                    )
+                    if name:
+                        guide_suggested_tools.add(name)
+            guide_suggested_tools = sorted(guide_suggested_tools)
+            execution_context = {
+                "execution_host": step.get("execution_host_node", "attacker"),
+                # Atom-declared tools are formal prerequisites.  Guide tools
+                # are suggestions and may be unavailable in the rebuilt Range.
+                "required_tools": environment_tools,
+                "environment_tools": environment_tools,
+                "guide_suggested_tools": guide_suggested_tools,
+                "material_paths": materials,
+                "network_requirements": (
+                    atom_config.network_requirements.model_dump(mode="json")
+                    if atom_config and atom_config.network_requirements else {}
+                ),
+                "command_channel": (
+                    guide_data.get("post_exploit", {}).get("command_channel", {})
+                    if isinstance(guide_data.get("post_exploit", {}), dict) else {}
+                ),
+                "tool_policy": (
+                    "inspect_first; guide_declares_download_need"
+                    if atom_config and atom_config.network_requirements.needs_tool_download
+                    else "inspect_first; prefer_guide_fallback; no_external_download_assumption"
+                ),
+            }
 
             # 数据面 IP（从 ip_allocations）
             node_ip = ip_alloc.get(node_name, {}).get("eth1", "").split("/")[0]
@@ -193,14 +1823,29 @@ class ScenarioVerifier:
                 "zone": step.get("zone", ""),
                 "flag_hint": flag_hint,
                 "flag_verify_command": flag_cmd,
-                "playbook": playbook_text,
+                "exploit_guide": guide_text,
+                "playbook": legacy_playbook,
+                "depends_on": step.get("depends_on", []),
+                "depends_on_nodes": step.get("depends_on_nodes", []),
+                "execution_host": step.get("execution_host_node", "attacker"),
+                "execution_adapter": step.get("execution_adapter"),
+                "required_capabilities": step.get("required_capabilities", []),
+                "readiness_probes": step.get("readiness_probes", []),
+                "material_paths": materials,
+                "required_tools": environment_tools,
+                "environment_tools": environment_tools,
+                "guide_suggested_tools": guide_suggested_tools,
+                "execution_context": execution_context,
             })
 
         input_data = {
             "scenario_name": ground_truth.get("scenario", lab_name),
             "attacker_ip": attacker_ip,
             "targets": targets,
-            "ground_truth": ground_truth,
+            "guide_preflight": guide_preflight or {},
+            # This is the sanitized view generated by ScenarioAssembler.  It
+            # intentionally contains no reference_command or success_pattern.
+            "objectives": list(objectives or []),
         }
 
         # 准备 workspace
@@ -208,21 +1853,49 @@ class ScenarioVerifier:
         workspace.mkdir(exist_ok=True)
         input_path = workspace / "input.json"
         output_path = workspace / "output.json"
+        session_path = workspace / "session.json"
+        stream_path = workspace / "agent_stream.log"
         input_path.write_text(json.dumps(input_data, indent=2, ensure_ascii=False))
-        if output_path.exists():
-            output_path.unlink()
+        self._reset_agent_artifacts(workspace)
 
         # 拷入 runner + input
-        subprocess.run(
+        runner_copy = subprocess.run(
             ["docker", "cp", str(SCENARIO_RUNNER_SRC.resolve()),
              f"{attacker_container}:/opt/scenario_runner.py"],
             capture_output=True, timeout=30,
         )
-        subprocess.run(
+        input_copy = subprocess.run(
             ["docker", "cp", str(input_path),
              f"{attacker_container}:/tmp/scenario_input.json"],
             capture_output=True, timeout=30,
         )
+        copy_errors = [result.stderr.decode(errors="replace") if isinstance(result.stderr, bytes)
+                       else result.stderr for result in (runner_copy, input_copy)
+                       if result.returncode != 0]
+        if copy_errors:
+            return {
+                "scenario_name": ground_truth.get("scenario", ""),
+                "success": False,
+                "verified_flags": {},
+                "attack_log": [],
+                "evidence": [f"Agent input copy failed: {'; '.join(copy_errors)}"],
+                "failed_targets": [t["node_name"] for t in targets],
+            }
+
+        cleanup = subprocess.run([
+            "docker", "exec", attacker_container, "rm", "-f",
+            "/tmp/scenario_output.json", "/tmp/scenario_session.json",
+        ], capture_output=True, text=True, timeout=30)
+        if cleanup.returncode != 0:
+            return {
+                "scenario_name": ground_truth.get("scenario", ""),
+                "success": False,
+                "verified_flags": {},
+                "attack_log": [],
+                "evidence": [cleanup.stderr.strip() or "Agent workspace cleanup failed"],
+                "failed_targets": [t["node_name"] for t in targets],
+                "termination_reason": "workspace_cleanup_failed",
+            }
 
         # 构建 docker exec 命令
         full_cmd = ["docker", "exec"]
@@ -243,52 +1916,167 @@ class ScenarioVerifier:
 
         # 执行
         stderr_chunks = []
+        process_returncode = None
+        termination_reason = ""
+        started_at = time.monotonic()
         try:
             proc = subprocess.Popen(
                 full_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             )
             def read_stderr():
-                for line in proc.stderr:
-                    stderr_chunks.append(line)
-                    print(line, end="", flush=True)
+                with stream_path.open("a") as stream:
+                    for line in proc.stderr:
+                        stderr_chunks.append(line)
+                        stream.write(line)
+                        stream.flush()
+                        print(line, end="", flush=True)
             reader = threading.Thread(target=read_stderr, daemon=True)
             reader.start()
-            proc.wait(timeout=1800)
+            deadline = started_at + self.agent_timeout
+            while proc.poll() is None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(full_cmd, self.agent_timeout)
+                try:
+                    proc.wait(timeout=min(30, remaining))
+                except subprocess.TimeoutExpired:
+                    elapsed = round(time.monotonic() - started_at)
+                    print(
+                        f"[Agent] still running ({elapsed}s/{self.agent_timeout}s)",
+                        flush=True,
+                    )
+            process_returncode = proc.returncode
             reader.join(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
-            stderr_chunks.append("Agent timed out after 30 minutes")
+            proc.wait(timeout=10)
+            reader.join(timeout=5)
+            termination_reason = "agent_timeout"
+            timeout_message = f"Agent timed out after {self.agent_timeout}s\n"
+            stderr_chunks.append(timeout_message)
+            with stream_path.open("a") as stream:
+                stream.write(timeout_message)
 
         # 拷出 output + session
-        subprocess.run(
+        output_copy = subprocess.run(
             ["docker", "cp",
              f"{attacker_container}:/tmp/scenario_output.json",
              str(output_path)],
             capture_output=True, timeout=30,
         )
-        session_path = workspace / "session.json"
-        subprocess.run(
+        session_copy = subprocess.run(
             ["docker", "cp",
              f"{attacker_container}:/tmp/scenario_session.json",
              str(session_path)],
             capture_output=True, timeout=30,
         )
-        if session_path.exists():
+        if session_copy.returncode == 0 and session_path.exists():
             print(f"  Session saved: {session_path}")
 
-        if output_path.exists():
+        elapsed_seconds = round(time.monotonic() - started_at, 3)
+        output_copy_error = (
+            output_copy.stderr.decode(errors="replace")
+            if isinstance(output_copy.stderr, bytes) else output_copy.stderr
+        ).strip()
+        session_copy_error = (
+            session_copy.stderr.decode(errors="replace")
+            if isinstance(session_copy.stderr, bytes) else session_copy.stderr
+        ).strip()
+        if output_copy.returncode == 0 and output_path.exists():
             try:
-                return json.loads(output_path.read_text())
+                result = json.loads(output_path.read_text())
+                result.setdefault("termination_reason", "completed")
+                result["elapsed_seconds"] = elapsed_seconds
+                result["agent_stream"] = str(stream_path)
+                result["session_saved"] = session_copy.returncode == 0 and session_path.exists()
+                result["artifact_errors"] = {
+                    "output_copy": output_copy_error,
+                    "session_copy": session_copy_error,
+                }
+                return result
             except json.JSONDecodeError:
                 pass
 
-        return {
+        if process_returncode not in (None, 0):
+            stderr_chunks.append(f"Agent runner exited with code {process_returncode}")
+
+        if not termination_reason:
+            termination_reason = "agent_runner_failed"
+        result = self._recover_partial_agent_result(
+            "".join(stderr_chunks), targets, termination_reason
+        )
+        result.update({
             "scenario_name": ground_truth.get("scenario", ""),
+            "elapsed_seconds": elapsed_seconds,
+            "agent_stream": str(stream_path),
+            "session_saved": session_copy.returncode == 0 and session_path.exists(),
+            "artifact_errors": {
+                "output_copy": output_copy_error,
+                "session_copy": session_copy_error,
+            },
+        })
+        return result
+
+    @staticmethod
+    def _reset_agent_artifacts(workspace: Path) -> None:
+        """Remove outputs from an earlier trial before starting a new one."""
+        for name in ("output.json", "session.json", "agent_stream.log"):
+            path = workspace / name
+            if path.exists():
+                path.unlink()
+
+    @staticmethod
+    def _recover_partial_agent_result(
+        stream: str,
+        targets: list[dict],
+        termination_reason: str,
+    ) -> dict[str, Any]:
+        """Recover explicit partial evidence without consulting ground-truth flags."""
+        events = [
+            line.strip()
+            for line in stream.splitlines()
+            if line.startswith(("[Agent]", "[Tool]", "[Error]", "[Done]"))
+        ]
+        observed_progress = extract_observed_progress(stream, targets)
+        # Natural-language output is useful for diagnosing where an Agent
+        # stopped, but it is not a structured witness.  In particular, the
+        # nearest target-name heuristic can associate a flag with the wrong
+        # node when the Agent discusses a pivot.  Never promote such claims to
+        # ``verified_flags``; only the JSON result emitted by the runner may
+        # enter the verification gate.
+        claimed_flags = [
+            {
+                "target": claim.get("target", ""),
+                "reported_flag": claim.get("reported_flag", ""),
+                "source": claim.get("source", "assistant_text"),
+            }
+            for claim in observed_progress.get("flag_claims", [])
+        ]
+        attack_log = [
+            {
+                "target": claim["target"],
+                "flag_claimed": True,
+                "reported_flag": claim["reported_flag"],
+                "partial": True,
+            }
+            for claim in claimed_flags
+        ]
+        return {
             "success": False,
             "verified_flags": {},
-            "attack_log": [],
-            "evidence": [f"Agent failed: {''.join(stderr_chunks)[:500]}"],
-            "failed_targets": [t["node_name"] for t in targets],
+            "claimed_flags": claimed_flags,
+            "attack_log": attack_log,
+            "evidence": events[-200:],
+            "observed_progress": observed_progress,
+            "structured_result": False,
+            "failed_targets": [
+                target["node_name"] for target in targets
+                if target["node_name"] not in observed_progress.get(
+                    "targets_with_claimed_flags", []
+                )
+            ],
+            "termination_reason": termination_reason,
+            "partial_result": True,
         }
 
     def _verify_flags(self, agent_result: dict, ground_truth: dict) -> dict:
@@ -316,19 +2104,112 @@ class ScenarioVerifier:
         """Public wrapper for flag verification."""
         return self._verify_flags(agent_result, ground_truth)
 
+    @staticmethod
+    def _verify_objectives(agent_result: dict, objectives: list[dict]) -> dict:
+        """Verify structured Agent evidence against private assertions.
+
+        The old implementation searched the serialized Agent result, which
+        allowed unrelated prose to satisfy an objective and could not
+        distinguish multiple objectives.  Only the evidence field belonging to
+        the matching objective is considered here.
+        """
+        reported = agent_result.get("objective_results", {})
+        if not isinstance(reported, dict):
+            reported = {}
+        per_objective = {}
+        for objective in objectives or []:
+            objective_id = str(
+                objective.get("id")
+                or f"{objective.get('asset', '')}-{objective.get('validation', '')}"
+            )
+            entry = reported.get(objective_id)
+            if not isinstance(entry, dict):
+                per_objective[objective_id] = {
+                    "asset": objective.get("asset", ""),
+                    "validation": objective.get("validation", ""),
+                    "reported": False,
+                    "achieved": False,
+                    "actor_valid": False,
+                    "target_valid": False,
+                    "evidence_matched": False,
+                    "matched": False,
+                    "failure_reason": "missing_objective_result",
+                }
+                continue
+
+            evidence_field = str(objective.get("evidence_field") or "evidence")
+            evidence = entry.get(evidence_field, "")
+            if isinstance(evidence, (dict, list)):
+                evidence = json.dumps(evidence, ensure_ascii=False, sort_keys=True)
+            else:
+                evidence = str(evidence or "")
+            pattern = str(objective.get("success_pattern") or "")
+            actor_expected = str(objective.get("actor_node") or "")
+            target_expected = str(objective.get("target_node") or "")
+            actor_valid = (
+                not actor_expected
+                or str(entry.get("actor_node") or "") == actor_expected
+            )
+            target_valid = (
+                not target_expected
+                or str(entry.get("target_node") or "") == target_expected
+            )
+            achieved = entry.get("achieved") is True
+            evidence_matched = bool(pattern and pattern in evidence)
+            matched = achieved and actor_valid and target_valid and evidence_matched
+            reason = "" if matched else (
+                "agent_reported_failure" if not achieved else
+                "actor_mismatch" if not actor_valid else
+                "target_mismatch" if not target_valid else
+                "evidence_mismatch" if not evidence_matched else
+                "objective_not_satisfied"
+            )
+            per_objective[objective_id] = {
+                "asset": objective.get("asset", ""),
+                "validation": objective.get("validation", ""),
+                "reported": True,
+                "achieved": achieved,
+                "actor_valid": actor_valid,
+                "target_valid": target_valid,
+                "evidence_matched": evidence_matched,
+                "matched": matched,
+                "failure_reason": reason,
+            }
+        return {
+            "all_satisfied": all(item["matched"] for item in per_objective.values())
+            if per_objective else True,
+            "per_objective": per_objective,
+        }
+
     def _get_node_ports(self, clab_data: dict, node_name: str) -> list[int]:
         """Extract configured ports from a clab node definition."""
         node = clab_data.get("topology", {}).get("nodes", {}).get(node_name, {})
         return node.get("ports", [])
 
-    def _save_result(self, scenario_path: Path, result: dict, ground_truth: dict) -> dict:
+    @staticmethod
+    def _validate_attack_graph(ground_truth: dict) -> bool:
+        """Validate dependency references and ordering before Agent execution."""
+        path = ground_truth.get("attack_path", [])
+        slots = {item.get("injection_point") for item in path}
+        seen = set()
+        for item in path:
+            dependencies = item.get("depends_on", []) or []
+            if any(dep not in slots or dep not in seen for dep in dependencies):
+                return False
+            seen.add(item.get("injection_point"))
+        return bool(path)
+
+    def _save_result(self, scenario_path: Path, result: dict) -> dict:
         """保存验证结果到场景目录"""
         result_file = scenario_path / "verify_result.json"
         result_file.write_text(json.dumps(result, indent=2, ensure_ascii=False))
         print(f"  Result saved: {result_file}")
 
-        # 打印摘要
-        if "flag_verification" in result:
+        # Environment-only runs prove Range construction, not flag capture.
+        if result.get("environment_only"):
+            status = "PASS" if result.get("range_build_verified") else "FAIL"
+            print(f"\n  Result: {status}")
+        elif "flag_verification" in result:
             fv = result["flag_verification"]
             status = "PASS" if fv["all_captured"] else "FAIL"
             print(f"\n  Result: {status}")
@@ -356,17 +2237,20 @@ class ScenarioVerifier:
     # ── Atom 数据加载 ──────────────────────────────────
 
     def _load_atom_playbook(self, cve_id: str) -> str:
-        playbook_dir = Path("data/atoms") / cve_id / "playbook"
-        if not playbook_dir.exists():
+        playbook = self.atoms_dir / cve_id / "playbook" / "sysfield.yaml"
+        if not playbook.exists():
             return ""
-        parts = []
-        for f in sorted(playbook_dir.iterdir()):
-            if f.is_file() and f.suffix in (".yaml", ".yml", ".sh"):
-                parts.append(f"### {f.name}\n{f.read_text()}")
-        return "\n\n".join(parts)
+        return playbook.read_text()
+
+    @staticmethod
+    def _load_scenario_guide(scenario_path: Path, injection_point: str) -> str:
+        guide = scenario_path / "exploit_guides" / f"{injection_point}.yaml"
+        if not guide.exists():
+            return ""
+        return guide.read_text()
 
     def _load_atom_flag_command(self, cve_id: str) -> str:
-        atom_yaml = Path("data/atoms") / cve_id / "atom.yaml"
+        atom_yaml = self.atoms_dir / cve_id / "atom.yaml"
         if not atom_yaml.exists():
             return ""
         import yaml
@@ -374,7 +2258,7 @@ class ScenarioVerifier:
         return data.get("flag_verify_command", "")
 
     def _load_atom_config(self, cve_id: str):
-        atom_yaml = Path("data/atoms") / cve_id / "atom.yaml"
+        atom_yaml = self.atoms_dir / cve_id / "atom.yaml"
         if not atom_yaml.exists():
             return None
         from clab_builder.shared.models.atom import AtomConfig
