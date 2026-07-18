@@ -95,7 +95,8 @@ def test_install_commands_apt_eol_archive_fallback():
     """EOL Debian fallback handles 404s even when apt-get exits zero."""
     cmd = install_commands("apt", ["curl"])
     assert "archive.debian.org" in cmd
-    assert "Failed to fetch https?://(deb\\.debian\\.org|security\\.debian\\.org)/" in cmd
+    assert "httpredir\\.debian\\.org" in cmd
+    assert "awk '$1 == \"deb\"" in cmd
     assert "sources.list.d/*.list" in cmd
     assert "apt_install_flags=--allow-unauthenticated" in cmd
     assert "apt-get install -y --no-install-recommends $apt_install_flags" in cmd

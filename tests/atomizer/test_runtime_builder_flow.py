@@ -5,6 +5,7 @@ project-directory, target-service selection, unsupported on no target,
 resolved-user via inspect, smoke-all gate, digest via inspect.
 """
 from pathlib import Path
+import subprocess
 from unittest.mock import patch, MagicMock
 
 import yaml
@@ -12,6 +13,7 @@ import yaml
 from clab_builder.shared.models.atom import AtomConfig, SourceBundle, RuntimeStatus
 from clab_builder.atomizer.runtime_builder import (
     build_runtime_image, _smoke_service_via_compose, _inspect_digest, _inspect_user,
+    _readiness_port, _detect_image_package_manager,
 )
 
 
@@ -125,6 +127,24 @@ def test_resolved_user_from_inspect_when_compose_has_no_user(tmp_path):
     assert "USER nginx" in df
 
 
+def test_detects_package_manager_from_base_image():
+    def fake_run(cmd, **kw):
+        return _cp(0 if cmd[-1] == "command -v dnf" else 1)
+
+    with patch("clab_builder.atomizer.runtime_builder._run", side_effect=fake_run):
+        assert _detect_image_package_manager("vulhub/test:1") == "dnf"
+
+
+def test_package_manager_probe_timeout_falls_back_to_next_manager():
+    def fake_run(cmd, **kw):
+        if cmd[-1] == "command -v apt-get":
+            raise subprocess.TimeoutExpired(cmd, 15)
+        return _cp(0 if cmd[-1] == "command -v apk" else 1)
+
+    with patch("clab_builder.atomizer.runtime_builder._run", side_effect=fake_run):
+        assert _detect_image_package_manager("vulhub/test:slow-pull") == "apk"
+
+
 def test_smoke_failure_blocks_ready(tmp_path):
     """Any smoke check failing -> failed, not ready, even if service would pass."""
     atom_dir = tmp_path / "CVE-RT-X"
@@ -170,6 +190,8 @@ def test_smoke_uses_only_declared_remote_tools(tmp_path):
 
     smoke_commands = [" ".join(cmd) for cmd in calls if cmd[:3] == ["docker", "run", "--rm"]]
     assert res.status == RuntimeStatus.READY
+    assert all(cmd[:5] == ["docker", "run", "--rm", "--entrypoint", "sh"]
+               for cmd in calls if cmd[:3] == ["docker", "run", "--rm"])
     assert any("import paramiko" in cmd for cmd in smoke_commands)
     assert all("import impacket" not in cmd for cmd in smoke_commands)
     assert all("import smb" not in cmd for cmd in smoke_commands)
@@ -227,6 +249,21 @@ def test_no_port_or_compose_is_unsupported(tmp_path):
          patch("clab_builder.atomizer.runtime_builder._inspect_user", return_value=""):
         res = build_runtime_image(atom, atom_dir)
     assert res.status == RuntimeStatus.UNSUPPORTED
+
+
+def test_runtime_readiness_prefers_exploit_entry_port(tmp_path):
+    """Multi-port services must verify the actual exploit entry, not port[0]."""
+    atom_dir = tmp_path / "CVE-MULTIPORT"
+    atom_dir.mkdir()
+    atom = _atom(
+        atom_dir,
+        compose_body="services:\n  broker:\n    image: vulhub/test:1\n",
+    )
+    atom.runtime_spec.ports = [61616, 8161]
+    atom.ports = [61616, 8161]
+    atom.exploit_access.required_service = {"protocol": "http", "port": 8161}
+
+    assert _readiness_port(atom) == 8161
 
 
 def test_vulhub_parser_reads_user():

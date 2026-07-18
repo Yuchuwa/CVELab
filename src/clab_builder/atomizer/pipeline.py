@@ -32,6 +32,7 @@ from .output.exploit_guide import ExploitGuideGenerator
 from .agent.researcher import SecurityResearcherAgent, CVEInput
 from .environment.container import CVEEnvironmentManager, ContainerInfo
 from clab_builder.shared.models.atom import RuntimeSpec
+from clab_builder.shared.service_resolver import resolve_service_family, service_role_for_family
 
 
 @dataclass
@@ -1292,8 +1293,20 @@ class AtomizerPipeline:
         primary_phase = MitrePhase(self._normalize_mitre_phase(
             agent_extra.get("primary_mitre_phase") or self._infer_primary_phase(mitre_mapping)
         ))
-        service_role = ServiceRole(agent_extra.get("service_role")
-                                   or self._infer_service_role(self.env.main_image))
+        main_service = self.env.main_service
+        service_family = resolve_service_family(
+            self.env.main_image,
+            main_service.name if main_service else "",
+            self.env.main_ports,
+        )
+        # A known runtime database family is more reliable than an Agent's
+        # coarse free-text role.  Unknown services retain the existing Agent
+        # first/fallback inference behavior.
+        service_role = ServiceRole(
+            service_role_for_family(service_family)
+            or agent_extra.get("service_role")
+            or self._infer_service_role(self.env.main_image)
+        )
         exploit_complexity = ExploitComplexity(agent_extra.get("exploit_complexity")
                                                or self._infer_complexity(agent_output))
         attack_method = AttackMethod(agent_extra.get("attack_method")
@@ -1365,11 +1378,14 @@ class AtomizerPipeline:
             init_files=init_file_mappings,
         )
         readiness_probes = [ReadinessProbe(probe_type=ProbeType.CONTAINER_STATE)]
-        if self.env.main_ports:
+        readiness_port = self._readiness_port_for_access(
+            exploit_access, self.env.main_ports
+        )
+        if readiness_port is not None:
             readiness_probes.append(
                 ReadinessProbe(
                     probe_type=ProbeType.TCP,
-                    target=str(self.env.main_ports[0]),
+                    target=str(readiness_port),
                 )
             )
         if startup.health_check:
@@ -1378,10 +1394,14 @@ class AtomizerPipeline:
             )
         validation_spec = ValidationSpec(readiness=readiness_probes)
 
+        # Capture the current source tree before orchestrated verification.
+        # A rebuild must validate the source bundle it will hand to Range,
+        # rather than a stale bundle left by an older Atom format.
+        source_bundle = self._capture_current_source_bundle(atom_dir)
+
         # Preserve the effective main-service runtime contract from the
         # original Compose definition.  Range assembly must not have to parse
         # source_bundle/docker-compose.yml or guess an image's command.
-        main_service = self.env.main_service
         runtime_spec = RuntimeSpec(
             ports=list(self.env.main_ports),
             services=[
@@ -1397,6 +1417,7 @@ class AtomizerPipeline:
             environment=dict(main_service.environment) if main_service else {},
             user=main_service.user if main_service else None,
             source_image=self.env.main_image,
+            service_family=service_family,
         )
 
         # ── verification: native (agent 跑通) + orchestrated (环境重建) ──
@@ -1430,6 +1451,7 @@ class AtomizerPipeline:
         # 验证 runtime_spec 能正确实例化（容器 running + 端口 readiness）。
         # 不重新利用漏洞，只验证环境语义。
         if native_verification["success"]:
+            self._orchestrated_readiness_port = readiness_port
             orch = self._run_orchestrated_verification(atom_dir, ground_truth)
         else:
             orch = {
@@ -1443,27 +1465,6 @@ class AtomizerPipeline:
             "native_verification": native_verification,
             "orchestrated_verification": orchestrated_verification,
         }
-
-        # ── source_bundle: capture from the vulhub source tree BEFORE
-        # orchestrated verification, so the environment rebuild check can
-        # actually use the bundle. Fresh builds no longer depend on a
-        # pre-existing source_bundle/ dir; they capture it here. The bundle
-        # is self-contained (compose/Dockerfile/init/poc) and hashed.
-        #
-        # Source-kind detection: CVE-Factory prepared staging dirs carry
-        # tests/test_vuln.py and task.yaml. For those, test_vuln.py is
-        # classified as an exploit_reference (assisted visibility) rather
-        # than a generic exploit material.
-        from clab_builder.shared.source_bundle import capture_source_bundle
-        vulhub_src = Path(self.vulhub_dir).resolve()
-        is_cve_factory = (vulhub_src / "tests" / "test_vuln.py").is_file() or \
-                         (vulhub_src / "task.yaml").is_file()
-        source_kind = "cve_factory" if is_cve_factory else "vulhub"
-        source_bundle = capture_source_bundle(
-            vulhub_src, atom_dir, source_kind=source_kind,
-        )
-        if source_bundle is None:
-            source_bundle = self._build_source_bundle_manifest(atom_dir)
 
         exploit_guide_ref = self._generate_exploit_guide(
             atom_dir,
@@ -1784,9 +1785,11 @@ class AtomizerPipeline:
 
             # 端口 readiness：读容器内 /proc/net/tcp 的 LISTEN 状态。比每次
             # docker run busybox nc 更可靠、更快，且不依赖目标镜像装 nc/curl。
-            ports = self.env.main_ports or []
-            if ports:
-                port = ports[0]
+            port = getattr(self, "_orchestrated_readiness_port", None)
+            if port is None:
+                ports = self.env.main_ports or []
+                port = ports[0] if ports else None
+            if port is not None:
                 # DB/搜索类慢启动服务给更长窗口：最多 60 次 × 5s = 300s；
                 # 普通服务 24 次 × 5s = 120s。
                 attempts = 60 if self._is_slow_init_port(port) else 24
@@ -1848,6 +1851,38 @@ class AtomizerPipeline:
         """
         from clab_builder.shared.source_bundle import scan_source_bundle
         return scan_source_bundle(atom_dir, source_kind="vulhub")
+
+    @staticmethod
+    def _readiness_port_for_access(exploit_access, fallback_ports) -> int | None:
+        """Prefer the recorded exploit entry over Compose port ordering."""
+        service = getattr(exploit_access, "required_service", {}) or {}
+        try:
+            port = int(service.get("port"))
+            if port > 0:
+                return port
+        except (TypeError, ValueError):
+            pass
+        for port in fallback_ports or []:
+            try:
+                return int(port)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    def _capture_current_source_bundle(self, atom_dir: Path):
+        """Capture a rebuild's source tree, with legacy-bundle fallback."""
+        from clab_builder.shared.source_bundle import capture_source_bundle
+
+        source = Path(self.vulhub_dir).resolve()
+        if source.is_dir():
+            source_kind = "cve_factory" if (
+                (source / "tests" / "test_vuln.py").is_file()
+                or (source / "task.yaml").is_file()
+            ) else "vulhub"
+            bundle = capture_source_bundle(source, atom_dir, source_kind=source_kind)
+            if bundle is not None:
+                return bundle
+        return self._build_source_bundle_manifest(atom_dir)
 
     @staticmethod
     def _force_rmtree(path) -> None:

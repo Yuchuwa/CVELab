@@ -117,6 +117,23 @@ def test_capture_creates_bundle_dir(tmp_path):
     assert (atom_dir / "source_bundle" / "docker-compose.yml").is_file()
 
 
+def test_capture_replaces_stale_directory_with_source_file(tmp_path):
+    """A fresh capture must not retain a legacy directory where source has a file."""
+    src = tmp_path / "src"
+    _write_vulhub_src(src)
+    (src / "index.php").write_text("<?php echo 'source'; ?>")
+    atom_dir = tmp_path / "atom" / "CVE-T"
+    stale = atom_dir / "source_bundle" / "index.php"
+    stale.mkdir(parents=True)
+    (stale / "obsolete").write_text("old")
+
+    capture_source_bundle(src, atom_dir, source_kind="vulhub")
+
+    materialized = atom_dir / "source_bundle" / "index.php"
+    assert materialized.is_file()
+    assert materialized.read_text() == "<?php echo 'source'; ?>"
+
+
 def test_scan_is_backward_compatible_no_metadata(tmp_path):
     """An old bundle dir without material_metadata still scans into a valid
     SourceBundle (the field defaults to empty)."""
