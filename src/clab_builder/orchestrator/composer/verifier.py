@@ -12,16 +12,23 @@
 
 import json
 import ipaddress
+import os
 import re
 import secrets
 import shlex
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from urllib.parse import urlparse
 from pathlib import Path
 from typing import Any
+
+try:  # Linux is the supported ContainerLab host platform.
+    import fcntl
+except ImportError:  # pragma: no cover - retained for importability on Windows.
+    fcntl = None
 
 from clab_builder.orchestrator.composer.scenario_runner import (
     DEFAULT_MAX_TURNS as DEFAULT_AGENT_TURNS,
@@ -58,6 +65,53 @@ class ScenarioVerifier:
         # alignment/runtime differences are advisory; only Guide integrity
         # can prevent Agent startup.
         self.strict_guide_compatibility = strict_guide_compatibility
+        self.execution_context: dict[str, Any] = {}
+
+    @staticmethod
+    def _atomic_write_json(path: Path, payload: dict) -> None:
+        """Write a result without exposing a partially-written JSON file."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2, ensure_ascii=False)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+            # Verifier commonly runs under sudo for ContainerLab.  Persisted
+            # research results must remain readable by the invoking user for
+            # resume and post-run analysis.
+            try:
+                owner_uid = int(os.environ.get("SUDO_UID", ""))
+                owner_gid = int(os.environ.get("SUDO_GID", ""))
+                os.chown(path, owner_uid, owner_gid)
+            except (TypeError, ValueError, OSError):
+                pass
+            os.chmod(path, 0o644)
+        except Exception:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+            raise
+
+    @staticmethod
+    def _lifecycle_lock():
+        """Serialize the small ContainerLab management-network lifecycle only."""
+        class _Lock:
+            def __enter__(self_inner):
+                self_inner.handle = open("/tmp/cvelab-clab-lifecycle.lock", "a+")
+                if fcntl is not None:
+                    fcntl.flock(self_inner.handle.fileno(), fcntl.LOCK_EX)
+                return self_inner
+
+            def __exit__(self_inner, *_exc):
+                if fcntl is not None:
+                    fcntl.flock(self_inner.handle.fileno(), fcntl.LOCK_UN)
+                self_inner.handle.close()
+
+        return _Lock()
 
     @staticmethod
     def _agent_endpoint(base_url: str) -> tuple[str, int]:
@@ -89,7 +143,12 @@ class ScenarioVerifier:
             command, capture_output=True, text=True, timeout=timeout,
         )
 
-    def _prepare_agent_transport(self, scenario_dir: str, base_url: str = "") -> dict[str, Any]:
+    def _prepare_agent_transport(
+        self,
+        scenario_dir: str,
+        base_url: str = "",
+        control_network_lease: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Create a scoped egress path from attacker to the LLM API.
 
         The scenario's data-plane default route intentionally cannot reach the
@@ -119,8 +178,12 @@ class ScenarioVerifier:
             if not addresses:
                 raise RuntimeError(f"LLM API host did not resolve: {host}")
 
+            lease = control_network_lease or {}
+            network = str(lease.get("network_name") or "")
+            network_created = bool(network)
             suffix = secrets.token_hex(4)
-            network = f"cvelab-agent-control-{re.sub(r'[^a-zA-Z0-9_.-]', '-', str(lab_name))[:35]}-{suffix}"
+            if not network:
+                network = f"cvelab-agent-control-{re.sub(r'[^a-zA-Z0-9_.-]', '-', str(lab_name))[:35]}-{suffix}"
             # Docker's automatic /20 allocator can overlap a scenario zone
             # (the batch failure used 192.168.96.0/20, covering 192.168.100.0/24).
             # Try small, reserved control subnets explicitly and let Docker
@@ -131,27 +194,42 @@ class ScenarioVerifier:
             created = None
             control_subnet = ""
             create_error = ""
-            for candidate in control_candidates:
-                candidate_net = ipaddress.ip_network(candidate)
-                if any(candidate_net.overlaps(network) for network in reserved_subnets):
-                    continue
-                gateway_candidate = str(next(ipaddress.ip_network(candidate).hosts()))
-                attempt = self._run_command([
-                    "docker", "network", "create", "--driver", "bridge",
-                    "--subnet", candidate, "--gateway", gateway_candidate,
-                    # ContainerLab already owns eth0/eth1 in the attacker netns.
-                    # Docker's default eth prefix would try to reuse eth1 when the
-                    # second network is joined, so use a dedicated control iface.
-                    "--opt", "com.docker.network.container_iface_prefix=ctl",
-                    "--label", "cvelab.role=agent-control",
-                    "--label", f"cvelab.scenario={lab_name}",
-                    network,
-                ])
-                if attempt.returncode == 0:
-                    created = attempt
-                    control_subnet = candidate
-                    break
-                create_error = attempt.stderr.strip()[-1000:]
+            if network_created:
+                control_subnet = str(lease.get("subnet") or "")
+                exists = self._run_command(["docker", "network", "inspect", network])
+                if exists.returncode != 0:
+                    return {
+                        "ok": False,
+                        "stage": "network_lease_missing",
+                        "error": exists.stderr.strip()[-1000:] or "leased control network is unavailable",
+                        "endpoint_host": host,
+                        "endpoint_port": port,
+                        "network_name": network,
+                        "network_created": True,
+                    }
+                created = exists
+            else:
+                for candidate in control_candidates:
+                    candidate_net = ipaddress.ip_network(candidate)
+                    if any(candidate_net.overlaps(network) for network in reserved_subnets):
+                        continue
+                    gateway_candidate = str(next(ipaddress.ip_network(candidate).hosts()))
+                    attempt = self._run_command([
+                        "docker", "network", "create", "--driver", "bridge",
+                        "--subnet", candidate, "--gateway", gateway_candidate,
+                        # ContainerLab already owns eth0/eth1 in the attacker netns.
+                        # Docker's default eth prefix would try to reuse eth1 when the
+                        # second network is joined, so use a dedicated control iface.
+                        "--opt", "com.docker.network.container_iface_prefix=ctl",
+                        "--label", "cvelab.role=agent-control",
+                        "--label", f"cvelab.scenario={lab_name}",
+                        network,
+                    ])
+                    if attempt.returncode == 0:
+                        created = attempt
+                        control_subnet = candidate
+                        break
+                    create_error = attempt.stderr.strip()[-1000:]
             if created is None:
                 return {
                     "ok": False,
@@ -268,15 +346,27 @@ class ScenarioVerifier:
                 "network_created": bool(locals().get("created")) and locals()["created"].returncode == 0,
             }
 
-    def _cleanup_agent_transport(self, transport: dict[str, Any]) -> None:
+    def _cleanup_agent_transport(self, transport: dict[str, Any]) -> dict[str, Any]:
         """Remove the per-run control network after the CLab lab is destroyed."""
         network = transport.get("network_name")
         if not network or not transport.get("network_created"):
-            return
+            return {"ok": True, "skipped": True}
         container = transport.get("container")
+        errors = []
         if container:
-            self._run_command(["docker", "network", "disconnect", "-f", network, container])
-        self._run_command(["docker", "network", "rm", network])
+            disconnected = self._run_command(
+                ["docker", "network", "disconnect", "-f", network, container]
+            )
+            if disconnected.returncode != 0 and "not connected" not in disconnected.stderr.lower():
+                errors.append(disconnected.stderr.strip()[-1000:])
+        removed = self._run_command(["docker", "network", "rm", network])
+        if removed.returncode != 0 and "not found" not in removed.stderr.lower():
+            errors.append(removed.stderr.strip()[-1000:])
+        return {
+            "ok": not errors,
+            "network_name": network,
+            "errors": [error for error in errors if error],
+        }
 
     def _load_scenario_context(self, scenario_dir: str):
         scenario_path = Path(scenario_dir)
@@ -644,6 +734,7 @@ class ScenarioVerifier:
         ground_truth, _ip_alloc, _meta = self._load_scenario_context(scenario_dir)
         result: dict[str, Any] = {
             "validation_mode": "sysfield",
+            "resolved_asset_bindings": _meta.get("resolved_asset_bindings", {}),
             "environment_verified": False,
             "environment_success": False,
             "range_build_verified": False,
@@ -666,8 +757,10 @@ class ScenarioVerifier:
             if not runtime_materialization.get("ok"):
                 result["failure_stage"] = "runtime_materialization"
                 return self._save_result(scenario_path, result)
-            if not self._deploy(scenario_dir):
+            deploy = self._deploy(scenario_dir)
+            if not (deploy.get("ok") if isinstance(deploy, dict) else deploy):
                 result["error"] = "Deploy failed"
+                result["deploy"] = deploy
                 result["failure_stage"] = "deploy"
                 return self._save_result(scenario_path, result)
             base = self._run_ansible(scenario_dir, "base.yaml")
@@ -742,6 +835,8 @@ class ScenarioVerifier:
         base_url: str = "",
         model: str = "",
         environment_only: bool = False,
+        runtime_policy: str = "rebuild_missing",
+        execution_context: dict[str, Any] | None = None,
     ) -> dict:
         """Run deployment validation, optionally followed by Agent evaluation.
 
@@ -750,7 +845,10 @@ class ScenarioVerifier:
         is intended for controlled Range compatibility experiments; it never
         treats a skipped Agent as an Agent failure.
         """
+        if runtime_policy not in {"rebuild_missing", "verify_only"}:
+            raise ValueError("runtime_policy must be rebuild_missing or verify_only")
         scenario_path = Path(scenario_dir)
+        self.execution_context = dict(execution_context or {})
 
         ground_truth, ip_alloc, _meta = self._load_scenario_context(scenario_dir)
         scenario_mode = _meta.get("validation_mode")
@@ -770,7 +868,9 @@ class ScenarioVerifier:
 
         try:
             # 1. Materialize Atom-declared runtime images, then deploy.
-            runtime_materialization = self._materialize_runtime_images(scenario_dir)
+            runtime_materialization = self._materialize_runtime_images(
+                scenario_dir, runtime_policy=runtime_policy
+            )
             if not runtime_materialization.get("ok"):
                 return self._save_result(scenario_path, {
                     "success": False,
@@ -800,10 +900,12 @@ class ScenarioVerifier:
 
             # 2. Deploy
             print("[1/5] Deploying...")
-            if not self._deploy(scenario_dir):
+            deploy = self._deploy(scenario_dir)
+            if not (deploy.get("ok") if isinstance(deploy, dict) else deploy):
                 return self._save_result(scenario_path, {
                     "success": False, "error": "Deploy failed",
                     "runtime_materialization": runtime_materialization,
+                    "deploy": deploy,
                     "environment_verified": False,
                     "environment_success": False,
                     "range_build_verified": False,
@@ -933,7 +1035,11 @@ class ScenarioVerifier:
                         "error": guide_preflight.get("overall_status", "failed"),
                     }
                 elif not guide_blocked:
-                    agent_transport = self._prepare_agent_transport(scenario_dir, base_url)
+                    agent_transport = self._prepare_agent_transport(
+                        scenario_dir,
+                        base_url,
+                        control_network_lease=self.execution_context.get("control_network_lease"),
+                    )
                 if not guide_blocked and agent_transport.get("ok"):
                     # The control network is attached after the first graph
                     # probe.  Re-probe now: Docker's route selection can make
@@ -1003,7 +1109,9 @@ class ScenarioVerifier:
             result = self._save_result(scenario_path, {
                 "validation_mode": self.validation_mode,
                 "environment_only": environment_only,
+                "resolved_asset_bindings": _meta.get("resolved_asset_bindings", {}),
                 "runtime_materialization": runtime_materialization,
+                "deploy": deploy,
                 "environment_verified": bool(environment.get("all_targets_verified")),
                 "environment_success": environment_success,
                 "range_build_verified": range_build_verified,
@@ -1065,10 +1173,31 @@ class ScenarioVerifier:
             return result
 
         finally:
-            # Always destroy
+            # Both cleanup stages are independent.  A destroy error must not
+            # strand a leased Agent control network.
             print("[Cleanup] Destroying...")
-            self._destroy(scenario_dir)
-            self._cleanup_agent_transport(agent_transport)
+            try:
+                destroy = self._destroy(scenario_dir)
+            except Exception as exc:  # preserve the original verification result
+                destroy = {"ok": False, "stage": "destroy", "error": str(exc)}
+            try:
+                transport_cleanup = self._cleanup_agent_transport(agent_transport)
+            except Exception as exc:
+                transport_cleanup = {"ok": False, "stage": "agent_transport_cleanup", "error": str(exc)}
+            result_file = scenario_path / "verify_result.json"
+            if result_file.exists():
+                try:
+                    persisted = json.loads(result_file.read_text())
+                    persisted["cleanup"] = {
+                        "destroy": destroy,
+                        "agent_transport": transport_cleanup,
+                    }
+                    persisted["execution_complete"] = bool(
+                        destroy.get("ok", False) and transport_cleanup.get("ok", False)
+                    )
+                    self._atomic_write_json(result_file, persisted)
+                except (OSError, json.JSONDecodeError):
+                    pass
 
     # ── 内部步骤 ──────────────────────────────────────
 
@@ -1126,23 +1255,87 @@ class ScenarioVerifier:
             return "objective"
         return ""
 
-    def _deploy(self, scenario_dir: str, timeout: int = 300) -> bool:
-        """clab deploy"""
+    def _deploy(self, scenario_dir: str, timeout: int = 300) -> dict[str, Any]:
+        """Deploy one lab, serializing only ContainerLab's shared lifecycle."""
         scenario_path = Path(scenario_dir)
         clab_file = scenario_path / "clab.yaml"
 
         if not clab_file.exists():
             raise FileNotFoundError(f"clab.yaml not found in {scenario_dir}")
 
-        result = subprocess.run(
-            ["clab", "deploy", "-t", str(clab_file)],
-            capture_output=True, text=True, timeout=timeout,
-        )
+        command = ["clab", "deploy", "-t", str(clab_file)]
+        management = self.execution_context.get("mgmt_network") or {}
+        if management.get("name") and management.get("subnet"):
+            # ``destroy`` has no --network/--ipv4-subnet flags; persist the
+            # batch-selected management identity in the generated topology so
+            # its later parse uses the same network as deploy.
+            self._bind_management_network(clab_file, management)
+            command.extend([
+                "--network", str(management["name"]),
+                "--ipv4-subnet", str(management["subnet"]),
+            ])
+        started = time.monotonic()
+        try:
+            with self._lifecycle_lock():
+                result = subprocess.run(
+                    command, capture_output=True, text=True, timeout=timeout,
+                )
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "ok": False, "stage": "deploy", "timed_out": True,
+                "duration_seconds": round(time.monotonic() - started, 3),
+                "stdout": (exc.stdout or "")[-4000:] if isinstance(exc.stdout, str) else "",
+                "stderr": (exc.stderr or "")[-4000:] if isinstance(exc.stderr, str) else "",
+                "error": f"clab deploy timed out after {timeout}s", "command": command,
+            }
+        except OSError as exc:
+            return {
+                "ok": False, "stage": "deploy",
+                "duration_seconds": round(time.monotonic() - started, 3),
+                "stdout": "", "stderr": str(exc), "error": str(exc), "command": command,
+            }
         if result.returncode != 0:
             print(f"  Deploy failed: {result.stderr}")
-            return False
+            return {
+                "ok": False, "stage": "deploy", "returncode": result.returncode,
+                "duration_seconds": round(time.monotonic() - started, 3),
+                "stdout": result.stdout[-4000:], "stderr": result.stderr[-4000:],
+                "error": result.stderr.strip()[-1000:] or "clab deploy failed", "command": command,
+            }
         print("  Deployed OK")
-        return True
+        return {
+            "ok": True, "stage": "deploy", "returncode": result.returncode,
+            "duration_seconds": round(time.monotonic() - started, 3),
+            "stdout": result.stdout[-4000:], "stderr": result.stderr[-4000:],
+            "command": command,
+        }
+
+    @staticmethod
+    def _bind_management_network(clab_file: Path, management: dict[str, Any]) -> None:
+        """Persist a batch management network in one generated topology.
+
+        This is Range-run metadata, not a template/Atom change.  ContainerLab
+        destroy only consumes the topology file, so the deploy-only CLI flags
+        are insufficient for a shared custom management network.
+        """
+        import yaml
+
+        try:
+            topology = yaml.safe_load(clab_file.read_text()) or {}
+        except (OSError, yaml.YAMLError) as exc:
+            raise RuntimeError(f"cannot read topology management config: {exc}") from exc
+        mgmt = dict(topology.get("mgmt") or {})
+        expected = {
+            "network": str(management["name"]),
+            "ipv4-subnet": str(management["subnet"]),
+        }
+        if all(mgmt.get(key) == value for key, value in expected.items()):
+            return
+        mgmt.update(expected)
+        topology["mgmt"] = mgmt
+        temporary = clab_file.with_suffix(".mgmt.tmp")
+        temporary.write_text(yaml.safe_dump(topology, sort_keys=False))
+        os.replace(temporary, clab_file)
 
     @staticmethod
     def _resolve_runtime_path(value: str, scenario_dir: str) -> Path:
@@ -1257,7 +1450,19 @@ class ScenarioVerifier:
             "runtime_digest_changed": rebuilt.runtime_image_digest != expected_runtime_digest,
         }
 
-    def _materialize_runtime_images(self, scenario_dir: str) -> dict[str, Any]:
+    def prepare_runtime_images(
+        self,
+        scenario_dir: str,
+        runtime_policy: str = "rebuild_missing",
+    ) -> dict[str, Any]:
+        """Public preflight used by a batch coordinator before workers start."""
+        return self._materialize_runtime_images(scenario_dir, runtime_policy=runtime_policy)
+
+    def _materialize_runtime_images(
+        self,
+        scenario_dir: str,
+        runtime_policy: str = "rebuild_missing",
+    ) -> dict[str, Any]:
         """Build Atom-declared Dockerfiles before ContainerLab deploy.
 
         ContainerLab consumes images, not Compose build sections.  The
@@ -1265,6 +1470,9 @@ class ScenarioVerifier:
         verifier materializes those images before deployment.
         """
         import yaml
+
+        if runtime_policy not in {"rebuild_missing", "verify_only"}:
+            raise ValueError("runtime_policy must be rebuild_missing or verify_only")
 
         meta_path = Path(scenario_dir) / "scenario.yaml"
         if not meta_path.exists():
@@ -1297,6 +1505,9 @@ class ScenarioVerifier:
             if image and expected_digest and expected_digest in identities:
                 check["ok"] = True
                 check["action"] = "verified_local_image"
+            elif runtime_policy == "verify_only":
+                check["error"] = identity["error"] or "runtime image digest mismatch"
+                check["action"] = "verification_failed_no_rebuild"
             else:
                 check["identity_error"] = identity["error"] or "runtime image digest mismatch"
                 check.update(self._rebuild_runtime_image(selection))
@@ -1305,6 +1516,14 @@ class ScenarioVerifier:
                 break
         if not all(item.get("ok") for item in image_checks):
             return {"ok": False, "builds": results, "runtime_images": image_checks}
+
+        if builds and runtime_policy == "verify_only":
+            return {
+                "ok": False,
+                "builds": [],
+                "runtime_images": image_checks,
+                "error": "legacy runtime build is disallowed by verify_only policy",
+            }
 
         for spec in builds:
             if not isinstance(spec, dict):
@@ -1380,10 +1599,17 @@ class ScenarioVerifier:
         if inventory.exists():
             cmd.extend(["-i", str(inventory.resolve())])
 
+        environment = os.environ.copy()
+        for key, value in (self.execution_context.get("ansible_paths") or {}).items():
+            if value:
+                Path(value).mkdir(parents=True, exist_ok=True)
+                environment[str(key)] = str(value)
+        started = time.monotonic()
         try:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout,
                 cwd=str(scenario_path.resolve()),
+                stdin=subprocess.DEVNULL, env=environment,
             )
         except subprocess.TimeoutExpired as exc:
             print(f"  Ansible {playbook} timed out after {timeout}s")
@@ -1396,6 +1622,17 @@ class ScenarioVerifier:
                 "stdout": (exc.stdout or "")[-4000:] if isinstance(exc.stdout, str) else "",
                 "stderr": (exc.stderr or "")[-4000:] if isinstance(exc.stderr, str) else "",
                 "error": f"ansible-playbook timed out after {timeout}s",
+                "duration_seconds": round(time.monotonic() - started, 3),
+            }
+        except OSError as exc:
+            return {
+                "ok": False,
+                "skipped": False,
+                "playbook": playbook,
+                "stdout": "",
+                "stderr": str(exc),
+                "error": str(exc),
+                "duration_seconds": round(time.monotonic() - started, 3),
             }
         if result.returncode != 0:
             print(f"  Ansible {playbook} warning: {result.stderr[:300]}")
@@ -1407,6 +1644,7 @@ class ScenarioVerifier:
             "playbook": playbook,
             "stdout": result.stdout,
             "stderr": result.stderr,
+            "duration_seconds": round(time.monotonic() - started, 3),
         }
 
     def _run_guide_runtime_preflight(
@@ -1821,6 +2059,8 @@ class ScenarioVerifier:
                 "ip": node_ip,
                 "ports": internal_ports,
                 "zone": step.get("zone", ""),
+                "service_family": step.get("service_family", "unknown"),
+                "service_role": step.get("service_role", ""),
                 "flag_hint": flag_hint,
                 "flag_verify_command": flag_cmd,
                 "exploit_guide": guide_text,
@@ -2202,7 +2442,7 @@ class ScenarioVerifier:
     def _save_result(self, scenario_path: Path, result: dict) -> dict:
         """保存验证结果到场景目录"""
         result_file = scenario_path / "verify_result.json"
-        result_file.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+        self._atomic_write_json(result_file, result)
         print(f"  Result saved: {result_file}")
 
         # Environment-only runs prove Range construction, not flag capture.
@@ -2219,20 +2459,48 @@ class ScenarioVerifier:
 
         return result
 
-    def _destroy(self, scenario_dir: str):
-        """clab destroy"""
+    def _destroy(self, scenario_dir: str) -> dict[str, Any]:
+        """Destroy one lab while retaining the batch-owned management network."""
         clab_file = Path(scenario_dir) / "clab.yaml"
         if not clab_file.exists():
-            return
+            return {"ok": True, "skipped": True, "stage": "destroy"}
 
-        result = subprocess.run(
-            ["clab", "destroy", "-t", str(clab_file), "--cleanup"],
-            capture_output=True, text=True, timeout=120,
-        )
-        if result.returncode != 0:
+        command = ["clab", "destroy", "-t", str(clab_file), "--cleanup"]
+        if (self.execution_context.get("mgmt_network") or {}).get("name"):
+            command.append("--keep-mgmt-net")
+        started = time.monotonic()
+        try:
+            with self._lifecycle_lock():
+                result = subprocess.run(
+                    command, capture_output=True, text=True, timeout=120,
+                )
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "ok": False, "stage": "destroy", "timed_out": True,
+                "duration_seconds": round(time.monotonic() - started, 3),
+                "stdout": (exc.stdout or "")[-4000:] if isinstance(exc.stdout, str) else "",
+                "stderr": (exc.stderr or "")[-4000:] if isinstance(exc.stderr, str) else "",
+                "error": "clab destroy timed out", "command": command,
+            }
+        except OSError as exc:
+            return {
+                "ok": False, "stage": "destroy",
+                "duration_seconds": round(time.monotonic() - started, 3),
+                "stdout": "", "stderr": str(exc), "error": str(exc), "command": command,
+            }
+        command_error = bool(re.search(r"\bERRO(?:R)?\b", result.stderr))
+        if result.returncode != 0 or command_error:
             print(f"  Destroy warning: {result.stderr[:200]}")
         else:
             print("  Destroyed OK")
+        return {
+            "ok": result.returncode == 0 and not command_error,
+            "stage": "destroy", "returncode": result.returncode,
+            "duration_seconds": round(time.monotonic() - started, 3),
+            "stdout": result.stdout[-4000:], "stderr": result.stderr[-4000:],
+            "error": result.stderr.strip()[-1000:] if (result.returncode or command_error) else "",
+            "command": command,
+        }
 
     # ── Atom 数据加载 ──────────────────────────────────
 

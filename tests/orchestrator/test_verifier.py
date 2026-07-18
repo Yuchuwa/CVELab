@@ -689,6 +689,40 @@ class TestAgentTransport:
         assert result["runtime_images"][0]["action"] == "rebuilt_and_reverified"
         rebuild.assert_called_once_with(selection)
 
+    def test_verify_only_runtime_policy_never_rebuilds_a_mismatch(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        selection = {
+            "cve_id": "CVE-RUNTIME-0001", "selected_image": "cvelab-runtime-test:abc",
+            "selection": "runtime_image", "runtime_image_digest": "sha256:expected",
+        }
+        (scenario_dir / "scenario.yaml").write_text(yaml.safe_dump({"runtime_images": [selection]}))
+        verifier = ScenarioVerifier()
+        with patch.object(
+            verifier, "_run_command",
+            return_value=subprocess.CompletedProcess([], 0, json.dumps([
+                {"Id": "sha256:wrong", "RepoDigests": []},
+            ]), ""),
+        ), patch.object(verifier, "_rebuild_runtime_image") as rebuild:
+            result = verifier._materialize_runtime_images(str(scenario_dir), runtime_policy="verify_only")
+
+        assert result["ok"] is False
+        assert result["runtime_images"][0]["action"] == "verification_failed_no_rebuild"
+        rebuild.assert_not_called()
+
+    def test_batch_management_network_is_persisted_in_topology(self, tmp_path):
+        clab_file = tmp_path / "clab.yaml"
+        clab_file.write_text(yaml.safe_dump({"name": "example", "topology": {"nodes": {}}}))
+
+        ScenarioVerifier._bind_management_network(
+            clab_file, {"name": "cvelab-range-mgmt", "subnet": "172.30.240.0/24"}
+        )
+
+        topology = yaml.safe_load(clab_file.read_text())
+        assert topology["mgmt"] == {
+            "network": "cvelab-range-mgmt", "ipv4-subnet": "172.30.240.0/24",
+        }
+
     def test_missing_runtime_image_is_rebuilt_with_shared_builder(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
         scenario_dir.mkdir()
