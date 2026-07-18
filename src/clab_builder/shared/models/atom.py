@@ -188,6 +188,10 @@ class RuntimeSpec(BaseModel):
     runtime_build: Optional[RuntimeBuildSpec] = None
     runtime_status: RuntimeStatus = RuntimeStatus.NOT_REQUESTED
     runtime_failure_reason: str = ""
+    # Canonical runtime service classification used by Range/template
+    # compatibility.  It is derived from the target runtime, not an Agent
+    # claim and does not affect native-verification eligibility.
+    service_family: Optional[str] = None
     # Original container user to restore after installing tools as root.
     # Empty/None = leave the base image default (which the FROM already
     # restored unless we override with USER root).

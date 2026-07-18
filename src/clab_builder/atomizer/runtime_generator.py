@@ -82,6 +82,7 @@ def generate_runtime_artifacts(
     atom: AtomConfig,
     source_image: str,
     atom_dir: Optional[Path] = None,
+    package_manager: Optional[str] = None,
 ) -> RuntimeArtifacts:
     """Generate runtime/Dockerfile + install-tools.sh + manifest for an atom.
 
@@ -113,6 +114,8 @@ def generate_runtime_artifacts(
     pm: Optional[str] = None
     if df_text:
         pm = detect_package_manager(df_text)
+    elif package_manager:
+        pm = package_manager
     if pm is None:
         low = (source_image or "").lower()
         if low.startswith("alpine"):

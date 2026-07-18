@@ -89,6 +89,39 @@ def _inspect_user(image: str) -> str:
     return ""
 
 
+def _detect_image_package_manager(image: str) -> Optional[str]:
+    """Detect the package manager from the actual base image when possible."""
+    for manager in ("apt-get", "apk", "dnf", "yum"):
+        try:
+            r = _run(["docker", "run", "--rm", "--entrypoint", "sh", image,
+                      "-c", f"command -v {manager}"], timeout=15)
+        except subprocess.TimeoutExpired:
+            # A cold image pull or slow entrypoint must not abort the whole
+            # rebuild. The generator still has provenance-preserving image
+            # heuristics and the later build has its full timeout.
+            continue
+        if r.returncode == 0:
+            return {"apt-get": "apt", "apk": "apk", "dnf": "dnf", "yum": "yum"}[manager]
+    return None
+
+
+def _readiness_port(atom: AtomConfig) -> Optional[int]:
+    """Prefer the CVE's recorded exploit entry over Compose port ordering."""
+    service = atom.exploit_access.required_service or {}
+    try:
+        port = int(service.get("port"))
+        if port > 0:
+            return port
+    except (TypeError, ValueError):
+        pass
+    for port in atom.runtime_spec.ports or atom.ports or []:
+        try:
+            return int(port)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def build_runtime_image(
     atom: AtomConfig,
     atom_dir: Path,
@@ -106,7 +139,11 @@ def build_runtime_image(
             failure_reason="no source image to derive from",
         )
 
-    arts = generate_runtime_artifacts(atom, src, atom_dir=atom_dir)
+    image_pm = None
+    if not (atom.source_bundle and atom.source_bundle.dockerfiles):
+        image_pm = _detect_image_package_manager(src)
+    arts = generate_runtime_artifacts(atom, src, atom_dir=atom_dir,
+                                      package_manager=image_pm)
     if arts.unsupported_reason:
         return RuntimeBuildResult(
             status=RuntimeStatus.UNSUPPORTED,
@@ -141,7 +178,8 @@ def build_runtime_image(
     # Re-generate artifacts with the resolved user so the Dockerfile restores it.
     if resolved_user and resolved_user != atom.runtime_spec.user:
         atom.runtime_spec.user = resolved_user
-        arts = generate_runtime_artifacts(atom, src, atom_dir=atom_dir)
+        arts = generate_runtime_artifacts(atom, src, atom_dir=atom_dir,
+                                          package_manager=image_pm)
         if arts.unsupported_reason:
             return RuntimeBuildResult(
                 status=RuntimeStatus.UNSUPPORTED,
@@ -175,7 +213,7 @@ def build_runtime_image(
     logical = arts.logical_tools
     smoke = {}
     for name, cmd in smoke_commands(logical):
-        c = _run(["docker", "run", "--rm", image, "sh", "-c",
+        c = _run(["docker", "run", "--rm", "--entrypoint", "sh", image, "-c",
                   cmd + " >/dev/null 2>&1"], timeout=smoke_timeout)
         smoke[name] = c.returncode == 0
     res.smoke_checks = smoke
@@ -187,8 +225,7 @@ def build_runtime_image(
 
     # 3. service behavior via the ORIGINAL compose with project-directory.
     rs = atom.runtime_spec
-    ports = rs.ports or atom.ports or []
-    port = ports[0] if ports else None
+    port = _readiness_port(atom)
     bundle = atom.source_bundle
     compose_ref = bundle.compose_file if bundle else None
     if port is None or not compose_ref:
