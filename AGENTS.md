@@ -268,6 +268,26 @@ The following files should be treated as current project bookkeeping sources:
 - `data/atom_pool_status.json`
 - `data/atom_pool_status.csv`
 - `data/atom_pool_status.md`
+- `docs/WORK_PROGRESS_REPORT.md`
+
+#### Progress recording requirement
+
+Atom and Range progress must be recorded promptly in
+`docs/WORK_PROGRESS_REPORT.md`. Record only established facts, with the date,
+scope, classification (`structure-healthy`, `template-candidate`, or
+`template-anchor`), verification/runtime result, known limitations, and the
+next owner when work crosses the Atom/Range boundary.
+
+- Record an Atom candidate when it is assessed, selected, rejected, built, or
+  downgraded. Do not present a research candidate as a verified Atom.
+- Record Atom-native, source-bundle, Guide, runtime-image, smoke, and service
+  readiness outcomes independently from Range outcomes.
+- Record each Range experiment's selected Atom combination and environment,
+  attack-graph, Guided Agent, and objective results separately.
+- Update the relevant candidate queue or status artifact alongside the progress
+  report when a queue entry is added, promoted, rejected, or superseded.
+- Do not rewrite historical results; append a dated correction or superseding
+  entry when an older record is stale.
 
 #### Immediate next priority
 
@@ -380,6 +400,141 @@ structure check
 A Range experiment is considered interpretable only when environment and attack
 graph checks pass, the public objective is supplied without oracle values, and
 the result records guided-trial and objective outcomes independently.
+
+### Superseding near-term priority: scalable Atom and Range expansion
+
+The immediate research priority is to expand the high-confidence Atom pool and
+generate and validate Range combinations at scale as quickly as possible.
+
+- Do **not** introduce proof that an Atom can carry business data, CRUD/data
+  witnesses, real application-to-data-service credential binding, or Agent
+  asset-use reporting as first-stage Atom admission gates.
+- Keep the existing high-confidence Atom requirements: self-contained runtime,
+  source bundle, native verification, orchestrated environment verification,
+  and a reviewed Exploit Guide.
+- Treat backend-specific asset setup as a Range/template compatibility concern,
+  rather than a new burden on every Atom build.
+- Prefer reusable slot-matching, template-composition, and batch-validation
+  rules over per-CVE or per-Range fixes.
+- Record environment validity, attack-graph validity, Guided Agent outcome,
+  and objective outcome separately.  A richer business-data contract must not
+  block batch composition in this first implementation stage.
+
+The following are deferred to a later research phase unless a concrete template
+requires them: structured data-operation evidence, real credential binding,
+proof that an Agent used a specific asset, and service-family evidence beyond
+what is needed for that template's executable setup.
+
+### Current expansion baseline and execution plan (2026-07-18)
+
+### This-week dataset-scale objective
+
+The immediate delivery objective is a rapid first research dataset version:
+
+```text
+100+ usable high-confidence Atoms
+→ 500–1000 Range experiments that complete Guided-Agent validation
+```
+
+For this objective, reasonable LLM API usage for native Atom reconstruction,
+Guide generation/review, and Guided Range experiments is explicitly allowed.
+Optimise for throughput through the shared pipeline and bounded batch execution,
+not by weakening evidence requirements or hard-coding a CVE/Range-specific
+workaround.
+
+“Usable high-confidence Atom” continues to mean the existing first-stage
+contract: self-contained runtime/source bundle, native verification,
+orchestrated environment verification, and a reviewed Exploit Guide. Do not add
+business-data/CRUD proof, real credential binding, or Agent asset-use evidence
+as additional gates for this first dataset version.
+
+“Guided-Agent validation completed” must retain separately recorded environment,
+attack-graph, Guided-Agent, and objective outcomes. A failed Agent run is
+research evidence and must not be rewritten as a passing Range merely to meet
+the numerical target.
+
+When throughput work reveals a failure, fix only a shared Atom construction or
+Range composition/verification contract that applies to a class of cases. A
+specific CVE or generated Range may serve as the reproducer, but never receives
+a special branch solely to increase dataset counts.
+
+### Dataset production plan
+
+The work proceeds as one shared pipeline, with explicit gates:
+
+```text
+Phase 1: batch Atom reconstruction audit and supply preparation
+→ Phase 2: repeated high-throughput Atom supply waves
+→ Phase 3: coverage-first 500–1000 Range manifest generation
+→ Phase 4: generate-only → environment-only → Guided-Agent batch validation
+→ Phase 5: reproducible dataset aggregation and failure analysis
+```
+
+Phase 1 identifies reusable reconstruction classes (bundle completeness,
+runtime/readiness contract, Guide/native evidence, and source availability)
+without changing individual Atom data to force eligibility. Phase 2 produces
+Atoms in bounded waves and records every acceptance, deferral, and failure
+class. Phase 3 consumes only the recorded contracts to generate selected and
+rejected combinations. Phase 4 does not send an Agent to a combination until
+its deterministic preflight and environment validation pass. Phase 5 preserves
+both successful and failed experiments with separate Atom, environment,
+attack-graph, Guided-Agent, and objective outcomes.
+
+The detailed Phase 1 ownership, tasks, and acceptance criteria are maintained
+in `docs/STAGE1_ATOM_RECONSTRUCTION_PLAN.md`.
+
+#### Established baseline
+
+- The Range composition path now resolves backend-specific template asset
+  variants from lightweight runtime `service_family` metadata. The first
+  supported variants are PostgreSQL/5432 and Elasticsearch/HTTP 9200; this
+  metadata identifies runtime compatibility only and is **not** proof of CRUD
+  or business-data capability.
+- The first five generated `enterprise_3tier` combinations passed
+  `environment-only` validation. Both PostgreSQL and Elasticsearch variants
+  completed deployment, asset setup/verify, attack-graph checks, and
+  reachability checks.
+- This is evidence that the shared composition path works for these two
+  backends. It is not evidence that every existing Atom is runtime-ready or
+  that Guided Agent validation has passed for every combination.
+
+#### Short-term plan
+
+1. **Atom supply expansion (OpenCode; parallel)**
+   - Assess and build a batch of high-value candidates by capability,
+     automation stability, diversity, and environment reliability.
+   - Use the shared Atom pipeline only. Do not change Range templates,
+     matching, verification, or generated scenarios to accommodate an
+     individual candidate.
+   - Record accepted, rejected, and downgraded candidates with their failure
+     class in the candidate/status artifacts and progress report.
+
+2. **Coverage-first batch composition (Codex)**
+   - Make bounded matrix selection cover distinct DMZ, application, data-layer,
+     and supported-backend alternatives rather than merely taking the first
+     lexicographic combinations.
+   - Keep matching and rejection explanations generic and reusable; no
+     CVE-specific branches.
+
+3. **Layered Range evaluation (Codex + operator)**
+   - Run `generate-only` over the full matrix, then bounded concurrent
+     `environment-only` validation, then serial Guided-Agent trials on a
+     coverage-representative subset that passed environment validation.
+   - Classify outcomes as Atom construction, runtime materialization, template
+     compatibility, network/environment, Guide/execution-context, Agent
+     planning, or objective verification. Modify shared contracts only when a
+     failure class recurs; never tune one selected Range to make it pass.
+
+#### Longer-term plan
+
+- Add template service variants only after a corresponding runtime family has
+  a stable setup/verify implementation and representative environment result.
+- Expand templates only when the high-confidence pool covers their required
+  roles, capabilities, and dependencies.
+- Use the enlarged pool for controlled Guide/no-Guide and topology/Atom
+  variation experiments, recording environment validity, attack-graph
+  validity, Guided outcome, objective outcome, cost, time, and failure class
+  separately.
 
 Before implementing:
 
