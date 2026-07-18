@@ -19,6 +19,8 @@ import yaml
 from clab_builder.shared.service_resolver import (
     resolve_service_contract,
     protocol_for_port,
+    resolve_service_family,
+    service_role_for_family,
 )
 from clab_builder.atomizer.output.vulhub_converter import VulhubService, VulhubEnvironment
 
@@ -90,6 +92,15 @@ def test_protocol_for_port_known_and_unknown():
     assert protocol_for_port(5432) == "postgres"
     assert protocol_for_port(9999) == "tcp"
     assert protocol_for_port("notint") == "tcp"
+
+
+def test_resolve_service_family_uses_runtime_identity_before_port_fallback():
+    assert resolve_service_family("vulhub/elasticsearch:1.4.2", ports=[9200]) == "elasticsearch"
+    assert resolve_service_family("postgres:16", ports=[5432]) == "postgresql"
+    assert resolve_service_family("custom/service:latest", ports=[9200]) == "elasticsearch"
+    assert resolve_service_family("custom/web:latest", ports=[8080]) == "unknown"
+    assert service_role_for_family("elasticsearch") == "database"
+    assert service_role_for_family("unknown") == ""
 
 
 def test_pipeline_fills_partial_required_service_from_resolver(tmp_path):

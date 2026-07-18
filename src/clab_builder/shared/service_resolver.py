@@ -47,6 +47,59 @@ _PORT_PROTOCOL = {
     27017: "mongodb", 50070: "hadoop",
 }
 
+_FAMILY_KEYWORDS = {
+    "postgresql": ("postgres", "postgresql"),
+    "mysql": ("mysql",),
+    "mariadb": ("mariadb",),
+    "mongodb": ("mongo", "mongodb"),
+    "couchdb": ("couchdb",),
+    "redis": ("redis",),
+    "elasticsearch": ("elasticsearch",),
+    "opensearch": ("opensearch",),
+    "cassandra": ("cassandra",),
+    "influxdb": ("influxdb", "influx"),
+}
+
+_PORT_FAMILIES = {
+    3306: "mysql",
+    5432: "postgresql",
+    6379: "redis",
+    9042: "cassandra",
+    9200: "elasticsearch",
+    9300: "elasticsearch",
+    27017: "mongodb",
+}
+
+
+def resolve_service_family(
+    image: str = "",
+    service_name: str = "",
+    ports: Optional[list[int]] = None,
+) -> str:
+    """Return a conservative canonical runtime service family.
+
+    This is compatibility metadata for Range asset setup, not a claim that an
+    Atom has proven any business-data operation.  Image/service names are the
+    strongest signal; a well-known database port is only a fallback.
+    """
+    haystack = f"{image} {service_name}".lower()
+    for family, keywords in _FAMILY_KEYWORDS.items():
+        if any(keyword in haystack for keyword in keywords):
+            return family
+    for port in ports or []:
+        try:
+            family = _PORT_FAMILIES.get(int(port))
+        except (TypeError, ValueError):
+            family = None
+        if family:
+            return family
+    return "unknown"
+
+
+def service_role_for_family(family: str) -> str:
+    """Return the template role implied by a known runtime family."""
+    return "database" if family and family != "unknown" else ""
+
 
 def protocol_for_port(port: int) -> str:
     try:
@@ -158,4 +211,6 @@ def resolve_service_contract(
 __all__ = [
     "resolve_service_contract",
     "protocol_for_port",
+    "resolve_service_family",
+    "service_role_for_family",
 ]

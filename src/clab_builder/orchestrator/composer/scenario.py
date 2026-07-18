@@ -147,6 +147,10 @@ class ScenarioPipeline:
                 compatible = self._keep_chain_capable_atoms(
                     ip, compatible, template
                 )
+                compatible = [
+                    item for item in compatible
+                    if self.assembler.slot_asset_compatible(template, ip, item)
+                ]
                 if not compatible:
                     raise ValueError(
                         f"Atom {cve_id} does not satisfy injection_point '{ip.id}' "
@@ -169,6 +173,10 @@ class ScenarioPipeline:
                     available_assets=available_assets,
                 )
                 matched = self._keep_chain_capable_atoms(ip, matched, template)
+                matched = [
+                    item for item in matched
+                    if self.assembler.slot_asset_compatible(template, ip, item)
+                ]
                 if not matched:
                     raise ValueError(
                         f"No matching atom for injection_point '{ip.id}' "
@@ -189,8 +197,12 @@ class ScenarioPipeline:
             resolved_closures[ip.id] = closure
             available_assets.update(closure.assets)
 
+        resolved_asset_bindings = self.assembler.resolve_asset_bindings(template, selected_atoms)
+
         if validation_mode == "guided_agent":
-            self._validate_guided_chain(template, selected_atoms, available_assets)
+            self._validate_guided_chain(
+                template, selected_atoms, available_assets, resolved_asset_bindings
+            )
 
         # Assemble
         scenario = self.assembler.assemble(
@@ -198,6 +210,7 @@ class ScenarioPipeline:
             atoms=selected_atoms,
             scenario_name=scenario_name,
             atoms_dir=self.atoms_dir,
+            resolved_asset_bindings=resolved_asset_bindings,
         )
 
         # Write output
@@ -482,6 +495,7 @@ class ScenarioPipeline:
         template,
         atoms: list,
         available_assets: set[str],
+        resolved_asset_bindings: dict[str, dict],
     ) -> None:
         """Validate the semantic inputs required by Guided Agent execution.
 
@@ -497,10 +511,20 @@ class ScenarioPipeline:
             if objective_id in objective_ids:
                 raise ValueError(f"guided Range has duplicate objective id {objective_id!r}")
             objective_ids.add(objective_id)
-            if not objective.reference_command or not objective.success_pattern:
+            asset_binding = resolved_asset_bindings.get(objective.asset, {})
+            variant_id = asset_binding.get("variant_id", "")
+            if variant_id:
+                assertions = [
+                    item for item in objective.assertion_variants
+                    if item.asset_variant == variant_id
+                ]
+                has_assertion = len(assertions) == 1
+            else:
+                has_assertion = bool(objective.reference_command and objective.success_pattern)
+            if not has_assertion:
                 raise ValueError(
                     f"guided Range objective {objective_id!r} requires "
-                    "reference_command and success_pattern"
+                    "one resolved reference_command and success_pattern"
                 )
             if objective.verification_mode not in {"agent_evidence"}:
                 raise ValueError(
@@ -517,8 +541,8 @@ class ScenarioPipeline:
         required_asset_ids.update(objective.asset for objective in template.objectives)
         for asset_id in required_asset_ids:
             asset = assets_by_id.get(asset_id)
-            metadata = asset.metadata if asset else {}
-            if not asset or not metadata.get("setup_command") or not metadata.get("verify_command"):
+            binding = resolved_asset_bindings.get(asset_id, {})
+            if not asset or not binding.get("setup_command") or not binding.get("verify_command"):
                 raise ValueError(
                     f"Guided Range asset {asset_id!r} requires setup_command and verify_command"
                 )

@@ -113,11 +113,14 @@ class TestAssemblerDMZSimple:
         assert private[0]["actor_node"] == "target-2"
         assert private[0]["reference_command"]
         assert private[0]["success_pattern"]
+        assert private[0]["asset_variant"] == "postgresql"
         assert public[0]["id"] == "read-customer-records"
         assert public[0]["target_node"] == "target-3"
         assert public[0]["actor_node"] == "target-2"
         assert "reference_command" not in public[0]
         assert "success_pattern" not in public[0]
+        assert public[0]["service_family"] == "postgresql"
+        assert "CVELAB-CANARY" not in json.dumps(public[0])
         assert result["ground_truth"]["objectives"] == private
 
     def test_clab_has_attacker_and_target(self, assembler):
@@ -332,8 +335,34 @@ class TestAssemblerDMZSimple:
             update={"required_service": {"protocol": "ssh", "port": 22}}
         )
         atoms = [_make_atom("CVE-1"), _make_atom("CVE-2"), atom]
-        with pytest.raises(ValueError, match="does not satisfy asset"):
+        with pytest.raises(ValueError, match="no compatible service variant"):
             assembler.assemble("enterprise_3tier", atoms)
+        template = assembler.template_loader.load("enterprise_3tier")
+        assert not assembler.slot_asset_compatible(template, template.injection_points[2], atom)
+
+    def test_asset_variants_select_elasticsearch_without_agent_role_relabel(self, assembler):
+        elasticsearch = _make_atom("CVE-ES-0001", ports=[9200])
+        elasticsearch.docker_image = "vulhub/elasticsearch:1.4.2"
+        elasticsearch.runtime_spec = RuntimeSpec(
+            ports=[9200], source_image="vulhub/elasticsearch:1.4.2"
+        )
+        elasticsearch.exploit_access = ExploitAccess(
+            required_service={"protocol": "http", "port": 9200}
+        )
+        result = assembler.assemble(
+            "enterprise_3tier",
+            [_make_atom("CVE-1", ports=[80]), _make_atom("CVE-2", ports=[8080]), elasticsearch],
+            scenario_name="elasticsearch-variant",
+        )
+
+        binding = result["resolved_asset_bindings"]["customer-records"]
+        assert binding["variant_id"] == "elasticsearch"
+        assert binding["service_family"] == "elasticsearch"
+        assert "9200/customers" in result["asset_setup"]
+        assert "9200/customers" in result["objectives"][0]["reference_command"]
+        assert result["agent_objectives"][0]["agent_hint"]
+        assert "CVELAB-CANARY" not in result["agent_objectives"][0]["agent_hint"]
+        assert "reference_command" not in result["agent_objectives"][0]
 
     def test_legacy_compose_runtime_is_migrated_without_cve_special_case(self, assembler, tmp_path):
         atom = _make_atom("CVE-LEGACY-0001")
@@ -453,7 +482,7 @@ class TestAssemblerDMZSimple:
         assert path[1]["depends_on_nodes"] == ["target-1"]
         assert path[1]["execution_host"] == "dmz-web"
         assert path[1]["execution_host_node"] == "target-1"
-        assert path[2]["required_assets"] == ["app-db-credential"]
+        assert path[2]["required_assets"] == []
         assert path[0]["mitre_phase"] == "initial_access"
         assert "provides" in path[0]
 

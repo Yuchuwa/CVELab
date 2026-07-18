@@ -37,6 +37,24 @@ class IsolationRule(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class AssetServiceVariant(BaseModel):
+    """Template-owned setup for one compatible runtime service family."""
+    id: str
+    required_service_family: str = ""
+    required_service_role: str = ""
+    required_service_access: Dict[str, object] = Field(default_factory=dict)
+    setup_command: str
+    verify_command: str
+    agent_hint: str = ""
+
+
+class ObjectiveAssertionVariant(BaseModel):
+    """Private objective assertion selected with an asset service variant."""
+    asset_variant: str
+    reference_command: str
+    success_pattern: str
+
+
 class ObjectiveDef(BaseModel):
     """最终业务目标及其私有 reference assertion。
 
@@ -53,6 +71,7 @@ class ObjectiveDef(BaseModel):
     actor_ref: str = ""
     reference_command: Optional[str] = None
     success_pattern: Optional[str] = None
+    assertion_variants: List[ObjectiveAssertionVariant] = Field(default_factory=list)
 
 
 class ScenarioAsset(BaseModel):
@@ -68,6 +87,7 @@ class ScenarioAsset(BaseModel):
     # protocol-specific service (for example PostgreSQL).  This prevents a
     # generic ``database`` role from being paired with a non-database Atom.
     required_service_access: Dict[str, object] = Field(default_factory=dict)
+    service_variants: List[AssetServiceVariant] = Field(default_factory=list)
 
 
 class BaselineAsset(BaseModel):

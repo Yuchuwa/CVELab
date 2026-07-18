@@ -23,7 +23,11 @@ from clab_builder.orchestrator.composer.capability_closure import (
     close_capabilities,
     seed_capabilities,
 )
-from clab_builder.orchestrator.composer.cve_matcher import service_access_matches
+from clab_builder.orchestrator.composer.cve_matcher import (
+    effective_service_family,
+    effective_service_role,
+    service_access_matches,
+)
 
 
 def _generate_flag() -> str:
@@ -358,6 +362,7 @@ class ScenarioAssembler:
         atoms: list[AtomConfig],
         scenario_name: Optional[str] = None,
         atoms_dir: str = "data/atoms",
+        resolved_asset_bindings: Optional[dict[str, dict]] = None,
     ) -> dict:
         """组装完整场景
 
@@ -374,7 +379,7 @@ class ScenarioAssembler:
         runtime_images, runtime_builds, runtime_image_selections = _runtime_build_specs(
             atoms, atoms_dir
         )
-        self.validate_asset_bindings(template, atoms)
+        resolved_asset_bindings = resolved_asset_bindings or self.resolve_asset_bindings(template, atoms)
 
         if not scenario_name:
             cve_tag = "-".join(a.cve_id.lower().replace("cve-", "") for a in atoms)
@@ -552,6 +557,8 @@ class ScenarioAssembler:
                 "execution_host": ip.depends_on[-1] if ip.depends_on else "attacker",
                 "required_assets": list(ip.required_assets),
                 "mitre_phase": atom.primary_mitre_phase.value,
+                "service_family": effective_service_family(atom),
+                "service_role": effective_service_role(atom),
                 "ports": list(atom.ports),
                 "readiness_probes": _readiness_probes(atom),
                 "provides": [
@@ -592,10 +599,10 @@ class ScenarioAssembler:
         # 生成 base.yaml（含 IP 配置、路由、管理网络禁用）
         ansible_base = self._generate_base_yaml(template, ip_alloc, scenario_name)
         asset_setup = self._generate_asset_playbook(
-            template, injections, scenario_name, "setup_command"
+            template, injections, scenario_name, resolved_asset_bindings, "setup_command"
         )
         asset_verify = self._generate_asset_playbook(
-            template, injections, scenario_name, "verify_command"
+            template, injections, scenario_name, resolved_asset_bindings, "verify_command"
         )
 
         # Ground truth: 含数据面 IP
@@ -669,12 +676,13 @@ class ScenarioAssembler:
                     })
 
         objective_bindings, agent_objectives = self._compile_objectives(
-            template, injections, ip_alloc
+            template, injections, ip_alloc, resolved_asset_bindings
         )
         # Objective assertions are kept in the non-agent ground truth.  The
         # public agent view is written separately below and deliberately omits
         # reference commands and success patterns.
         ground_truth["objectives"] = objective_bindings
+        ground_truth["resolved_asset_bindings"] = resolved_asset_bindings
 
         return {
             "name": scenario_name,
@@ -692,6 +700,7 @@ class ScenarioAssembler:
             "objectives": objective_bindings,
             "agent_objectives": agent_objectives,
             "assets": [asset.model_dump(mode="json") for asset in template.assets],
+            "resolved_asset_bindings": resolved_asset_bindings,
             "network_subnets": [
                 *(zone.subnet for zone in template.zones.values()),
                 *(transit.subnet for transit in template.transits),
@@ -701,6 +710,8 @@ class ScenarioAssembler:
                     "injection_point": injection.id,
                     "cve_id": atom.cve_id,
                     "exploit_access": getattr(atom.exploit_access, "model_dump", lambda **_: {})(),
+                    "service_family": effective_service_family(atom),
+                    "service_role": effective_service_role(atom),
                     "capability_grants": [
                         grant.model_dump(mode="json") for grant in getattr(atom, "capability_grants", [])
                     ],
@@ -712,33 +723,110 @@ class ScenarioAssembler:
         }
 
     @staticmethod
-    def validate_asset_bindings(template: TopologyTemplate, atoms: list[AtomConfig]) -> None:
-        """Validate protocol-specific asset setup against selected Atoms.
+    def _asset_variant_matches(atom: AtomConfig, variant) -> bool:
+        family = str(getattr(variant, "required_service_family", "") or "").lower()
+        if family and effective_service_family(atom) != family:
+            return False
+        role = str(getattr(variant, "required_service_role", "") or "")
+        if role and effective_service_role(atom) != role:
+            return False
+        actual = getattr(atom.exploit_access, "required_service", {}) or {}
+        return service_access_matches(
+            getattr(variant, "required_service_access", {}) or {}, actual
+        )
 
-        Asset commands are intentionally opaque shell snippets.  The explicit
-        service contract is therefore the generic, checkable boundary between
-        a template's setup command and an Atom's exposed service.
+    @classmethod
+    def slot_asset_compatible(cls, template: TopologyTemplate, injection, atom: AtomConfig) -> bool:
+        """Return whether assets hosted by one slot support this Atom.
+
+        This is deliberately usable before assembly so explicit and automatic
+        Atom selection share the same compatibility gate.
         """
+        for asset in template.assets:
+            if (asset.location or {}).get("node_ref", "") != injection.id:
+                continue
+            variants = list(getattr(asset, "service_variants", []) or [])
+            if variants:
+                if not any(cls._asset_variant_matches(atom, variant) for variant in variants):
+                    return False
+                continue
+            required = getattr(asset, "required_service_access", {}) or {}
+            actual = getattr(atom.exploit_access, "required_service", {}) or {}
+            if not service_access_matches(required, actual):
+                return False
+        return True
+
+    @classmethod
+    def resolve_asset_bindings(cls, template: TopologyTemplate, atoms: list[AtomConfig]) -> dict[str, dict]:
+        """Resolve exactly one executable setup profile for every template asset."""
         atoms_by_slot = {
             injection.id: atom
             for injection, atom in zip(template.injection_points, atoms)
         }
+        bindings: dict[str, dict] = {}
         for asset in template.assets:
-            required = getattr(asset, "required_service_access", {}) or {}
-            if not required:
-                continue
             node_ref = (asset.location or {}).get("node_ref", "")
+            if not node_ref:
+                bindings[asset.id] = {
+                    "asset_id": asset.id,
+                    "setup_command": (asset.metadata or {}).get("setup_command", ""),
+                    "verify_command": (asset.metadata or {}).get("verify_command", ""),
+                }
+                continue
             atom = atoms_by_slot.get(node_ref)
             if atom is None:
                 raise ValueError(
                     f"Asset {asset.id!r} references unknown injection point {node_ref!r}"
                 )
             actual = getattr(atom.exploit_access, "required_service", {}) or {}
+            variants = list(getattr(asset, "service_variants", []) or [])
+            if variants:
+                matches = [
+                    variant for variant in variants
+                    if cls._asset_variant_matches(atom, variant)
+                ]
+                if len(matches) != 1:
+                    detail = "no compatible" if not matches else "ambiguous compatible"
+                    raise ValueError(
+                        f"Asset {asset.id!r} has {detail} service variant for "
+                        f"Atom {atom.cve_id} (family={effective_service_family(atom)!r}, "
+                        f"role={effective_service_role(atom)!r}, access={actual!r})"
+                    )
+                variant = matches[0]
+                bindings[asset.id] = {
+                    "asset_id": asset.id,
+                    "node_ref": node_ref,
+                    "variant_id": variant.id,
+                    "service_family": effective_service_family(atom),
+                    "service_role": effective_service_role(atom),
+                    "service_access": actual,
+                    "setup_command": variant.setup_command,
+                    "verify_command": variant.verify_command,
+                    "agent_hint": variant.agent_hint,
+                }
+                continue
+            required = getattr(asset, "required_service_access", {}) or {}
+            actual = getattr(atom.exploit_access, "required_service", {}) or {}
             if not service_access_matches(required, actual):
                 raise ValueError(
                     f"Atom {atom.cve_id} service access {actual!r} does not satisfy "
                     f"asset {asset.id!r} requirement {required!r}"
                 )
+            bindings[asset.id] = {
+                "asset_id": asset.id,
+                "node_ref": node_ref,
+                "service_family": effective_service_family(atom),
+                "service_role": effective_service_role(atom),
+                "service_access": actual,
+                "setup_command": (asset.metadata or {}).get("setup_command", ""),
+                "verify_command": (asset.metadata or {}).get("verify_command", ""),
+            }
+        return bindings
+
+    @classmethod
+    def validate_asset_bindings(cls, template: TopologyTemplate, atoms: list[AtomConfig]) -> None:
+        """Compatibility wrapper retained for existing callers."""
+        cls.resolve_asset_bindings(template, atoms)
 
     @staticmethod
     def _objective_id(objective) -> str:
@@ -753,6 +841,7 @@ class ScenarioAssembler:
         template: TopologyTemplate,
         injections: list[dict],
         ip_alloc: dict,
+        resolved_asset_bindings: dict[str, dict],
     ) -> tuple[list[dict], list[dict]]:
         """Bind template objectives to runtime nodes and create agent views.
 
@@ -809,7 +898,21 @@ class ScenarioAssembler:
                 f"Complete {objective.validation} for asset {objective.asset} "
                 "and report the obtained evidence"
             )
+            asset_binding = resolved_asset_bindings.get(objective.asset, {})
             binding = objective.model_dump(mode="json")
+            variant_id = asset_binding.get("variant_id", "")
+            if variant_id:
+                assertions = [
+                    item for item in objective.assertion_variants
+                    if item.asset_variant == variant_id
+                ]
+                if len(assertions) != 1:
+                    raise ValueError(
+                        f"Objective {objective_id!r} requires exactly one assertion "
+                        f"for asset variant {variant_id!r}"
+                    )
+                binding["reference_command"] = assertions[0].reference_command
+                binding["success_pattern"] = assertions[0].success_pattern
             binding.update({
                 "id": objective_id,
                 "goal": goal,
@@ -817,6 +920,9 @@ class ScenarioAssembler:
                 "target_node": target_node,
                 "target_ip": target_ip,
                 "actor_node": actor_node,
+                "asset_variant": variant_id,
+                "service_family": asset_binding.get("service_family", ""),
+                "service_access": asset_binding.get("service_access", {}),
             })
             bindings.append(binding)
             public.append({
@@ -829,6 +935,10 @@ class ScenarioAssembler:
                 "target_node": target_node,
                 "target_ip": target_ip,
                 "actor_node": actor_node,
+                "asset_variant": variant_id,
+                "service_family": asset_binding.get("service_family", ""),
+                "service_access": asset_binding.get("service_access", {}),
+                "agent_hint": asset_binding.get("agent_hint", ""),
             })
         return bindings, public
 
@@ -837,6 +947,7 @@ class ScenarioAssembler:
         template: TopologyTemplate,
         injections: list[dict],
         scenario_name: str,
+        resolved_asset_bindings: dict[str, dict],
         command_key: str,
     ) -> str:
         """Generate deterministic asset setup/verification commands.
@@ -848,7 +959,7 @@ class ScenarioAssembler:
         injection_by_slot = {item["ip_id"]: item for item in injections}
         tasks = []
         for asset in template.assets:
-            command = (asset.metadata or {}).get(command_key)
+            command = (resolved_asset_bindings.get(asset.id, {}) or {}).get(command_key)
             if not command:
                 continue
             node_ref = (asset.location or {}).get("node_ref", "")
@@ -1250,6 +1361,7 @@ class ScenarioAssembler:
             # Public, oracle-free view consumed by Guided Agent execution.
             "agent_objectives": scenario.get("agent_objectives", []),
             "assets": scenario.get("assets", []),
+            "resolved_asset_bindings": scenario.get("resolved_asset_bindings", {}),
             "network_subnets": scenario.get("network_subnets", []),
             "match_report": scenario.get("match_report", []),
             "runtime_builds": scenario.get("runtime_builds", []),

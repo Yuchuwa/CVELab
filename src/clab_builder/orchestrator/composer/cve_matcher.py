@@ -5,6 +5,25 @@ from typing import Optional
 
 from clab_builder.shared.models.atom import AtomConfig
 from clab_builder.shared.models.template import InjectionPoint
+from clab_builder.shared.service_resolver import resolve_service_family, service_role_for_family
+
+
+def effective_service_family(atom: AtomConfig) -> str:
+    """Return persisted runtime family or safely derive it for legacy atoms."""
+    runtime = getattr(atom, "runtime_spec", None)
+    family = str(getattr(runtime, "service_family", "") or "").strip().lower()
+    if family and family != "unknown":
+        return family
+    return resolve_service_family(
+        getattr(runtime, "source_image", "") or getattr(atom, "docker_image", ""),
+        "",
+        getattr(runtime, "ports", None) or getattr(atom, "ports", []),
+    )
+
+
+def effective_service_role(atom: AtomConfig) -> str:
+    """Use deterministic runtime classification when it has a known role."""
+    return service_role_for_family(effective_service_family(atom)) or atom.service_role.value
 
 
 def service_access_matches(required: dict, actual: dict) -> bool:
@@ -89,7 +108,7 @@ def match(
 
         # 规则 3: service role 匹配 (可选，空时跳过)
         if injection_point.required_service_role:
-            if atom.service_role.value not in injection_point.required_service_role:
+            if effective_service_role(atom) not in injection_point.required_service_role:
                 continue
 
         if not service_access_matches(
