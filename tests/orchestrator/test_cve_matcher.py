@@ -7,6 +7,7 @@ from clab_builder.shared.models.atom import (
     ExploitComplexity, AttackMethod, ServiceInfo,
     PostExploit, PivotCapability,
     ExploitAccess,
+    RuntimeSpec,
 )
 from clab_builder.shared.models.template import InjectionPoint
 from clab_builder.orchestrator.composer.cve_matcher import (
@@ -173,3 +174,16 @@ def test_service_access_contract_matches_protocol_and_port():
         required_service_access={"protocol": "ssh", "port": 22},
     )
     assert match(incompatible, [atom]) == []
+
+
+def test_runtime_service_family_overrides_stale_agent_role_for_slot_matching():
+    atom = _make_atom(service_role=ServiceRole.WEB_APPLICATION)
+    atom.docker_image = "vulhub/elasticsearch:1.4.2"
+    atom.ports = [9200]
+    atom.runtime_spec = RuntimeSpec(
+        ports=[9200], source_image="vulhub/elasticsearch:1.4.2"
+    )
+    atom.exploit_access = ExploitAccess(required_service={"protocol": "http", "port": 9200})
+    ip = InjectionPoint(id="data-store", zone="data", required_service_role=["database"])
+
+    assert match(ip, [atom]) == [atom]
