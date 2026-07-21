@@ -2,7 +2,9 @@
 
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -72,3 +74,32 @@ def test_atomic_json_never_leaves_temporary_file(tmp_path):
     assert json.loads(destination.read_text()) == {"ok": True}
     assert destination.stat().st_mode & 0o777 == 0o644
     assert not list(tmp_path.glob(".state.json.*"))
+
+
+def test_control_lease_uses_scoped_bridge_network():
+    completed = subprocess.CompletedProcess([], 0, "network-id\n", "")
+    with patch.object(MODULE, "_docker_network_subnets", return_value=set()), \
+         patch.object(MODULE.subprocess, "run", return_value=completed) as run:
+        lease = MODULE.control_lease("a" * 24, "case-a", [])
+
+    assert lease["network_name"].startswith("cvelab-agent-")
+    create = run.call_args.args[0]
+    assert create[:5] == ["docker", "network", "create", "--driver", "bridge"]
+    assert "--internal" not in create
+
+
+def test_live_output_streams_new_worker_log_lines(tmp_path, capsys):
+    log_path = tmp_path / "worker.log"
+    log_path.write_text("[1/5] Deploying...\npartial", encoding="utf-8")
+    active = {"case-a": (None, 0.0, log_path)}
+    positions = {}
+    pending = {}
+
+    MODULE._stream_log_updates(active, positions, pending)
+    assert "[case-a] [1/5] Deploying..." in capsys.readouterr().out
+    assert pending["case-a"] == "partial"
+
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(" done\n")
+    MODULE._stream_log_updates(active, positions, pending)
+    assert "[case-a] partial done" in capsys.readouterr().out
