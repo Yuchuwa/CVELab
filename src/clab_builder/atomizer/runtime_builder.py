@@ -129,7 +129,7 @@ def build_runtime_image(
     source_image: Optional[str] = None,
     build_timeout: int = 900,
     smoke_timeout: int = 30,
-    service_wait_seconds: int = 40,
+    service_wait_seconds: int = 120,
 ) -> RuntimeBuildResult:
     """Build + smoke-test + service-check the derived runtime image."""
     src = source_image or atom.docker_image
@@ -299,13 +299,26 @@ def _smoke_service_via_compose(
     # Override only the target service image; keep volumes/env/depends_on.
     services[target_name]["image"] = runtime_image
     services[target_name].pop("build", None)
+    # Drop host port mappings for the smoke run: readiness is probed via
+    # `docker exec` inside the container, so host ports are unnecessary and
+    # a busy host port (e.g. 8081) would spuriously fail the runtime build.
+    # docker compose merges lists by append, so `ports: []` does NOT clear
+    # the original; use the `!reset` tag to actually reset the list.
+    for svc in services.values():
+        if isinstance(svc, dict) and svc.get("ports"):
+            svc["ports"] = []
     data["services"] = services
+    dump_text = yaml.safe_dump(data, sort_keys=False)
+    # yaml.safe_dump cannot emit `!reset`; patch the ports lines post-hoc so
+    # compose actually drops the host mappings instead of merging them.
+    import re as _re
+    dump_text = _re.sub(r"^(\s+ports:\s*)\[\]\s*$", r"\1!reset []", dump_text, flags=_re.MULTILINE)
 
     # Override file in runtime/, NOT source_bundle. Use it as a second -f so
     # it overrides the original while the original stays the path base.
     override_path = atom_dir / "runtime" / "smoke-override.yml"
     override_path.parent.mkdir(parents=True, exist_ok=True)
-    override_path.write_text(yaml.safe_dump(data, sort_keys=False))
+    override_path.write_text(dump_text)
 
     project = f"rtsmoke-{atom.cve_id.lower()}"
     container = f"{project}-{target_name}-1"
@@ -314,6 +327,14 @@ def _smoke_service_via_compose(
               "--project-directory", str(project_dir),
               "-f", str(compose_path), "-f", str(override_path),
               "up", "-d"], timeout=120)
+        # Wait for declared depends_on services to be reachable before probing
+        # the target port; multi-service compose (e.g. mongo-express + mongo)
+        # needs the dependency up first or the target crashes on boot.
+        dep_ok, dep_detail = _wait_for_dependency_services(
+            project, services, target_name, wait_seconds,
+        )
+        if not dep_ok:
+            return False, f"dependency not ready: {dep_detail}"
         ready = False
         for _ in range(max(1, wait_seconds // 2)):
             probe = _run(["docker", "exec", container, "sh", "-c",
@@ -337,6 +358,63 @@ def _smoke_service_via_compose(
             override_path.unlink()
         except OSError:
             pass
+
+
+def _wait_for_dependency_services(
+    project: str, services: dict, target_name: str, wait_seconds: int,
+) -> tuple[bool, str]:
+    """Poll dependency services (declared via depends_on) until their exposed
+    ports accept TCP connections, so the target service can start against an
+    already-ready dependency.  This is a shared readiness contract for
+    multi-service compose environments (e.g. mongo-express depends on mongo);
+    it does not change the target service image or compose semantics.
+    """
+    target_svc = services.get(target_name) or {}
+    depends_on = target_svc.get("depends_on") or []
+    if isinstance(depends_on, dict):  # long-form depends_on with condition
+        depends_on = list(depends_on.keys())
+    deps = [d for d in depends_on if d in services]
+    if not deps:
+        return True, "no dependencies"
+    deadline = time.monotonic() + wait_seconds
+    not_ready = list(deps)
+    while not_ready and time.monotonic() < deadline:
+        still = []
+        for dep in not_ready:
+            dep_container = f"{project}-{dep}-1"
+            dep_ports = []
+            dep_svc = services.get(dep) or {}
+            for pm in (dep_svc.get("ports") or []):
+                if isinstance(pm, str) and ":" in pm:
+                    dep_ports.append(int(pm.split(":")[0]))
+                elif isinstance(pm, dict):
+                    try:
+                        dep_ports.append(int(pm.get("published") or pm.get("target")))
+                    except (TypeError, ValueError):
+                        pass
+            if not dep_ports:
+                # no host port to probe; assume ready once container is running
+                r = _run(["docker", "inspect", "-f", "{{.State.Running}}", dep_container], timeout=5)
+                if r.returncode == 0 and r.stdout.strip() == "true":
+                    continue
+                still.append(dep)
+                continue
+            up = False
+            for dp in dep_ports:
+                probe = _run(["docker", "exec", dep_container, "sh", "-c",
+                              f"python3 -c \"import socket;socket.create_connection(('127.0.0.1',{dp}),2).close()\" 2>/dev/null"],
+                             timeout=8)
+                if probe.returncode == 0:
+                    up = True
+                    break
+            if not up:
+                still.append(dep)
+        not_ready = still
+        if not_ready:
+            time.sleep(2)
+    if not_ready:
+        return False, f"dependencies not ready: {not_ready}"
+    return True, "ok"
 
 
 def runtime_verification_record(res: RuntimeBuildResult) -> dict:

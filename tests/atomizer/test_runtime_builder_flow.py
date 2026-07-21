@@ -78,6 +78,33 @@ def test_smoke_compose_uses_project_directory_and_override_in_runtime(tmp_path):
     assert not (atom_dir / "runtime" / "smoke-override.yml").exists()
 
 
+def test_smoke_override_resets_host_port_mappings(tmp_path):
+    """The runtime smoke override must reset host port mappings (via !reset)
+    so a busy host port does not spuriously fail the runtime build.  Readiness
+    is probed via `docker exec` inside the container, so host ports are
+    unnecessary; without !reset, docker compose merges the empty list and
+    keeps the original host mapping."""
+    atom_dir = tmp_path / "CVE-RT-PORT"
+    atom_dir.mkdir()
+    compose = (
+        "services:\n  web:\n    image: vulhub/test:1\n    ports: ['8081:8081']\n"
+    )
+    atom = _atom(atom_dir, compose_body=compose)
+    captured = {}
+
+    def fake_run(cmd, **kw):
+        if cmd[:3] == ["docker", "compose", "-p"] and "up" in cmd:
+            ovf = [a for a in cmd if a.endswith("smoke-override.yml")]
+            if ovf:
+                captured["text"] = Path(ovf[0]).read_text()
+        return _cp(0)
+
+    with patch("clab_builder.atomizer.runtime_builder._run", side_effect=fake_run):
+        _smoke_service_via_compose("rt:1", atom_dir, atom, 8081, 4)
+    assert "!reset" in captured["text"]
+    assert "ports" in captured["text"]
+
+
 def test_no_target_service_identified_is_unsupported(tmp_path):
     """If no service matches is_target/image, builder returns unsupported
     rather than substituting the first (dependency) service."""
@@ -357,6 +384,16 @@ def test_pipeline_writes_source_image(tmp_path):
     assert rs.get("source_image") == "vulhub/test:1"
 
 
+def test_service_wait_seconds_default_accommodates_java_services():
+    """The default readiness window must accommodate slow-start Java services
+    (Druid/JBoss/Openfire) that need >90s, not the legacy 40s.  This is a
+    shared runtime contract default, not a per-CVE setting."""
+    import inspect
+    from clab_builder.atomizer.runtime_builder import build_runtime_image
+    sig = inspect.signature(build_runtime_image)
+    assert sig.parameters["service_wait_seconds"].default >= 120
+
+
 def test_ca_certificates_smoke_checks_real_bundle():
     """ca_certificates smoke verifies a real non-empty CA bundle, not just
     openssl or an empty certs directory. Every branch uses -s (non-empty
@@ -374,3 +411,66 @@ def test_ca_certificates_smoke_checks_real_bundle():
     # fallback searches for a non-empty pem, not just any pem
     assert "-size +0c" in cmd
     assert "openssl version" not in cmd
+
+
+def test_wait_for_dependency_services_polls_dep_port_before_target():
+    """Multi-service compose (e.g. mongo-express + mongo) must wait for the
+    declared depends_on service port to accept TCP before probing the target
+    port.  This is a shared readiness contract for compose dependencies, not
+    a per-CVE workaround."""
+    from clab_builder.atomizer.runtime_builder import _wait_for_dependency_services
+
+    services = {
+        "web": {"depends_on": ["mongo"], "ports": ["8081:8081"]},
+        "mongo": {"ports": ["27017:27017"]},
+    }
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        # docker inspect running -> true for mongo container, then the exec
+        # probe for 27017 succeeds on the second poll.
+        if cmd[:2] == ["docker", "inspect"]:
+            return _cp(0, "true")
+        if cmd[:3] == ["docker", "exec"]:
+            return _cp(0)  # dep port reachable
+        return _cp(0)
+
+    with patch("clab_builder.atomizer.runtime_builder._run", side_effect=fake_run):
+        ok, detail = _wait_for_dependency_services("proj", services, "web", 30)
+    assert ok
+    assert detail == "ok"
+
+
+def test_wait_for_dependency_services_no_deps_returns_immediately():
+    from clab_builder.atomizer.runtime_builder import _wait_for_dependency_services
+    services = {"web": {"ports": ["8080:8080"]}}
+    with patch("clab_builder.atomizer.runtime_builder._run") as fake:
+        ok, detail = _wait_for_dependency_services("proj", services, "web", 30)
+    assert ok
+    assert detail == "no dependencies"
+    fake.assert_not_called()
+
+
+def test_wait_for_dependency_services_times_out_when_dep_never_ready():
+    from clab_builder.atomizer.runtime_builder import _wait_for_dependency_services
+
+    services = {
+        "web": {"depends_on": ["mongo"], "ports": ["8081:8081"]},
+        "mongo": {"ports": ["27017:27017"]},
+    }
+
+    def fake_run(cmd, **kw):
+        if cmd[:2] == ["docker", "inspect"]:
+            return _cp(0, "false")  # never running
+        if cmd[:3] == ["docker", "exec"]:
+            return _cp(1)  # port never reachable
+        return _cp(0)
+
+    with patch("clab_builder.atomizer.runtime_builder._run", side_effect=fake_run), \
+         patch("clab_builder.atomizer.runtime_builder.time.monotonic") as mt:
+        # simulate deadline passing
+        mt.side_effect = [0, 100, 200]
+        ok, detail = _wait_for_dependency_services("proj", services, "web", 1)
+    assert not ok
+    assert "mongo" in detail
