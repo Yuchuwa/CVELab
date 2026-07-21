@@ -58,19 +58,54 @@ def _coverage_features(case: dict) -> set[str]:
 
 
 def select_coverage_first(cases: list[dict], max_cases: int) -> list[dict]:
-    """Greedily select distinct slot and asset-variant coverage, deterministically."""
+    """Greedily select distinct slot and asset-variant coverage, deterministically.
+
+    Two-stage tie-breaking:
+    1. Prefer cases that add the most uncovered slot/asset-variant features
+       (the original coverage-first objective).
+    2. On ties (including the common case where all features are already
+       covered, so every remaining case adds zero), break by per-slot
+       balance: pick the case whose entry-point slot (``dmz-web``) CVE has
+       been selected the fewest times so far, then by total slot-CVE
+       imbalance. This prevents the old behavior where, once coverage
+       saturates, ``max`` keeps returning the alphabetically-first case ID
+       and one entry CVE (historically CVE-2012-1823) ends up in ~70% of the
+       selected cases purely because its case IDs sort earliest.
+
+    Determinism is preserved: ties on the balance key fall back to the
+    sorted case ID, so the result is reproducible regardless of dict order.
+    """
     remaining = sorted(cases, key=lambda case: str(case["id"]))
     selected: list[dict] = []
     covered: set[str] = set()
     limit = max_cases or len(remaining)
+    slot_cve_count: dict[str, dict[str, int]] = {}
+
+    def _balance_key(case: dict) -> tuple:
+        # We minimize this tuple with min(), so lower is better.
+        # 1. Maximize new coverage first: -new_features (so more coverage =>
+        #    smaller value, which min picks).
+        # 2. Then balance the entry-point slot: the entry CVE's count so far
+        #    (fewer = picked first, spreading entry CVEs).
+        # 3. Then total slot-CVE imbalance (spreads across all slots too).
+        slot_atoms = case.get("slot_atoms") or {}
+        entry_slot = "dmz-web" if "dmz-web" in slot_atoms else next(
+            iter(slot_atoms), ""
+        )
+        entry_cve = slot_atoms.get(entry_slot, "")
+        entry_count = slot_cve_count.get(entry_slot, {}).get(entry_cve, 0)
+        total = sum(
+            slot_cve_count.get(slot, {}).get(cve, 0)
+            for slot, cve in slot_atoms.items()
+        )
+        return (-len(_coverage_features(case) - covered), entry_count, total)
 
     while remaining and len(selected) < limit:
-        best = max(
-            remaining,
-            # ``remaining`` is sorted by ID, and max keeps its first equal
-            # value, so ties remain deterministic without random sampling.
-            key=lambda case: len(_coverage_features(case) - covered),
-        )
+        best = min(remaining, key=_balance_key)
+        # Record counts before removing so the chosen case is counted too.
+        for slot, cve in (best.get("slot_atoms") or {}).items():
+            slot_cve_count.setdefault(slot, {})
+            slot_cve_count[slot][cve] = slot_cve_count[slot].get(cve, 0) + 1
         selected.append(best)
         covered.update(_coverage_features(best))
         remaining.remove(best)
