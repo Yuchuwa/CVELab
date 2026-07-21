@@ -283,6 +283,49 @@ def test_validate_compose_services_accepts_successful_init_container(tmp_path, m
 
 
 @pytest.mark.unit
+def test_validate_compose_services_accepts_initd_prefix_container(tmp_path, monkeypatch):
+    """A one-shot initd dependency (init prefix, not separator-bounded) exiting 0
+    is a successful service state.  Covers CouchDB CVE-2017-12635 where the
+    init service is named ``initd`` and the legacy regex required a separator
+    after ``init``."""
+    cve_dir = tmp_path / "vulhub" / "test" / "CVE-2024-0010"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({"services": {"web": {"image": "vulhub/test:latest"}}})
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0010\n")
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+    monkeypatch.setattr(
+        pipeline,
+        "_inspect_compose_services",
+        lambda _: [
+            {
+                "service": "couchdb",
+                "container_name": "app-couchdb-1",
+                "is_target": True,
+                "running": True,
+                "status": "running",
+                "exit_code": 0,
+                "health": "none",
+            },
+            {
+                "service": "initd",
+                "container_name": "app-initd-1",
+                "is_target": False,
+                "running": False,
+                "status": "exited",
+                "exit_code": 0,
+                "health": "none",
+            },
+        ],
+    )
+
+    services = pipeline._validate_compose_services("app")
+
+    assert len(services) == 2
+
+
+@pytest.mark.unit
 def test_container_port_from_compose_spec_accepts_protocol_suffixes():
     assert container_port_from_spec("2379/tcp") == 2379
     assert container_port_from_spec("127.0.0.1:8080:80/tcp") == 80

@@ -886,14 +886,20 @@ class AtomizerPipeline:
 
     @staticmethod
     def _is_completed_init_service(service: dict[str, Any]) -> bool:
-        """Accept explicitly named non-target one-shot setup services that exit 0."""
+        """Accept explicitly named non-target one-shot setup services that exit 0.
+
+        Covers containers whose service/container name starts with an init/setup
+        prefix (init, initd, setup, bootstrap, migrate, migration, install),
+        not just the exact token bounded by separators.  A one-shot ``initd``
+        service that exits 0 is a normal completion, not a dependency failure.
+        """
         if service.get("is_target") or service.get("exit_code") != 0:
             return False
         name = " ".join([
             str(service.get("service", "")),
             str(service.get("container_name", "")),
         ]).lower()
-        return bool(re.search(r"(^|[-_])(init|setup|bootstrap|migrate|migration|install)([-_]|$)", name))
+        return bool(re.search(r"(^|[-_])(init|setup|bootstrap|migrate|migration|install)", name))
 
     def _build_agent_environment_context(self, cve_info: ContainerInfo,
                                          network_name: str) -> dict[str, Any]:
@@ -1738,6 +1744,13 @@ class AtomizerPipeline:
                 env["FLAG"] = flag_value
 
         evidence: list[str] = []
+        # Drop host port mappings: orchestrated verification probes the
+        # service inside the compose network via /proc/net/tcp, so host
+        # ports are unnecessary and a busy host port would spuriously fail
+        # the verification (same contract as the runtime smoke override).
+        for svc in services.values():
+            if isinstance(svc, dict):
+                svc.pop("ports", None)
         tmp_compose = atom_dir / "source_bundle" / ".orch-compose.yml"
         try:
             tmp_compose.write_text(yaml.safe_dump(compose_data, sort_keys=False))
