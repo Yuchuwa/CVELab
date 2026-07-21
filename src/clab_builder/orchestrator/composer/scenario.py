@@ -43,6 +43,8 @@ class ScenarioPipeline:
         output_dir: str = "data/scenarios",
         seed: Optional[int] = None,
         validation_mode: Optional[str] = None,
+        agent_context: str = "guided",
+        noise_level: str = "none",
     ) -> dict:
         """生成完整场景
 
@@ -52,6 +54,10 @@ class ScenarioPipeline:
             scenario_name: 场景名
             output_dir: 输出目录
             seed: 随机种子 (用于可复现)
+            agent_context: Agent 上下文 (guided/no_guide/no_hint/l0/l1/l2)，
+                控制 clab.yaml 中 attacker 的 PoC 材料挂载策略
+            noise_level: 噪音档位 (模板 ``noise_levels`` 的 key，默认 none)，
+                控制是否在 zone LAN 内插入良性 decoy 节点。正交于 agent_context。
 
         Returns:
             assembled scenario dict (同 ScenarioAssembler.assemble 的返回值)
@@ -211,6 +217,8 @@ class ScenarioPipeline:
             scenario_name=scenario_name,
             atoms_dir=self.atoms_dir,
             resolved_asset_bindings=resolved_asset_bindings,
+            agent_context=agent_context,
+            noise_level=noise_level,
         )
 
         # Write output

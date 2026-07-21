@@ -32,8 +32,15 @@ def main():
 @click.option("--validation-mode", type=click.Choice(["guided_agent", "sysfield"]),
               default="guided_agent", show_default=True,
               help="Range validation artifact to generate")
+@click.option(
+    "--agent-context",
+    type=click.Choice(["guided", "no_guide", "no_hint", "l0", "l1", "l2"]),
+    default="guided", show_default=True,
+    help="Agent context: difficulty level l0/l1/l2 (l0=entry IP only, "
+         "l1=+topology, l2=+CVE+credentials) or legacy guided/no_guide/no_hint",
+)
 def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir,
-             validation_mode):
+             validation_mode, agent_context):
     """Generate scenario files from topology template.
 
     TEMPLATE_NAME is the template directory name (e.g. dmz_simple).
@@ -52,6 +59,7 @@ def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir,
             output_dir=output,
             seed=seed,
             validation_mode=validation_mode,
+            agent_context=agent_context,
         )
     except (FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}")
@@ -92,9 +100,16 @@ def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir,
 @click.option("--validation-mode", type=click.Choice(["guided_agent", "sysfield"]),
               default="guided_agent", show_default=True,
               help="Reference validation mode")
+@click.option(
+    "--agent-context",
+    type=click.Choice(["guided", "no_guide", "no_hint", "l0", "l1", "l2"]),
+    default="guided", show_default=True,
+    help="Agent context: difficulty level l0/l1/l2 (l0=entry IP only, "
+         "l1=+topology, l2=+CVE+credentials) or legacy guided/no_guide/no_hint",
+)
 def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
            api_key, base_url, model, max_turns, environment_only, strict_guide_compatibility,
-           validation_mode):
+           validation_mode, agent_context):
     """Generate + deploy + agent verify + destroy + save (all-in-one).
 
     TEMPLATE_NAME is the template directory name (e.g. dmz_simple).
@@ -119,6 +134,7 @@ def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
             output_dir=output,
             seed=seed,
             validation_mode=validation_mode,
+            agent_context=agent_context,
         )
     except (FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}")
@@ -141,6 +157,7 @@ def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
         base_url=base_url,
         model=model,
         environment_only=environment_only,
+        agent_context=agent_context,
     )
 
     # 3. Summary

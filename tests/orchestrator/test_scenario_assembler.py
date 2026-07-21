@@ -363,6 +363,14 @@ class TestAssemblerDMZSimple:
         assert result["agent_objectives"][0]["agent_hint"]
         assert "CVELAB-CANARY" not in result["agent_objectives"][0]["agent_hint"]
         assert "reference_command" not in result["agent_objectives"][0]
+        asset_setup = yaml.safe_load(result["asset_setup"])
+        customer_task = next(
+            task for play in asset_setup for task in play["tasks"]
+            if task["name"] == "setup_command customer-records"
+        )
+        assert customer_task["retries"] == 18
+        assert customer_task["delay"] == 10
+        assert customer_task["until"].endswith(".rc == 0")
 
     def test_legacy_compose_runtime_is_migrated_without_cve_special_case(self, assembler, tmp_path):
         atom = _make_atom("CVE-LEGACY-0001")
