@@ -695,7 +695,12 @@ def extract_observed_progress(text: str, targets: list[dict]) -> dict:
     }
 
 
-def classify_termination(text: str, *, structured_result: bool = False) -> str:
+def classify_termination(
+    text: str,
+    *,
+    structured_result: bool = False,
+    partial_result: bool = False,
+) -> str:
     """Map SDK errors to stable research result categories."""
     lowered = text.lower()
     if "maximum number of turns" in lowered or "max_turns" in lowered:
@@ -709,7 +714,14 @@ def classify_termination(text: str, *, structured_result: bool = False) -> str:
         return "agent_api_quota"
     if "empty or malformed response" in lowered or "api error" in lowered:
         return "agent_api_protocol"
-    return "completed" if structured_result else "agent_runner_error"
+    # The Agent ran and produced prose but no parseable structured JSON. This
+    # is a normal Agent exploit failure (e.g. could not complete the attack
+    # chain), not a runner crash. Only a truly empty run (no text, no
+    # structured output) is classified as agent_runner_error. See
+    # WORK_PROGRESS_REPORT 2026-07-21 'agent_runner_error mis-label' analysis.
+    if structured_result or partial_result:
+        return "completed"
+    return "agent_runner_error"
 
 
 async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TURNS):
@@ -797,12 +809,17 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
         result.update(extracted)
     else:
         result["evidence"].append(full_text[:2000])
-        result["partial_result"] = bool(full_text.strip())
+    # partial_result is computed unconditionally so classify_termination can
+    # distinguish a normal Agent exploit failure (prose produced, no JSON)
+    # from a true runner crash (no output at all).
+    partial_result = bool(full_text.strip())
+    result["partial_result"] = partial_result
     result["structured_result"] = bool(extracted)
     result["observed_progress"] = extract_observed_progress(full_text, input_data.get("targets", []))
     result["termination_reason"] = classify_termination(
         f"{termination_hint}\n{full_text}\n{result.get('evidence', [])}",
         structured_result=bool(extracted),
+        partial_result=partial_result,
     )
 
     with open(output_path, "w") as f:
