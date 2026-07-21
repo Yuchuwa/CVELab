@@ -1904,6 +1904,23 @@ class TestRunnerExtractJson:
             "API Error: 402 Insufficient Balance (request id: test)"
         ) == "agent_api_quota"
 
+        # Agent produced prose but no parseable JSON: a normal exploit
+        # failure, not a runner crash. See WORK_PROGRESS_REPORT 2026-07-21.
+        assert classify_termination(
+            "I was unable to complete the attack chain.",
+            structured_result=False, partial_result=True,
+        ) == "completed"
+
+        # Structured JSON extracted: completed regardless of prose.
+        assert classify_termination(
+            "attack finished", structured_result=True, partial_result=False,
+        ) == "completed"
+
+        # No text and no structured output: a true runner crash.
+        assert classify_termination(
+            "", structured_result=False, partial_result=False,
+        ) == "agent_runner_error"
+
 
 class TestVerifierDefaults:
     """Verifier 默认值"""
