@@ -555,10 +555,15 @@ class ScenarioAssembler:
             iface_map.setdefault(zone_router, {})[router_eth] = node_name
             iface_map.setdefault(node_name, {})["eth1"] = zone_router
 
-            # CVE setup: bounded startup wait plus a non-fatal, generic TCP
-            # diagnostic.  The verifier repeats the probe as the hard gate and
-            # records its structured result, so Ansible output cannot mask a
-            # service that is merely in the Running state.
+            # CVE setup: bounded readiness poll. The probe retries until the
+            # TCP port is listening (or exhausts retries:18 delay:10 = 180s),
+            # so slow-start services (ES/PostgreSQL JVM) are ready before
+            # asset_setup tries to write the canary. failed_when stays False so
+            # a truly broken service still does not block cve_setup; the
+            # verifier's _verify_environment remains the hard gate. See
+            # WORK_PROGRESS_REPORT 2026-07-21 "verifier setup order" analysis.
+            # Keep a short initial pause so the container's entrypoint can
+            # exec before the first /proc/net/tcp read.
             setup_tasks = [{
                 "name": f"Wait {atom.service_startup.wait_seconds}s for service",
                 "ansible.builtin.pause": {
@@ -590,6 +595,9 @@ class ScenarioAssembler:
                     "register": register_name,
                     "changed_when": False,
                     "failed_when": False,
+                    "until": f"{register_name}.rc == 0",
+                    "retries": 18,
+                    "delay": 10,
                 })
             cve_setup_tasks.append({
                 "name": f"Wait for {atom.cve_id} on {service_node_name}",
@@ -685,7 +693,10 @@ class ScenarioAssembler:
             iface_map.setdefault(svc.name, {})["eth1"] = zone_router
             zone_targets[svc.zone].append(svc.name)
 
-            # Decoy readiness probes (TCP only, same shape as chain-node probes).
+            # Decoy readiness probes (TCP only, same shape as chain-node
+            # probes): poll until the port listens or retries:18 delay:10
+            # (180s) exhaust, matching the chain-node readiness contract so
+            # slow-start decoys do not race asset_setup.
             decoy_setup_tasks: list[dict] = []
             decoy_container = f"clab-{scenario_name}-{svc.name}"
             for port in svc.ports:
@@ -706,6 +717,9 @@ class ScenarioAssembler:
                     "register": register_name,
                     "changed_when": False,
                     "failed_when": False,
+                    "until": f"{register_name}.rc == 0",
+                    "retries": 18,
+                    "delay": 10,
                 })
             if decoy_setup_tasks:
                 cve_setup_tasks.append({
