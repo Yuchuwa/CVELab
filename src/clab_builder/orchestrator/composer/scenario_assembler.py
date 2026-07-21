@@ -35,6 +35,39 @@ def _generate_flag() -> str:
     return f"flag{{{secrets.token_hex(16)}}}"
 
 
+# PoC material classification shared with verifier.py (levels). Keep in sync
+# with ScenarioVerifier._CREDENTIAL_MATERIAL_PATTERNS / _PAYLOAD_MATERIAL_PATTERNS.
+_CREDENTIAL_MATERIAL_PATTERNS = (
+    "id_rsa", "id_dsa", "id_ed25519", "id_ecdsa",
+    ".pem", ".key", ".p12", "id_rsa.pub",
+)
+_PAYLOAD_MATERIAL_PATTERNS = (
+    "poc.py", "poc.sh", "poc.png", "poc.jpg", "poc.gif",
+    "exploit.py", "exploit.sh", "exp.py", "exp.sh",
+    "evil.py", "evil.sh",
+)
+
+
+def _is_credential_material(material: str) -> bool:
+    base = str(Path(material).name).lower()
+    if any(base == p or base.endswith(p) for p in _PAYLOAD_MATERIAL_PATTERNS):
+        return False
+    return any(p in base for p in _CREDENTIAL_MATERIAL_PATTERNS)
+
+
+def _agent_context_level(agent_context: str) -> Optional[str]:
+    """Map agent_context to a difficulty level (l0/l1/l2) or None.
+
+    None means the legacy guided/no_guide path (mount all materials).
+    "no_hint" is a legacy alias mapping to l2 (credential-only mount).
+    """
+    if agent_context in ("l0", "l1", "l2"):
+        return agent_context
+    if agent_context == "no_hint":
+        return "l2"
+    return None
+
+
 def _generate_scenario_hash(scenario_name: str, cve_ids: list[str]) -> str:
     """场景去重 hash"""
     payload = f"{scenario_name}:{','.join(sorted(cve_ids))}"
@@ -363,6 +396,8 @@ class ScenarioAssembler:
         scenario_name: Optional[str] = None,
         atoms_dir: str = "data/atoms",
         resolved_asset_bindings: Optional[dict[str, dict]] = None,
+        agent_context: str = "guided",
+        noise_level: str = "none",
     ) -> dict:
         """组装完整场景
 
@@ -372,6 +407,12 @@ class ScenarioAssembler:
                 "cve_setup", "injections", "ground_truth", "flag_files",
                 "ip_allocations",
             }
+
+        ``agent_context`` controls how PoC materials are bind-mounted into the
+        attacker container. Levels l0/l1/l2 (and the legacy no_hint alias) only
+        mount credential-type materials (leaked keys) for l2; payload-type PoC
+        files are never mounted at any level. guided/no_guide keep the original
+        full-material mount.
         """
         template = self.template_loader.load(template_name)
         clab_base = self.template_loader.load_clab_base(template_name)
@@ -392,15 +433,30 @@ class ScenarioAssembler:
         # Make atom PoC material self-contained for the attacker actor.  The
         # deterministic Range exporter uses the same names when rendering
         # /vulhub/<CVE>__<file> references.
+        #
+        # Material mounting policy by agent_context:
+        #   guided / no_guide : mount all declared PoC materials (legacy).
+        #   l0 / l1           : mount no PoC materials (no payload, no creds).
+        #   l2 (incl no_hint) : mount credential-type materials only (leaked
+        #                       credential locations, AGENTCYBERRANGE Level-2).
+        # Payload-type PoC files (poc.py/poc.png/exploit.py/...) are never
+        # mounted at any level — they would hand the Agent a working exploit.
         attacker_node = clab.get("topology", {}).get("nodes", {}).get("attacker")
         if attacker_node is not None:
             attacker_binds = list(attacker_node.get("binds", []))
             atoms_path = Path(atoms_dir).resolve()
+            level = _agent_context_level(agent_context)
             for atom in atoms:
                 bundle = getattr(atom, "source_bundle", None)
                 for material in getattr(bundle, "poc_materials", []) if bundle else []:
                     if Path(material).is_absolute() or ".." in Path(material).parts:
                         raise ValueError(f"Atom {atom.cve_id} has an unsafe PoC material path: {material}")
+                    if level is not None and not _is_credential_material(material):
+                        # Levels never mount payload-type PoC materials.
+                        continue
+                    if level in ("l0", "l1"):
+                        # No materials at all for l0/l1 (not even credentials).
+                        continue
                     source = atoms_path / atom.cve_id / material
                     if not source.is_file():
                         raise ValueError(f"Atom {atom.cve_id} declares missing PoC material: {material}")
@@ -542,6 +598,16 @@ class ScenarioAssembler:
                 "tasks": setup_tasks,
             })
 
+            # Exploit port: the required_service port the attack actually
+            # targets. Distinct from ``ports`` (all listening ports incl.
+            # management/admin ports that may only bind localhost). The
+            # reachability check uses exploit_port so a management port that
+            # is not reachable across the data plane does not fail the attack
+            # edge (e.g. JBoss 9990 vs exploit 8080).
+            required_service = (
+                getattr(getattr(atom, "exploit_access", None), "required_service", {}) or {}
+            )
+            exploit_port = required_service.get("port")
             injections.append({
                 "ip_id": ip.id,
                 "cve_id": atom.cve_id,
@@ -560,6 +626,7 @@ class ScenarioAssembler:
                 "service_family": effective_service_family(atom),
                 "service_role": effective_service_role(atom),
                 "ports": list(atom.ports),
+                "exploit_port": int(exploit_port) if exploit_port is not None else None,
                 "readiness_probes": _readiness_probes(atom),
                 "provides": [
                     capability.type.value
@@ -582,6 +649,79 @@ class ScenarioAssembler:
             flag_files.append((node_name, flag, flag_file_name))
             used_cves.append(atom.cve_id)
             zone_targets[ip.zone].append(node_name)
+
+        # ── 良性 decoy 节点（noise services）──────────────────────────
+        # Decoys share the zone LAN with chain nodes, are not flag/injection
+        # targets, and never enter attack_path / objectives / capability
+        # closure. They only raise Agent target-identification difficulty by
+        # mixing benign services into the zone subnet (paper §A.3).
+        noise_nodes_meta: list[dict] = []
+        noise_services = list(template.noise_levels.get(noise_level, []) or [])
+        for svc in noise_services:
+            if svc.name in clab["topology"]["nodes"]:
+                raise ValueError(f"noise service name collides with clab node: {svc.name}")
+            if svc.zone not in template.zones:
+                raise ValueError(
+                    f"noise service {svc.name!r} references unknown zone {svc.zone!r}"
+                )
+            node_def: dict[str, Any] = {
+                "kind": "linux",
+                "image": svc.image,
+            }
+            if svc.environment:
+                node_def["env"] = dict(svc.environment)
+            if svc.command:
+                node_def["cmd"] = svc.command
+            clab["topology"]["nodes"][svc.name] = node_def
+
+            zone_router = template.zones[svc.zone].router
+            if not zone_router:
+                zone_router = next(iter(template.routers), "edge-router")
+            router_eth = _next_eth(iface_map.get(zone_router, {}))
+            clab["topology"]["links"].append(
+                {"endpoints": [f"{svc.name}:eth1", f"{zone_router}:{router_eth}"]}
+            )
+            iface_map.setdefault(zone_router, {})[router_eth] = svc.name
+            iface_map.setdefault(svc.name, {})["eth1"] = zone_router
+            zone_targets[svc.zone].append(svc.name)
+
+            # Decoy readiness probes (TCP only, same shape as chain-node probes).
+            decoy_setup_tasks: list[dict] = []
+            decoy_container = f"clab-{scenario_name}-{svc.name}"
+            for port in svc.ports:
+                port_hex = f"{int(port):04X}"
+                check = (
+                    f"grep -i -q ':{port_hex} .* 0A' "
+                    "/proc/net/tcp /proc/net/tcp6"
+                )
+                register_name = re.sub(
+                    r"[^A-Za-z0-9_]", "_", f"readiness_{svc.name}_{port}"
+                )
+                decoy_setup_tasks.append({
+                    "name": f"Probe TCP {port} on {svc.name}",
+                    "ansible.builtin.shell": (
+                        f"docker exec {shlex.quote(decoy_container)} sh -c "
+                        f"{shlex.quote(check)}"
+                    ),
+                    "register": register_name,
+                    "changed_when": False,
+                    "failed_when": False,
+                })
+            if decoy_setup_tasks:
+                cve_setup_tasks.append({
+                    "name": f"Wait for decoy {svc.name}",
+                    "hosts": "localhost",
+                    "gather_facts": False,
+                    "tasks": decoy_setup_tasks,
+                })
+
+            noise_nodes_meta.append({
+                "name": svc.name,
+                "zone": svc.zone,
+                "image": svc.image,
+                "ports": list(svc.ports),
+                "command": svc.command,
+            })
 
         injection_by_slot = {item["ip_id"]: item for item in injections}
         for injection in injections:
@@ -611,6 +751,7 @@ class ScenarioAssembler:
             "template": template_name,
             "attack_path": [],
             "network_policy_checks": [],
+            "noise_nodes": [],
         }
         for inj in injections:
             node_ip = ip_alloc.get(inj["node_name"], {})
@@ -624,6 +765,7 @@ class ScenarioAssembler:
                 "flag_hint": inj.get("flag_hint", "file:/flag.txt"),
                 "target_ip": node_ip.get("eth1", "").split("/")[0],
                 "ports": list(inj.get("ports", [])),
+                "exploit_port": inj.get("exploit_port"),
                 "service_node": inj.get("service_node", inj["node_name"]),
                 "requires_pivot_host": inj.get("requires_pivot_host", False),
                 "depends_on": list(inj.get("depends_on", [])),
@@ -665,13 +807,26 @@ class ScenarioAssembler:
             for source_node in source_nodes:
                 for target_node in target_nodes:
                     target_injection = injection_by_node[target_node]
+                    # Use exploit_port (required_service.port) for the same
+                    # reason as the attack_edge reachability: isolation rules
+                    # must hold on the exploit port, not on management ports
+                    # that only bind localhost. Otherwise a management port
+                    # (e.g. JBoss 9990) that is not reachable across the data
+                    # plane fails an "accept" rule even though the exploit
+                    # port (8080) is reachable. See WORK_PROGRESS_REPORT
+                    # 2026-07-20 problem C/E.
+                    target_exploit_port = target_injection.get("exploit_port")
+                    if target_exploit_port is not None:
+                        rule_ports = [int(target_exploit_port)]
+                    else:
+                        rule_ports = list(target_injection.get("ports", []))
                     ground_truth["network_policy_checks"].append({
                         "source_zone": rule.from_zone,
                         "target_zone": rule.to_zone,
                         "source_node": source_node,
                         "target_node": target_node,
                         "target_ip": ip_alloc[target_node]["eth1"].split("/", 1)[0],
-                        "ports": list(target_injection.get("ports", [])),
+                        "ports": rule_ports,
                         "expected_reachable": rule.action.lower() == "accept",
                     })
 
@@ -683,6 +838,14 @@ class ScenarioAssembler:
         # reference commands and success patterns.
         ground_truth["objectives"] = objective_bindings
         ground_truth["resolved_asset_bindings"] = resolved_asset_bindings
+
+        # Populate noise_nodes with the allocated data-plane IPs (after
+        # _allocate_ips ran).  These IPs are mixed into L1/L2 topology hints
+        # by the verifier but never enter attack_path/targets.
+        for meta in noise_nodes_meta:
+            node_ip = ip_alloc.get(meta["name"], {}).get("eth1", "")
+            meta["ip"] = node_ip.split("/", 1)[0] if node_ip else ""
+            ground_truth["noise_nodes"].append(meta)
 
         return {
             "name": scenario_name,
@@ -973,6 +1136,9 @@ class ScenarioAssembler:
             docker_command = (
                 f"docker exec {shlex.quote(container)} sh -c {shlex.quote(command)}"
             )
+            register_name = re.sub(
+                r"[^A-Za-z0-9_]", "_", f"asset_{command_key}_{asset.id}"
+            )
             tasks.append({
                 "name": f"{command_key} {asset.id}",
                 "hosts": "localhost",
@@ -981,6 +1147,14 @@ class ScenarioAssembler:
                     "name": f"{command_key} {asset.id}",
                     "ansible.builtin.shell": docker_command,
                     "changed_when": False,
+                    # A TCP listener can exist before an HTTP/database service
+                    # accepts requests.  Retry the generic asset command for
+                    # a bounded window instead of turning startup races into
+                    # Atom- or CVE-specific failures.
+                    "register": register_name,
+                    "until": f"{register_name}.rc == 0",
+                    "retries": 18,
+                    "delay": 10,
                 }],
             })
         return yaml.dump(tasks, default_flow_style=False, sort_keys=False) if tasks else ""

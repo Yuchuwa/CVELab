@@ -118,10 +118,17 @@ class InjectionPoint(BaseModel):
 
 
 class NoiseService(BaseModel):
-    """噪音服务"""
+    """良性 decoy 服务（不参与攻击图、不挂 flag、不进 capability closure）。
+
+    ports/command/environment 供 assembler 生成 clab 节点与 readiness probe；
+    缺省时沿用 image 自带的启动行为。
+    """
     name: str
     zone: str
     image: str
+    ports: List[int] = Field(default_factory=list)
+    command: str = ""
+    environment: Dict[str, str] = Field(default_factory=dict)
 
 
 class TopologyTemplate(BaseModel):

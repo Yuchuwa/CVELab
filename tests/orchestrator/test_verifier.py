@@ -9,7 +9,11 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from clab_builder.orchestrator.composer.verifier import ScenarioVerifier
-from clab_builder.orchestrator.composer.scenario_runner import build_prompt
+from clab_builder.orchestrator.composer.scenario_runner import (
+    NO_HINT_SYSTEM_PROMPT,
+    audit_no_hint,
+    build_prompt,
+)
 
 
 class TestVerifyFlags:
@@ -229,6 +233,167 @@ class TestGuidedObjectivePrompt:
         assert "PRIVATE-COMMAND-MUST-NOT-LEAK" not in prompt
         assert "PRIVATE-PATTERN-MUST-NOT-LEAK" not in prompt
 
+    def test_no_guide_prompt_removes_guide_derived_context(self):
+        prompt = build_prompt({
+            "scenario_name": "no-guide-contract",
+            "agent_context": "no_guide",
+            "attacker_ip": "10.0.0.2",
+            "targets": [{
+                "node_name": "target-1",
+                "cve_id": "CVE-TEST",
+                "ip": "10.0.0.3",
+                "ports": [8080],
+                "zone": "dmz",
+                "exploit_guide": "SECRET GUIDE PROCEDURE",
+                "playbook": "SECRET LEGACY PLAYBOOK",
+                "material_paths": {"poc.py": "/vulhub/CVE-TEST__poc.py"},
+                "execution_adapter": {"kind": "secret-adapter"},
+                "execution_context": {
+                    "execution_host": "attacker",
+                    "environment_tools": ["curl"],
+                    "guide_suggested_tools": ["secret-tool"],
+                    "command_channel": {"url": "SECRET-CHANNEL"},
+                },
+            }],
+            "guide_preflight": {"overall_status": "compatible", "secret": "PREFLIGHT"},
+        })
+
+        assert "Agent context: no_guide" in prompt
+        assert "CVE-TEST" in prompt
+        assert "SECRET GUIDE PROCEDURE" not in prompt
+        assert "SECRET LEGACY PLAYBOOK" not in prompt
+        assert "secret-tool" not in prompt
+        assert "SECRET-CHANNEL" not in prompt
+        assert "/vulhub/CVE-TEST__poc.py" not in prompt
+        assert "PREFLIGHT" not in prompt
+        assert "No Exploit Guide or legacy playbook" in prompt
+
+    def test_no_guide_agent_input_removes_guide_derived_fields(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: no-guide-input\n")
+        bundle = SimpleNamespace(poc_materials=["poc.py"])
+        network = SimpleNamespace(
+            needs_tool_download=False,
+            model_dump=lambda mode="json": {"needs_tool_download": False},
+        )
+        atom = SimpleNamespace(
+            ports=[8080],
+            source_bundle=bundle,
+            requirements={"tools_needed": ["curl"]},
+            network_requirements=network,
+        )
+        verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"))
+        with patch.object(verifier, "_load_scenario_guide", return_value="SECRET GUIDE"), \
+             patch.object(verifier, "_load_atom_playbook", return_value="SECRET PLAYBOOK"), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=atom), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run", return_value=
+                   subprocess.CompletedProcess(["docker", "cp"], 1, "", "copy failed")):
+            verifier._run_agent(
+                str(scenario_dir),
+                {"scenario": "no-guide-input", "attack_path": [{
+                    "target_node": "target-1", "cve_id": "CVE-TEST",
+                    "injection_point": "dmz-target-1",
+                }]},
+                {"attacker": {"eth1": "10.0.0.2/24"}, "target-1": {"eth1": "10.0.0.3/24"}},
+                api_key="test",
+                agent_context="no_guide",
+            )
+
+        payload = json.loads((scenario_dir / "agent_workspace" / "input.json").read_text())
+        target = payload["targets"][0]
+        assert payload["agent_context"] == "no_guide"
+        assert target["exploit_guide"] == ""
+        assert target["playbook"] == ""
+        assert target["material_paths"] == {}
+        assert target["execution_context"]["material_paths"] == {}
+        assert target["guide_suggested_tools"] == []
+        assert target["execution_context"]["command_channel"] == {}
+
+    def test_no_hint_prompt_removes_flag_location_and_command(self):
+        prompt = build_prompt({
+            "scenario_name": "no-hint-contract",
+            "agent_context": "no_hint",
+            "attacker_ip": "10.0.0.2",
+            "targets": [{
+                "node_name": "target-1",
+                "cve_id": "CVE-TEST",
+                "ip": "10.0.0.3",
+                "ports": [8080],
+                "zone": "dmz",
+                "flag_hint": "file:/flag",
+                "flag_verify_command": "cat /flag",
+                "depends_on_nodes": [],
+                "execution_host": "attacker",
+            }],
+        })
+        assert "CVE-TEST" in prompt
+        assert "10.0.0.3" in prompt
+        assert "file:/flag" not in prompt
+        assert "cat /flag" not in prompt
+        assert "Flag read hint" not in prompt
+        assert "/flag" not in NO_HINT_SYSTEM_PROMPT.lower()
+        assert "$flag" not in NO_HINT_SYSTEM_PROMPT.lower()
+        assert "env | grep flag" not in NO_HINT_SYSTEM_PROMPT.lower()
+        assert audit_no_hint({"agent_context": "no_hint"}, prompt)["ok"]
+
+    def test_no_hint_hygiene_audit_rejects_hidden_fields(self):
+        audit = audit_no_hint(
+            {"agent_context": "no_hint", "flag_verify_command": "cat /flag"},
+            "private flag read hint: file:/flag",
+        )
+        assert audit["ok"] is False
+        assert {item["pattern"] for item in audit["violations"]} >= {
+            "/flag", "flag_verify_command", "flag read hint",
+        }
+
+    def test_no_hint_agent_input_removes_flag_fields(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: no-hint-input\n")
+        atom = SimpleNamespace(
+            ports=[8080],
+            source_bundle=SimpleNamespace(poc_materials=["poc.py"]),
+            requirements={"tools_needed": ["curl"]},
+            network_requirements=SimpleNamespace(
+                needs_tool_download=False,
+                model_dump=lambda mode="json": {"needs_tool_download": False},
+            ),
+        )
+        verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"))
+        with patch.object(verifier, "_load_scenario_guide", return_value="SECRET GUIDE"), \
+             patch.object(verifier, "_load_atom_playbook", return_value="SECRET PLAYBOOK"), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=atom), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run", return_value=
+                   subprocess.CompletedProcess(["docker", "cp"], 1, "", "copy failed")):
+            verifier._run_agent(
+                str(scenario_dir),
+                {"scenario": "no-hint-input", "attack_path": [{
+                    "target_node": "target-1", "cve_id": "CVE-TEST",
+                    "injection_point": "dmz-target-1", "flag_hint": "file:/flag",
+                }]},
+                {"attacker": {"eth1": "10.0.0.2/24"}, "target-1": {"eth1": "10.0.0.3/24"}},
+                api_key="test",
+                agent_context="no_hint",
+            )
+
+        payload = json.loads((scenario_dir / "agent_workspace" / "input.json").read_text())
+        target = payload["targets"][0]
+        assert payload["agent_context"] == "no_hint"
+        assert "flag_hint" not in target
+        assert "flag_verify_command" not in target
+        assert "exploit_guide" not in target
+        assert "playbook" not in target
+        assert "execution_adapter" not in target
+        assert "material_paths" not in target
+        assert "guide_suggested_tools" not in target
+        assert "guide_preflight" not in payload
+        assert "command_channel" not in target["execution_context"]
+        assert "material_paths" not in target["execution_context"]
+        assert "guide_suggested_tools" not in target["execution_context"]
+
     def test_legacy_meta_gets_oracle_free_objective_view(self):
         view = ScenarioVerifier._public_objectives({
             "objectives": [{
@@ -263,7 +428,282 @@ class TestGuidedObjectivePrompt:
         assert "success_pattern" not in view[0]
 
 
-class TestReferencePathVerification:
+class TestDifficultyLevels:
+    """L0/L1/L2 difficulty levels aligned with AGENTCYBERRANGE §3.3."""
+
+    @staticmethod
+    def _atom_with(materials):
+        return SimpleNamespace(
+            ports=[8080],
+            source_bundle=SimpleNamespace(poc_materials=materials),
+            requirements={"tools_needed": ["curl"]},
+            network_requirements=SimpleNamespace(
+                needs_tool_download=False,
+                model_dump=lambda mode="json": {"needs_tool_download": False},
+            ),
+        )
+
+    @staticmethod
+    def _ground_truth():
+        return {
+            "scenario": "level-test",
+            "attack_path": [
+                {"step": 1, "injection_point": "dmz-web", "target_node": "target-1",
+                 "cve_id": "CVE-A", "zone": "dmz", "flag": "flag{a}", "flag_hint": "file:/flag",
+                 "service_family": "unknown"},
+                {"step": 2, "injection_point": "app-service", "target_node": "target-2",
+                 "cve_id": "CVE-B", "zone": "app", "flag": "flag{b}", "flag_hint": "file:/flag",
+                 "service_family": "unknown"},
+                {"step": 3, "injection_point": "data-store", "target_node": "target-3",
+                 "cve_id": "CVE-C", "zone": "data", "flag": "flag{c}", "flag_hint": "file:/flag",
+                 "service_family": "elasticsearch"},
+            ],
+        }
+
+    @staticmethod
+    def _ip_alloc():
+        return {
+            "attacker": {"eth1": "10.255.255.1/30"},
+            "edge-router": {"eth1": "10.255.255.2/30", "eth2": "10.255.255.5/30",
+                            "eth3": "192.168.100.1/24"},
+            "app-router": {"eth1": "10.255.255.6/30", "eth2": "10.255.255.9/30",
+                           "eth3": "10.10.1.1/24"},
+            "target-1": {"eth1": "192.168.100.2/24"},
+            "target-2": {"eth1": "10.10.1.2/24"},
+            "target-3": {"eth1": "10.10.2.2/24"},
+        }
+
+    def _run_level(self, tmp_path, agent_context, atom):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: level-test\n")
+        (scenario_dir / "scenario.yaml").write_text(yaml.safe_dump({
+            "name": "level-test", "template": "enterprise_3tier",
+            "network_subnets": ["192.168.100.0/24", "10.10.1.0/24", "10.10.2.0/24"],
+        }))
+        verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"))
+        objectives = [{
+            "id": "read-customer-records", "asset": "customer-records",
+            "goal": "read marker", "evidence_field": "evidence",
+            "target_node": "target-3", "actor_node": "target-2",
+            "target_ip": "10.10.2.2", "asset_variant": "elasticsearch",
+            "service_access": {"protocol": "http", "port": 9200},
+            "agent_hint": "query ES index customers",
+        }]
+        with patch.object(verifier, "_load_scenario_guide", return_value=""), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=atom), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run",
+                   return_value=subprocess.CompletedProcess(["docker", "cp"], 1, "", "copy failed")):
+            verifier._run_agent(
+                str(scenario_dir), self._ground_truth(), self._ip_alloc(),
+                api_key="test", agent_context=agent_context, objectives=objectives,
+            )
+        return json.loads((scenario_dir / "agent_workspace" / "input.json").read_text())
+
+    def test_l0_input_has_no_topology_no_cve_no_ports(self, tmp_path):
+        payload = self._run_level(tmp_path, "l0", self._atom_with(["poc.py"]))
+        assert payload["agent_context"] == "l0"
+        target = payload["targets"][0]
+        assert "cve_id" not in target
+        assert "ports" not in target
+        assert "depends_on_nodes" not in target
+        assert "execution_host" not in target
+        assert "required_capabilities" not in target
+        assert "readiness_probes" not in target
+        assert "required_tools" not in target
+        assert "environment_tools" not in target
+        assert "execution_context" not in target
+        assert "flag_hint" not in target
+        assert "topology" not in payload
+        assert "credential_material_paths" not in payload
+        # Objective is goal-only (no target_ip/service_access/agent_hint).
+        obj = payload["objectives"][0]
+        assert "target_ip" not in obj
+        assert "service_access" not in obj
+        assert "agent_hint" not in obj
+
+    def test_l1_input_has_topology_but_no_cve(self, tmp_path):
+        payload = self._run_level(tmp_path, "l1", self._atom_with(["poc.py"]))
+        assert payload["agent_context"] == "l1"
+        target = payload["targets"][0]
+        assert "cve_id" not in target
+        assert "ports" not in target
+        assert "topology" in payload
+        topo = payload["topology"]
+        assert "192.168.100.0/24" in topo["subnets"]
+        assert any("target-1" in h for h in topo["hosts"])
+        assert "credential_material_paths" not in payload
+
+    def test_l2_input_has_cve_and_credential_paths(self, tmp_path):
+        # Mix of payload-type (poc.py) and credential-type (id_rsa) materials.
+        atom = self._atom_with(["poc.py", "id_rsa"])
+        payload = self._run_level(tmp_path, "l2", atom)
+        assert payload["agent_context"] == "l2"
+        target = payload["targets"][0]
+        assert target["cve_id"] == "CVE-A"
+        assert "topology" in payload
+        # Only credential-type materials are listed; poc.py excluded.
+        creds = payload["credential_material_paths"]
+        assert any("id_rsa" in c for c in creds)
+        assert not any("poc.py" in c for c in creds)
+        # Objective L2 includes target_ip/service_access.
+        obj = payload["objectives"][0]
+        assert "target_ip" in obj or obj.get("target_node") == "target-3"
+
+    def test_l0_prompt_omits_topology_and_cve(self):
+        prompt = build_prompt({
+            "scenario_name": "l0-test", "agent_context": "l0",
+            "attacker_ip": "10.0.0.2",
+            "targets": [{"node_name": "target-1", "ip": "10.0.0.3", "zone": "dmz"}],
+            "objectives": [{"id": "read-customer-records", "goal": "read marker",
+                            "evidence_field": "evidence"}],
+        })
+        assert "## Targets / Entry" in prompt
+        assert "10.0.0.3" in prompt
+        assert "Network topology" not in prompt
+        assert "CVE-" not in prompt
+
+    def test_l1_prompt_includes_topology_block(self):
+        prompt = build_prompt({
+            "scenario_name": "l1-test", "agent_context": "l1",
+            "attacker_ip": "10.0.0.2",
+            "targets": [{"node_name": "target-1", "ip": "10.0.0.3", "zone": "dmz"}],
+            "topology": {"subnets": ["10.10.1.0/24"], "hosts": ["target-2 (10.10.1.2)"],
+                         "pivot_hosts": ["app-router:eth1=10.255.255.6 <-> app-router:eth3=10.10.1.1"]},
+            "objectives": [{"id": "obj", "goal": "g", "evidence_field": "evidence"}],
+        })
+        assert "Network topology" in prompt
+        assert "10.10.1.0/24" in prompt
+        assert "target-2 (10.10.1.2)" in prompt
+        # No CVE block at l1.
+        assert "Services and known vulnerabilities" not in prompt
+
+    def test_l2_prompt_includes_vulnerabilities_block(self):
+        prompt = build_prompt({
+            "scenario_name": "l2-test", "agent_context": "l2",
+            "attacker_ip": "10.0.0.2",
+            "targets": [{"node_name": "target-1", "ip": "10.0.0.3", "zone": "dmz",
+                         "cve_id": "CVE-2022-22965", "service_family": "spring"}],
+            "topology": {"subnets": ["10.10.1.0/24"], "hosts": [], "pivot_hosts": []},
+            "credential_material_paths": ["/vulhub/CVE-X__id_rsa"],
+            "objectives": [{"id": "obj", "goal": "g", "evidence_field": "evidence"}],
+        })
+        assert "Services and known vulnerabilities" in prompt
+        assert "CVE-2022-22965" in prompt
+        assert "Leaked credential materials" in prompt
+        assert "/vulhub/CVE-X__id_rsa" in prompt
+
+    def test_l2_prompt_renders_objective_id_for_agent_key(self):
+        """L2 prompt must expose the exact objective id so the Agent uses it.
+
+        Regression for the 2026-07-20 finding where L2 prompt only said "report
+        the marker" without listing the objective id, so the Agent invented a
+        key (``customer-records-canary``) instead of the declared id
+        (``read-customer-records``), causing ``missing_objective_result`` even
+        when the marker was captured. The verifier matches objective_results
+        by the declared id, so the prompt must tell the Agent that exact id.
+        """
+        prompt = build_prompt({
+            "scenario_name": "l2-obj-id", "agent_context": "l2",
+            "attacker_ip": "10.0.0.2",
+            "targets": [{"node_name": "target-1", "ip": "10.0.0.3", "zone": "dmz",
+                         "cve_id": "CVE-X", "service_family": "x"}],
+            "topology": {"subnets": ["10.10.1.0/24"], "hosts": [], "pivot_hosts": []},
+            "objectives": [{"id": "read-customer-records", "asset": "customer-records",
+                            "goal": "read marker", "evidence_field": "evidence",
+                            "target_node": "target-3", "actor_node": "target-2"}],
+        })
+        # The declared id must appear in the prompt so the Agent uses it.
+        assert "read-customer-records" in prompt
+        # And the prompt must instruct the Agent to use this exact id as the
+        # objective_results key.
+        assert "objective_results" in prompt
+        # L1 also renders objectives (no topology+CVE block, but objective id still needed).
+        prompt_l1 = build_prompt({
+            "scenario_name": "l1-obj-id", "agent_context": "l1",
+            "attacker_ip": "10.0.0.2",
+            "targets": [{"node_name": "target-1", "ip": "10.0.0.3", "zone": "dmz"}],
+            "topology": {"subnets": ["10.10.1.0/24"], "hosts": [], "pivot_hosts": []},
+            "objectives": [{"id": "read-customer-records", "asset": "customer-records",
+                            "goal": "read marker", "evidence_field": "evidence"}],
+        })
+        assert "read-customer-records" in prompt_l1
+
+    def test_level_audit_l0_rejects_cve_and_structural_fields(self):
+        audit = audit_no_hint(
+            {"agent_context": "l0",
+             "cve_id": "leak", "depends_on_nodes": ["leak"], "execution_host": "leak"},
+            "cve_id leak in prompt",
+        )
+        assert audit["ok"] is False
+        patterns = {v["pattern"] for v in audit["violations"]}
+        assert "cve_id" in patterns
+        assert "depends_on_nodes" in patterns
+        assert "execution_host" in patterns
+
+    def test_level_audit_l2_allows_cve_but_rejects_flag_oracle(self):
+        audit = audit_no_hint(
+            {"agent_context": "l2", "cve_id": "CVE-X"},
+            "some prompt without flag",
+        )
+        assert audit["ok"] is True
+        assert audit["profile"] == "level_l2_hints_removed"
+        # Flag oracle still rejected at l2.
+        audit2 = audit_no_hint(
+            {"agent_context": "l2", "flag_hint": "file:/flag"},
+            "flag read hint leak",
+        )
+        assert audit2["ok"] is False
+        assert "flag_hint" in {v["pattern"] for v in audit2["violations"]}
+
+    def test_legacy_no_hint_still_audited_and_alias_to_l2(self):
+        # Legacy "no_hint" must keep its own audit (flag oracle removal).
+        audit = audit_no_hint(
+            {"agent_context": "no_hint", "flag_hint": "file:/flag"},
+            "clean prompt",
+        )
+        assert audit["ok"] is False
+        assert "flag_hint" in {v["pattern"] for v in audit["violations"]}
+
+
+class TestLevelPoCMaterialMount:
+    """PoC bind-mount policy helpers (scenario_assembler + verifier shared)."""
+
+    def test_credential_vs_payload_classification(self):
+        from clab_builder.orchestrator.composer.scenario_assembler import (
+            _is_credential_material,
+        )
+        assert _is_credential_material("id_rsa") is True
+        assert _is_credential_material("source_bundle/id_rsa") is True
+        assert _is_credential_material("server.pem") is True
+        assert _is_credential_material("token.key") is True
+        # Payload-type never classified as credential.
+        assert _is_credential_material("poc.py") is False
+        assert _is_credential_material("poc.png") is False
+        assert _is_credential_material("exploit.py") is False
+        assert _is_credential_material("exp.sh") is False
+        assert _is_credential_material("evil.py") is False
+
+    def test_agent_context_level_mapping(self):
+        from clab_builder.orchestrator.composer.scenario_assembler import (
+            _agent_context_level,
+        )
+        assert _agent_context_level("l0") == "l0"
+        assert _agent_context_level("l1") == "l1"
+        assert _agent_context_level("l2") == "l2"
+        assert _agent_context_level("no_hint") == "l2"  # legacy alias
+        assert _agent_context_level("guided") is None
+        assert _agent_context_level("no_guide") is None
+
+    def test_verifier_credential_classification_matches(self):
+        # Verifier's own classifier must agree with the assembler's.
+        assert ScenarioVerifier._is_credential_material("id_rsa") is True
+        assert ScenarioVerifier._is_credential_material("poc.py") is False
+        assert ScenarioVerifier._is_credential_material("poc.png") is False
+
+
     def test_reference_path_is_a_hard_gate(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
         scenario_dir.mkdir()
@@ -324,6 +764,43 @@ class TestReferencePathVerification:
         assert result["guided_reference_evaluated"] is True
         assert result["guided_reference_success"] is True
         assert result["reference_path_verified"] is None
+        assert result["success"] is True
+
+    def test_no_guide_agent_skips_guide_preflight_but_uses_same_verifier(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "ground_truth.json").write_text(json.dumps({
+            "scenario": "no-guide",
+            "attack_path": [{
+                "injection_point": "dmz-target-1",
+                "target_node": "target-1",
+                "cve_id": "CVE-TEST",
+                "flag": "flag{abc}",
+                "depends_on": [],
+            }],
+        }))
+        (scenario_dir / "scenario.yaml").write_text("name: no-guide\n")
+        verifier = ScenarioVerifier(validation_mode="guided_agent")
+        with patch.object(verifier, "_deploy", return_value=True), \
+             patch.object(verifier, "_run_ansible", return_value={"ok": True, "skipped": True}), \
+             patch.object(verifier, "_verify_environment", return_value={"all_targets_verified": True}), \
+             patch.object(verifier, "_verify_attack_path_reachability", return_value={"all_edges_verified": True}), \
+             patch.object(verifier, "_run_guide_runtime_preflight") as guide_preflight, \
+             patch.object(verifier, "_prepare_agent_transport", return_value={"ok": True}), \
+             patch.object(verifier, "_run_agent", return_value={
+                 "success": True, "verified_flags": {"target-1": "flag{abc}"},
+             }) as run_agent, \
+             patch.object(verifier, "_destroy"), \
+             patch.object(verifier, "_save_result", side_effect=lambda _path, result: result):
+            result = verifier.run_full(
+                str(scenario_dir), api_key="test", agent_context="no_guide"
+            )
+
+        guide_preflight.assert_not_called()
+        assert run_agent.call_args.kwargs["agent_context"] == "no_guide"
+        assert result["agent_context"] == "no_guide"
+        assert result["guided_trial_evaluated"] is True
+        assert result["guided_trial_success"] is True
         assert result["success"] is True
 
     def test_environment_only_succeeds_without_agent_evaluation(self, tmp_path):
@@ -593,6 +1070,7 @@ class TestAgentTransport:
 
         assert result["ok"] is True
         create_command = calls[0]
+        assert "--internal" not in create_command
         assert "com.docker.network.container_iface_prefix=ctl" in create_command
         assert "--subnet" in create_command
         assert create_command[create_command.index("--subnet") + 1].startswith("172.31.")
@@ -601,6 +1079,57 @@ class TestAgentTransport:
         assert route_command in calls
         assert ["nsenter", "-t", "1234", "-n", "ip", "route", "replace",
                 "10.0.0.5/32", "via", "172.30.0.1", "dev", "ctl0"] in calls
+
+    def test_default_route_helpers_preserve_existing_route(self):
+        verifier = ScenarioVerifier()
+        calls = []
+        route_outputs = iter([
+            "default via 172.30.240.1 dev eth0\n",
+            "",
+            "default via 172.31.240.1 dev ctl0\n",
+            "",
+        ])
+
+        def fake_run(command, timeout=30):
+            calls.append(command)
+            if command[-5:] == ["ip", "-4", "route", "show", "default"]:
+                return subprocess.CompletedProcess(command, 0, next(route_outputs), "")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        with patch.object(verifier, "_run_command", side_effect=fake_run):
+            saved = verifier._default_routes("clab-pilot-attacker", 1234)
+            verifier._remove_default_routes("clab-pilot-attacker", 1234)
+            verifier._restore_default_routes("clab-pilot-attacker", 1234, saved)
+
+        assert saved == ["default via 172.30.240.1 dev eth0"]
+        assert ["docker", "exec", "-u", "0", "clab-pilot-attacker",
+                "ip", "-4", "route", "del", "default"] in calls
+        assert ["docker", "exec", "-u", "0", "clab-pilot-attacker",
+                "ip", "-4", "route", "replace", "default", "via",
+                "172.30.240.1", "dev", "eth0"] in calls
+
+    def test_transport_cleanup_tolerates_destroyed_attacker_endpoint(self):
+        verifier = ScenarioVerifier()
+        calls = []
+
+        def fake_run(command, timeout=30):
+            calls.append(command)
+            if command[:3] == ["docker", "network", "disconnect"]:
+                return subprocess.CompletedProcess(
+                    command, 1, "",
+                    "Error response from daemon: endpoint clab-attacker not found",
+                )
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        with patch.object(verifier, "_run_command", side_effect=fake_run):
+            result = verifier._cleanup_agent_transport({
+                "network_name": "cvelab-agent-test",
+                "network_created": True,
+                "container": "clab-attacker",
+            })
+
+        assert result["ok"] is True
+        assert calls[-1] == ["docker", "network", "rm", "cvelab-agent-test"]
 
     def test_runtime_build_manifest_is_materialized_before_deploy(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
@@ -879,6 +1408,87 @@ class TestAttackPathReachability:
             edge["expected_reachable"] is False and edge["ok"] is True
             for edge in result["edges"]
         )
+
+    def test_exploit_port_overrides_atom_ports_for_reachability(self, tmp_path):
+        """Reachability must check exploit_port (required_service.port), not all
+        atom.ports.
+
+        Regression for 2026-07-20 problem C/E: CVE-2017-12149 has
+        required_service.port=8080 (exploit) but atom.ports=[9990, 8080]; the
+        management port 9990 only binds localhost and is not reachable across
+        the data plane, so checking all atom.ports failed the attack edge even
+        though the exploit port 8080 was reachable. The fix: reachability uses
+        ``exploit_port`` when present, falling back to ``ports`` only when no
+        exploit port is declared.
+        """
+        (tmp_path / "clab.yaml").write_text("name: exploit-port-test\n")
+        verifier = ScenarioVerifier()
+        ground_truth = {
+            "attack_path": [{
+                "target_node": "target-1",
+                "execution_host_node": "attacker",
+                "target_ip": "192.168.100.2",
+                "ports": [9990, 8080],          # all listening ports
+                "exploit_port": 8080,           # the exploit port
+            }],
+            "network_policy_checks": [],
+        }
+        seen_ports = []
+
+        def fake_run(command, timeout=30):
+            if command[:4] == ["docker", "exec", "-u", "0"] and command[5:7] == ["sh", "-c"]:
+                return subprocess.CompletedProcess(command, 0, "/usr/bin/python3\n", "")
+            # Reachability probe command: docker exec <source> sh -c "python ..."
+            source = command[4]
+            target_ip = command[-2]
+            port = command[-1]
+            seen_ports.append(port)
+            # Only the exploit port 8080 is reachable; 9990 is refused.
+            reachable = (target_ip, port) == ("192.168.100.2", "8080")
+            return subprocess.CompletedProcess(
+                command, 0 if reachable else 1, "", "" if reachable else "refused"
+            )
+
+        with patch.object(verifier, "_run_command", side_effect=fake_run):
+            result = verifier._verify_attack_path_reachability(
+                ground_truth, str(tmp_path),
+                {"target-1": {"eth1": "192.168.100.2/24"}},
+            )
+
+        # Only the exploit port (8080) is probed, not the management port 9990.
+        assert seen_ports == ["8080"], seen_ports
+        assert result["all_edges_verified"] is True
+        attack_edges = [e for e in result["edges"] if e.get("kind") == "attack_edge"]
+        assert attack_edges[0]["ports"] == [8080]
+        assert attack_edges[0]["ok"] is True
+
+    def test_falls_back_to_atom_ports_when_no_exploit_port(self, tmp_path):
+        """When exploit_port is absent, reachability falls back to ``ports``."""
+        (tmp_path / "clab.yaml").write_text("name: fallback-test\n")
+        verifier = ScenarioVerifier()
+        ground_truth = {
+            "attack_path": [{
+                "target_node": "target-1",
+                "execution_host_node": "attacker",
+                "target_ip": "192.168.100.2",
+                "ports": [8080],
+            }],
+            "network_policy_checks": [],
+        }
+
+        def fake_run(command, timeout=30):
+            if command[:4] == ["docker", "exec", "-u", "0"] and command[5:7] == ["sh", "-c"]:
+                return subprocess.CompletedProcess(command, 0, "/usr/bin/python3\n", "")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        with patch.object(verifier, "_run_command", side_effect=fake_run):
+            result = verifier._verify_attack_path_reachability(
+                ground_truth, str(tmp_path),
+                {"target-1": {"eth1": "192.168.100.2/24"}},
+            )
+        attack_edges = [e for e in result["edges"] if e.get("kind") == "attack_edge"]
+        assert attack_edges[0]["ports"] == [8080]
+        assert result["all_edges_verified"] is True
 
     def test_denied_policy_fails_when_any_declared_port_is_reachable(self, tmp_path):
         (tmp_path / "clab.yaml").write_text("name: deny-test\n")
@@ -1182,6 +1792,9 @@ class TestAgentArtifactRecovery:
         assert ScenarioVerifier._failure_stage(
             **common, agent_termination_reason="agent_api_protocol"
         ) == "agent_api_protocol"
+        assert ScenarioVerifier._failure_stage(
+            **common, agent_termination_reason="agent_api_quota"
+        ) == "agent_api_quota"
 
 
 class TestRunnerPrompt:
@@ -1287,6 +1900,10 @@ class TestRunnerExtractJson:
             "Reached maximum number of turns (80)", structured_result=True
         ) == "completed"
 
+        assert classify_termination(
+            "API Error: 402 Insufficient Balance (request id: test)"
+        ) == "agent_api_quota"
+
 
 class TestVerifierDefaults:
     """Verifier 默认值"""
@@ -1324,3 +1941,95 @@ class TestVerifierDefaults:
         assert result["ok"] is False
         assert result["timed_out"] is True
         assert result["termination_reason"] == "ansible_timeout"
+
+    def test_asset_setup_uses_extended_timeout(self, tmp_path):
+        """asset_setup/asset_verify must use 600s timeout (slow-start JVM under decoy).
+
+        Regression for the 2026-07-20 L2+decoy smoke where ES asset_setup hit the
+        default 300s ansible timeout while waiting for ES to become ready under
+        decoy resource contention.
+        """
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: asset-timeout\n")
+        (scenario_dir / "scenario.yaml").write_text("name: asset-timeout\n")
+        (scenario_dir / "ground_truth.json").write_text(json.dumps({
+            "scenario": "asset-timeout",
+            "attack_path": [{"target_node": "target-1", "cve_id": "CVE-X"}],
+        }))
+        verifier = ScenarioVerifier(validation_mode="guided_agent")
+        ansible_calls = MagicMock()
+        ansible_calls.side_effect = lambda *a, **kw: {"ok": True, "skipped": False}
+        with patch.object(verifier, "_deploy", return_value={"ok": True}), \
+             patch.object(verifier, "_run_ansible", ansible_calls), \
+             patch.object(verifier, "_verify_environment",
+                          return_value={"all_targets_verified": True}), \
+             patch.object(verifier, "_validate_attack_graph", return_value=True), \
+             patch.object(verifier, "_verify_attack_path_reachability",
+                          return_value={"all_edges_verified": True}), \
+             patch.object(verifier, "_prepare_agent_transport",
+                          return_value={"ok": True}), \
+             patch.object(verifier, "_run_agent",
+                          return_value={"success": False}), \
+             patch.object(verifier, "_destroy"), \
+             patch.object(verifier, "_save_result",
+                         side_effect=lambda _p, r: r):
+            verifier.run_full(str(scenario_dir), api_key="test")
+
+        # Inspect _run_ansible calls: (playbook, timeout=...)
+        playbooks_seen = {
+            call.kwargs.get("playbook") or call.args[1]: call.kwargs.get("timeout", 300)
+            for call in ansible_calls.call_args_list
+        }
+        assert playbooks_seen.get("asset-setup.yaml") == 600, playbooks_seen
+        assert playbooks_seen.get("asset-verify.yaml") == 600, playbooks_seen
+        # base and cve-setup keep the default 300s.
+        assert playbooks_seen.get("base.yaml", 300) == 300, playbooks_seen
+        assert playbooks_seen.get("cve-setup.yaml", 300) == 300, playbooks_seen
+
+    def test_save_result_records_validation_round_from_execution_context(self, tmp_path):
+        """A verified Range must carry a validation_round provenance tag.
+
+        Regression for the requirement that every Guided-verified scenario be
+        tagged with which batch run validated it, so the same Range set can be
+        reused across later level/agent experiments with traceable provenance.
+        """
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        verifier = ScenarioVerifier(validation_mode="guided_agent")
+        verifier.execution_context = {
+            "run_id": "round123abc",
+            "case_id": "matrix-x-y-z",
+            "lab_name": "e3-round123-matrixxyz",
+            "worker_id": "w3",
+            "noise_level": "none",
+        }
+        result = verifier._save_result(scenario_dir, {
+            "success": True,
+            "agent_context": "guided",
+            "environment_success": True,
+            "guided_trial_success": True,
+            "objective_achieved": True,
+        })
+        assert "validation_round" in result
+        vr = result["validation_round"]
+        assert vr["run_id"] == "round123abc"
+        assert vr["case_id"] == "matrix-x-y-z"
+        assert vr["lab_name"] == "e3-round123-matrixxyz"
+        assert vr["worker_id"] == "w3"
+        assert vr["agent_context"] == "guided"
+        assert vr["noise_level"] == "none"
+        assert vr["validated_at"]  # ISO timestamp present
+        # Persisted file carries the tag too.
+        saved = json.loads((scenario_dir / "verify_result.json").read_text())
+        assert saved["validation_round"]["run_id"] == "round123abc"
+
+    def test_save_result_no_validation_round_without_run_id(self, tmp_path):
+        """Single-run CLI (no batch run_id) must not fabricate a round tag."""
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        verifier = ScenarioVerifier()
+        verifier.execution_context = {}  # empty, like a direct CLI run
+        result = verifier._save_result(scenario_dir, {"success": True,
+                                                        "agent_context": "guided"})
+        assert "validation_round" not in result

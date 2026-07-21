@@ -37,6 +37,22 @@ class TestTemplateModel:
         assert r.image == "frrouting/frr:latest"
         assert r.connects == ["attacker", "dmz"]
 
+    def test_noise_service_defaults(self):
+        n = NoiseService(name="x", zone="dmz", image="nginx:alpine")
+        assert n.ports == []
+        assert n.command == ""
+        assert n.environment == {}
+
+    def test_noise_service_full_fields(self):
+        n = NoiseService(
+            name="y", zone="app", image="postgres:alpine",
+            ports=[5432], command="postgres",
+            environment={"POSTGRES_PASSWORD": "decoy"},
+        )
+        assert n.ports == [5432]
+        assert n.command == "postgres"
+        assert n.environment == {"POSTGRES_PASSWORD": "decoy"}
+
 
 # ── Template loader tests ───────────────────────────────
 
@@ -175,6 +191,30 @@ class TestAllTemplates:
         assert "data" in tpl.zones
         assert len(tpl.routers) == 3
         assert len(tpl.injection_points) == 3
+
+    def test_enterprise_3tier_noise_levels(self, loader):
+        tpl = loader.load("enterprise_3tier")
+        assert "none" in tpl.noise_levels
+        assert "baseline" in tpl.noise_levels
+        assert tpl.noise_levels["none"] == []
+        baseline = tpl.noise_levels["baseline"]
+        assert len(baseline) == 5
+        zones = {s.zone for s in baseline}
+        assert zones == {"dmz", "app", "data"}
+        # each baseline service is a real NoiseService with parsed fields
+        for s in baseline:
+            assert s.name.startswith("decoy-")
+            assert s.image
+            assert isinstance(s.ports, list)
+        # postgres decoy replaced by lightweight alpine+nc listener (no env)
+        pg = next(s for s in baseline if s.name == "decoy-app-postgres")
+        assert pg.ports == [5432]
+        assert pg.image == "alpine:latest"
+        assert pg.command == "nc -lk -p 5432 -e /bin/true"
+        assert pg.environment == {}
+        # busybox decoy carries a command
+        bb = next(s for s in baseline if s.name == "decoy-data-busybox")
+        assert bb.command == "httpd -f -p 8080"
 
     def test_enterprise_3tier_injection_zones(self, loader):
         tpl = loader.load("enterprise_3tier")
