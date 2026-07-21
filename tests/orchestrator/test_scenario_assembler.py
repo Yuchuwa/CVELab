@@ -437,6 +437,12 @@ class TestAssemblerDMZSimple:
         assert all(task.get("failed_when") is False for task in setup["tasks"] if "Probe TCP" in task["name"])
         probe = next(task for task in setup["tasks"] if "Probe TCP" in task["name"])
         assert probe["register"] == "readiness_target_1_8080"
+        # Readiness probe must poll until the port listens (retries:18 delay:10
+        # = 180s window) so slow-start services are ready before asset_setup
+        # writes the canary. See WORK_PROGRESS_REPORT 2026-07-21.
+        assert probe["until"] == "readiness_target_1_8080.rc == 0"
+        assert probe["retries"] == 18
+        assert probe["delay"] == 10
 
     def test_ground_truth_structure(self, assembler):
         atom = _make_atom()

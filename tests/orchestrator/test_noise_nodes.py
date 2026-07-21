@@ -172,6 +172,11 @@ class TestBaselineDecoyInjection:
         nginx_task = next(t for t in out["cve_setup"] if "decoy-dmz-nginx" in t["name"])
         probe_cmds = [t for t in nginx_task["tasks"] if "Probe TCP" in t.get("name", "")]
         assert any("0050" in t["ansible.builtin.shell"] for t in probe_cmds)  # port 80
+        # decoy probes poll until the port listens, matching chain-node probes
+        for t in probe_cmds:
+            assert t["retries"] == 18
+            assert t["delay"] == 10
+            assert t["until"].endswith(".rc == 0")
 
     def test_decoy_links_to_zone_router(self, assembler):
         out = assembler.assemble(
