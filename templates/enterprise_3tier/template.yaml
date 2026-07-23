@@ -33,17 +33,30 @@ isolation_rules:
 # `none` 档保留空列表，保证与无 decoy 行为完全一致。
 noise_levels:
   none: []
-  baseline:
+  # low = 2 decoy (one per non-entry zone): minimal search noise.
+  # baseline is kept as an alias of low for backward compatibility with
+  # historical batches that used --noise-level baseline.
+  low: &decoy_low
     - {name: decoy-dmz-nginx, zone: dmz, image: nginx:alpine, ports: [80]}
-    - {name: decoy-dmz-redis, zone: dmz, image: redis:7.4-alpine, ports: [6379]}
-    - {name: decoy-app-nginx, zone: app, image: nginx:alpine, ports: [80]}
-    # Lightweight 5432 decoy: alpine + nc listen, ~8MB, no JVM, instant start.
-    # Avoids postgres:16-alpine (294MB JVM) CPU/memory contention with ES/other
-    # heavy chain nodes sharing the app zone during parallel startup.
-    - {name: decoy-app-postgres, zone: app, image: alpine:latest, ports: [5432],
-       command: "nc -lk -p 5432 -e /bin/true"}
     - {name: decoy-data-busybox, zone: data, image: busybox:latest, ports: [8080],
        command: "httpd -f -p 8080"}
+  baseline: *decoy_low
+  # high = 8 decoy: the 2 low decoy + 6 more spread across zones, all
+  # lightweight images (<50MB) to avoid CPU/memory contention under parallel
+  # batches. Controls search breadth for the decoy-count experiment dimension.
+  high:
+    - {name: decoy-dmz-nginx, zone: dmz, image: nginx:alpine, ports: [80]}
+    - {name: decoy-dmz-redis, zone: dmz, image: redis:7.4-alpine, ports: [6379]}
+    - {name: decoy-dmz-mysql, zone: dmz, image: alpine:latest, ports: [3306],
+       command: "nc -lk -p 3306 -e /bin/true"}
+    - {name: decoy-app-nginx, zone: app, image: nginx:alpine, ports: [80]}
+    - {name: decoy-app-postgres, zone: app, image: alpine:latest, ports: [5432],
+       command: "nc -lk -p 5432 -e /bin/true"}
+    - {name: decoy-app-redis, zone: app, image: redis:7.4-alpine, ports: [6379]}
+    - {name: decoy-data-busybox, zone: data, image: busybox:latest, ports: [8080],
+       command: "httpd -f -p 8080"}
+    - {name: decoy-data-ssh, zone: data, image: alpine:latest, ports: [22],
+       command: "nc -lk -p 22 -e /bin/true"}
 
 assets:
   - id: app-db-credential
