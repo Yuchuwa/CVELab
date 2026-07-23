@@ -1864,6 +1864,20 @@ class TestRunnerPrompt:
         assert "same CLab network" not in prompt
         assert "flag{secret}" not in prompt
 
+    def test_openai_runner_has_no_agent_tool(self):
+        """The OpenAI runner must not expose an Agent/Task tool with a model
+        parameter, so the model cannot request a sub-model (haiku) the gateway
+        may not serve. See WORK_PROGRESS_REPORT 2026-07-23 'haiku sub-agent'.
+        """
+        from clab_builder.orchestrator.composer.openai_scenario_runner import TOOLS
+        names = [t["function"]["name"] for t in TOOLS]
+        assert "Agent" not in names
+        assert "TaskCreate" not in names
+        assert "TaskOutput" not in names
+        # The fixed tool set is self-defined.
+        assert "Bash" in names
+        assert "WebSearch" in names
+
 
 class TestRunnerExtractJson:
     """JSON 提取逻辑"""

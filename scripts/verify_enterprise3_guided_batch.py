@@ -197,6 +197,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--base-url", default=os.getenv("LLM_BASE_URL", ""))
     parser.add_argument("--model", default=os.getenv("LLM_MODEL", ""))
     parser.add_argument(
+        "--agent-runner",
+        choices=("claude", "openai"),
+        default="claude",
+        help="Agent runner harness: claude (claude_agent_sdk, default) or "
+             "openai (openai SDK, no built-in Agent/Task tools, avoids "
+             "sub-agent model-not-found issues on gateways without haiku).",
+    )
+    parser.add_argument(
         "--agent-context",
         choices=("guided", "no-guide", "no-hint", "l0", "l1", "l2"),
         default="guided",
@@ -372,10 +380,12 @@ def _digest_inputs(selected: list[dict[str, object]], args: argparse.Namespace) 
         "validation_mode": "guided_agent",
         "agent_context": args.agent_context,
         "noise_level": str(getattr(args, "noise_level", "none")),
+        "agent_runner": args.agent_runner,
     }, sort_keys=True).encode())
     paths = [ROOT / "templates" / "enterprise_3tier" / "template.yaml", Path(__file__),
              ROOT / "src/clab_builder/orchestrator/composer/verifier.py",
-             ROOT / "src/clab_builder/orchestrator/composer/scenario_runner.py"]
+             ROOT / "src/clab_builder/orchestrator/composer/scenario_runner.py",
+             ROOT / "src/clab_builder/orchestrator/composer/openai_scenario_runner.py"]
     for case in selected:
         for cve in case["cves"]:
             atom_dir = ROOT / args.atoms_dir / str(cve)
@@ -533,6 +543,7 @@ def run_worker(spec_path: Path) -> int:
                     "noise_level": spec.get("noise_level", "none"),
                 },
                 agent_context=str(spec.get("agent_context", "guided")),
+                agent_runner=str(spec.get("agent_runner", "claude")),
             )
             # run_full writes final cleanup information in its ``finally``
             # block.  Reload it so the batch result records that durable
@@ -700,6 +711,7 @@ def _worker_spec(state: dict[str, Any], case_state: dict[str, Any], args: argpar
         "environment_only": args.environment_only,
         "agent_context": str(getattr(args, "agent_context", "guided")).replace("-", "_"),
         "noise_level": str(getattr(args, "noise_level", "none")),
+        "agent_runner": str(getattr(args, "agent_runner", "claude")),
         "strict_guide_compatibility": args.strict_guide_compatibility,
         "mgmt_network": management, "control_network_lease": case_state.get("control_network_lease") or {},
         "ansible_paths": {
