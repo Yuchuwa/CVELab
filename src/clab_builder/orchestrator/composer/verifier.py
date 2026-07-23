@@ -965,6 +965,7 @@ class ScenarioVerifier:
         runtime_policy: str = "rebuild_missing",
         execution_context: dict[str, Any] | None = None,
         agent_context: str = "guided",
+        agent_runner: str = "claude",
     ) -> dict:
         """Run deployment validation, optionally followed by Agent evaluation.
 
@@ -1205,6 +1206,7 @@ class ScenarioVerifier:
                             objectives=self._public_objectives(_meta),
                             guide_preflight=guide_preflight,
                             agent_context=agent_context,
+                            agent_runner=agent_runner,
                         )
                         agent_evaluated = True
                         guided_reference_evaluated = self.validation_mode == "guided_agent"
@@ -2192,8 +2194,10 @@ class ScenarioVerifier:
         objectives: list[dict] | None = None,
         guide_preflight: dict[str, Any] | None = None,
         agent_context: str = "guided",
+        agent_runner: str = "claude",
     ) -> dict:
-        """在 attacker 容器内运行 scenario_runner.py"""
+        """在 attacker 容器内运行 scenario_runner.py (claude) 或
+        openai_scenario_runner.py (openai)。"""
         import threading
 
         if agent_context not in AGENT_CONTEXTS:
@@ -2429,12 +2433,24 @@ class ScenarioVerifier:
         input_path.write_text(json.dumps(input_data, indent=2, ensure_ascii=False))
         self._reset_agent_artifacts(workspace)
 
-        # 拷入 runner + input
+        # 拷入 runner + input. Select the runner source by agent_runner mode:
+        # "claude" uses scenario_runner.py (claude_agent_sdk), "openai" uses
+        # openai_scenario_runner.py (openai SDK, no built-in Agent/Task tools).
+        OPENAI_RUNNER_SRC = Path(__file__).parent / "openai_scenario_runner.py"
+        runner_src = OPENAI_RUNNER_SRC if agent_runner == "openai" else SCENARIO_RUNNER_SRC
+        # The openai runner imports pure helpers from scenario_runner, so copy
+        # both files; the entrypoint is always /opt/scenario_runner.py.
         runner_copy = subprocess.run(
-            ["docker", "cp", str(SCENARIO_RUNNER_SRC.resolve()),
+            ["docker", "cp", str(runner_src.resolve()),
              f"{attacker_container}:/opt/scenario_runner.py"],
             capture_output=True, timeout=30,
         )
+        if agent_runner == "openai":
+            subprocess.run(
+                ["docker", "cp", str(SCENARIO_RUNNER_SRC.resolve()),
+                 f"{attacker_container}:/opt/scenario_runner_lib.py"],
+                capture_output=True, timeout=30,
+            )
         input_copy = subprocess.run(
             ["docker", "cp", str(input_path),
              f"{attacker_container}:/tmp/scenario_input.json"],
@@ -2470,19 +2486,30 @@ class ScenarioVerifier:
 
         # 构建 docker exec 命令
         full_cmd = ["docker", "exec"]
-        env_flags = [f"ANTHROPIC_API_KEY={api_key}"]
-        if base_url:
-            env_flags.append(f"ANTHROPIC_BASE_URL={base_url}")
-        if model:
-            env_flags.append(f"MODEL={model}")
-            # Claude Code SDK's Agent/Task tools spawn sub-agents that default
-            # to a lighter model (claude-haiku-4-5). When the LLM API gateway
-            # has no channel for that default (503 No available channel), the
-            # sub-agent fails and the trial is mislabeled agent_api_protocol.
-            # Pin the sub-agent model to the same model the main agent uses so
-            # every LLM call hits a gateway-backed model. See WORK_PROGRESS_REPORT
-            # 2026-07-23 'haiku sub-agent 503' analysis.
-            env_flags.append(f"CLAUDE_CODE_SUBAGENT_MODEL={model}")
+        if agent_runner == "openai":
+            # OpenAI runner reads OPENAI_BASE_URL / OPENAI_API_KEY (with
+            # LLM_* / ANTHROPIC_* fallbacks inside the runner). No Agent/Task
+            # built-in tools, so no CLAUDE_CODE_SUBAGENT_MODEL needed.
+            env_flags = [f"OPENAI_API_KEY={api_key}"]
+            if base_url:
+                env_flags.append(f"OPENAI_BASE_URL={base_url}")
+            if model:
+                env_flags.append(f"MODEL={model}")
+        else:
+            env_flags = [f"ANTHROPIC_API_KEY={api_key}"]
+            if base_url:
+                env_flags.append(f"ANTHROPIC_BASE_URL={base_url}")
+            if model:
+                env_flags.append(f"MODEL={model}")
+                # Claude Code SDK's Agent/Task tools spawn sub-agents that
+                # default to a lighter model (claude-haiku-4-5). When the LLM
+                # API gateway has no channel for that default (503 No
+                # available channel), the sub-agent fails and the trial is
+                # mislabeled agent_api_protocol. Pin the sub-agent model to
+                # the same model the main agent uses so every LLM call hits a
+                # gateway-backed model. See WORK_PROGRESS_REPORT 2026-07-23
+                # 'haiku sub-agent 503' analysis.
+                env_flags.append(f"CLAUDE_CODE_SUBAGENT_MODEL={model}")
         for ef in env_flags:
             full_cmd.extend(["-e", ef])
         full_cmd.extend([
