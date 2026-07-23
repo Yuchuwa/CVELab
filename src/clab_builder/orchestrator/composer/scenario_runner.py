@@ -609,9 +609,13 @@ def extract_json(text: str) -> dict | None:
         except json.JSONDecodeError:
             pass
 
-    # 裸 JSON 包含 "success" key
-    start = text.find('{"success"')
-    if start >= 0:
+    # 裸 JSON 包含 "success" key. Some models emit pretty-printed JSON
+    # with whitespace between the opening brace and the first key
+    # (e.g. ``{\n  "success": false``), so a literal ``{"success"`` find
+    # misses it. Tolerate whitespace via a regex anchor.
+    start_match = re.search(r'\{\s*"success"', text)
+    if start_match:
+        start = start_match.start()
         depth = 0
         for i in range(start, len(text)):
             if text[i] == '{':
