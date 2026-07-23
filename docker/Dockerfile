@@ -35,6 +35,7 @@ RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
 # Install Python packages - Claude Agent SDK provides built-in tools (Bash, Read, Write)
 RUN pip3 install --no-cache-dir \
     claude-agent-sdk>=0.2.87 \
+    openai>=1.40.0 \
     requests \
     pexpect \
     paramiko \
