@@ -17,6 +17,18 @@ isolation_rules:
 
 noise_levels:
   none: []
+  low:
+    - {name: decoy-dmz-nginx, zone: dmz, image: nginx:alpine, ports: [80]}
+    - {name: decoy-dmz-redis, zone: dmz, image: redis:7.4-alpine, ports: [6379]}
+  high:
+    - {name: decoy-dmz-nginx, zone: dmz, image: nginx:alpine, ports: [80]}
+    - {name: decoy-dmz-redis, zone: dmz, image: redis:7.4-alpine, ports: [6379]}
+    - {name: decoy-dmz-mysql, zone: dmz, image: alpine:latest, ports: [3306],
+       command: "nc -lk -p 3306 -e /bin/true"}
+    - {name: decoy-dmz-ssh, zone: dmz, image: alpine:latest, ports: [22],
+       command: "nc -lk -p 22 -e /bin/true"}
+    - {name: decoy-dmz-busybox, zone: dmz, image: busybox:latest, ports: [8080],
+       command: "httpd -f -p 8080"}
 
 injection_points:
   - id: dmz-target-1

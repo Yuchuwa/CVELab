@@ -95,28 +95,34 @@ class TestBaselineDecoyInjection:
         )
         nodes = out["clab"]["topology"]["nodes"]
         decoy_names = [n for n in nodes if n.startswith("decoy-")]
-        # template declares 5 decoys across 3 zones
-        assert len(decoy_names) == 5
-        assert set(decoy_names) == {
-            "decoy-dmz-nginx", "decoy-dmz-redis",
-            "decoy-app-nginx", "decoy-app-postgres",
-            "decoy-data-busybox",
-        }
-        # postgres decoy carries its env
-        pg = nodes["decoy-app-postgres"]
-        # Lightweight alpine+nc decoy: no env, nc-listen command on 5432.
-        assert pg.get("env", {}) == {}
-        assert pg["cmd"] == "nc -lk -p 5432 -e /bin/true"
+        # baseline is an alias of low = 2 decoys (dmz-nginx + data-busybox).
+        assert len(decoy_names) == 2
+        assert set(decoy_names) == {"decoy-dmz-nginx", "decoy-data-busybox"}
         # busybox decoy carries its command
         assert nodes["decoy-data-busybox"]["cmd"] == "httpd -f -p 8080"
+
+    def test_high_noise_creates_8_decoys_across_zones(self, assembler):
+        out = assembler.assemble(
+            "enterprise_3tier", _three_atoms(),
+            scenario_name="high-clab", noise_level="high",
+        )
+        nodes = out["clab"]["topology"]["nodes"]
+        decoy_names = [n for n in nodes if n.startswith("decoy-")]
+        # high = 8 decoys spread across dmz/app/data zones.
+        assert len(decoy_names) == 8
+        assert set(decoy_names) == {
+            "decoy-dmz-nginx", "decoy-dmz-redis", "decoy-dmz-mysql",
+            "decoy-app-nginx", "decoy-app-postgres", "decoy-app-redis",
+            "decoy-data-busybox", "decoy-data-ssh",
+        }
 
     def test_decoys_get_zone_ips_after_chain_nodes(self, assembler):
         out = assembler.assemble(
             "enterprise_3tier", _three_atoms(),
-            scenario_name="baseline-ip", noise_level="baseline",
+            scenario_name="high-ip", noise_level="high",
         )
         alloc = out["ip_allocations"]
-        # target-1 = .2, decoys = .3, .4
+        # target-1 = .2, decoys = .3, .4, .5
         assert alloc["target-1"]["eth1"].startswith("192.168.100.2/")
         assert alloc["decoy-dmz-nginx"]["eth1"].startswith("192.168.100.3/")
         assert alloc["decoy-dmz-redis"]["eth1"].startswith("192.168.100.4/")
@@ -149,10 +155,10 @@ class TestBaselineDecoyInjection:
     def test_noise_nodes_recorded_with_ip_zone_image(self, assembler):
         out = assembler.assemble(
             "enterprise_3tier", _three_atoms(),
-            scenario_name="baseline-meta", noise_level="baseline",
+            scenario_name="high-meta", noise_level="high",
         )
         nn = out["ground_truth"]["noise_nodes"]
-        assert len(nn) == 5
+        assert len(nn) == 8
         for n in nn:
             assert n["name"].startswith("decoy-")
             assert n["zone"] in {"dmz", "app", "data"}
@@ -163,7 +169,7 @@ class TestBaselineDecoyInjection:
     def test_decoy_readiness_probes_added(self, assembler):
         out = assembler.assemble(
             "enterprise_3tier", _three_atoms(),
-            scenario_name="baseline-probe", noise_level="baseline",
+            scenario_name="high-probe", noise_level="high",
         )
         setup_names = [t["name"] for t in out["cve_setup"]]
         assert any("decoy-dmz-nginx" in n for n in setup_names)
@@ -181,14 +187,15 @@ class TestBaselineDecoyInjection:
     def test_decoy_links_to_zone_router(self, assembler):
         out = assembler.assemble(
             "enterprise_3tier", _three_atoms(),
-            scenario_name="baseline-link", noise_level="baseline",
+            scenario_name="high-link", noise_level="high",
         )
         links = out["clab"]["topology"]["links"]
         dmz_decoy_links = [
             l for l in links
             if any("decoy-dmz-" in ep.split(":")[0] for ep in l["endpoints"])
         ]
-        assert len(dmz_decoy_links) == 2
+        # high = 3 dmz decoys (nginx, redis, mysql) => 3 links to edge-router.
+        assert len(dmz_decoy_links) == 3
         for l in dmz_decoy_links:
             peers = [ep.split(":")[0] for ep in l["endpoints"]]
             assert "edge-router" in peers
