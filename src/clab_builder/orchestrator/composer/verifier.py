@@ -2475,6 +2475,14 @@ class ScenarioVerifier:
             env_flags.append(f"ANTHROPIC_BASE_URL={base_url}")
         if model:
             env_flags.append(f"MODEL={model}")
+            # Claude Code SDK's Agent/Task tools spawn sub-agents that default
+            # to a lighter model (claude-haiku-4-5). When the LLM API gateway
+            # has no channel for that default (503 No available channel), the
+            # sub-agent fails and the trial is mislabeled agent_api_protocol.
+            # Pin the sub-agent model to the same model the main agent uses so
+            # every LLM call hits a gateway-backed model. See WORK_PROGRESS_REPORT
+            # 2026-07-23 'haiku sub-agent 503' analysis.
+            env_flags.append(f"CLAUDE_CODE_SUBAGENT_MODEL={model}")
         for ef in env_flags:
             full_cmd.extend(["-e", ef])
         full_cmd.extend([
