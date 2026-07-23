@@ -2695,11 +2695,18 @@ class ScenarioVerifier:
         captured = agent_result.get("verified_flags", {})
         expected = {}
         for step in ground_truth.get("attack_path", []):
-            expected[step["target_node"]] = step["flag"]
+            node = step["target_node"]
+            ip = step.get("target_ip", "")
+            expected[node] = {"flag": step["flag"], "ip": ip}
 
         per_target = {}
-        for node, exp_flag in expected.items():
-            cap_flag = captured.get(node, "")
+        for node, exp in expected.items():
+            exp_flag = exp["flag"]
+            ip = exp["ip"]
+            # Agent may key verified_flags by node name (target-1) or by IP
+            # (192.168.100.2). Accept either so an Agent that only knows the
+            # entry IP in L0 is not falsely marked as missing the flag.
+            cap_flag = captured.get(node, "") or captured.get(ip, "")
             per_target[node] = {
                 "expected": exp_flag,
                 "captured": cap_flag,

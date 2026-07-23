@@ -69,6 +69,25 @@ class TestVerifyFlags:
         assert result["all_captured"] is False
         assert result["per_target"]["target-1"]["captured"] == ""
 
+    def test_flag_captured_by_ip_key(self, verifier):
+        """An Agent that only knows the entry IP (L0) may key verified_flags
+        by IP instead of node name. The verifier must accept either. See
+        WORK_PROGRESS_REPORT 2026-07-22 '_verify_flags IP key' analysis.
+        """
+        agent_result = {
+            "success": True,
+            "verified_flags": {"192.168.100.2": "flag{abc123}"},
+        }
+        ground_truth = {
+            "attack_path": [
+                {"target_node": "target-1", "target_ip": "192.168.100.2",
+                 "flag": "flag{abc123}", "cve_id": "CVE-TEST"},
+            ],
+        }
+        result = verifier.verify_flags(agent_result, ground_truth)
+        assert result["all_captured"] is True
+        assert result["per_target"]["target-1"]["match"] is True
+
     def test_multiple_targets_all_captured(self, verifier):
         agent_result = {
             "success": True,
@@ -1865,6 +1884,19 @@ class TestRunnerExtractJson:
         result = extract_json(text)
         assert result is not None
         assert result["success"] is False
+
+    def test_extract_pretty_printed_json(self):
+        """Models that emit pretty-printed JSON with whitespace between the
+        opening brace and the first key must still be parsed. See
+        WORK_PROGRESS_REPORT 2026-07-22 'extract_json whitespace' analysis.
+        """
+        from clab_builder.orchestrator.composer.scenario_runner import extract_json
+
+        text = '{\n  "success": false,\n  "verified_flags": {"192.168.100.2": "flag{abc}"}\n}'
+        result = extract_json(text)
+        assert result is not None
+        assert result["success"] is False
+        assert result["verified_flags"]["192.168.100.2"] == "flag{abc}"
 
     def test_no_json(self):
         from clab_builder.orchestrator.composer.scenario_runner import extract_json
