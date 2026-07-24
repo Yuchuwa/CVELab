@@ -33,7 +33,7 @@ def load_jsonl_dataset(path: str) -> Dataset:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--model", default="Qwen/Qwen3-8B")
+    ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     ap.add_argument("--data", default="data/sft/cve_attack_sft_v1.jsonl")
     ap.add_argument("--output", required=True)
     ap.add_argument("--max-seq-length", type=int, default=32768)
@@ -48,6 +48,9 @@ def main():
     args = ap.parse_args()
 
     os.makedirs(args.output, exist_ok=True)
+
+    # trl SFTTrainer uses transformers Trainer which manages device placement
+    # internally via accelerate; no explicit Accelerator needed.
 
     print(f"[setup] loading tokenizer + model: {args.model}")
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
@@ -87,7 +90,11 @@ def main():
     else:
         max_steps = args.max_steps if args.max_steps > 0 else -1
         save_strategy = "epoch"
-        report_to = "tensorboard"
+        try:
+            import tensorboard  # noqa: F401
+            report_to = "tensorboard"
+        except ImportError:
+            report_to = "none"
         logging_steps = 10
 
     cfg = SFTConfig(
@@ -107,7 +114,6 @@ def main():
         max_length=args.max_seq_length,
         packing=False,
         length_column_name="length",
-        group_by_length=False,  # transformers 5.x dropped this; rely on dynamic padding
         completion_only_loss=True,  # mask prompt, train on assistant turns only
         report_to=report_to,
         dataloader_num_workers=4,
