@@ -3315,3 +3315,22 @@ L2 的 CVE→IP 块仍用真 target IP（不受影响），所以 L2 下 Agent �
 
 手动调 `_build_topology_hint` 输出全是 `node-N`，无 target-/decoy- 前缀。
 test_l1_input_has_topology_but_no_cve 断言改成 node-N。88 passed。
+
+---
+
+## 2026-07-24 — cve_setup timeout 300→600(适配 50 节点 high decoy)
+
+### 问题
+
+50 节点 high 档(43 decoy)时 cve-setup.yaml 含 46 个 readiness probe(3 target
++ 43 decoy),每个 probe 一次 `docker exec`。46 个 probe 串行 + 43 decoy 容器
+并发启动慢,超过默认 300s ansible timeout → 全部 case 挂在 setup:cve_setup。
+
+### 修复
+
+`verifier._run_ansible` 对 cve-setup.yaml 提 timeout 到 600s(两处:line 901
+full-verify 分支、line 1089 environment-only 分支)。base/asset_setup/
+asset_verify 不变(base 仍 300,asset_setup/verify 仍 600)。
+
+测试 test_asset_setup_uses_extended_timeout 断言 cve-setup timeout=600。
+88 passed。
