@@ -3099,3 +3099,29 @@ agent_timeout 2、objective 验证失败 3、agent_runner_error 3（实为 Agent
 2. 修 scenario_runner 终止原因标注契约；
 3. 给 `customer-records` asset 加 redis service_variant（解锁 CVE-2022-0543 末层）；
 4. 用本批 L2 结果与历史 Guided batch 做正式 Guide 消融对比（paired）。
+
+## 2026-07-23：stratified-50 首个 Range 静态物化检查
+
+- 范围：从 `data/stratified_50_ranges.json` 选择第一条 case，使用
+  `enterprise_3tier`、`agent_context=l2`、`noise_level=baseline` 执行
+  `generate-only`；未部署 ContainerLab、未调用 Agent。
+- Case：`matrix-2018-16509-2012-1823-2015-1427`，对应 DMZ/App/Data 三层
+  `CVE-2018-16509 -> CVE-2012-1823 -> CVE-2015-1427`。
+- 结果：静态生成成功；输出包含 12 个节点、11 条链路、3 个随机 FLAG、5 个
+  decoy，以及完整的 CLab、Ansible、Ground Truth、Guide 和场景元数据产物。
+- 资产绑定：`customer-records` 正确解析为 Elasticsearch（HTTP/9200）；本次仅证明
+  场景可物化，不构成环境验证、漏洞利用验证或 template-anchor 状态变更。
+- 后续边界：以该生成场景作为 CVELab 到 Sysbox 拓扑映射的首个输入样本。
+
+### Environment-only 启动检查
+
+- Docker daemon（27.5.1）、ContainerLab（0.72.0）、`vm.max_map_count=262144`
+  及宿主内存/磁盘检查通过；场景运行前本机不存在三个目标镜像。
+- `ScenarioVerifier.run_full(..., environment_only=True)` 在
+  `runtime_materialization` 阶段按预期 fail-closed，未进入 CLab deploy，并完成清理。
+- 根因：`CVE-2018-16509` Atom/场景记录的 runtime generated hash 为
+  `6690af7aec2e...`，当前共享 `generate_runtime_artifacts` 对同一构建输入计算为
+  `9596de73edd4...`。缺失的历史 runtime 镜像不能在输入漂移后按原契约重建。
+- 分类：runtime 构建契约/产物版本漂移；不是拓扑语法、网络资源或服务 readiness
+  失败。当前场景尚不能通过受支持的 verifier 流程启动，后续应在共享 runtime
+  重建流程中重新建立 Atom 元数据、构建产物与生成器版本的一致性。

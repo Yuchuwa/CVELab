@@ -35,6 +35,25 @@ def _generate_flag() -> str:
     return f"flag{{{secrets.token_hex(16)}}}"
 
 
+# Docker registry mirror prefix applied to all container images referenced in
+# generated scenarios.  When the host cannot reach Docker Hub directly set this
+# to a working mirror (e.g., "docker.1ms.run/").  An empty string disables it.
+_REGISTRY_MIRROR_PREFIX = ""
+
+
+def _mirror(image: str) -> str:
+    """Prepend the registry mirror prefix unless the image already carries one."""
+    if not image or not _REGISTRY_MIRROR_PREFIX:
+        return image
+    # Already has a registry prefix (contains a dot-separated host: docker.io/…,
+    # ghcr.io/…, docker.1ms.run/…, quay.io/…)
+    if "/" in image:
+        prefix = image.split("/", 1)[0]
+        if "." in prefix or prefix in ("ghcr",):
+            return image
+    return _REGISTRY_MIRROR_PREFIX + image
+
+
 # PoC material classification shared with verifier.py (levels). Keep in sync
 # with ScenarioVerifier._CREDENTIAL_MATERIAL_PATTERNS / _PAYLOAD_MATERIAL_PATTERNS.
 _CREDENTIAL_MATERIAL_PATTERNS = (
@@ -487,7 +506,7 @@ class ScenarioAssembler:
             # CVE 容器节点
             node_def = {
                 "kind": "linux",
-                "image": runtime_images.get(atom.cve_id, atom.docker_image),
+                "image": _mirror(runtime_images.get(atom.cve_id, atom.docker_image)),
             }
             runtime = _effective_runtime(atom, atoms_dir)
             runtime_env = dict(runtime.get("environment", {}) or {})
@@ -534,7 +553,7 @@ class ScenarioAssembler:
                 service_node_name = f"{node_name}-service"
                 clab["topology"]["nodes"][node_name] = {
                     "kind": "linux",
-                    "image": atom.post_exploit.pivot_host_image,
+                    "image": _mirror(atom.post_exploit.pivot_host_image),
                     "cmd": "sleep infinity",
                 }
                 node_def["network-mode"] = f"container:clab-{scenario_name}-{node_name}"
@@ -674,7 +693,7 @@ class ScenarioAssembler:
                 )
             node_def: dict[str, Any] = {
                 "kind": "linux",
-                "image": svc.image,
+                "image": _mirror(svc.image),
             }
             if svc.environment:
                 node_def["env"] = dict(svc.environment)

@@ -160,7 +160,7 @@ def build_runtime_image(
         df_path = atom_dir / arts.source_dockerfile
         ctx = df_path.parent
         inter = arts.base_image_for_runtime
-        ib = _run(["docker", "build", "-t", inter, "-f", str(df_path), str(ctx)],
+        ib = _run(["docker", "build", "--network", "host", "-t", inter, "-f", str(df_path), str(ctx)],
                   timeout=build_timeout)
         if ib.returncode != 0:
             return RuntimeBuildResult(
@@ -188,7 +188,7 @@ def build_runtime_image(
     write_runtime_dir(atom_dir, arts)
     image = _runtime_image_name(atom.cve_id, arts.manifest["generated_hash"])
 
-    build = _run(["docker", "build", "-t", image, "-f", str(atom_dir / "runtime" / "Dockerfile"),
+    build = _run(["docker", "build", "--network", "host", "-t", image, "-f", str(atom_dir / "runtime" / "Dockerfile"),
                   str(atom_dir / "runtime")], timeout=build_timeout)
     if build.returncode != 0:
         return RuntimeBuildResult(
