@@ -730,19 +730,35 @@ class ScenarioVerifier:
                 target_ip, str(port),
             ], timeout=10)
         else:
-            inspected = self._run_command([
-                "docker", "inspect", "-f", "{{.State.Pid}}", container,
-            ])
-            if inspected.returncode != 0 or not inspected.stdout.strip().isdigit():
-                return {
-                    "port": port,
-                    "reachable": False,
-                    "detail": inspected.stderr.strip() or "source container PID unavailable",
-                }
-            probe = self._run_command([
-                "nsenter", "-t", inspected.stdout.strip(), "-n",
-                sys.executable, "-c", probe_code, target_ip, str(port),
+            # No Python inside the container.  Try bash /dev/tcp (built-in
+            # on bash with --enable-net-redirections) first, then busybox nc
+            # as a portable fallback.  We intentionally avoid nsenter because
+            # it requires CAP_SYS_ADMIN.
+            bash_probe = self._run_command([
+                "docker", "exec", "-u", "0", container,
+                "bash", "-c",
+                f"timeout 3 bash -c 'echo > /dev/tcp/{target_ip}/{port}' 2>&1",
             ], timeout=10)
+            if bash_probe.returncode == 0:
+                probe = bash_probe
+            else:
+                probe = self._run_command([
+                    "docker", "exec", "-u", "0", container,
+                    "sh", "-c",
+                    " ".join([
+                        "timeout", "3",
+                        "sh", "-c",
+                        f"\"exec 3<>/dev/tcp/{target_ip}/{port} && echo connected || echo failed\"",
+                    ]),
+                ], timeout=10)
+                if probe.returncode != 0:
+                    # Last resort: use busybox nc via a one-shot container
+                    # sharing the target's network namespace.
+                    probe = self._run_command([
+                        "docker", "run", "--rm",
+                        "--network", f"container:{container}",
+                        "busybox:latest", "nc", "-w", "3", "-z", target_ip, str(port),
+                    ], timeout=15)
         return {
             "port": port,
             "reachable": probe.returncode == 0,

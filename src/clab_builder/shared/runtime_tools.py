@@ -219,44 +219,49 @@ def install_commands(package_manager: str, packages: list[str]) -> str:
     Uses proxy env inheritance (HTTP_PROXY/HTTPS_PROXY/NO_PROXY) from the
     build environment without hardcoding any address. Cleans caches.
 
-    For apt: EOL Debian releases (jessie/stretch/buster) have their package
-    sources removed from deb.debian.org; this block falls back to
-    archive.debian.org when the primary apt-get update fails. This is a
-    generic release-aging fix, not a per-CVE branch.
+    For apt: EOL Debian releases (jessie/stretch/buster/bullseye) have their
+    package sources removed from deb.debian.org. The generated script
+    proactively detects the Debian codename from /etc/os-release so EOL
+    releases go straight to archive.debian.org without wasting 10+ minutes
+    on a doomed apt-get update. This is a generic release-aging fix, not a
+    per-CVE branch.
     """
     if not packages:
         return ""
     if package_manager == "apt":
-        # EOL Debian releases (jessie/stretch/buster) lose their deb.debian.org
-        # sources; archive.debian.org serves them but with expired signing
-        # keys, so [trusted=yes] + --allow-unauthenticated are required. This
-         # fallback extracts the codename from any Debian source entry (so it
-         # also handles httpredir.debian.org), rewrites to a single archive
-         # line, and drops security/updates (archive does not mirror them).
-         # Only that archive path permits expired signatures.
-        # Generic release-aging handling, not a per-CVE branch.
         return (
             "export DEBIAN_FRONTEND=noninteractive\n"
             "apt_install_flags=\n"
-            "apt_log=/tmp/cvelab-apt-update.log\n"
-             "if ! apt-get update -qq >\"$apt_log\" 2>&1 || "
-             "grep -Eq 'Failed to fetch https?://(deb\\.debian\\.org|security\\.debian\\.org|httpredir\\.debian\\.org|security\\.debian\\.org/debian)/' \"$apt_log\"; then\n"
-             "  . /etc/os-release 2>/dev/null || true\n"
-             "  codename=$(awk '$1 == \"deb\" {print $3; exit}' /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null)\n"
-             "  codename=${codename:-${VERSION_CODENAME:-}}\n"
-             "  case \"${ID:-}\":\"$codename\" in\n"
-             "    debian:jessie|debian:stretch|debian:buster|debian:bullseye)\n"
-             "      echo \"deb [trusted=yes] http://archive.debian.org/debian $codename main\" > /etc/apt/sources.list\n"
-             "      rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true\n"
-             "      apt-get update -qq\n"
-             "      apt_install_flags=--allow-unauthenticated\n"
-             "      ;;\n"
-             "    *) cat \"$apt_log\" >&2; exit 1 ;;\n"
-             "  esac\n"
-             "fi &&\n"
-             "rm -f \"$apt_log\" &&\n"
-             "mkdir -p /usr/share/man/man1 /usr/share/man/man7 &&\n"
-             "apt-get install -y --no-install-recommends $apt_install_flags "
+            "# Proactively detect EOL Debian so we don't waste time on dead repos\n"
+            ". /etc/os-release 2>/dev/null || true\n"
+            "case \"${ID:-}\":\"${VERSION_CODENAME:-}\" in\n"
+            "  debian:jessie|debian:stretch|debian:buster|debian:bullseye)\n"
+            "    echo \"deb [trusted=yes] http://archive.debian.org/debian ${VERSION_CODENAME} main\" > /etc/apt/sources.list\n"
+            "    rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true\n"
+            "    apt-get update -qq\n"
+            "    apt_install_flags=--allow-unauthenticated\n"
+            "    ;;\n"
+            "  *)\n"
+            "    apt_log=/tmp/cvelab-apt-update.log\n"
+            "    if ! apt-get update -qq >\"$apt_log\" 2>&1 || "
+            "grep -Eq 'Failed to fetch https?://(deb\\.debian\\.org|security\\.debian\\.org|httpredir\\.debian\\.org|security\\.debian\\.org/debian)/' \"$apt_log\"; then\n"
+            "      codename=$(awk '$1 == \"deb\" {print $3; exit}' /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null)\n"
+            "      codename=${codename:-${VERSION_CODENAME:-}}\n"
+            "      case \"${ID:-}\":\"$codename\" in\n"
+            "        debian:jessie|debian:stretch|debian:buster|debian:bullseye)\n"
+            "          echo \"deb [trusted=yes] http://archive.debian.org/debian $codename main\" > /etc/apt/sources.list\n"
+            "          rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true\n"
+            "          apt-get update -qq\n"
+            "          apt_install_flags=--allow-unauthenticated\n"
+            "          ;;\n"
+            "        *) cat \"$apt_log\" >&2; exit 1 ;;\n"
+            "      esac\n"
+            "    fi &&\n"
+            "    rm -f \"$apt_log\"\n"
+            "    ;;\n"
+            "esac &&\n"
+            "mkdir -p /usr/share/man/man1 /usr/share/man/man7 &&\n"
+            "apt-get install -y --no-install-recommends $apt_install_flags "
             + " ".join(packages) + " && "
             "rm -rf /var/lib/apt/lists/*"
         )
