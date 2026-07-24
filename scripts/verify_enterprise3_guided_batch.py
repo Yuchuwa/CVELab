@@ -91,7 +91,7 @@ CASES: tuple[dict[str, object], ...] = (
 
 
 CASE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$")
-MGMT_NETWORK_NAME = "cvelab-range-mgmt"
+MGMT_NETWORK_NAME = "cvelab-range-mgmt-v2"
 # /23 (510 usable IPs) so high-node-count scenarios (50 nodes) can run at
 # parallel 8+ without hitting the /24 (254 IP) cap. 172.30.240.0/23 covers
 # 172.30.240.0 - 172.30.241.255; the next /23 starts at .242, etc.
