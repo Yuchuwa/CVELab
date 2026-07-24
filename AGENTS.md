@@ -287,6 +287,13 @@ Do not leave the report stale across a session boundary. If a finding needs a
 later deep-dive, record it as a dated TODO entry now rather than relying on
 memory or chat history.
 
+**Auto-maintenance rule:** Do NOT ask the user whether to record progress in
+`docs/WORK_PROGRESS_REPORT.md`. When a batch finishes, a shared contract is
+changed, a model is tested, or a result is analyzed, append a dated entry
+proactively and commit it. The report is a self-maintained ledger, not a
+user-prompted task. Read it at session start to know prior state; write to it
+whenever a fact is established.
+
 - Record an Atom candidate when it is assessed, selected, rejected, built, or
   downgraded. Do not present a research candidate as a verified Atom.
 - Record Atom-native, source-bundle, Guide, runtime-image, smoke, and service
