@@ -1539,7 +1539,7 @@ class TestAttackPathReachability:
         assert result["all_edges_verified"] is False
         assert result["edges"][0]["ok"] is False
 
-    def test_probe_falls_back_to_nsenter_without_source_python(self):
+    def test_probe_falls_back_to_docker_exec_without_source_python(self):
         verifier = ScenarioVerifier()
         calls = []
 
@@ -1549,6 +1549,12 @@ class TestAttackPathReachability:
                 return subprocess.CompletedProcess(command, 1, "", "python unavailable")
             if command[:3] == ["docker", "inspect", "-f"]:
                 return subprocess.CompletedProcess(command, 0, "100\n", "")
+            # Simulate bash /dev/tcp succeeding
+            if command[0] == "docker" and "bash" in command:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            # Simulate busybox nc succeeding
+            if command[0] == "docker" and "busybox" in command:
+                return subprocess.CompletedProcess(command, 0, "connected", "")
             return subprocess.CompletedProcess(command, 0, "", "")
 
         with patch.object(verifier, "_run_command", side_effect=fake_run):
@@ -1557,7 +1563,12 @@ class TestAttackPathReachability:
             )
 
         assert result["reachable"] is True
-        assert any(command[0] == "nsenter" for command in calls)
+        # When no Python, bash /dev/tcp or busybox nc is used instead of nsenter.
+        assert any(
+            (command[0] == "docker" and "bash" in command)
+            or (command[0] == "docker" and "busybox" in command)
+            for command in calls
+        )
 
 
 class TestGuideRuntimePreflight:
