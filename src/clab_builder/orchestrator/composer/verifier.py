@@ -898,7 +898,7 @@ class ScenarioVerifier:
                 scenario_dir, "asset-verify.yaml", required=assets_required,
                 timeout=600,
             )
-            cve = self._run_ansible(scenario_dir, "cve-setup.yaml")
+            cve = self._run_ansible(scenario_dir, "cve-setup.yaml", timeout=600)
             environment = self._verify_environment(ground_truth, scenario_dir)
             result["environment_verified"] = bool(environment.get("all_targets_verified"))
             result["environment_verification"] = environment
@@ -1086,7 +1086,7 @@ class ScenarioVerifier:
                 scenario_dir, "asset-verify.yaml", required=assets_required,
                 timeout=600,
             )
-            cve = self._run_ansible(scenario_dir, "cve-setup.yaml")
+            cve = self._run_ansible(scenario_dir, "cve-setup.yaml", timeout=600)
 
             environment = self._verify_environment(ground_truth, scenario_dir)
             environment_success = bool(environment.get("all_targets_verified")) and all(

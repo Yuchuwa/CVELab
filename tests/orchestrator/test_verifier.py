@@ -2048,9 +2048,10 @@ class TestVerifierDefaults:
         }
         assert playbooks_seen.get("asset-setup.yaml") == 600, playbooks_seen
         assert playbooks_seen.get("asset-verify.yaml") == 600, playbooks_seen
-        # base and cve-setup keep the default 300s.
+        # base keeps the default 300s; cve-setup uses 600s so high-decoy
+        # scenarios (43 probes) do not hit the 300s ansible timeout.
         assert playbooks_seen.get("base.yaml", 300) == 300, playbooks_seen
-        assert playbooks_seen.get("cve-setup.yaml", 300) == 300, playbooks_seen
+        assert playbooks_seen.get("cve-setup.yaml", 600) == 600, playbooks_seen
 
     def test_save_result_records_validation_round_from_execution_context(self, tmp_path):
         """A verified Range must carry a validation_round provenance tag.
