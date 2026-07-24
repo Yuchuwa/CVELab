@@ -234,12 +234,18 @@ def _stream_completion(client, model: str, messages: list, max_tokens: int):
     Some gateways (e.g. GLM-5.2) only return tool_calls in streaming
     responses, so we always stream and aggregate.
     """
+    # Temperature: default 0 for deterministic, reproducible output (control
+    # variable for ablation/model comparison). Reasoning models (kimi-k3,
+    # GLM, etc.) reject temperature=0 with 'only 1 is allowed'; allow override
+    # via LLM_TEMPERATURE env var so those models can be used without code
+    # changes. See WORK_PROGRESS_REPORT 2026-07-24 'kimi temperature' analysis.
+    temperature = float(os.environ.get("LLM_TEMPERATURE", "0"))
     resp = client.chat.completions.create(
         model=model,
         messages=messages,
         tools=TOOLS,
         max_tokens=max_tokens,
-        temperature=0,
+        temperature=temperature,
         stream=True,
     )
     content_parts: list[str] = []

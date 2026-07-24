@@ -2495,6 +2495,11 @@ class ScenarioVerifier:
                 env_flags.append(f"OPENAI_BASE_URL={base_url}")
             if model:
                 env_flags.append(f"MODEL={model}")
+            # Reasoning models (kimi-k3, GLM) require temperature=1; pass
+            # LLM_TEMPERATURE through so the runner picks it up. Defaults to 0
+            # inside the runner when unset.
+            if os.environ.get("LLM_TEMPERATURE"):
+                env_flags.append(f"LLM_TEMPERATURE={os.environ['LLM_TEMPERATURE']}")
         else:
             env_flags = [f"ANTHROPIC_API_KEY={api_key}"]
             if base_url:
