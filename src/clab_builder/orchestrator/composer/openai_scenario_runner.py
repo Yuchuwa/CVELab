@@ -233,45 +233,84 @@ def _stream_completion(client, model: str, messages: list, max_tokens: int):
 
     Some gateways (e.g. GLM-5.2) only return tool_calls in streaming
     responses, so we always stream and aggregate.
+
+    Transient gateway errors (429 rate limit / engine overloaded, 5xx) are
+    retried with exponential backoff so a single temporary overload does not
+    abort the whole Agent run. The turn is retried without consuming the turn
+    budget; only after MAX_RETRIES consecutive failures does the error
+    propagate to the caller. See WORK_PROGRESS_REPORT 2026-07-24 '429 retry'.
     """
+    import time
+    from openai import RateLimitError, APIError
+
+    MAX_RETRIES = 5
     # Temperature: default 0 for deterministic, reproducible output (control
     # variable for ablation/model comparison). Reasoning models (kimi-k3,
     # GLM, etc.) reject temperature=0 with 'only 1 is allowed'; allow override
     # via LLM_TEMPERATURE env var so those models can be used without code
     # changes. See WORK_PROGRESS_REPORT 2026-07-24 'kimi temperature' analysis.
     temperature = float(os.environ.get("LLM_TEMPERATURE", "0"))
-    resp = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        tools=TOOLS,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        stream=True,
-    )
-    content_parts: list[str] = []
-    tc_buf: dict[int, dict[str, str]] = {}
-    for chunk in resp:
-        if not chunk.choices:
-            continue
-        delta = chunk.choices[0].delta
-        if delta is None:
-            continue
-        if delta.content:
-            content_parts.append(delta.content)
-        if delta.tool_calls:
-            for tc in delta.tool_calls:
-                idx = tc.index
-                if idx not in tc_buf:
-                    tc_buf[idx] = {"id": tc.id or f"call_{idx}", "name": "", "arguments": ""}
-                if tc.id:
-                    tc_buf[idx]["id"] = tc.id
-                if tc.function and tc.function.name:
-                    tc_buf[idx]["name"] = tc.function.name
-                if tc.function and tc.function.arguments:
-                    tc_buf[idx]["arguments"] += tc.function.arguments
-    content = "".join(content_parts)
-    tool_calls = [tc_buf[i] for i in sorted(tc_buf.keys())]
-    return content, tool_calls
+
+    def _is_transient(exc: Exception) -> bool:
+        # 429 / engine overloaded / 5xx server errors are retryable.
+        if isinstance(exc, RateLimitError):
+            return True
+        if isinstance(exc, APIError):
+            status = getattr(exc, "status_code", None) or 0
+            if status >= 500 or status == 429:
+                return True
+        # Gateway-wrapped 429 (some relays put it in the message body as a
+        # 400 with a 429-style payload). Match on the error text too.
+        msg = str(exc).lower()
+        if "overloaded" in msg or "rate_limit" in msg or "429" in msg:
+            return True
+        return False
+
+    last_exc = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                tools=TOOLS,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stream=True,
+            )
+            content_parts: list[str] = []
+            tc_buf: dict[int, dict[str, str]] = {}
+            for chunk in resp:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if delta is None:
+                    continue
+                if delta.content:
+                    content_parts.append(delta.content)
+                if delta.tool_calls:
+                    for tc in delta.tool_calls:
+                        idx = tc.index
+                        if idx not in tc_buf:
+                            tc_buf[idx] = {"id": tc.id or f"call_{idx}", "name": "", "arguments": ""}
+                        if tc.id:
+                            tc_buf[idx]["id"] = tc.id
+                        if tc.function and tc.function.name:
+                            tc_buf[idx]["name"] = tc.function.name
+                        if tc.function and tc.function.arguments:
+                            tc_buf[idx]["arguments"] += tc.function.arguments
+            content = "".join(content_parts)
+            tool_calls = [tc_buf[i] for i in sorted(tc_buf.keys())]
+            return content, tool_calls
+        except Exception as exc:  # noqa: BLE001
+            if _is_transient(exc) and attempt < MAX_RETRIES - 1:
+                wait = 2 ** attempt  # 1, 2, 4, 8, 16s
+                print(f"[Warn] transient API error (attempt {attempt+1}/{MAX_RETRIES}), retrying in {wait}s: {str(exc)[:120]}", file=sys.stderr)
+                time.sleep(wait)
+                last_exc = exc
+                continue
+            raise
+    # Should not reach here, but propagate if it does.
+    raise last_exc  # type: ignore[misc]
 
 
 def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TURNS):
