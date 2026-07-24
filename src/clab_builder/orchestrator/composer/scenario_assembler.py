@@ -694,9 +694,12 @@ class ScenarioAssembler:
             zone_targets[svc.zone].append(svc.name)
 
             # Decoy readiness probes (TCP only, same shape as chain-node
-            # probes): poll until the port listens or retries:18 delay:10
-            # (180s) exhaust, matching the chain-node readiness contract so
-            # slow-start decoys do not race asset_setup.
+            # probes): poll until the port listens or retries:3 delay:2
+            # (6s window) exhaust. Decoys are lightweight images that start in
+            # <2s, so the chain-node's 18×10=180s window is unnecessary and
+            # makes 43-decoy high-tier cve_setup take 43×180s >> any timeout.
+            # A short window keeps slow-start chain nodes (which retain the
+            # 18×10 window) covered while decoy probes finish fast.
             decoy_setup_tasks: list[dict] = []
             decoy_container = f"clab-{scenario_name}-{svc.name}"
             for port in svc.ports:
@@ -718,8 +721,8 @@ class ScenarioAssembler:
                     "changed_when": False,
                     "failed_when": False,
                     "until": f"{register_name}.rc == 0",
-                    "retries": 18,
-                    "delay": 10,
+                    "retries": 3,
+                    "delay": 2,
                 })
             if decoy_setup_tasks:
                 cve_setup_tasks.append({

@@ -174,10 +174,12 @@ class TestBaselineDecoyInjection:
         nginx_task = next(t for t in out["cve_setup"] if "decoy-dmz-01" in t["name"])
         probe_cmds = [t for t in nginx_task["tasks"] if "Probe TCP" in t.get("name", "")]
         assert any("0050" in t["ansible.builtin.shell"] for t in probe_cmds)  # port 80
-        # decoy probes poll until the port listens, matching chain-node probes
+        # decoy probes poll until the port listens. Decoys are lightweight and
+        # start fast, so they use a short window (retries:3 delay:2 = 6s),
+        # unlike chain nodes which keep the 18×10 window for slow JVM starts.
         for t in probe_cmds:
-            assert t["retries"] == 18
-            assert t["delay"] == 10
+            assert t["retries"] == 3
+            assert t["delay"] == 2
             assert t["until"].endswith(".rc == 0")
 
     def test_decoy_links_to_zone_router(self, assembler):
@@ -266,14 +268,15 @@ class TestVerifierTopologyHintMixesDecoys:
             scenario_dir, self._ground_truth_with_decoys(), self._ip_alloc(),
         )
         hosts = topo["hosts"]
-        # Both chain and decoy hosts present, same format, no "decoy"/"chain" label
-        assert any("target-1" in h for h in hosts)
-        assert any("decoy-dmz-nginx" in h for h in hosts)
-        assert any("decoy-app-postgres" in h for h in hosts)
-        # No host line contains a marker word distinguishing decoy from chain
+        # All hosts (chain + decoy) are neutralized to 'node-N (ip, zone: z)'
+        # with no target-/decoy- prefix (paper §A.3). Chain nodes carry their
+        # real IPs (192.168.100.2 / 10.10.1.2), decoys carry theirs.
+        assert any("node-" in h and "192.168.100.2" in h for h in hosts)
+        assert any("node-" in h and "192.168.100.3" in h for h in hosts)  # decoy
+        assert any("node-" in h and "10.10.1.4" in h for h in hosts)      # decoy
+        # No host line carries a marker distinguishing decoy from chain
         for h in hosts:
-            assert "decoy" not in h.lower().split("(", 1)[0] or h.startswith("decoy-")
-        # All decoy entries follow the same "name (ip, zone: z)" shape as chain nodes
+            assert "decoy" not in h.lower() and "target-" not in h.lower()
         for h in hosts:
             assert "(" in h and "zone:" in h
 
@@ -289,7 +292,8 @@ class TestVerifierTopologyHintMixesDecoys:
         ], "noise_nodes": []}
         verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"))
         topo = verifier._build_topology_hint(scenario_dir, gt, {"target-1": {"eth1": "192.168.100.2/24"}})
-        assert any("target-1" in h for h in topo["hosts"])
+        # Single chain host, neutralized to node-N; no decoys.
+        assert any("node-" in h and "192.168.100.2" in h for h in topo["hosts"])
         assert not any("decoy" in h for h in topo["hosts"])
 
 
