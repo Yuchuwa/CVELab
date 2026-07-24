@@ -108,13 +108,11 @@ class TestBaselineDecoyInjection:
         )
         nodes = out["clab"]["topology"]["nodes"]
         decoy_names = [n for n in nodes if n.startswith("decoy-")]
-        # high = 8 decoys spread across dmz/app/data zones.
-        assert len(decoy_names) == 8
-        assert set(decoy_names) == {
-            "decoy-dmz-nginx", "decoy-dmz-redis", "decoy-dmz-mysql",
-            "decoy-app-nginx", "decoy-app-postgres", "decoy-app-redis",
-            "decoy-data-busybox", "decoy-data-ssh",
-        }
+        # high = 43 decoys (50 total nodes): dmz 18 + app 13 + data 12.
+        assert len(decoy_names) == 43
+        assert sum(1 for n in decoy_names if "-dmz-" in n) == 18
+        assert sum(1 for n in decoy_names if "-app-" in n) == 13
+        assert sum(1 for n in decoy_names if "-data-" in n) == 12
 
     def test_decoys_get_zone_ips_after_chain_nodes(self, assembler):
         out = assembler.assemble(
@@ -124,8 +122,8 @@ class TestBaselineDecoyInjection:
         alloc = out["ip_allocations"]
         # target-1 = .2, decoys = .3, .4, .5
         assert alloc["target-1"]["eth1"].startswith("192.168.100.2/")
-        assert alloc["decoy-dmz-nginx"]["eth1"].startswith("192.168.100.3/")
-        assert alloc["decoy-dmz-redis"]["eth1"].startswith("192.168.100.4/")
+        assert alloc["decoy-dmz-01"]["eth1"].startswith("192.168.100.3/")
+        assert alloc["decoy-dmz-02"]["eth1"].startswith("192.168.100.4/")
         # multi-node zone activates bridge
         assert "bridges" in alloc.get("edge-router", {})
         dmz_bridge = alloc["edge-router"]["bridges"][0]
@@ -158,7 +156,7 @@ class TestBaselineDecoyInjection:
             scenario_name="high-meta", noise_level="high",
         )
         nn = out["ground_truth"]["noise_nodes"]
-        assert len(nn) == 8
+        assert len(nn) == 43
         for n in nn:
             assert n["name"].startswith("decoy-")
             assert n["zone"] in {"dmz", "app", "data"}
@@ -172,10 +170,11 @@ class TestBaselineDecoyInjection:
             scenario_name="high-probe", noise_level="high",
         )
         setup_names = [t["name"] for t in out["cve_setup"]]
-        assert any("decoy-dmz-nginx" in n for n in setup_names)
-        assert any("decoy-app-postgres" in n for n in setup_names)
+        # high uses numbered decoys (decoy-dmz-01..); nginx:alpine on port 80
+        # is the first in the cycle, so decoy-dmz-01 carries port 80.
+        assert any("decoy-dmz-01" in n for n in setup_names)
         # each decoy setup task probes its declared port(s)
-        nginx_task = next(t for t in out["cve_setup"] if "decoy-dmz-nginx" in t["name"])
+        nginx_task = next(t for t in out["cve_setup"] if "decoy-dmz-01" in t["name"])
         probe_cmds = [t for t in nginx_task["tasks"] if "Probe TCP" in t.get("name", "")]
         assert any("0050" in t["ansible.builtin.shell"] for t in probe_cmds)  # port 80
         # decoy probes poll until the port listens, matching chain-node probes
@@ -194,8 +193,8 @@ class TestBaselineDecoyInjection:
             l for l in links
             if any("decoy-dmz-" in ep.split(":")[0] for ep in l["endpoints"])
         ]
-        # high = 3 dmz decoys (nginx, redis, mysql) => 3 links to edge-router.
-        assert len(dmz_decoy_links) == 3
+        # high = 18 dmz decoys => 18 links to edge-router.
+        assert len(dmz_decoy_links) == 18
         for l in dmz_decoy_links:
             peers = [ep.split(":")[0] for ep in l["endpoints"]]
             assert "edge-router" in peers

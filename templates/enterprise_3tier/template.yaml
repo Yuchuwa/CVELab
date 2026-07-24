@@ -41,22 +41,53 @@ noise_levels:
     - {name: decoy-data-busybox, zone: data, image: busybox:latest, ports: [8080],
        command: "httpd -f -p 8080"}
   baseline: *decoy_low
-  # high = 8 decoy: the 2 low decoy + 6 more spread across zones, all
-  # lightweight images (<50MB) to avoid CPU/memory contention under parallel
-  # batches. Controls search breadth for the decoy-count experiment dimension.
+  # high = 43 decoy (50 total nodes): max search breadth for the decoy
+  # experiment dimension. Distributed dmz 18 / app 13 / data 12, all lightweight
+  # images. Node count 7 base + 43 decoy = 50.
   high:
-    - {name: decoy-dmz-nginx, zone: dmz, image: nginx:alpine, ports: [80]}
-    - {name: decoy-dmz-redis, zone: dmz, image: redis:7.4-alpine, ports: [6379]}
-    - {name: decoy-dmz-mysql, zone: dmz, image: alpine:latest, ports: [3306],
-       command: "nc -lk -p 3306 -e /bin/true"}
-    - {name: decoy-app-nginx, zone: app, image: nginx:alpine, ports: [80]}
-    - {name: decoy-app-postgres, zone: app, image: alpine:latest, ports: [5432],
-       command: "nc -lk -p 5432 -e /bin/true"}
-    - {name: decoy-app-redis, zone: app, image: redis:7.4-alpine, ports: [6379]}
-    - {name: decoy-data-busybox, zone: data, image: busybox:latest, ports: [8080],
-       command: "httpd -f -p 8080"}
-    - {name: decoy-data-ssh, zone: data, image: alpine:latest, ports: [22],
-       command: "nc -lk -p 22 -e /bin/true"}
+    - {name: decoy-dmz-01, zone: dmz, image: nginx:alpine, ports: [80]}
+    - {name: decoy-dmz-02, zone: dmz, image: redis:7.4-alpine, ports: [6379]}
+    - {name: decoy-dmz-03, zone: dmz, image: alpine:latest, ports: [3306], command: "nc -lk -p 3306 -e /bin/true"}
+    - {name: decoy-dmz-04, zone: dmz, image: alpine:latest, ports: [22], command: "nc -lk -p 22 -e /bin/true"}
+    - {name: decoy-dmz-05, zone: dmz, image: busybox:latest, ports: [8080], command: "httpd -f -p 8080"}
+    - {name: decoy-dmz-06, zone: dmz, image: nginx:alpine, ports: [8443]}
+    - {name: decoy-dmz-07, zone: dmz, image: alpine:latest, ports: [5432], command: "nc -lk -p 5432 -e /bin/true"}
+    - {name: decoy-dmz-08, zone: dmz, image: alpine:latest, ports: [9000], command: "nc -lk -p 9000 -e /bin/true"}
+    - {name: decoy-dmz-09, zone: dmz, image: redis:7.4-alpine, ports: [6380]}
+    - {name: decoy-dmz-10, zone: dmz, image: busybox:latest, ports: [8888], command: "httpd -f -p 8888"}
+    - {name: decoy-dmz-11, zone: dmz, image: nginx:alpine, ports: [80]}
+    - {name: decoy-dmz-12, zone: dmz, image: redis:7.4-alpine, ports: [6379]}
+    - {name: decoy-dmz-13, zone: dmz, image: alpine:latest, ports: [3306], command: "nc -lk -p 3306 -e /bin/true"}
+    - {name: decoy-dmz-14, zone: dmz, image: alpine:latest, ports: [22], command: "nc -lk -p 22 -e /bin/true"}
+    - {name: decoy-dmz-15, zone: dmz, image: busybox:latest, ports: [8080], command: "httpd -f -p 8080"}
+    - {name: decoy-dmz-16, zone: dmz, image: nginx:alpine, ports: [8443]}
+    - {name: decoy-dmz-17, zone: dmz, image: alpine:latest, ports: [5432], command: "nc -lk -p 5432 -e /bin/true"}
+    - {name: decoy-dmz-18, zone: dmz, image: alpine:latest, ports: [9000], command: "nc -lk -p 9000 -e /bin/true"}
+    - {name: decoy-app-19, zone: app, image: redis:7.4-alpine, ports: [6380]}
+    - {name: decoy-app-20, zone: app, image: busybox:latest, ports: [8888], command: "httpd -f -p 8888"}
+    - {name: decoy-app-21, zone: app, image: nginx:alpine, ports: [80]}
+    - {name: decoy-app-22, zone: app, image: redis:7.4-alpine, ports: [6379]}
+    - {name: decoy-app-23, zone: app, image: alpine:latest, ports: [3306], command: "nc -lk -p 3306 -e /bin/true"}
+    - {name: decoy-app-24, zone: app, image: alpine:latest, ports: [22], command: "nc -lk -p 22 -e /bin/true"}
+    - {name: decoy-app-25, zone: app, image: busybox:latest, ports: [8080], command: "httpd -f -p 8080"}
+    - {name: decoy-app-26, zone: app, image: nginx:alpine, ports: [8443]}
+    - {name: decoy-app-27, zone: app, image: alpine:latest, ports: [5432], command: "nc -lk -p 5432 -e /bin/true"}
+    - {name: decoy-app-28, zone: app, image: alpine:latest, ports: [9000], command: "nc -lk -p 9000 -e /bin/true"}
+    - {name: decoy-app-29, zone: app, image: redis:7.4-alpine, ports: [6380]}
+    - {name: decoy-app-30, zone: app, image: busybox:latest, ports: [8888], command: "httpd -f -p 8888"}
+    - {name: decoy-app-31, zone: app, image: nginx:alpine, ports: [80]}
+    - {name: decoy-data-32, zone: data, image: redis:7.4-alpine, ports: [6379]}
+    - {name: decoy-data-33, zone: data, image: alpine:latest, ports: [3306], command: "nc -lk -p 3306 -e /bin/true"}
+    - {name: decoy-data-34, zone: data, image: alpine:latest, ports: [22], command: "nc -lk -p 22 -e /bin/true"}
+    - {name: decoy-data-35, zone: data, image: busybox:latest, ports: [8080], command: "httpd -f -p 8080"}
+    - {name: decoy-data-36, zone: data, image: nginx:alpine, ports: [8443]}
+    - {name: decoy-data-37, zone: data, image: alpine:latest, ports: [5432], command: "nc -lk -p 5432 -e /bin/true"}
+    - {name: decoy-data-38, zone: data, image: alpine:latest, ports: [9000], command: "nc -lk -p 9000 -e /bin/true"}
+    - {name: decoy-data-39, zone: data, image: redis:7.4-alpine, ports: [6380]}
+    - {name: decoy-data-40, zone: data, image: busybox:latest, ports: [8888], command: "httpd -f -p 8888"}
+    - {name: decoy-data-41, zone: data, image: nginx:alpine, ports: [80]}
+    - {name: decoy-data-42, zone: data, image: redis:7.4-alpine, ports: [6379]}
+    - {name: decoy-data-43, zone: data, image: alpine:latest, ports: [3306], command: "nc -lk -p 3306 -e /bin/true"}
 
 assets:
   - id: app-db-credential
