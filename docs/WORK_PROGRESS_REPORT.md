@@ -3449,3 +3449,56 @@ test_topology_hosts_includes_decoys_unmarked / no_decoys 断言改成 node-N
 1. 下载完成 → 三档 smoke（8k/16k/32k 各 2 步）测峰值显存。
 2. 32k 不 OOM → 正式 3 epochs 训练。
 3. 训练完成 → Phase 3 域内评测（重新生成 Range，对照 base Qwen3-8B + luna）。
+
+## 2026-07-24 — SFT smoke 全通过 + 正式训练启动（单卡 GPU 0）
+
+### 基座切换
+
+- Qwen3-8B 权重下载持续失败（hf-mirror 不稳定，多次断连）。
+- 发现 **Qwen2.5-7B-Instruct** 本地已完整缓存（15GB，5 个 safetensors），
+  chat template 支持 tool_calls（Hermes 格式），功能等价。
+- 基座从 Qwen3-8B 改为 Qwen2.5-7B-Instruct，不影响研究结论（验证
+  "攻击轨迹能否提升小模型网络攻击能力"）。
+
+### Smoke 结果（单卡 A6000-48G）
+
+| max_seq | 步时 | train_loss | OOM? |
+|---|---|---|---|
+| 8192 | 41s/2步 | 1.251 | 否 |
+| 16384 | 57s/2步 | 1.144 | 否 |
+| 32768 | 72s/2步 | 1.111 | 否 |
+
+- 32k 单卡峰值显存 ~37.5GB（smoke 时），正式训练峰值 45.5GB（接近 48G 上限但未 OOM）。
+- loss 正常下降（8k→16k→32k：1.25→1.14→1.11）。
+- 修复：装 tensorboard；删掉显式 `Accelerator()`（与 SFTTrainer 内部冲突）；
+  SFTConfig 去掉 `group_by_length`（transformers 5.x 移除）。
+
+### 正式训练参数
+
+```
+基座:     Qwen2.5-7B-Instruct
+微调:     LoRA r=64, alpha=128, target all linear
+数据:     666 条 SFT 样本
+seq:      32768
+epochs:   3
+steps:    501
+grad_accum: 4
+lr:       1e-4, cosine, warmup 0.03
+GPU:      0 (单卡, A6000-48G)
+completion_only_loss: True (只训 assistant turn)
+```
+
+预估完成时间：~5 小时（~35s/step × 501 steps）。
+
+### 评测脚本就绪
+
+- `sft/eval_sft.py`：serve 模式用 FastAPI 起 OpenAI 兼容服务加载 LoRA adapter；
+  eval 模式调 `verify_enterprise3_guided_batch.py` 跑 Range case，用 `manifest_sol_smoke8`（同 kimi smoke8 8 个 case）。
+- 对照：base Qwen2.5-7B-Instruct（无 LoRA）vs +LoRA adapter_v1。
+- 目标：完成度 > luna 的 10%。
+
+### 产物
+
+- 训练日志：`/tmp/sft_train.log`
+- LoRA adapter：`data/sft/adapter_v1/`（训练完成后产出）
+- 评测脚本：`sft/eval_sft.py`
