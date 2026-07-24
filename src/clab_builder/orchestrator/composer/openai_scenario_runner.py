@@ -406,7 +406,7 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
                 handler = TOOL_HANDLERS.get(name)
                 tool_result = handler(args) if handler else f"[unknown tool] {name}"
                 messages.append({"role": "tool", "tool_call_id": tc["id"], "content": tool_result})
-                session_events.append({"type": "tool", "message": {"role": "tool", "name": name, "args": args, "result": tool_result[:500]}, "turn": turn})
+                session_events.append({"type": "tool", "message": {"role": "tool", "name": name, "args": args, "result": tool_result}, "turn": turn})
                 print(f"[ToolResult] {tool_result[:160]}", file=sys.stderr)
         else:
             termination_hint = f"Agent reached max-turns ({max_turns}) without a final report"
