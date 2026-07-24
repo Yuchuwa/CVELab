@@ -3410,3 +3410,42 @@ test_topology_hosts_includes_decoys_unmarked / no_decoys 断言改成 node-N
   但将全部 676 条硬截断会损失多跳成功信号。
 - 第一版不建议直接降到 16k：会使约 35.5% 样本超限。后续若显存或吞吐
   不足，再以 16k 做对照实验，而不是先假定 16k 足够。
+
+## 2026-07-24 — SFT Phase 0 数据管线完成 + Phase 1 启动
+
+### Phase 0 产出
+
+- 转换器：`sft/convert_trajectories_to_sft.py`
+  - 筛 `l0/l1/l2/no_hint` Claude-format session + ≥1 flag 捕获
+  - 按成功 flag 边界切前缀样本（hop1/hop2/hop3），3-flag 完整成功轨迹额外
+    生成 `.report` 样本教最终结构化输出
+  - 归一化 Anthropic content-block → OpenAI tool_calls/tool 格式
+  - 剥离 SDK 噪声工具（TaskCreate/TaskUpdate 等，eval openai runner 无此工具）
+  - 注入 `NO_HINT_SYSTEM_PROMPT`（按 ctx 选，从 scenario_runner 读常量）
+  - 超长样本压缩 tool_result（head+tail 截断 + 标记）再压 thinking
+  - 反泄漏扫描 system+首 user 消息
+- 产出：`data/sft/cve_attack_sft_v1.jsonl`
+  - **666 条 SFT 样本**（hop1=320, hop2=125, hop3=70, report=151）
+  - 169 条超长被丢弃（hop3 占 81，是三跳完整长链路；hop1 占 29，是 agent
+    大量扫描后才拿第一个 flag 的噪音数据）
+  - token：min 3322 / median 7871 / mean 12800 / p90 29575 / max 32746
+  - 反泄漏扫描：**0 命中**
+- 报告：`data/sft/length_report.json`
+- Qwen3-8B chat template 验证：tool_calls 正确渲染为 Hermes function-call 格式，
+  tool 结果渲染为 user-role tool_result，可直接用于 SFTTrainer。
+
+### Phase 1 进度
+
+- 已装 `trl 1.9.0`、`peft 0.19.1`、`datasets 5.0.0`（playbook env）。
+- 训练脚本：`sft/train_sft.py`（trl SFTTrainer + peft LoRA + accelerate，
+  completion_only_loss=True 只训 assistant turn）。
+- SFTConfig 适配：trl 1.9 用 `max_length` 而非 `max_seq_length`；transformers
+  5.x 移除了 `group_by_length`，改用 dynamic padding。
+- Qwen3-8B 权重本地缓存不完整（仅 766MB，缺 5 个 safetensors 分片共 ~16GB），
+  正在从 hf-mirror 下载。下载完成后跑 8k/16k/32k 三档 smoke 测显存。
+
+### 待办
+
+1. 下载完成 → 三档 smoke（8k/16k/32k 各 2 步）测峰值显存。
+2. 32k 不 OOM → 正式 3 epochs 训练。
+3. 训练完成 → Phase 3 域内评测（重新生成 Range，对照 base Qwen3-8B + luna）。

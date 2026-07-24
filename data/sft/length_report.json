@@ -1,0 +1,23 @@
+{
+  "n_samples": 666,
+  "skipped_overlong": 169,
+  "leak_flagged_samples": 0,
+  "by_context": {
+    "l2": 476,
+    "l0": 22,
+    "l1": 15,
+    "no_hint": 153
+  },
+  "by_hops_captured": {
+    "1": 320,
+    "3": 221,
+    "2": 125
+  },
+  "token_stats": {
+    "min": 3322,
+    "median": 7871,
+    "mean": 12800,
+    "p90": 29575,
+    "max": 32746
+  }
+}
