@@ -3334,3 +3334,27 @@ asset_verify 不变(base 仍 300,asset_setup/verify 仍 600)。
 
 测试 test_asset_setup_uses_extended_timeout 断言 cve-setup timeout=600。
 88 passed。
+
+---
+
+## 2026-07-24 — decoy probe 窗口 18×10→3×2(修 50 节点 cve_setup 超时)
+
+### 问题
+
+600s timeout 仍不够:50 节点 high 档 cve-setup.yaml 有 46 个 play 串行,每个
+decoy probe 用 retries:18 delay:10(180s 窗口)。43 decoy × 180s = 7740s 上限,
+即使服务秒过,46 个串行 play 的固定开销 + 43 容器并发启动就超 600s。
+
+### 修复
+
+decoy probe 的轮询窗口改成 retries:3 delay:2(6s)。decoy 都是轻量镜像
+(nginx/alpine/busybox),启动 <2s,不需要 180s 等待窗口。chain-node(真 target,
+可能 JVM 慢启动)保持 18×10=180s 窗口不变。
+
+43 decoy × 6s = 258s 上限 + 3 chain-node ~30s = ~290s,600s timeout 充裕。
+
+### 测试
+
+test_decoy_readiness_probes_added 断言 retries 18→3, delay 10→2。
+test_topology_hosts_includes_decoys_unmarked / no_decoys 断言改成 node-N
+(配套拓扑 hint 中性化)。149 passed。
