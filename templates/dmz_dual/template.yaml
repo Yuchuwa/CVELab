@@ -24,17 +24,6 @@ isolation_rules:
 noise_levels:
   none: []
   low:
-  - name: decoy-dmz-nginx
-    zone: dmz
-    image: nginx:alpine
-    ports:
-    - 80
-  - name: decoy-dmz-redis
-    zone: dmz
-    image: redis:7.4-alpine
-    ports:
-    - 6379
-  high:
   - name: decoy-dmz-01
     zone: dmz
     image: nginx:alpine
@@ -63,6 +52,30 @@ noise_levels:
     ports: &id005
     - 8080
     command: httpd -f -p 8080
+  medium:
+  - name: decoy-dmz-01
+    zone: dmz
+    image: nginx:alpine
+    ports: *id001
+  - name: decoy-dmz-02
+    zone: dmz
+    image: redis:7.4-alpine
+    ports: *id002
+  - name: decoy-dmz-03
+    zone: dmz
+    image: alpine:latest
+    ports: *id003
+    command: nc -lk -p 3306 -e /bin/true
+  - name: decoy-dmz-04
+    zone: dmz
+    image: alpine:latest
+    ports: *id004
+    command: nc -lk -p 22 -e /bin/true
+  - name: decoy-dmz-05
+    zone: dmz
+    image: busybox:latest
+    ports: *id005
+    command: httpd -f -p 8080
   - name: decoy-dmz-06
     zone: dmz
     image: nginx:alpine
@@ -90,6 +103,117 @@ noise_levels:
     image: busybox:latest
     ports: &id010
     - 8888
+    command: httpd -f -p 8888
+  - name: decoy-dmz-11
+    zone: dmz
+    image: nginx:alpine
+    ports: *id001
+  - name: decoy-dmz-12
+    zone: dmz
+    image: redis:7.4-alpine
+    ports: *id002
+  - name: decoy-dmz-13
+    zone: dmz
+    image: alpine:latest
+    ports: *id003
+    command: nc -lk -p 3306 -e /bin/true
+  - name: decoy-dmz-14
+    zone: dmz
+    image: alpine:latest
+    ports: *id004
+    command: nc -lk -p 22 -e /bin/true
+  - name: decoy-dmz-15
+    zone: dmz
+    image: busybox:latest
+    ports: *id005
+    command: httpd -f -p 8080
+  - name: decoy-dmz-16
+    zone: dmz
+    image: nginx:alpine
+    ports: *id006
+  - name: decoy-dmz-17
+    zone: dmz
+    image: alpine:latest
+    ports: *id007
+    command: nc -lk -p 5432 -e /bin/true
+  - name: decoy-dmz-18
+    zone: dmz
+    image: alpine:latest
+    ports: *id008
+    command: nc -lk -p 9000 -e /bin/true
+  - name: decoy-dmz-19
+    zone: dmz
+    image: redis:7.4-alpine
+    ports: *id009
+  - name: decoy-dmz-20
+    zone: dmz
+    image: busybox:latest
+    ports: *id010
+    command: httpd -f -p 8888
+  - name: decoy-dmz-21
+    zone: dmz
+    image: nginx:alpine
+    ports: *id001
+  - name: decoy-dmz-22
+    zone: dmz
+    image: redis:7.4-alpine
+    ports: *id002
+  - name: decoy-dmz-23
+    zone: dmz
+    image: alpine:latest
+    ports: *id003
+    command: nc -lk -p 3306 -e /bin/true
+  - name: decoy-dmz-24
+    zone: dmz
+    image: alpine:latest
+    ports: *id004
+    command: nc -lk -p 22 -e /bin/true
+  high:
+  - name: decoy-dmz-01
+    zone: dmz
+    image: nginx:alpine
+    ports: *id001
+  - name: decoy-dmz-02
+    zone: dmz
+    image: redis:7.4-alpine
+    ports: *id002
+  - name: decoy-dmz-03
+    zone: dmz
+    image: alpine:latest
+    ports: *id003
+    command: nc -lk -p 3306 -e /bin/true
+  - name: decoy-dmz-04
+    zone: dmz
+    image: alpine:latest
+    ports: *id004
+    command: nc -lk -p 22 -e /bin/true
+  - name: decoy-dmz-05
+    zone: dmz
+    image: busybox:latest
+    ports: *id005
+    command: httpd -f -p 8080
+  - name: decoy-dmz-06
+    zone: dmz
+    image: nginx:alpine
+    ports: *id006
+  - name: decoy-dmz-07
+    zone: dmz
+    image: alpine:latest
+    ports: *id007
+    command: nc -lk -p 5432 -e /bin/true
+  - name: decoy-dmz-08
+    zone: dmz
+    image: alpine:latest
+    ports: *id008
+    command: nc -lk -p 9000 -e /bin/true
+  - name: decoy-dmz-09
+    zone: dmz
+    image: redis:7.4-alpine
+    ports: *id009
+  - name: decoy-dmz-10
+    zone: dmz
+    image: busybox:latest
+    ports: *id010
     command: httpd -f -p 8888
   - name: decoy-dmz-11
     zone: dmz

@@ -91,15 +91,12 @@ class TestBaselineDecoyInjection:
     def test_baseline_creates_decoy_nodes_in_clab(self, assembler):
         out = assembler.assemble(
             "enterprise_3tier", _three_atoms(),
-            scenario_name="baseline-clab", noise_level="baseline",
+            scenario_name="low-clab", noise_level="low",
         )
         nodes = out["clab"]["topology"]["nodes"]
         decoy_names = [n for n in nodes if n.startswith("decoy-")]
-        # baseline is an alias of low = 2 decoys (dmz-nginx + data-busybox).
-        assert len(decoy_names) == 2
-        assert set(decoy_names) == {"decoy-dmz-nginx", "decoy-data-busybox"}
-        # busybox decoy carries its command
-        assert nodes["decoy-data-busybox"]["cmd"] == "httpd -f -p 8080"
+        # low = 5 decoys (dmz 2 + app 2 + data 1).
+        assert len(decoy_names) == 5
 
     def test_high_noise_creates_8_decoys_across_zones(self, assembler):
         out = assembler.assemble(
@@ -133,7 +130,7 @@ class TestBaselineDecoyInjection:
     def test_decoys_never_enter_attack_path(self, assembler):
         out = assembler.assemble(
             "enterprise_3tier", _three_atoms(),
-            scenario_name="baseline-path", noise_level="baseline",
+            scenario_name="baseline-path", noise_level="low",
         )
         gt = out["ground_truth"]
         targets = {step["target_node"] for step in gt["attack_path"]}
@@ -144,7 +141,7 @@ class TestBaselineDecoyInjection:
     def test_decoys_not_in_injections_or_objectives(self, assembler):
         out = assembler.assemble(
             "enterprise_3tier", _three_atoms(),
-            scenario_name="baseline-inj", noise_level="baseline",
+            scenario_name="baseline-inj", noise_level="low",
         )
         inj_nodes = {inj["node_name"] for inj in out["injections"]}
         decoy_names = {n["name"] for n in out["ground_truth"]["noise_nodes"]}
@@ -202,26 +199,26 @@ class TestBaselineDecoyInjection:
     def test_decoy_name_collision_rejected(self, assembler):
         # Tamper the template's noise service to collide with a chain node name.
         tpl = TemplateLoader(templates_dir="templates").load("enterprise_3tier")
-        bad = list(tpl.noise_levels["baseline"])
+        bad = list(tpl.noise_levels["low"])
         bad[0] = bad[0].model_copy(update={"name": "target-1"})
-        tpl.noise_levels["baseline"] = bad
+        tpl.noise_levels["low"] = bad
         assembler.template_loader.load = lambda name: tpl
         with pytest.raises(ValueError, match="collides"):
             assembler.assemble(
                 "enterprise_3tier", _three_atoms(),
-                scenario_name="collide", noise_level="baseline",
+                scenario_name="collide", noise_level="low",
             )
 
     def test_unknown_decoy_zone_rejected(self, assembler):
         tpl = TemplateLoader(templates_dir="templates").load("enterprise_3tier")
-        bad = list(tpl.noise_levels["baseline"])
+        bad = list(tpl.noise_levels["low"])
         bad[0] = bad[0].model_copy(update={"zone": "no-such-zone"})
-        tpl.noise_levels["baseline"] = bad
+        tpl.noise_levels["low"] = bad
         assembler.template_loader.load = lambda name: tpl
         with pytest.raises(ValueError, match="unknown zone"):
             assembler.assemble(
                 "enterprise_3tier", _three_atoms(),
-                scenario_name="badzone", noise_level="baseline",
+                scenario_name="badzone", noise_level="low",
             )
 
 
