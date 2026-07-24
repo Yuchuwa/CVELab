@@ -92,7 +92,11 @@ CASES: tuple[dict[str, object], ...] = (
 
 CASE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$")
 MGMT_NETWORK_NAME = "cvelab-range-mgmt"
-MGMT_SUBNETS = [f"172.30.{octet}.0/24" for octet in range(240, 256)]
+# /23 (510 usable IPs) so high-node-count scenarios (50 nodes) can run at
+# parallel 8+ without hitting the /24 (254 IP) cap. 172.30.240.0/23 covers
+# 172.30.240.0 - 172.30.241.255; the next /23 starts at .242, etc.
+MGMT_SUBNETS = [f"172.30.{240 + 2*i}.0/23" for i in range(8)]
+MGMT_CAPACITY = 510
 CONTROL_SUBNETS = [f"172.31.{octet}.0/28" for octet in range(240, 256)] + [
     f"10.254.{octet}.0/28" for octet in range(240, 256)
 ]
@@ -993,8 +997,8 @@ def main() -> int:
         management = select_management_network()
         node_count = max((len((__import__("yaml").safe_load((Path(item["scenario_dir"]) / "clab.yaml").read_text()) or {}).get("topology", {}).get("nodes", {}))
                           for item in state["cases"].values() if item["status"] == "runtime_prepared"), default=0)
-        if node_count * args.parallel + int(management.get("endpoints", "0")) > 254:
-            raise SystemExit("selected parallelism exceeds the shared /24 management-network endpoint capacity")
+        if node_count * args.parallel + int(management.get("endpoints", "0")) > MGMT_CAPACITY:
+            raise SystemExit("selected parallelism exceeds the shared management-network endpoint capacity")
         completed_cleanly = _launch_workers(state, args, output_dir, management)
         _persist(output_dir, state)
         results = []
