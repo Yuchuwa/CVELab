@@ -3290,3 +3290,28 @@ deepseek 居中(平衡),luna 最弱(早收尾 + payload 精度差)。
 
 - 合并后:`data/guide_ablation/l2_kimi_smoke8/`(summary + 8 scenarios)
 - 重跑:`data/guide_ablation/l2_kimi_rerun2/`(1 条)
+
+---
+
+## 2026-07-24 — topology hint 不再暴露 decoy/target 身份
+
+### 问题
+
+L1/L2 拓扑 hint 的 hosts 列表把真目标写成 `target-1 (ip, zone)`、decoy 写成
+`decoy-dmz-01 (ip, zone)`。Agent 一看 `decoy-` 前缀就直接排除干扰节点，decoy
+数量再多也不影响难度——decoy 维度实验失去意义。
+
+### 修复
+
+`verifier._build_topology_hint` 给所有 hosts（真 target + decoy）统一用中性名
+`node-N (ip, zone)`，去掉 target-/decoy- 前缀。真目标和 decoy 在 hosts 列表里
+不可区分（paper §A.3：所有 host 列出但不标注哪个是 decoy）。
+
+L2 的 CVE→IP 块仍用真 target IP（不受影响），所以 L2 下 Agent 仍能按 CVE→IP
+直奔目标；decoy 的干扰主要在 L1（只给拓扑、不给 CVE→IP，Agent 得逐个节点
+扫端口判断）。
+
+### 验证
+
+手动调 `_build_topology_hint` 输出全是 `node-N`，无 target-/decoy- 前缀。
+test_l1_input_has_topology_but_no_cve 断言改成 node-N。88 passed。
