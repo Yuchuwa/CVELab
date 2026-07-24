@@ -2151,24 +2151,35 @@ class ScenarioVerifier:
             nets = sy.get("network_subnets") or []
             if isinstance(nets, list):
                 topology["subnets"] = [str(n) for n in nets]
-        # Chain hosts (target-* nodes) with their data-plane IPs.
+        # Chain hosts (target-* nodes) with their data-plane IPs. The node
+        # names carry a 'target-' prefix; replace with 'node-N' so the Agent
+        # cannot pick targets by name alone — all hosts (chain + decoy) look
+        # the same in the prompt (paper §A.3). The L2 CVE→IP block still
+        # identifies the real targets by IP, so the difficulty delta is
+        # purely about scanning/resolving the host list under L1.
+        _host_counter = 0
         for step in ground_truth.get("attack_path", []):
             node = step.get("target_node", "")
             if not node:
                 continue
             ip = ip_alloc.get(node, {}).get("eth1", "").split("/")[0] or step.get("target_ip", "")
             zone = step.get("zone", "")
-            topology["hosts"].append(f"{node} ({ip}, zone: {zone})")
-        # Decoy hosts (noise_nodes) mixed into the same hosts list, with no
-        # marker distinguishing them from chain nodes (paper §A.3: the prompt
-        # lists all hosts without labeling which are decoys).
+            _host_counter += 1
+            topology["hosts"].append(f"node-{_host_counter} ({ip}, zone: {zone})")
+        # Decoy hosts (noise_nodes) mixed into the same hosts list. The node
+        # names in the data carry a 'decoy-' prefix (e.g. decoy-dmz-01), which
+        # would immediately expose them as decoys to the Agent. Replace the
+        # name with a neutral 'node-N' label so the Agent cannot distinguish
+        # decoys from chain targets by name (paper §A.3: all hosts listed
+        # without labeling which are decoys). The IP and zone stay accurate.
         for node in ground_truth.get("noise_nodes", []) or []:
             name = node.get("name", "")
             if not name:
                 continue
             ip = node.get("ip", "") or ip_alloc.get(name, {}).get("eth1", "").split("/")[0]
             zone = node.get("zone", "")
-            topology["hosts"].append(f"{name} ({ip}, zone: {zone})")
+            _host_counter += 1
+            topology["hosts"].append(f"node-{_host_counter} ({ip}, zone: {zone})")
         # Multi-homed pivot hosts: router nodes with multiple interfaces.
         for node_name, alloc in ip_alloc.items():
             if "router" not in node_name:

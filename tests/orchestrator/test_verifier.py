@@ -552,7 +552,9 @@ class TestDifficultyLevels:
         assert "topology" in payload
         topo = payload["topology"]
         assert "192.168.100.0/24" in topo["subnets"]
-        assert any("target-1" in h for h in topo["hosts"])
+        # Hosts are neutralized to 'node-N' (no target-/decoy- prefix) so the
+        # Agent cannot pick targets by name (paper §A.3).
+        assert any("node-" in h and "192.168.100.2" in h for h in topo["hosts"])
         assert "credential_material_paths" not in payload
 
     def test_l2_input_has_cve_and_credential_paths(self, tmp_path):
