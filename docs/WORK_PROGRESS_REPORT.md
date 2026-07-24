@@ -3358,3 +3358,55 @@ decoy probe 的轮询窗口改成 retries:3 delay:2(6s)。decoy 都是轻量镜�
 test_decoy_readiness_probes_added 断言 retries 18→3, delay 10→2。
 test_topology_hosts_includes_decoys_unmarked / no_decoys 断言改成 node-N
 (配套拓扑 hint 中性化)。149 passed。
+
+## 2026-07-24 — Attack trajectory SFT feasibility probe
+
+### 范围
+
+复核现有 `data/guide_ablation/*/scenarios/` 中无 flag-hint 泄漏的
+`l0/l1/l2/no_hint` Claude-format session，评估完整成功与部分成功轨迹是否
+可以按已捕获 flag 截取为 SFT 前缀样本。此前的 128 条只代表满足三跳全部
+成功条件的 Claude session，不代表全部可用轨迹。
+
+### 已建立事实
+
+- 共有 682 条有完整 Claude-format `session.json` 的干净上下文轨迹。
+- 按 verifier 的 `flag_verification.per_target.*.match` 统计：0 flag=336，
+  1 flag=164，2 flags=26，3 flags=156。
+- 156 条是完整三跳成功；190 条部分成功至少打通一跳，包含 26 条打通两跳。
+- 三跳完整成功样本中，三个 flag 均能在 session 的 agent-visible tool
+  result 中定位，因此可用成功 flag 作为 generic hop boundary，而不需要把
+  ground-truth flag 注入训练输入。
+- 已增加探针 `scripts/probe_trajectory_split.py`，用于测量按 flag 边界切分
+  后的长度。完整三跳样本的 seg1/seg2/seg3 token 中位数约为 3.3k/13.6k/22.9k。
+
+### 训练数据决策（第一版）
+
+- 部分成功轨迹纳入：1 flag 生成一跳成功前缀，2 flags 生成一跳和两跳
+  成功前缀，3 flags 生成一跳、两跳和三跳成功前缀。
+- 0 flag 失败轨迹暂不作为 SFT 正样本；后续可单独作为 DPO/负例数据。
+- 第一版不做 CVE train/test 划分，使用同批 CVE 做域内能力验证；验证重跑
+  不应复用训练轨迹本身。
+
+## 2026-07-24 — SFT context length feasibility check
+
+### 已建立事实
+
+- 按成功 flag 前缀可定位并计算长度的样本为 676 条（少于理论 684 条，
+  少数 session 无法完成长度/边界统计，不改变总体结论）。
+- 以 session 字符数约 3.5 chars/token 估算，32k 上下文可完整容纳 554/676
+  条（82.0%）；16k 可容纳 436/676（64.5%），8k 仅 292/676（43.2%）。
+- 样本 token 长度中位数约 11k，P75 约 23.7k，P90 约 45.5k，P95 约
+  58.6k，P99 约 93.9k。32k 是合理的最大上下文上限，但不是应对每条样本
+  固定 padding 到的长度。
+
+### 当前训练建议
+
+- Qwen3-8B LoRA 使用 32k `max_seq_length` 可行，但必须 dynamic padding、
+  gradient checkpointing、FlashAttention、micro-batch=1；4 卡主要提供
+  数据并行，不会把单条 32k 样本的激活显存平均到多卡。
+- 不对超过 32k 的样本做简单尾部截断。优先保留成功 flag 边界，压缩冗长
+  tool result；无法安全压缩的长样本暂不进入第一版 SFT。32k 不是过短，
+  但将全部 676 条硬截断会损失多跳成功信号。
+- 第一版不建议直接降到 16k：会使约 35.5% 样本超限。后续若显存或吞吐
+  不足，再以 16k 做对照实验，而不是先假定 16k 足够。
