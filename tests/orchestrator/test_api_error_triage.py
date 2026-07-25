@@ -83,6 +83,17 @@ class TestClassifyApiError:
         assert m._classify_api_error(_make_api_error(500, "internal")) == "transient"
         assert m._classify_api_error(_make_api_error(503, "unavailable")) == "transient"
 
+    def test_transient_connection_error(self):
+        from openai import APIConnectionError
+        import httpx
+
+        m = _runner_module()
+        # DNS/TCP/TLS handshake failures have no HTTP status and should be
+        # retried (gateway cold start, transient network blip).
+        req = httpx.Request("POST", "https://api.moonshot.cn/v1/chat/completions")
+        exc = APIConnectionError(message="Connection error.", request=req)
+        assert m._classify_api_error(exc) == "transient"
+
     def test_other_for_unclassified(self):
         m = _runner_module()
         assert m._classify_api_error(_make_api_error(400, "bad json")) == "other"
