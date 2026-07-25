@@ -3502,3 +3502,25 @@ completion_only_loss: True (只训 assistant turn)
 - 训练日志：`/tmp/sft_train.log`
 - LoRA adapter：`data/sft/adapter_v1/`（训练完成后产出）
 - 评测脚本：`sft/eval_sft.py`
+
+## 2026-07-25 — SFT 训练完成
+
+### 训练结果
+
+- 501 steps / 3 epochs 完成，wall-clock **24210s ≈ 6.7 小时**（GPU 0 单卡 A6000）。
+- train_loss: **1.111 → 0.313**（avg），收敛平稳无崩塌。
+- mean_token_accuracy: **0.928**（92.8%）。
+- loss 按 epoch 轨迹：epoch1 ~0.30 → epoch2 ~0.23 → epoch3 ~0.22（平稳，未见过拟合）。
+- 峰值显存 45.5GB / 48GB（未 OOM）。
+- adapter 保存于 `data/sft/adapter_v1/`：
+  - `adapter_model.safetensors`（646MB，rank-64 LoRA）
+  - 3 个 epoch checkpoint（checkpoint-167/334/501）
+  - `adapter_config.json` + `chat_template.jinja`
+
+### 下一步
+
+Phase 3 域内评测：
+1. `python sft/eval_sft.py serve` 起 LoRA 模型的 OpenAI 兼容服务。
+2. `python sft/eval_sft.py eval` 跑 `manifest_sol_smoke8` 的 8 个 Range case（同 kimi smoke8）。
+3. 对照 base Qwen2.5-7B-Instruct（无 LoRA）同 case。
+4. 成功判据：LoRA 模型完成度 > base，且 > luna 的 10%。
