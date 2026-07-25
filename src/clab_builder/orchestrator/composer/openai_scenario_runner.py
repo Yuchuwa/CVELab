@@ -219,6 +219,47 @@ def _web_fetch(url: str, prompt: str = "") -> str:
         return f"[fetch error] {exc}"
 
 
+def _parse_tool_arguments(raw: Any) -> dict:
+    """Parse model-supplied tool arguments into a dict.
+
+    Some served models (e.g. Hermes tool-call parser over Qwen2.5-LoRA)
+    return the ``arguments`` field as a JSON-encoded string literal rather
+    than as a raw JSON object, or generate malformed JSON fragments. We
+    accept:
+
+      - a JSON object (normal case)
+      - a JSON string that itself encodes a JSON object (double-encoded)
+      - malformed JSON -> return an empty-ish dict with an error marker
+
+    Returning a dict keeps the ``TOOL_HANDLERS`` lambdas (which all call
+    ``args.get``) from crashing the runner on a bad model turn.
+    """
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if not isinstance(raw, str):
+        return {"__parse_error__": True, "__raw__": str(raw)}
+
+    # Try the direct JSON object first.
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            return parsed
+        # Double-encoded string: try to unwrap one level.
+        if isinstance(parsed, str):
+            try:
+                inner = json.loads(parsed)
+                if isinstance(inner, dict):
+                    return inner
+                return {"__parse_error__": True, "__raw__": raw, "__inner_type__": type(inner).__name__}
+            except json.JSONDecodeError:
+                return {"__parse_error__": True, "__raw__": raw}
+        return {"__parse_error__": True, "__raw__": raw, "__type__": type(parsed).__name__}
+    except json.JSONDecodeError:
+        return {"__parse_error__": True, "__raw__": raw}
+
+
 TOOL_HANDLERS = {
     "Bash": lambda args: _run_bash(args.get("command", ""), int(args.get("timeout", 120) or 120)),
     "Read": lambda args: _read_file(args.get("path", "")),
@@ -264,7 +305,7 @@ def _classify_api_error(exc: Exception) -> str:
     status_code attribute, not openai.APIError subclasses), then check the
     SDK exception type, then fall back to message text.
     """
-    from openai import RateLimitError
+    from openai import RateLimitError, APIConnectionError
 
     msg = str(exc).lower()
     # getattr (not isinstance) so gateway-wrapped plain Exceptions carrying a
@@ -289,8 +330,11 @@ def _classify_api_error(exc: Exception) -> str:
     if isinstance(exc, RateLimitError) or status == 429:
         return "rate_limit"
 
-    # 5. Transient server errors (5xx) — retry, not fatal/rate_limit
+    # 5. Transient server errors (5xx) and connection-layer failures (DNS/TCP/
+    # TLS handshake, gateway not ready) — retry, not fatal/rate_limit.
     if status >= 500:
+        return "transient"
+    if isinstance(exc, APIConnectionError):
         return "transient"
 
     return "other"
@@ -470,10 +514,7 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
 
             for tc in tool_calls:
                 name = tc["name"]
-                try:
-                    args = json.loads(tc["arguments"]) if tc["arguments"] else {}
-                except json.JSONDecodeError:
-                    args = {}
+                args = _parse_tool_arguments(tc["arguments"])
                 print(f"[Tool] {name}: {json.dumps(args)[:120]}", file=sys.stderr)
                 handler = TOOL_HANDLERS.get(name)
                 tool_result = handler(args) if handler else f"[unknown tool] {name}"
