@@ -3660,3 +3660,48 @@ LLM_MODEL=kimi-k3 LLM_TEMPERATURE=1 \
 AGENT_CONTEXT=l1 AGENT_RUNNER=openai \
 bash scripts/run_decoy_ablation.sh 2>&1 | tee data/guide_ablation/decoy_l1_kimi_v2.log
 ```
+
+## 2026-07-25 — L1 kimi-k3 二次失败：API 连接错误与网关配置排查
+
+### 现象
+
+用 Moonshot 官方 `https://api.moonshot.cn/v1` 重跑后，Agent 阶段报 `Connection error.`，不是 deploy 失败。但直接在中转网关测试也报 401 Invalid Authentication，说明 `.env` 里的 Moonshot key 无效。
+
+用户随后提供另一组配置：
+
+```text
+LLM_MODEL=kimi-k3
+LLM_BASE_URL=http://10.129.164.144:3000
+LLM_API_KEY=sk-Il01fdOq3dqilL0dvjkNRbFr6HhObInuNHcYWjkCxQ6XgCZZ
+```
+
+### 排查结果
+
+- 该网关 `/v1/models` 返回标准 OpenAI 格式，且模型列表包含 `kimi-k3`。
+- 在 `clab-agent:latest` 容器内用 `http://10.129.164.144:3000/v1` + `kimi-k3` + stream=True 直接测试：**流式输出正常**，收到 11 个 chunk。
+- 用非 stream 或没有 `/v1` 后缀调用会返回 HTML，说明 openai SDK 必须走 `/v1` 路径（runner 已自动补 `/v1`）。
+- 结论：该网关配置本身可用；之前 runner 的 `Connection error` 是网关冷启动/首次连接瞬断，runner 没有重试直接放弃。
+
+### 修复
+
+`openai_scenario_runner.py` 的 `_classify_api_error` 把 `openai.APIConnectionError`（DNS/TCP/TLS/网关未就绪）归类为 `transient`，与 5xx 共享 5 次指数退避重试。避免网关冷启动导致首条 Agent 请求秒失败。
+
+验证：`tests/orchestrator/test_api_error_triage.py` 16 passed。
+
+### 当前状态
+
+- 旧 `decoy_ablation_l1_none` 已重命名为 `decoy_ablation_l1_none_gateway_test/`。
+- 环境干净（Docker 0 running）。
+- 代码已推送：`cb0a679`。
+
+### 重跑命令
+
+```bash
+LLM_MODEL=kimi-k3 \
+LLM_BASE_URL=http://10.129.164.144:3000 \
+LLM_API_KEY=sk-Il01fdOq3dqilL0dvjkNRbFr6HhObInuNHcYWjkCxQ6XgCZZ \
+LLM_TEMPERATURE=1 \
+AGENT_CONTEXT=l1 \
+AGENT_RUNNER=openai \
+bash scripts/run_decoy_ablation.sh 2>&1 | tee data/guide_ablation/decoy_l1_kimi_v3.log
+```
