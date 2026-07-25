@@ -3598,6 +3598,7 @@ Phase 3 域内评测：
 
 - 新增 `tests/orchestrator/test_api_error_triage.py`，覆盖 fatal/rate-limit/transient/other 分类、额度优先级、重试升级、failure-stage 映射及 coordinator action policy。
 - 相关回归：**120 passed**（API triage、verifier、guided batch runner、serial batch runner）。
+- 手动 fake-client smoke：HTTP 402 + `insufficient balance` 被立即分类为 fatal，runner 输出 `termination_reason=quota_exhausted` / `api_error_class=quota_exhausted`，未发生重试。
 - 全 orchestrator 回归中发现的其他失败来自工作树中既有的 Atom/template 数据变更（CVE-2015-1427 unresolved `{{flag_payload}}`、enterprise_3tier decoy 断言），不由本次 API 容错代码引入；未修改这些非本任务数据。
 
 ### 下一步
