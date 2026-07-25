@@ -14,6 +14,7 @@ MAX_TURNS="${MAX_TURNS:-300}"
 AGENT_TIMEOUT="${AGENT_TIMEOUT:-3600}"
 PARALLEL="${PARALLEL:-6}"
 AGENT_CONTEXT="${AGENT_CONTEXT:-l2}"
+AGENT_RUNNER="${AGENT_RUNNER:-claude}"
 
 # Load .env so LLM_* reach the privileged subprocess.
 set -a
@@ -40,6 +41,7 @@ MAX_TURNS="'"$MAX_TURNS"'"
 AGENT_TIMEOUT="'"$AGENT_TIMEOUT"'"
 PARALLEL="'"$PARALLEL"'"
 AGENT_CONTEXT="'"$AGENT_CONTEXT"'"
+AGENT_RUNNER="'"$AGENT_RUNNER"'"
 
 for LEVEL in $LEVELS; do
   echo "===== noise-level: '"'"'$LEVEL'"'"' (context=$AGENT_CONTEXT) ====="
@@ -47,7 +49,7 @@ for LEVEL in $LEVELS; do
     --case-manifest "$MANIFEST" \
     --max-cases 8 \
     --agent-context "$AGENT_CONTEXT" \
-    --agent-runner claude \
+    --agent-runner "$AGENT_RUNNER" \
     --noise-level "$LEVEL" \
     --parallel "$PARALLEL" \
     --max-turns "$MAX_TURNS" \

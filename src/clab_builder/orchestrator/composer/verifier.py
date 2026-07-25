@@ -1398,8 +1398,12 @@ class ScenarioVerifier:
             return "agent_timeout"
         if validation_mode == "guided_agent" and agent_termination_reason == "max_turns_reached":
             return "agent_turn_limit"
-        if validation_mode == "guided_agent" and agent_termination_reason == "agent_api_quota":
-            return "agent_api_quota"
+        if validation_mode == "guided_agent" and agent_termination_reason in (
+            "agent_api_quota", "quota_exhausted"
+        ):
+            return "agent_quota_exhausted"
+        if validation_mode == "guided_agent" and agent_termination_reason == "rate_limit_persistent":
+            return "agent_rate_limit"
         if validation_mode == "guided_agent" and agent_termination_reason == "agent_api_protocol":
             return "agent_api_protocol"
         if validation_mode == "guided_agent" and agent_evaluated and not guided_trial_success:

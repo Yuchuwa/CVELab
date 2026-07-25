@@ -3568,3 +3568,39 @@ Phase 3 域内评测：
 - **根因**：L2 给了 CVE→IP 映射，Agent 直奔目标 IP，decoy 既不改变攻击路径也不增加寻路成本。decoy 干扰只在 Agent 需要**逐节点扫端口定位目标**时才显现——即 L1/L0 场景。
 - **已知局限**：N=8 统计力不足；high 档 decoy_interactions 仅 1 次 hit（几乎所有 case 的 Agent 都没碰 decoy）。
 - **下一步**：改用 `--agent-context l1`（只给拓扑、不给 CVE→IP）重跑同 4 档，验证 decoy 在需寻路场景下是否有可测负效应。改用 kimi-k3（payload 构造能力最强，避免 deepseek 低基数下差异不显著）。
+
+## 2026-07-25 — Agent API 错误分级与 batch 容错实现
+
+### 需求与范围
+
+- 目标：为下一轮 kimi-k3 × L1 × decoy 实验增加共享层 API 容错，不修改 Atom、模板或单个 CVE/Range 数据。
+- 影响范围：OpenAI Range runner、ScenarioVerifier 的 failure-stage 映射、batch coordinator，以及 decoy ablation 启动脚本的 runner 参数。
+
+### 已实现的通用契约
+
+- `openai_scenario_runner.py` 新增 API 错误分类：
+  - `fatal`：额度/余额/计费/认证类错误（文本标记 + HTTP 401/402/403），立即抛出 `QuotaExhaustedError`，不继续重试。
+  - `rate_limit`：429、overloaded、too-many/concurrency/throttle 等，指数退避 5 次；仍失败则抛出 `RateLimitPersistentError`。
+  - `transient`：5xx，保持有限退避后按普通 Agent 失败处理。
+  - 未分类错误保持普通 Agent 失败，不扩大停机范围。
+- runner 输出稳定的 `termination_reason` / `api_error_class`：
+  - 额度耗尽：`quota_exhausted`。
+  - 持续限流：`rate_limit_persistent`。
+- `ScenarioVerifier._failure_stage` 统一映射：
+  - 新旧额度信号（`quota_exhausted`、旧版 `agent_api_quota`）→ `agent_quota_exhausted`。
+  - `rate_limit_persistent` → `agent_rate_limit`。
+- batch coordinator：
+  - `agent_quota_exhausted`：停止调度、SIGTERM 当前运行 worker，并将未启动/被终止 case 记录为 quota-stop skipped，不再自动重试。
+  - `agent_rate_limit`：case 进入 `paused`，不消耗基础重试次数；其他 case 继续，空闲后等待 60 秒再入队，最多暂停 3 次，之后作为限流失败收尾。
+- `scripts/run_decoy_ablation.sh` 新增 `AGENT_RUNNER` 环境变量。deepseek 继续使用默认 `claude`；kimi-k3 实验应使用 `AGENT_RUNNER=openai`，并设置 `LLM_TEMPERATURE=1`。
+
+### 验证
+
+- 新增 `tests/orchestrator/test_api_error_triage.py`，覆盖 fatal/rate-limit/transient/other 分类、额度优先级、重试升级、failure-stage 映射及 coordinator action policy。
+- 相关回归：**120 passed**（API triage、verifier、guided batch runner、serial batch runner）。
+- 全 orchestrator 回归中发现的其他失败来自工作树中既有的 Atom/template 数据变更（CVE-2015-1427 unresolved `{{flag_payload}}`、enterprise_3tier decoy 断言），不由本次 API 容错代码引入；未修改这些非本任务数据。
+
+### 下一步
+
+- 用新的 `AGENT_RUNNER=openai AGENT_CONTEXT=l1` 启动 kimi-k3 四档实验。
+- 实验结束后分别记录 environment、Agent、flag/objective、API error class、暂停/终止次数和最终成功率，不把 quota-stop 或 rate-limit pause 误记为普通 exploit failure。

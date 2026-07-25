@@ -104,6 +104,26 @@ INFRA_RETRY_STAGES = {
     "worker_launch", "worker_timeout", "deploy", "scheduler_conflict",
     "agent_transport", "cleanup_failed",
 }
+# API error classes that the coordinator handles specially (not as ordinary
+# agent failures). See WORK_PROGRESS_REPORT 2026-07-25 'API error triage'.
+FATAL_API_STAGE = "agent_quota_exhausted"
+RATE_LIMIT_API_STAGE = "agent_rate_limit"
+# Cap paused-case re-queues so a permanently rate-limited case cannot loop
+# forever. Each pause is one launch; beyond this the case is finalized as
+# a rate-limit failure.
+MAX_RATE_LIMIT_PAUSES = 3
+# Cooldown before a paused case is eligible for re-queue, so the gateway
+# rate-limit window can clear.
+RATE_LIMIT_COOLDOWN_S = 60
+
+
+def _api_error_action(failure_stage: str, pauses: int) -> str:
+    """Return the coordinator action for a classified Agent API failure."""
+    if failure_stage == FATAL_API_STAGE:
+        return "stop"
+    if failure_stage == RATE_LIMIT_API_STAGE:
+        return "finalize" if pauses > MAX_RATE_LIMIT_PAUSES else "pause"
+    return "ordinary"
 
 
 def utcnow() -> str:
@@ -764,11 +784,12 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
     log_positions: dict[str, int] = {}
     log_pending: dict[str, str] = {}
     interrupted = False
+    fatal_stop = False
     case_timeout = args.case_timeout or max(1800, args.agent_timeout + 1800)
     while True:
         ready = [state["cases"][case_id] for case_id in state["selected_case_ids"]
                  if state["cases"][case_id]["status"] in {"runtime_prepared", "leased"}]
-        while ready and len(active) < args.parallel and not interrupted:
+        while ready and len(active) < args.parallel and not interrupted and not fatal_stop:
             item = ready.pop(0)
             case_id = item["case"]["id"]
             if not args.environment_only and not args.generate_only and not item.get("control_network_lease"):
@@ -826,9 +847,39 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 log_pending.pop(case_id, None)
             _persist(output_dir, state)
 
+        if fatal_stop and not active:
+            # Fatal quota exhaustion: finalize every non-terminal case as
+            # skipped so --resume won't re-run them and the summary reflects
+            # the stop cause. Do not mark them as failures (success=False
+            # already set by the infra-result stub); keep failure_stage.
+            for cid in state["selected_case_ids"]:
+                it = state["cases"][cid]
+                if it["status"] not in {"completed", "interrupted"}:
+                    _save_case_result(it, _result_for_infra(
+                        it, FATAL_API_STAGE, "skipped: API quota exhausted, batch stopped"))
+                    it["status"] = "completed"
+            _persist(output_dir, state)
+            print("[Fatal] batch stopped due to API quota exhaustion", flush=True)
+            return False
         if not active:
+            # Re-queue a paused (rate-limited) case once its cooldown elapsed,
+            # so it is picked up in the next loop iteration's `ready` list.
             if not any(state["cases"][case_id]["status"] in {"runtime_prepared", "leased", "running"}
                        for case_id in state["selected_case_ids"]):
+                paused = [state["cases"][cid] for cid in state["selected_case_ids"]
+                          if state["cases"][cid]["status"] == "paused"]
+                if paused:
+                    paused.sort(key=lambda it: it.get("paused_at", 0.0))
+                    candidate = paused[0]
+                    if time.monotonic() - candidate.get("paused_at", 0.0) >= RATE_LIMIT_COOLDOWN_S:
+                        candidate["status"] = "runtime_prepared"
+                        print(f"[Warn] {candidate['case']['id']}: re-queuing after "
+                              f"rate-limit cooldown", flush=True)
+                        _persist(output_dir, state)
+                        continue
+                    # Still cooling down: wait for it rather than declaring done.
+                    time.sleep(0.5)
+                    continue
                 return not interrupted
             time.sleep(0.1)
             continue
@@ -863,8 +914,12 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 _stream_log_updates(active, log_positions, log_pending)
             result_path = Path(item["result_path"])
             if not result_path.exists():
-                stage = "interrupted" if interrupted else "worker_failed"
-                _save_case_result(item, _result_for_infra(item, stage, "worker exited without a result"))
+                stage = FATAL_API_STAGE if fatal_stop else ("interrupted" if interrupted else "worker_failed")
+                error = (
+                    "skipped: API quota exhausted, batch stopped"
+                    if fatal_stop else "worker exited without a result"
+                )
+                _save_case_result(item, _result_for_infra(item, stage, error))
             try:
                 result = json.loads(result_path.read_text())
             except (OSError, json.JSONDecodeError):
@@ -879,18 +934,59 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 _save_case_result(item, result)
             release_control_lease(item.get("control_network_lease"))
             item["control_network_lease"] = None
+            failure_stage = result.get("failure_stage", "")
             retry = _should_retry(result, item["attempts"], interrupted)
-            if interrupted:
+            # --- API error triage (2026-07-25) -------------------------------
+            # Fatal quota exhaustion: stop the whole batch and kill running
+            # workers so no more quota is burned. Remaining cases are marked
+            # skipped (not failed) and do not auto-retry.
+            api_action = _api_error_action(
+                failure_stage, item.get("rate_limit_pauses", 0) + 1
+            )
+            if api_action == "stop":
+                fatal_stop = True
+                print(f"[Fatal] {case_id}: API quota exhausted — stopping batch "
+                      f"and terminating {max(0, len(active) - 1)} running worker(s)", flush=True)
+                for rid, (rproc, _rstart, _rlog) in list(active.items()):
+                    if rid == case_id:
+                        continue
+                    try:
+                        os.killpg(rproc.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                # This case is terminal.
+                item["status"] = "completed"
+            # Persistent rate limit: pause this case (do NOT count as a
+            # failure attempt) and re-queue it after the cooldown so other
+            # cases can progress in the meantime.
+            elif api_action in {"pause", "finalize"}:
+                pauses = item.get("rate_limit_pauses", 0) + 1
+                item["rate_limit_pauses"] = pauses
+                if api_action == "finalize":
+                    print(f"[Warn] {case_id}: rate-limit paused {pauses} times "
+                          f"(> {MAX_RATE_LIMIT_PAUSES}), finalizing as rate-limit failure", flush=True)
+                    item["status"] = "completed"
+                else:
+                    print(f"[Warn] {case_id}: rate-limit persistent — pausing, "
+                          f"will re-queue after {RATE_LIMIT_COOLDOWN_S}s "
+                          f"(pause #{pauses}/{MAX_RATE_LIMIT_PAUSES})", flush=True)
+                    item["status"] = "paused"
+                    item["paused_at"] = time.monotonic()
+                    # Roll back the attempts increment so a rate-limit pause
+                    # does not eat into the infra-retry budget.
+                    item["attempts"] = max(0, item["attempts"] - 1)
+            elif interrupted:
                 item["status"] = "interrupted"
             else:
                 item["status"] = "runtime_prepared" if retry else "completed"
+            # ----------------------------------------------------------------
             item["attempt_records"][-1].update({
-                "finished_at": utcnow(), "failure_stage": result.get("failure_stage", ""),
+                "finished_at": utcnow(), "failure_stage": failure_stage,
                 "success": bool(result.get("success", False)),
                 "cleanup_failed": bool(result.get("cleanup_failed", False)),
                 "cleanup": cleanup,
             })
-            item["last_failure_stage"] = result.get("failure_stage", "")
+            item["last_failure_stage"] = failure_stage
             active.pop(case_id)
             if args.live_output:
                 pending_line = log_pending.pop(case_id, "")
