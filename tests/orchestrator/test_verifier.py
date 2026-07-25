@@ -1815,7 +1815,14 @@ class TestAgentArtifactRecovery:
         ) == "agent_api_protocol"
         assert ScenarioVerifier._failure_stage(
             **common, agent_termination_reason="agent_api_quota"
-        ) == "agent_api_quota"
+        ) == "agent_quota_exhausted"
+        # New OpenAI-runner API error classes (2026-07-25 'API error triage').
+        assert ScenarioVerifier._failure_stage(
+            **common, agent_termination_reason="quota_exhausted"
+        ) == "agent_quota_exhausted"
+        assert ScenarioVerifier._failure_stage(
+            **common, agent_termination_reason="rate_limit_persistent"
+        ) == "agent_rate_limit"
 
 
 class TestRunnerPrompt:
