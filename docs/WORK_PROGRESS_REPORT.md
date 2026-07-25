@@ -3605,3 +3605,24 @@ Phase 3 域内评测：
 
 - 用新的 `AGENT_RUNNER=openai AGENT_CONTEXT=l1` 启动 kimi-k3 四档实验。
 - 实验结束后分别记录 environment、Agent、flag/objective、API error class、暂停/终止次数和最终成功率，不把 quota-stop 或 rate-limit pause 误记为普通 exploit failure。
+
+## 2026-07-25 — SFT Phase 3 vLLM 服务修复与评测重跑前置检查
+
+### 服务链路
+
+- 初版 `sft/serve_lora.py` 只提供普通 JSON completion，不支持 Range runner
+  强制使用的 SSE streaming 和结构化 tool calls；首次评测出现
+  `session_events=0` / `agent_runner_error`，该结果不计入模型评测。
+- `vllm 0.25.1` 要求 `libcudart.so.13`，与本机 CUDA 12.1 不兼容，已改用
+  `vllm 0.7.3` + `torch 2.5.1+cu121`，并匹配 `transformers 4.48.3`。
+- vLLM 已使用 `--enable-lora --enable-auto-tool-choice --tool-call-parser hermes`
+  加载 `data/sft/adapter_v1`。直接 API smoke 返回结构化 `tool_calls`，服务层链路通过。
+- `sft/eval_sft.py serve` 已改为调用 vLLM 原生 server，不再使用不支持工具
+  循环的自写 FastAPI server。
+
+### 首次重跑分类
+
+- `sft_v1_eval_v2` 以普通用户运行时，8 个 case 均在 ContainerLab deploy
+  阶段失败，错误为 `/tmp/cvelab-clab-lifecycle.lock` root-owned 且不可写。
+- 该批次没有进入 Agent，不能计入模型成功率；需要一次 sudo 修复锁文件
+  ownership 后，用新输出目录重跑。
