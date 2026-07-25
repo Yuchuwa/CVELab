@@ -16,11 +16,21 @@ PARALLEL="${PARALLEL:-6}"
 AGENT_CONTEXT="${AGENT_CONTEXT:-l2}"
 AGENT_RUNNER="${AGENT_RUNNER:-claude}"
 
+# Preserve explicit environment overrides while loading project defaults.
+_LLM_API_KEY_OVERRIDE="${LLM_API_KEY-}"
+_LLM_BASE_URL_OVERRIDE="${LLM_BASE_URL-}"
+_LLM_MODEL_OVERRIDE="${LLM_MODEL-}"
+_LLM_TEMPERATURE_OVERRIDE="${LLM_TEMPERATURE-}"
+
 # Load .env so LLM_* reach the privileged subprocess.
 set -a
 # shellcheck disable=SC1091
 source "$ROOT/.env"
 set +a
+[[ -n "$_LLM_API_KEY_OVERRIDE" ]] && LLM_API_KEY="$_LLM_API_KEY_OVERRIDE"
+[[ -n "$_LLM_BASE_URL_OVERRIDE" ]] && LLM_BASE_URL="$_LLM_BASE_URL_OVERRIDE"
+[[ -n "$_LLM_MODEL_OVERRIDE" ]] && LLM_MODEL="$_LLM_MODEL_OVERRIDE"
+[[ -n "$_LLM_TEMPERATURE_OVERRIDE" ]] && LLM_TEMPERATURE="$_LLM_TEMPERATURE_OVERRIDE"
 
 sudo -E env \
   HOME="$HOME" \

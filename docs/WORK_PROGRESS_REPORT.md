@@ -3592,7 +3592,7 @@ Phase 3 域内评测：
 - batch coordinator：
   - `agent_quota_exhausted`：停止调度、SIGTERM 当前运行 worker，并将未启动/被终止 case 记录为 quota-stop skipped，不再自动重试。
   - `agent_rate_limit`：case 进入 `paused`，不消耗基础重试次数；其他 case 继续，空闲后等待 60 秒再入队，最多暂停 3 次，之后作为限流失败收尾。
-- `scripts/run_decoy_ablation.sh` 新增 `AGENT_RUNNER` 环境变量。deepseek 继续使用默认 `claude`；kimi-k3 实验应使用 `AGENT_RUNNER=openai`，并设置 `LLM_TEMPERATURE=1`。
+- `scripts/run_decoy_ablation.sh` 新增 `AGENT_RUNNER` 环境变量，并修正外部 `LLM_*` 环境变量优先于 `.env` 的加载顺序。deepseek 继续使用默认 `claude`；kimi-k3 实验应使用 `AGENT_RUNNER=openai`，并设置 `LLM_TEMPERATURE=1`。
 
 ### 验证
 
