@@ -13,6 +13,7 @@ OUTPUT_ROOT="${OUTPUT_ROOT:-$ROOT/data/guide_ablation}"
 MAX_TURNS="${MAX_TURNS:-500}"
 AGENT_TIMEOUT="${AGENT_TIMEOUT:-3600}"
 PARALLEL="${PARALLEL:-6}"
+AGENT_CONTEXT="${AGENT_CONTEXT:-l2}"
 
 # Load .env so LLM_* reach the privileged subprocess.
 set -a
@@ -38,19 +39,20 @@ OUTPUT_ROOT="'"$OUTPUT_ROOT"'"
 MAX_TURNS="'"$MAX_TURNS"'"
 AGENT_TIMEOUT="'"$AGENT_TIMEOUT"'"
 PARALLEL="'"$PARALLEL"'"
+AGENT_CONTEXT="'"$AGENT_CONTEXT"'"
 
 for LEVEL in $LEVELS; do
-  echo "===== noise-level: '"'"'$LEVEL'"'"' ====="
+  echo "===== noise-level: '"'"'$LEVEL'"'"' (context=$AGENT_CONTEXT) ====="
   "$PYTHON_BIN" "$ROOT/scripts/verify_enterprise3_guided_batch.py" \
     --case-manifest "$MANIFEST" \
     --max-cases 8 \
-    --agent-context l2 \
+    --agent-context "$AGENT_CONTEXT" \
     --agent-runner claude \
     --noise-level "$LEVEL" \
     --parallel "$PARALLEL" \
     --max-turns "$MAX_TURNS" \
     --agent-timeout "$AGENT_TIMEOUT" \
     --live-output \
-    --output "$OUTPUT_ROOT/decoy_ablation_$LEVEL"
+    --output "$OUTPUT_ROOT/decoy_ablation_${AGENT_CONTEXT}_${LEVEL}"
 done
 '
