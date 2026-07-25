@@ -127,10 +127,28 @@ class ScenarioVerifier:
 
     @staticmethod
     def _lifecycle_lock():
-        """Serialize the small ContainerLab management-network lifecycle only."""
+        """Serialize the small ContainerLab management-network lifecycle only.
+
+        The lock file is world-writable (0666) so both the sudo-root batch
+        process and the invoking researcher can coordinate. Permission-denied
+        on a stale file is treated as a stale lock: delete and recreate.
+        """
+        path = Path("/tmp/cvelab-clab-lifecycle.lock")
+
         class _Lock:
             def __enter__(self_inner):
-                self_inner.handle = open("/tmp/cvelab-clab-lifecycle.lock", "a+")
+                # Ensure the lock file exists and is writable by whoever runs
+                # the batch (root via sudo or the ordinary user). A stale lock
+                # left by a different uid can block deploys, so recreate it.
+                try:
+                    self_inner.handle = open(path, "a+")
+                except PermissionError:
+                    try:
+                        path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    path.touch(mode=0o666)
+                    self_inner.handle = open(path, "a+")
                 if fcntl is not None:
                     fcntl.flock(self_inner.handle.fileno(), fcntl.LOCK_EX)
                 return self_inner
