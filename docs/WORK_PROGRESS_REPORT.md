@@ -3626,3 +3626,37 @@ Phase 3 域内评测：
   阶段失败，错误为 `/tmp/cvelab-clab-lifecycle.lock` root-owned 且不可写。
 - 该批次没有进入 Agent，不能计入模型成功率；需要一次 sudo 修复锁文件
   ownership 后，用新输出目录重跑。
+
+## 2026-07-25 — L1 kimi-k3 decoy ablation 首次重跑失败：ContainerLab 锁权限
+
+### 现象
+
+启动 `AGENT_CONTEXT=l1 AGENT_RUNNER=openai LLM_MODEL=kimi-k3 LLM_TEMPERATURE=1` 四档实验后，四个目录全部 32 个 case 的 `failure_stage` 为 `deploy`，`environment_success=0`，未进入 Agent 阶段。
+
+错误详情：`[Errno 13] Permission denied: '/tmp/cvelab-clab-lifecycle.lock'`。
+
+### 根因
+
+共享层 `verifier.py` 的 `_lifecycle_lock` 把序列化锁硬编码在 `/tmp/cvelab-clab-lifecycle.lock`，并用 `open("a+")` 打开。该文件先被用户态进程创建后 ownership 为 `hanlin:hanlin`，随后 batch 通过 `sudo` 以 root 运行时反而触发权限拒绝（锁文件不是 666/world-writable，且代码未做降级容错）。这是共享层生命周期锁的 robustness 缺陷，不是 Atom/模板/模型问题。
+
+### 修复
+
+`verifier.py` 的 `_lifecycle_lock` 现在：
+- 创建锁文件时设为 `0o666`（world-writable），无论 owner 是谁都能打开；
+- 如果存在但打开报 `PermissionError`，视为 stale lock，删除并重建。
+
+这避免了每次锁文件 ownership 漂移后都要手动 `sudo chown` 的 workaround。
+
+### 验证
+
+- `tests/orchestrator/test_verifier.py` 回归：88 passed。
+- 旧失败目录已重命名为 `data/guide_ablation/decoy_ablation_l1_{none,low,medium,high}_lockfail/` 保留记录，不混入新实验结果。
+- Docker 环境已清空（0 running containers）。
+
+### 重跑命令
+
+```bash
+LLM_MODEL=kimi-k3 LLM_TEMPERATURE=1 \
+AGENT_CONTEXT=l1 AGENT_RUNNER=openai \
+bash scripts/run_decoy_ablation.sh 2>&1 | tee data/guide_ablation/decoy_l1_kimi_v2.log
+```
