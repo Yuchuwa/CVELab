@@ -18,6 +18,7 @@ if str(PROTOCOL) not in sys.path:
 from protocol.formal_run import (  # noqa: E402
     FormalRunConfig,
     create_formal_run,
+    execution_env,
     refresh_case_index,
 )
 
@@ -77,7 +78,12 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(run.batch_command, ensure_ascii=False))
     if not args.execute:
         return 0
-    completed = subprocess.run(run.batch_command, cwd=str(ROOT), stdin=subprocess.DEVNULL)
+    completed = subprocess.run(
+        run.batch_command,
+        cwd=str(ROOT),
+        stdin=subprocess.DEVNULL,
+        env=execution_env(base_url_label=args.base_url_label),
+    )
     refresh_case_index(run.run_dir)
     return completed.returncode
 

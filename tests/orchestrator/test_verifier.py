@@ -545,6 +545,60 @@ class TestDifficultyLevels:
         assert "service_access" not in obj
         assert "agent_hint" not in obj
 
+    def test_claude_runner_uses_clab_agent_network_namespace(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: claude-runner\n")
+        verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"))
+        popen_commands = []
+
+        class FakeProcess:
+            returncode = 1
+            stderr = iter(())
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def kill(self):
+                self.returncode = -9
+
+        def fake_run(command, *args, **kwargs):
+            if command[:2] == ["docker", "cp"] and command[-1].endswith("scenario_runner.py"):
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[:2] == ["docker", "cp"] and command[-1].endswith("scenario_input.json"):
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[:3] == ["docker", "exec", "clab-claude-runner-attacker"]:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return subprocess.CompletedProcess(command, 1, "", "copy failed")
+
+        def fake_popen(command, *args, **kwargs):
+            popen_commands.append(command)
+            return FakeProcess()
+
+        with patch.object(verifier, "_load_scenario_guide", return_value=""), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=self._atom_with([])), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run", side_effect=fake_run), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.Popen", side_effect=fake_popen):
+            verifier._run_agent(
+                str(scenario_dir), self._ground_truth(), self._ip_alloc(),
+                api_key="test", agent_context="l2", agent_runner="claude",
+            )
+
+        assert popen_commands
+        command = popen_commands[0]
+        assert command[:2] == ["docker", "run"]
+        assert "--rm" in command
+        assert f"--network=container:clab-claude-runner-attacker" in command
+        assert "clab-agent:latest" in command
+        assert "-e" in command
+        assert "ANTHROPIC_API_KEY=test" in command
+        assert "ANTHROPIC_AUTH_TOKEN=test" in command
+
     def test_l1_input_has_topology_but_no_cve(self, tmp_path):
         payload = self._run_level(tmp_path, "l1", self._atom_with(["poc.py"]))
         assert payload["agent_context"] == "l1"

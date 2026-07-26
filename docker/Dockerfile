@@ -9,7 +9,9 @@ LABEL version="3.0.0"
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Use stable mirror (tsinghua, HTTP)
-RUN sed -i 's|http://http.kali.org/kali|http://mirrors.tuna.tsinghua.edu.cn/kali|g' /etc/apt/sources.list
+RUN if [ -f /etc/apt/sources.list ]; then \
+        sed -i 's|http://http.kali.org/kali|http://mirrors.tuna.tsinghua.edu.cn/kali|g' /etc/apt/sources.list; \
+    fi
 
 # System deps first
 RUN apt-get update && \
@@ -34,8 +36,8 @@ RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
 
 # Install Python packages - Claude Agent SDK provides built-in tools (Bash, Read, Write)
 RUN pip3 install --no-cache-dir \
-    claude-agent-sdk>=0.2.87 \
-    openai>=1.40.0 \
+    'claude-agent-sdk>=0.2.87' \
+    'openai>=1.40.0' \
     requests \
     pexpect \
     paramiko \

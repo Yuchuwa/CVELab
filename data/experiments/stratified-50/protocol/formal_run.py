@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import os
 import secrets
 import subprocess
 import sys
@@ -165,6 +166,36 @@ def build_batch_command(config: FormalRunConfig, batch_output_dir: Path) -> list
     if environment_only:
         command.append("--environment-only")
     return command
+
+
+def execution_env(
+    *,
+    base_url_label: str = "",
+    environ: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Return process env for executing a formal run without leaking secrets.
+
+    The batch runner's stable contract is LLM_API_KEY / LLM_BASE_URL /
+    LLM_MODEL.  DeepSeek's official Anthropic-compatible endpoint is a common
+    provider-specific spelling for the Claude SDK harness, so normalize it here
+    while preserving any explicit LLM_* values supplied by the caller.
+    """
+
+    env = dict(os.environ if environ is None else environ)
+    label = (base_url_label or "").strip().lower()
+    if not env.get("LLM_API_KEY") and env.get("DEEPSEEK_API_KEY"):
+        env["LLM_API_KEY"] = env["DEEPSEEK_API_KEY"]
+    if label in {"deepseek", "deepseek-official", "deepseek_anthropic"}:
+        env.setdefault(
+            "LLM_BASE_URL",
+            env.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/anthropic"),
+        )
+        env.setdefault("LLM_MODEL", env.get("DEEPSEEK_MODEL", "deepseek-v4-pro"))
+    elif env.get("DEEPSEEK_BASE_URL") and not env.get("LLM_BASE_URL"):
+        env["LLM_BASE_URL"] = env["DEEPSEEK_BASE_URL"]
+    if env.get("DEEPSEEK_MODEL") and not env.get("LLM_MODEL"):
+        env["LLM_MODEL"] = env["DEEPSEEK_MODEL"]
+    return env
 
 
 def create_formal_run(config: FormalRunConfig) -> FormalRun:
