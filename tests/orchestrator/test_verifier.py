@@ -599,6 +599,80 @@ class TestDifficultyLevels:
         assert "ANTHROPIC_API_KEY=test" in command
         assert "ANTHROPIC_AUTH_TOKEN=test" in command
 
+    def test_guided_claude_runner_mounts_allowed_source_materials(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: claude-materials\n")
+        atoms_dir = tmp_path / "atoms"
+        for cve_id in ("CVE-A", "CVE-B", "CVE-C"):
+            bundle = atoms_dir / cve_id / "source_bundle"
+            bundle.mkdir(parents=True)
+            (bundle / "poc.png").write_text(f"{cve_id} material")
+        verifier = ScenarioVerifier(atoms_dir=str(atoms_dir))
+        popen_commands = []
+
+        class FakeProcess:
+            returncode = 1
+            stderr = iter(())
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def kill(self):
+                self.returncode = -9
+
+        def fake_popen(command, *args, **kwargs):
+            popen_commands.append(command)
+            return FakeProcess()
+
+        with patch.object(verifier, "_load_scenario_guide", return_value="requirements: {tools: [curl]}\nsteps: []\n"), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=self._atom_with(["source_bundle/poc.png"])), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run",
+                   return_value=subprocess.CompletedProcess(["noop"], 0, "", "")), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.Popen", side_effect=fake_popen):
+            verifier._run_agent(
+                str(scenario_dir), self._ground_truth(), self._ip_alloc(),
+                api_key="test", agent_context="guided", agent_runner="claude",
+            )
+
+        vulhub_dir = scenario_dir / "agent_workspace" / "vulhub"
+        assert (vulhub_dir / "CVE-A__poc.png").read_text() == "CVE-A material"
+        assert (vulhub_dir / "CVE-B__poc.png").read_text() == "CVE-B material"
+        command = popen_commands[0]
+        assert "-v" in command
+        assert f"{vulhub_dir.resolve()}:/vulhub:ro" in command
+
+    def test_claude_materials_reject_paths_outside_source_bundle(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: claude-material-safety\n")
+        atoms_dir = tmp_path / "atoms"
+        bundle = atoms_dir / "CVE-A" / "source_bundle"
+        bundle.mkdir(parents=True)
+        (atoms_dir / "CVE-A" / "secret.txt").write_text("do-not-copy")
+        (bundle / "ok.txt").write_text("ok")
+        (bundle / "escape").symlink_to(atoms_dir / "CVE-A" / "secret.txt")
+        verifier = ScenarioVerifier(atoms_dir=str(atoms_dir))
+
+        vulhub_dir = verifier._materialize_agent_materials(
+            scenario_dir,
+            [
+                ("CVE-A", atoms_dir / "CVE-A" / "source_bundle" / "ok.txt", "/vulhub/CVE-A__ok.txt"),
+                ("CVE-A", atoms_dir / "CVE-A" / "source_bundle" / "../secret.txt", "/vulhub/CVE-A__secret.txt"),
+                ("CVE-A", atoms_dir / "CVE-A" / "source_bundle" / "escape", "/vulhub/CVE-A__escape"),
+            ],
+        )
+
+        assert vulhub_dir is not None
+        assert (vulhub_dir / "CVE-A__ok.txt").read_text() == "ok"
+        assert not (vulhub_dir / "CVE-A__secret.txt").exists()
+        assert not (vulhub_dir / "CVE-A__escape").exists()
+
     def test_l1_input_has_topology_but_no_cve(self, tmp_path):
         payload = self._run_level(tmp_path, "l1", self._atom_with(["poc.py"]))
         assert payload["agent_context"] == "l1"
