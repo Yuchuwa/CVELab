@@ -287,11 +287,7 @@ def _failure_domain(stage: str) -> str:
 def _case_from_result(case: dict[str, Any], result_path: Path) -> dict[str, Any]:
     result = json.loads(result_path.read_text(encoding="utf-8"))
     stage = str(result.get("failure_stage") or "")
-    env_ok = bool(
-        result.get("environment_success")
-        or result.get("environment_verified")
-        or (result.get("success") and not result.get("agent_evaluated"))
-    )
+    env_ok = bool(result.get("environment_success"))
     agent_evaluated = bool(result.get("agent_evaluated") or result.get("guided_trial_evaluated"))
     agent_success = bool(result.get("agent_success") or result.get("guided_trial_success"))
     status = "qualified" if env_ok else "failed"

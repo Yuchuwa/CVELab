@@ -170,3 +170,41 @@ def test_refresh_case_index_separates_qualification_and_agent_outcome(tmp_path: 
         "success": None,
     }
     assert by_id["matrix-case-b"]["failure_domain"] == "runtime"
+
+
+def test_refresh_case_index_does_not_qualify_failed_environment_verification(tmp_path: Path):
+    manifest_path = tmp_path / "stratified_50_ranges.json"
+    _write_case_manifest(manifest_path)
+    run = create_formal_run(
+        FormalRunConfig(
+            repo_root=tmp_path,
+            experiment_root=tmp_path / "data/experiments/stratified-50",
+            case_manifest_path=manifest_path,
+            run_kind="qualification",
+            run_id="qual-test-run",
+            max_cases=2,
+        )
+    )
+    batch_results = run.run_dir / "batch/.batch/results"
+    batch_results.mkdir(parents=True)
+    (batch_results / "matrix-case-a.json").write_text(
+        json.dumps(
+            {
+                "case_id": "matrix-case-a",
+                "success": False,
+                "environment_verified": True,
+                "environment_success": False,
+                "failure_stage": "setup:base",
+                "agent_evaluated": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    index = refresh_case_index(run.run_dir)
+
+    by_id = {item["case_id"]: item for item in index["cases"]}
+    assert index["totals"]["qualified"] == 0
+    assert index["totals"]["failed"] == 1
+    assert by_id["matrix-case-a"]["status"] == "failed"
+    assert by_id["matrix-case-a"]["failure_domain"] == "setup:base"
