@@ -31,7 +31,10 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 # In the attacker container this file is /opt/scenario_runner.py and the
@@ -228,6 +231,74 @@ TOOL_HANDLERS = {
 }
 
 
+def _to_namespace(value: Any) -> Any:
+    if isinstance(value, dict):
+        return SimpleNamespace(**{k: _to_namespace(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return [_to_namespace(v) for v in value]
+    return value
+
+
+class _StdlibOpenAICompletions:
+    def __init__(self, api_key: str, base_url: str | None):
+        self.api_key = api_key
+        self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
+
+    def create(self, **payload):
+        url = f"{self.base_url}/chat/completions"
+        body = json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "Accept": "text/event-stream",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response:
+                content_type = response.headers.get("Content-Type", "")
+                if "text/event-stream" not in content_type:
+                    raw = response.read().decode("utf-8", errors="replace")
+                    data = json.loads(raw)
+                    return [_to_namespace(data)]
+
+                chunks = []
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line or line.startswith(":"):
+                        continue
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if data == "[DONE]":
+                        break
+                    chunks.append(_to_namespace(json.loads(data)))
+                return chunks
+        except urllib.error.HTTPError as exc:
+            error_body = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"OpenAI-compatible API HTTP {exc.code}: {error_body}") from exc
+
+
+class _StdlibOpenAIClient:
+    def __init__(self, api_key: str, base_url: str | None):
+        self.chat = SimpleNamespace(
+            completions=_StdlibOpenAICompletions(api_key=api_key, base_url=base_url)
+        )
+
+
+def _make_completion_client(api_key: str, base_url: str | None):
+    try:
+        import openai
+    except ModuleNotFoundError as exc:
+        if exc.name == "openai" or "openai" in str(exc):
+            return _StdlibOpenAIClient(api_key=api_key, base_url=base_url)
+        raise
+    return openai.OpenAI(api_key=api_key, base_url=base_url or None)
+
+
 def _stream_completion(client, model: str, messages: list, max_tokens: int):
     """Call the model with stream=True and aggregate content + tool_calls.
 
@@ -250,19 +321,25 @@ def _stream_completion(client, model: str, messages: list, max_tokens: int):
         delta = chunk.choices[0].delta
         if delta is None:
             continue
-        if delta.content:
-            content_parts.append(delta.content)
-        if delta.tool_calls:
-            for tc in delta.tool_calls:
-                idx = tc.index
+        content_delta = getattr(delta, "content", None)
+        if content_delta:
+            content_parts.append(content_delta)
+        tool_call_delta = getattr(delta, "tool_calls", None)
+        if tool_call_delta:
+            for tc in tool_call_delta:
+                idx = getattr(tc, "index", 0)
+                tc_id = getattr(tc, "id", None)
+                function = getattr(tc, "function", None)
+                function_name = getattr(function, "name", None) if function else None
+                function_arguments = getattr(function, "arguments", None) if function else None
                 if idx not in tc_buf:
-                    tc_buf[idx] = {"id": tc.id or f"call_{idx}", "name": "", "arguments": ""}
-                if tc.id:
-                    tc_buf[idx]["id"] = tc.id
-                if tc.function and tc.function.name:
-                    tc_buf[idx]["name"] = tc.function.name
-                if tc.function and tc.function.arguments:
-                    tc_buf[idx]["arguments"] += tc.function.arguments
+                    tc_buf[idx] = {"id": tc_id or f"call_{idx}", "name": "", "arguments": ""}
+                if tc_id:
+                    tc_buf[idx]["id"] = tc_id
+                if function_name:
+                    tc_buf[idx]["name"] = function_name
+                if function_arguments:
+                    tc_buf[idx]["arguments"] += function_arguments
     content = "".join(content_parts)
     tool_calls = [tc_buf[i] for i in sorted(tc_buf.keys())]
     return content, tool_calls
@@ -270,8 +347,6 @@ def _stream_completion(client, model: str, messages: list, max_tokens: int):
 
 def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TURNS):
     """OpenAI-protocol Range agent main loop."""
-    import openai
-
     with open(input_path) as f:
         input_data = json.load(f)
 
@@ -290,7 +365,7 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
         print("[Error] no API key found", file=sys.stderr)
         return
 
-    client = openai.OpenAI(api_key=api_key, base_url=base_url or None)
+    client = _make_completion_client(api_key=api_key, base_url=base_url or None)
     max_tokens = int(os.environ.get("MAX_TOKENS", "16000"))
 
     messages = [

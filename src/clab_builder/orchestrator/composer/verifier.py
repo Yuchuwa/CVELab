@@ -401,6 +401,20 @@ class ScenarioVerifier:
                         route.stderr.strip() or f"route install failed for {address}"
                     )
 
+            if not re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", host):
+                hosts_line = f"{addresses[0]} {host}"
+                hosts_script = (
+                    f"grep -Eq {shlex.quote(r'^[0-9.]+[[:space:]]+' + re.escape(host) + r'([[:space:]]|$)')} "
+                    f"/etc/hosts || printf '\\n%s\\n' {shlex.quote(hosts_line)} >> /etc/hosts"
+                )
+                hosts_update = self._run_command([
+                    "docker", "exec", "-u", "0", attacker, "sh", "-c", hosts_script,
+                ])
+                if hosts_update.returncode != 0:
+                    raise RuntimeError(
+                        hosts_update.stderr.strip() or f"cannot pin {host} in attacker /etc/hosts"
+                    )
+
             probe_code = (
                 "import socket,sys; "
                 "s=socket.create_connection((sys.argv[1],int(sys.argv[2])),5); "
