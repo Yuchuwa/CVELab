@@ -11,6 +11,7 @@ if str(EXPERIMENT_ROOT) not in sys.path:
 from protocol.formal_run import (
     FormalRunConfig,
     create_formal_run,
+    execution_env,
     refresh_case_index,
 )
 
@@ -208,3 +209,16 @@ def test_refresh_case_index_does_not_qualify_failed_environment_verification(tmp
     assert index["totals"]["failed"] == 1
     assert by_id["matrix-case-a"]["status"] == "failed"
     assert by_id["matrix-case-a"]["failure_domain"] == "setup:base"
+
+
+def test_execution_env_maps_deepseek_official_settings(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-secret")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+    env = execution_env(base_url_label="deepseek-official")
+
+    assert env["LLM_API_KEY"] == "deepseek-secret"
+    assert env["LLM_BASE_URL"] == "https://api.deepseek.com/anthropic"
+    assert env["LLM_MODEL"] == "deepseek-v4-pro"

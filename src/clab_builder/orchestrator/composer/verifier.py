@@ -2462,30 +2462,40 @@ class ScenarioVerifier:
         stream_path = workspace / "agent_stream.log"
         input_path.write_text(json.dumps(input_data, indent=2, ensure_ascii=False))
         self._reset_agent_artifacts(workspace)
+        if agent_runner == "claude":
+            try:
+                os.chmod(workspace, 0o777)
+            except OSError:
+                pass
 
-        # 拷入 runner + input. Select the runner source by agent_runner mode:
-        # "claude" uses scenario_runner.py (claude_agent_sdk), "openai" uses
-        # openai_scenario_runner.py (openai SDK, no built-in Agent/Task tools).
+        # Prepare runner + input. Select the runner source by agent_runner mode:
+        # "claude" uses scenario_runner.py (claude_agent_sdk) in the
+        # clab-agent image while sharing the attacker network namespace;
+        # "openai" keeps running inside the attacker container because it has
+        # a no-dependency stdlib API fallback.
         OPENAI_RUNNER_SRC = Path(__file__).parent / "openai_scenario_runner.py"
         runner_src = OPENAI_RUNNER_SRC if agent_runner == "openai" else SCENARIO_RUNNER_SRC
-        # The openai runner imports pure helpers from scenario_runner, so copy
-        # both files; the entrypoint is always /opt/scenario_runner.py.
-        runner_copy = subprocess.run(
-            ["docker", "cp", str(runner_src.resolve()),
-             f"{attacker_container}:/opt/scenario_runner.py"],
-            capture_output=True, timeout=30,
-        )
+        runner_copy = subprocess.CompletedProcess(["runner-prepared"], 0, "", "")
         if agent_runner == "openai":
+            # The openai runner imports pure helpers from scenario_runner, so
+            # copy both files; the entrypoint is always /opt/scenario_runner.py.
+            runner_copy = subprocess.run(
+                ["docker", "cp", str(runner_src.resolve()),
+                 f"{attacker_container}:/opt/scenario_runner.py"],
+                capture_output=True, timeout=30,
+            )
             subprocess.run(
                 ["docker", "cp", str(SCENARIO_RUNNER_SRC.resolve()),
                  f"{attacker_container}:/opt/scenario_runner_lib.py"],
                 capture_output=True, timeout=30,
             )
-        input_copy = subprocess.run(
-            ["docker", "cp", str(input_path),
-             f"{attacker_container}:/tmp/scenario_input.json"],
-            capture_output=True, timeout=30,
-        )
+            input_copy = subprocess.run(
+                ["docker", "cp", str(input_path),
+                 f"{attacker_container}:/tmp/scenario_input.json"],
+                capture_output=True, timeout=30,
+            )
+        else:
+            input_copy = subprocess.CompletedProcess(["input-mounted"], 0, "", "")
         copy_errors = [result.stderr.decode(errors="replace") if isinstance(result.stderr, bytes)
                        else result.stderr for result in (runner_copy, input_copy)
                        if result.returncode != 0]
@@ -2499,10 +2509,13 @@ class ScenarioVerifier:
                 "failed_targets": [t["node_name"] for t in targets],
             }
 
-        cleanup = subprocess.run([
-            "docker", "exec", attacker_container, "rm", "-f",
-            "/tmp/scenario_output.json", "/tmp/scenario_session.json",
-        ], capture_output=True, text=True, timeout=30)
+        if agent_runner == "openai":
+            cleanup = subprocess.run([
+                "docker", "exec", attacker_container, "rm", "-f",
+                "/tmp/scenario_output.json", "/tmp/scenario_session.json",
+            ], capture_output=True, text=True, timeout=30)
+        else:
+            cleanup = subprocess.CompletedProcess(["workspace-reset"], 0, "", "")
         if cleanup.returncode != 0:
             return {
                 "scenario_name": ground_truth.get("scenario", ""),
@@ -2514,8 +2527,7 @@ class ScenarioVerifier:
                 "termination_reason": "workspace_cleanup_failed",
             }
 
-        # 构建 docker exec 命令
-        full_cmd = ["docker", "exec"]
+        # 构建 Agent command
         if agent_runner == "openai":
             # OpenAI runner reads OPENAI_BASE_URL / OPENAI_API_KEY (with
             # LLM_* / ANTHROPIC_* fallbacks inside the runner). No Agent/Task
@@ -2525,12 +2537,26 @@ class ScenarioVerifier:
                 env_flags.append(f"OPENAI_BASE_URL={base_url}")
             if model:
                 env_flags.append(f"MODEL={model}")
+            full_cmd = ["docker", "exec"]
+            for ef in env_flags:
+                full_cmd.extend(["-e", ef])
+            full_cmd.extend([
+                attacker_container,
+                "python3", "/opt/scenario_runner.py",
+                "--input", "/tmp/scenario_input.json",
+                "--output", "/tmp/scenario_output.json",
+                "--max-turns", str(self.max_turns),
+            ])
         else:
-            env_flags = [f"ANTHROPIC_API_KEY={api_key}"]
+            env_flags = [
+                f"ANTHROPIC_API_KEY={api_key}",
+                f"ANTHROPIC_AUTH_TOKEN={api_key}",
+            ]
             if base_url:
                 env_flags.append(f"ANTHROPIC_BASE_URL={base_url}")
             if model:
                 env_flags.append(f"MODEL={model}")
+                env_flags.append(f"ANTHROPIC_MODEL={model}")
                 # Claude Code SDK's Agent/Task tools spawn sub-agents that
                 # default to a lighter model (claude-haiku-4-5). When the LLM
                 # API gateway has no channel for that default (503 No
@@ -2540,15 +2566,32 @@ class ScenarioVerifier:
                 # gateway-backed model. See WORK_PROGRESS_REPORT 2026-07-23
                 # 'haiku sub-agent 503' analysis.
                 env_flags.append(f"CLAUDE_CODE_SUBAGENT_MODEL={model}")
-        for ef in env_flags:
-            full_cmd.extend(["-e", ef])
-        full_cmd.extend([
-            attacker_container,
-            "python3", "/opt/scenario_runner.py",
-            "--input", "/tmp/scenario_input.json",
-            "--output", "/tmp/scenario_output.json",
-            "--max-turns", str(self.max_turns),
-        ])
+            claude_cache_dir = workspace / ".claude_cache"
+            claude_cache_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                os.chmod(claude_cache_dir, 0o777)
+            except OSError:
+                pass
+            full_cmd = [
+                "docker", "run", "--rm",
+                f"--network=container:{attacker_container}",
+                "--cap-add", "NET_RAW",
+                "--cap-add", "NET_ADMIN",
+                "-v", f"{workspace.resolve()}:/workspace",
+                "-v", f"{runner_src.resolve()}:/opt/scenario_runner.py:ro",
+                "-v", f"{claude_cache_dir.resolve()}:/home/agent/.claude",
+                "-e", "CLAUDE_CONFIG_DIR=/home/agent/.claude",
+                "-e", "HOME=/home/agent",
+            ]
+            for ef in env_flags:
+                full_cmd.extend(["-e", ef])
+            full_cmd.extend([
+                self.agent_image,
+                "python3", "/opt/scenario_runner.py",
+                "--input", "/workspace/input.json",
+                "--output", "/workspace/output.json",
+                "--max-turns", str(self.max_turns),
+            ])
 
         # 执行
         stderr_chunks = []
@@ -2593,19 +2636,28 @@ class ScenarioVerifier:
             with stream_path.open("a") as stream:
                 stream.write(timeout_message)
 
-        # 拷出 output + session
-        output_copy = subprocess.run(
-            ["docker", "cp",
-             f"{attacker_container}:/tmp/scenario_output.json",
-             str(output_path)],
-            capture_output=True, timeout=30,
-        )
-        session_copy = subprocess.run(
-            ["docker", "cp",
-             f"{attacker_container}:/tmp/scenario_session.json",
-             str(session_path)],
-            capture_output=True, timeout=30,
-        )
+        # 拷出 output + session. Claude runner writes directly to the mounted
+        # workspace; OpenAI runner writes inside attacker and needs docker cp.
+        if agent_runner == "openai":
+            output_copy = subprocess.run(
+                ["docker", "cp",
+                 f"{attacker_container}:/tmp/scenario_output.json",
+                 str(output_path)],
+                capture_output=True, timeout=30,
+            )
+            session_copy = subprocess.run(
+                ["docker", "cp",
+                 f"{attacker_container}:/tmp/scenario_session.json",
+                 str(session_path)],
+                capture_output=True, timeout=30,
+            )
+        else:
+            output_copy = subprocess.CompletedProcess(
+                ["mounted-output"], 0 if output_path.exists() else 1, "", ""
+            )
+            session_copy = subprocess.CompletedProcess(
+                ["mounted-session"], 0 if session_path.exists() else 1, "", ""
+            )
         if session_copy.returncode == 0 and session_path.exists():
             print(f"  Session saved: {session_path}")
 
