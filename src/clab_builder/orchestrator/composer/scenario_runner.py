@@ -60,16 +60,7 @@ import sys
 import os
 import re
 from pathlib import Path
-
-from claude_agent_sdk import (
-    query,
-    ClaudeAgentOptions,
-    AssistantMessage,
-    ResultMessage,
-    TextBlock,
-    ToolUseBlock,
-    get_session_messages,
-)
+from types import SimpleNamespace
 
 DEFAULT_MAX_TURNS = 80
 
@@ -739,8 +730,46 @@ def classify_termination(
     return "agent_runner_error"
 
 
+def _load_claude_agent_sdk():
+    """Import Claude SDK only for the Claude runner execution path.
+
+    The OpenAI runner copies this module into the attacker container as a pure
+    helper library. That helper import must not require claude_agent_sdk.
+    """
+    try:
+        from claude_agent_sdk import (
+            query,
+            ClaudeAgentOptions,
+            AssistantMessage,
+            ResultMessage,
+            TextBlock,
+            ToolUseBlock,
+            get_session_messages,
+        )
+    except ModuleNotFoundError as exc:
+        if exc.name == "claude_agent_sdk":
+            raise RuntimeError(
+                "claude_agent_sdk is required only when running the Claude "
+                "scenario runner. Use --agent-runner openai for OpenAI-compatible "
+                "models, or install claude_agent_sdk in the attacker container."
+            ) from exc
+        raise
+
+    return SimpleNamespace(
+        query=query,
+        ClaudeAgentOptions=ClaudeAgentOptions,
+        AssistantMessage=AssistantMessage,
+        ResultMessage=ResultMessage,
+        TextBlock=TextBlock,
+        ToolUseBlock=ToolUseBlock,
+        get_session_messages=get_session_messages,
+    )
+
+
 async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TURNS):
     """运行 Agent 主流程"""
+    claude_sdk = _load_claude_agent_sdk()
+
     with open(input_path) as f:
         input_data = json.load(f)
 
@@ -755,7 +784,7 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
     system_prompt = (
         NO_HINT_SYSTEM_PROMPT if needs_hygiene else SYSTEM_PROMPT
     )
-    options = ClaudeAgentOptions(
+    options = claude_sdk.ClaudeAgentOptions(
         system_prompt=system_prompt,
         max_turns=max_turns,
         permission_mode="bypassPermissions",
@@ -797,16 +826,16 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
     termination_hint = ""
 
     try:
-        async for message in query(prompt=prompt, options=options):
-            if isinstance(message, AssistantMessage):
+        async for message in claude_sdk.query(prompt=prompt, options=options):
+            if isinstance(message, claude_sdk.AssistantMessage):
                 for block in message.content:
-                    if isinstance(block, TextBlock):
+                    if isinstance(block, claude_sdk.TextBlock):
                         full_text += block.text + "\n"
                         print(f"[Agent] {block.text[:200]}", file=sys.stderr)
-                    elif isinstance(block, ToolUseBlock):
+                    elif isinstance(block, claude_sdk.ToolUseBlock):
                         print(f"[Tool] {block.name}: {json.dumps(block.input)[:120]}", file=sys.stderr)
 
-            elif isinstance(message, ResultMessage):
+            elif isinstance(message, claude_sdk.ResultMessage):
                 session_id = message.session_id
                 print(f"[Done] session={session_id}, cost=${message.total_cost_usd:.4f}", file=sys.stderr)
                 result_message = str(getattr(message, "result", "") or "")
@@ -844,7 +873,7 @@ async def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_
     # 保存 session 文件
     if session_id:
         try:
-            messages = get_session_messages(session_id)
+            messages = claude_sdk.get_session_messages(session_id)
             session_path = str(output_path).replace("output.json", "session.json")
             session_data = []
             for msg in messages:

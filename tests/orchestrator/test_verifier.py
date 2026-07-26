@@ -1,6 +1,8 @@
 """Tests for Scenario Verifier"""
 
 import json
+import builtins
+import importlib.util
 import subprocess
 from types import SimpleNamespace
 import pytest
@@ -1099,6 +1101,52 @@ class TestAgentTransport:
         assert ["nsenter", "-t", "1234", "-n", "ip", "route", "replace",
                 "10.0.0.5/32", "via", "172.30.0.1", "dev", "ctl0"] in calls
 
+    def test_agent_transport_pins_hostname_resolution_inside_attacker(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: pilot\n")
+        verifier = ScenarioVerifier()
+        calls = []
+        network_name = ""
+
+        def fake_run(command, timeout=30):
+            nonlocal network_name
+            calls.append(command)
+            if command[:3] == ["docker", "network", "create"]:
+                network_name = command[-1]
+                return subprocess.CompletedProcess(command, 0, "id\n", "")
+            if command[:3] == ["docker", "network", "connect"]:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[:2] == ["docker", "inspect"]:
+                payload = [{
+                    "State": {"Pid": 1234},
+                    "NetworkSettings": {"Networks": {
+                        network_name: {"Gateway": "172.31.240.1", "IPAddress": "172.31.240.2"}
+                    }},
+                }]
+                return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
+            if command[:6] == ["docker", "exec", "-u", "0", "clab-pilot-attacker", "ip"]:
+                if "addr" in command:
+                    output = "3: ctl0@if4: <UP> inet 172.31.240.2/28 scope global ctl0\n"
+                    return subprocess.CompletedProcess(command, 0, output, "")
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        with patch.object(verifier, "_resolve_endpoint", return_value=["203.0.113.10"]), \
+             patch.object(verifier, "_run_command", side_effect=fake_run):
+            result = verifier._prepare_agent_transport(
+                str(scenario_dir), "https://api.quickrouter.ai/v1"
+            )
+
+        assert result["ok"] is True
+        assert any(
+            command[:6] == ["docker", "exec", "-u", "0", "clab-pilot-attacker", "sh"]
+            and "/etc/hosts" in command[-1]
+            and "api.quickrouter.ai" in command[-1]
+            and "203.0.113.10" in command[-1]
+            for command in calls
+        )
+
     def test_default_route_helpers_preserve_existing_route(self):
         verifier = ScenarioVerifier()
         calls = []
@@ -1830,6 +1878,33 @@ class TestAgentArtifactRecovery:
 class TestRunnerPrompt:
     """scenario_runner.py 的 prompt 构建"""
 
+    def test_scenario_runner_helpers_import_without_claude_sdk(self):
+        """OpenAI runner copies scenario_runner.py as a helper library into the
+        attacker container. That helper import must not require Claude SDK.
+        """
+        runner_path = (
+            Path(__file__).parents[2]
+            / "src/clab_builder/orchestrator/composer/scenario_runner.py"
+        )
+        spec = importlib.util.spec_from_file_location(
+            "_scenario_runner_without_claude_sdk", runner_path
+        )
+        assert spec and spec.loader
+
+        module = importlib.util.module_from_spec(spec)
+        original_import = builtins.__import__
+
+        def import_without_claude_sdk(name, *args, **kwargs):
+            if name == "claude_agent_sdk":
+                raise ModuleNotFoundError("No module named 'claude_agent_sdk'")
+            return original_import(name, *args, **kwargs)
+
+        with patch.object(builtins, "__import__", side_effect=import_without_claude_sdk):
+            spec.loader.exec_module(module)
+
+        assert module.SYSTEM_PROMPT
+        assert module.build_prompt({"scenario_name": "x", "targets": []})
+
     def test_build_prompt(self):
         from clab_builder.orchestrator.composer.scenario_runner import build_prompt
 
@@ -1888,6 +1963,51 @@ class TestRunnerPrompt:
         # The fixed tool set is self-defined.
         assert "Bash" in names
         assert "WebSearch" in names
+
+    def test_openai_runner_client_works_without_openai_package(self):
+        """The OpenAI-compatible runner is copied into the attacker container,
+        where the openai Python package may not be installed.
+        """
+        from clab_builder.orchestrator.composer import openai_scenario_runner
+
+        original_import = builtins.__import__
+
+        def import_without_openai(name, *args, **kwargs):
+            if name == "openai":
+                raise ModuleNotFoundError("No module named 'openai'")
+            return original_import(name, *args, **kwargs)
+
+        with patch.object(builtins, "__import__", side_effect=import_without_openai):
+            client = openai_scenario_runner._make_completion_client(
+                api_key="test-key",
+                base_url="https://api.example.test/v1",
+            )
+
+        assert hasattr(client.chat.completions, "create")
+
+    def test_openai_runner_stream_tolerates_missing_delta_fields(self):
+        from clab_builder.orchestrator.composer import openai_scenario_runner
+
+        class Client:
+            class chat:
+                class completions:
+                    @staticmethod
+                    def create(**_kwargs):
+                        return [
+                            openai_scenario_runner._to_namespace({
+                                "choices": [{"delta": {"tool_calls": []}}],
+                            }),
+                            openai_scenario_runner._to_namespace({
+                                "choices": [{"delta": {"content": "ok"}}],
+                            }),
+                        ]
+
+        content, tool_calls = openai_scenario_runner._stream_completion(
+            Client(), "model", [], 128
+        )
+
+        assert content == "ok"
+        assert tool_calls == []
 
 
 class TestRunnerExtractJson:
