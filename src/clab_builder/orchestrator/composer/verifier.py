@@ -16,6 +16,7 @@ import os
 import re
 import secrets
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -2252,6 +2253,7 @@ class ScenarioVerifier:
         # explicit l0/l1/l2 contexts get the level-trimmed contract.
         targets = []
         credential_material_paths: list[str] = []
+        agent_materials: list[tuple[str, Path, str]] = []
         for step in ground_truth.get("attack_path", []):
             node_name = step["target_node"]
             cve_id = step["cve_id"]
@@ -2274,7 +2276,16 @@ class ScenarioVerifier:
             materials = {}
             if atom_config and atom_config.source_bundle:
                 for material in atom_config.source_bundle.poc_materials:
-                    materials[material] = f"/vulhub/{cve_id}__{Path(material).name}"
+                    mounted_path = f"/vulhub/{cve_id}__{Path(material).name}"
+                    materials[material] = mounted_path
+                    material_is_allowed = (
+                        agent_context in ("guided", "no_guide")
+                        or (level == "l2" and self._is_credential_material(material))
+                    )
+                    if material_is_allowed:
+                        agent_materials.append(
+                            (cve_id, self.atoms_dir / cve_id / material, mounted_path)
+                        )
             flag_hint = (
                 step.get("flag_hint", "file:/flag.txt")
                 if agent_context != "no_hint" and not is_level else ""
@@ -2456,6 +2467,7 @@ class ScenarioVerifier:
         # 准备 workspace
         workspace = scenario_path / "agent_workspace"
         workspace.mkdir(exist_ok=True)
+        vulhub_mount_dir = self._materialize_agent_materials(workspace, agent_materials)
         input_path = workspace / "input.json"
         output_path = workspace / "output.json"
         session_path = workspace / "session.json"
@@ -2583,6 +2595,8 @@ class ScenarioVerifier:
                 "-e", "CLAUDE_CONFIG_DIR=/home/agent/.claude",
                 "-e", "HOME=/home/agent",
             ]
+            if vulhub_mount_dir is not None:
+                full_cmd.extend(["-v", f"{vulhub_mount_dir.resolve()}:/vulhub:ro"])
             for ef in env_flags:
                 full_cmd.extend(["-e", ef])
             full_cmd.extend([
@@ -3047,6 +3061,54 @@ class ScenarioVerifier:
         import yaml
         data = yaml.safe_load(atom_yaml.read_text())
         return data.get("flag_verify_command", "")
+
+    def _materialize_agent_materials(
+        self,
+        workspace: Path,
+        materials: list[tuple[str, Path, str]],
+    ) -> Path | None:
+        """Create a /vulhub-compatible material view for external agent images.
+
+        The attacker container receives source_bundle files through ContainerLab
+        binds, but the Claude SDK runner now executes in a separate clab-agent
+        container that only shares the attacker's network namespace.  Copy the
+        same allowed files into the agent workspace and bind-mount them at
+        /vulhub so guided/no_guide and L2 credential hints remain truthful.
+        """
+
+        vulhub_dir = workspace / "vulhub"
+        if vulhub_dir.exists():
+            shutil.rmtree(vulhub_dir)
+        safe_materials: list[tuple[Path, Path]] = []
+        for cve_id, source, container_path in materials:
+            if not str(container_path).startswith("/vulhub/"):
+                continue
+            target_name = Path(container_path).name
+            if not target_name or target_name in {".", ".."}:
+                continue
+            try:
+                bundle_root = (self.atoms_dir / cve_id / "source_bundle").resolve(strict=True)
+                resolved_source = source.resolve(strict=True)
+                resolved_source.relative_to(bundle_root)
+            except (FileNotFoundError, RuntimeError, ValueError):
+                continue
+            if not resolved_source.is_file() or source.is_symlink():
+                continue
+            safe_materials.append((resolved_source, vulhub_dir / target_name))
+        if not safe_materials:
+            return None
+        vulhub_dir.mkdir(parents=True, exist_ok=True)
+        for source, target in safe_materials:
+            shutil.copy2(source, target)
+            try:
+                os.chmod(target, 0o644)
+            except OSError:
+                pass
+        try:
+            os.chmod(vulhub_dir, 0o755)
+        except OSError:
+            pass
+        return vulhub_dir
 
     def _load_atom_config(self, cve_id: str):
         atom_yaml = self.atoms_dir / cve_id / "atom.yaml"
