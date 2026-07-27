@@ -93,3 +93,4 @@ data/vulhub/
 data/atoms/**/.workspace/
 data/atoms/**/node_modules/
 src/sysfield/
+data/experiments/stratified-50/runs/
