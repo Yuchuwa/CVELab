@@ -3125,3 +3125,29 @@ agent_timeout 2、objective 验证失败 3、agent_runner_error 3（实为 Agent
 - 分类：runtime 构建契约/产物版本漂移；不是拓扑语法、网络资源或服务 readiness
   失败。当前场景尚不能通过受支持的 verifier 流程启动，后续应在共享 runtime
   重建流程中重新建立 Atom 元数据、构建产物与生成器版本的一致性。
+
+## 2026-07-27：sysarmor-case0 Event 流为零的根因定位
+
+- 范围：只读对照 `sysarmor-next-project/test/release` 的 `namespace/self` 验收链路、
+  Tetragon scope 实现与正在运行的 `sysarmor-case0` 三个 target；未修改 Agent 或
+  场景运行配置。
+- Release 基线并非普通 Docker 默认配置：业务容器显式使用
+  `--privileged --cgroupns=host`，并按镜像串行运行 Tetragon；`namespace/self`
+  从 `/proc/self/cgroup` 解析自身 64 位容器 ID，事件过滤使用双向前缀匹配。
+- CVELab runtime injector 因 ContainerLab 拓扑未暴露 `--cgroupns=host`，将 scope
+  改写成 `container/<docker inspect 返回的 64 位完整 ID>`。三个 target 实际均为
+  `CgroupnsMode=private`，容器内 `/proc/self/cgroup` 为 `0::/`。
+- 直接订阅 target-1 的 Tetragon gRPC 流 6 秒得到约 7.9 万行原始输出，确认
+  Tetragon 仍在采集；因此 deployment-mode/cgroup warning 不是本次零 Event 的
+  直接原因。
+- 已确认直接根因：Tetragon v1.7.0 原始事件的 `process.docker` 为 32 位容器 ID，
+  injector 写入 64 位 selector；`container` scope 实现仅执行
+  `strings.HasPrefix(eventContainerID, scopeSelector)`，32 位值不可能以 64 位值开头，
+  所有事件均在 Agent scope 过滤层被丢弃，最终产生
+  `event_stream_blind:no_events_seen`。
+- 违反的通用契约：`container` selector 是事件容器 ID 的前缀，运行时注入器不能
+  假设 Docker 完整 ID 与 sensor 输出长度一致。现有 backend 测试只覆盖短 selector
+  匹配长 event ID，未覆盖长 selector 对截断 event ID 的兼容性。
+- 后续修复应位于可复用注入/作用域契约层，并增加 64 位 Docker ID 对 32 位
+  Tetragon ID 的回归测试；private cgroup namespace 和同宿主多 Tetragon 实例仍是
+  独立的部署风险，需分别验证，不能与本次直接根因混为一谈。
