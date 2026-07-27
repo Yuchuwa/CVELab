@@ -12,6 +12,7 @@
 
 - First-version targets are Linux amd64 ContainerLab containers running as root.
 - Target images, entrypoints, commands, and vulnerable service processes remain unchanged.
+- ContainerLab 0.72 Docker nodes rely on its default privileged mode; topology files must not use unsupported `privileged` or `docker-opts` fields.
 - Target containers never access GitHub; every asset is cached and SHA-256 verified on the host.
 - One unsupported or unhealthy target fails the defended experiment.
 - The workflow remains observe-only and must not claim enforcement.
@@ -27,13 +28,14 @@
 
 **Interfaces:**
 - Consumes: source scenario `clab.yaml`
-- Produces: `patch_clab(clab: dict) -> dict` that adds runtime privileges without changing `node["image"]`, `cmd`, or entrypoint-related fields
+- Produces: `patch_clab(clab: dict) -> dict` that adds supported runtime mounts without changing `node["image"]`, `cmd`, or entrypoint-related fields
 
 - [ ] **Step 1: Replace Dockerfile assertions with a failing preservation test**
 
 Create an in-memory topology with the three original image names, call
 `patch_clab`, and assert the images and commands are unchanged while
-`privileged`, BTF, bpffs, cgroup namespace, and restart policy are present.
+BTF, bpffs, and restart policy are present, while unsupported `privileged` and
+`docker-opts` fields are absent.
 
 - [ ] **Step 2: Run the focused test and verify it fails**
 
@@ -45,8 +47,8 @@ Expected: FAIL because `patch_clab` replaces target images with
 - [ ] **Step 3: Remove image replacement from the materializer**
 
 Delete `IMAGE_BY_TARGET`. Iterate the explicit target tuple
-`("target-1", "target-2", "target-3")` and retain only runtime requirement
-patching.
+`("target-1", "target-2", "target-3")` and retain only supported runtime mount
+and restart-policy patching.
 
 - [ ] **Step 4: Run the focused test and commit**
 
@@ -136,7 +138,8 @@ Expected: FAIL because `inject-runtime.sh` does not exist.
 Parse topology `name:` without broad container matching, validate target names,
 perform host checks for amd64/BTF/bpffs/cgroup v2, revalidate asset digests,
 inspect each exact Docker container, execute the installer with temporary jq and
-the local Tetragon archive, launch
+the local Tetragon archive, change the sensor scope to `container` with the
+exact Docker container ID, launch
 `/opt/sysarmor/agent/bin/sysarmor-agent run --config /etc/sysarmor/agent/agent.yaml`
 using `docker exec -d`, and poll `/usr/local/bin/sysarmorctl` until healthy or
 timeout. Capture install and agent logs without dumping environment variables.

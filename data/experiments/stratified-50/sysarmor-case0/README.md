@@ -24,8 +24,9 @@ From the CVELab repository root:
 data/experiments/stratified-50/sysarmor-case0/scripts/materialize-defended-scenario.py
 ```
 
-The materializer keeps the original target images and adds the privileged,
-BTF, bpffs, and host-cgroup settings required by SysArmor/Tetragon.
+The materializer keeps the original target images and adds the BTF and bpffs
+mounts required by SysArmor/Tetragon. ContainerLab's Docker runtime creates
+Linux nodes in privileged mode by default.
 
 ## Deploy and Inject
 

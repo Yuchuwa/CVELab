@@ -29,17 +29,14 @@ def patch_clab(clab: dict) -> dict:
     nodes = clab.setdefault("topology", {}).setdefault("nodes", {})
     for target in TARGETS:
         node = nodes[target]
-        node["privileged"] = True
+        node.pop("privileged", None)
+        node.pop("docker-opts", None)
         node["restart-policy"] = "unless-stopped"
         binds = list(node.get("binds", []))
         for bind in SYSARMOR_BINDS:
             if bind not in binds:
                 binds.append(bind)
         node["binds"] = binds
-        docker_opts = list(node.get("docker-opts", []))
-        if "--cgroupns=host" not in docker_opts:
-            docker_opts.append("--cgroupns=host")
-        node["docker-opts"] = docker_opts
     return clab
 
 

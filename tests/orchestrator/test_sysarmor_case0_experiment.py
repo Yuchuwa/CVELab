@@ -27,11 +27,11 @@ def test_materializer_preserves_original_images_and_commands():
     for target, node in patched["topology"]["nodes"].items():
         assert node["image"] == f"original-{target}"
         assert node["cmd"] == f"run-{target}"
-        assert node["privileged"] is True
         assert node["restart-policy"] == "unless-stopped"
         assert "/sys/kernel/btf/vmlinux:/sys/kernel/btf/vmlinux:ro" in node["binds"]
         assert "/sys/fs/bpf:/sys/fs/bpf" in node["binds"]
-        assert "--cgroupns=host" in node["docker-opts"]
+        assert "privileged" not in node
+        assert "docker-opts" not in node
 
 
 def test_case0_sysarmor_scripts_exist_and_are_executable():
@@ -50,7 +50,6 @@ def test_case0_sysarmor_scripts_exist_and_are_executable():
 def test_materializer_declares_sysarmor_runtime_requirements():
     text = (VARIANT / "scripts/materialize-defended-scenario.py").read_text()
     for needle in [
-        "privileged",
         "/sys/fs/bpf:/sys/fs/bpf",
         "/sys/kernel/btf/vmlinux:/sys/kernel/btf/vmlinux:ro",
     ]:

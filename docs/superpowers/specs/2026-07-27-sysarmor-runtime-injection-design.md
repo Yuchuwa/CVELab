@@ -47,15 +47,16 @@ version, URL, and digest are pinned explicitly.
 ## Scenario Materialization
 
 The defended scenario keeps the original target image references. The
-materializer adds only the runtime capabilities required by SysArmor/Tetragon:
+materializer adds only the runtime mounts required by SysArmor/Tetragon:
 
-- `privileged: true`
 - `/sys/kernel/btf/vmlinux:/sys/kernel/btf/vmlinux:ro`
 - `/sys/fs/bpf:/sys/fs/bpf`
-- Docker option `--cgroupns=host`
 - restart policy `unless-stopped`
 
 It does not replace image names, entrypoints, or commands.
+ContainerLab 0.72 creates Docker-backed Linux nodes in privileged mode by
+default; its topology schema does not accept `privileged` or raw `docker-opts`
+node fields.
 
 ## Injection Flow
 
@@ -83,10 +84,12 @@ The injector then performs these steps per target:
 4. Run the packaged installer with the temporary `jq` first in `PATH`,
    `SYSARMOR_TETRAGON_ARCHIVE` pointing at the copied archive, and profile
    `linux-container`.
-5. Start the installed Agent detached inside the existing target container,
-   using the installed standalone-container configuration.
-6. Poll `sysarmorctl agent health` with a bounded timeout.
-7. Remove copied archives and temporary extraction data after success or
+5. Rewrite the installed sensor scope from `namespace/self` to `container` with
+   the exact Docker container ID. This preserves per-target isolation without
+   requiring ContainerLab to expose Docker's `--cgroupns=host` option.
+6. Start the installed Agent detached inside the existing target container.
+7. Poll `sysarmorctl agent health` with bounded per-call and overall timeouts.
+8. Remove copied archives and temporary extraction data after success or
    failure, while retaining diagnostic logs.
 
 The target service continues running throughout injection. The injector does
