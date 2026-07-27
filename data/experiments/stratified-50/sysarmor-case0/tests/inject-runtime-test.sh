@@ -24,7 +24,7 @@ set -euo pipefail
 printf '%q ' "$@" >>"$FAKE_DOCKER_LOG"
 printf '\n' >>"$FAKE_DOCKER_LOG"
 case "$1 $2" in
-  "inspect -f") echo "true original-image" ;;
+  "inspect -f") echo "true original-image 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" ;;
   "image inspect") echo "linux amd64" ;;
   "exec clab-exact-lab-target-1")
     shift 2
@@ -59,6 +59,8 @@ export SYSARMOR_HEALTH_TIMEOUT=2
 "$INJECT" --topology "$WORK/topology.yaml" --target target-1
 grep -Fq 'clab-exact-lab-target-1' "$WORK/docker.log"
 grep -Fq 'stop_existing_agent' "$WORK/docker.log"
+grep -Fq 'type:\ container' "$WORK/docker.log"
+grep -Fq '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' "$WORK/docker.log"
 first_starts="$(grep -c 'sysarmor-agent\\ run' "$WORK/docker.log")"
 test "$first_starts" -eq 1
 
