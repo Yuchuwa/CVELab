@@ -14,6 +14,7 @@ done < <(sed -E '/^[A-Z0-9_]+=/!d; s/^([^=]+)="(.*)"$/\1=\2/' "$HERE/runtime-ass
 CACHE_DIR="${SYSARMOR_CASE0_CACHE_DIR:-$VARIANT_DIR/_build/runtime-assets/$SYSARMOR_RELEASE_TAG}"
 LOG_DIR="${SYSARMOR_CASE0_LOG_DIR:-$VARIANT_DIR/_build/logs}"
 HEALTH_TIMEOUT="${SYSARMOR_HEALTH_TIMEOUT:-60}"
+HEALTH_COMMAND_TIMEOUT="${SYSARMOR_HEALTH_COMMAND_TIMEOUT:-5}"
 TOPOLOGY=""
 TARGETS=()
 
@@ -38,6 +39,7 @@ done
 [[ -f "$TOPOLOGY" ]] || fail "topology not found: $TOPOLOGY"
 [[ ${#TARGETS[@]} -gt 0 ]] || fail "at least one --target is required"
 [[ "$HEALTH_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || fail "SYSARMOR_HEALTH_TIMEOUT must be positive"
+[[ "$HEALTH_COMMAND_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || fail "SYSARMOR_HEALTH_COMMAND_TIMEOUT must be positive"
 
 lab_name="$(awk -F: '$1 == "name" {sub(/^[[:space:]]+/, "", $2); sub(/[[:space:]]+$/, "", $2); print $2; exit}' "$TOPOLOGY" | tr -d "\"'")"
 [[ "$lab_name" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || fail "invalid or missing topology name"
@@ -64,22 +66,30 @@ fi
 
 mkdir -p "$LOG_DIR"
 
+health_check() {
+  timeout "${HEALTH_COMMAND_TIMEOUT}s" docker exec "$1" \
+    /usr/local/bin/sysarmorctl --socket /run/sysarmor/agent/control.sock --json agent health \
+    >/dev/null 2>&1
+}
+
 for target in "${TARGETS[@]}"; do
   [[ "$target" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || fail "invalid target name: $target"
   container="clab-$lab_name-$target"
-  read -r running image < <(docker inspect -f '{{.State.Running}} {{.Config.Image}}' "$container") || fail "$target: container not found"
+  read -r running image container_id < <(docker inspect -f '{{.State.Running}} {{.Config.Image}} {{.Id}}' "$container") || fail "$target: container not found"
   [[ "$running" == true ]] || fail "$target: container is not running"
+  [[ "$container_id" =~ ^[0-9a-f]{64}$ ]] || fail "$target: invalid Docker container ID"
   read -r image_os image_arch < <(docker image inspect -f '{{.Os}} {{.Architecture}}' "$image")
   [[ "$image_os $image_arch" == "linux amd64" ]] || fail "$target: unsupported image platform $image_os/$image_arch"
 
   if docker exec "$container" sh -c \
-    "test \"\$(cat /var/lib/sysarmor/agent/.sysarmor-release 2>/dev/null)\" = '$SYSARMOR_RELEASE_TAG' && /usr/local/bin/sysarmorctl --socket /run/sysarmor/agent/control.sock --json agent health >/dev/null 2>&1"; then
+    "test \"\$(cat /var/lib/sysarmor/agent/.sysarmor-release 2>/dev/null)\" = '$SYSARMOR_RELEASE_TAG'" \
+    && health_check "$container"; then
     echo "[sysarmor-inject] $target: already healthy at $SYSARMOR_RELEASE_TAG"
     continue
   fi
 
   docker exec "$container" sh -c \
-    'test "$(id -u)" = 0 && for d in /opt /etc /var/lib /run /usr/local/bin; do test -w "$d"; done && for x in sh tar gzip install cp mv mktemp find sha256sum awk; do command -v "$x" >/dev/null; done' \
+    'test "$(id -u)" = 0 && for d in /opt /etc /var/lib /run /usr/local/bin; do test -w "$d"; done && for x in sh tar gzip install cp mv mktemp find sha256sum awk sed; do command -v "$x" >/dev/null; done' \
     || fail "$target: container preflight failed"
 
   docker exec "$container" sh -c '
@@ -102,7 +112,7 @@ for target in "${TARGETS[@]}"; do
   docker cp "$jq_binary" "$container:$remote/bin/jq"
 
   if ! docker exec "$container" sh -c \
-    "chmod 0755 '$remote/bin/jq' && tar -xzf '$remote/agent.tar.gz' -C '$remote/release' && PATH='$remote/bin':\$PATH SYSARMOR_TETRAGON_ARCHIVE='$remote/tetragon.tar.gz' '$remote/release/install.sh' --profile linux-container >'$remote/install.log' 2>&1 && printf '%s\\n' '$SYSARMOR_RELEASE_TAG' > /var/lib/sysarmor/agent/.sysarmor-release"; then
+    "chmod 0755 '$remote/bin/jq' && tar -xzf '$remote/agent.tar.gz' -C '$remote/release' && PATH='$remote/bin':\$PATH SYSARMOR_TETRAGON_ARCHIVE='$remote/tetragon.tar.gz' '$remote/release/install.sh' --profile linux-container >'$remote/install.log' 2>&1 && sed -i -e 's/^    type: namespace$/    type: container/' -e 's/^    selector: self$/    selector: $container_id/' /etc/sysarmor/agent/agent.yaml && printf '%s\\n' '$SYSARMOR_RELEASE_TAG' > /var/lib/sysarmor/agent/.sysarmor-release"; then
     docker cp "$container:$remote/install.log" "$LOG_DIR/$target-install.log" 2>/dev/null || true
     docker exec "$container" rm -rf "$remote" >/dev/null 2>&1 || true
     fail "$target: installation failed; see $LOG_DIR/$target-install.log"
@@ -113,7 +123,7 @@ for target in "${TARGETS[@]}"; do
 
   healthy=0
   for ((attempt=0; attempt<HEALTH_TIMEOUT; attempt++)); do
-    if docker exec "$container" /usr/local/bin/sysarmorctl --socket /run/sysarmor/agent/control.sock --json agent health >/dev/null 2>&1; then
+    if health_check "$container"; then
       healthy=1
       break
     fi
