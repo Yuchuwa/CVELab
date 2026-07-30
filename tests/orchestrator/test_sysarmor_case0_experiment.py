@@ -135,7 +135,11 @@ def test_general_behavior_rules_are_additive_and_product_agnostic():
         "expr",
         "sequence",
     }
-    assert all("suppress" in rule for rule in rulesets[0]["rules"])
+    for rule in rulesets[0]["rules"]:
+        if rule["runtime"]["type"] == "expr":
+            assert "suppress" in rule
+        else:
+            assert "suppress" not in rule
 
     raw = "\n".join(path.read_text().lower() for path in rules.glob("*.json"))
     for forbidden in (

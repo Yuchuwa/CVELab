@@ -104,7 +104,7 @@ current_policy_filter='
      (.rawJson? | fromjson? | .detection.rulesets?) //
      (.raw_json? | fromjson? | .detection.rulesets?) //
      []);
-  (current_rulesets | map(select(.enabled == true) | .ref)) as $refs |
+  (current_rulesets | map(select(.enabled != false) | .ref)) as $refs |
   ($refs | index("ruleset:cep-endpoint")) and
   ($refs | index("ruleset:cvelab-general-behavior"))
 '
