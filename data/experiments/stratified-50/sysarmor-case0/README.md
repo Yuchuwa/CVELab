@@ -16,6 +16,10 @@ Target containers do not access GitHub. The host downloads and verifies the
 pinned SysArmor Release, Tetragon archive, and static jq once under
 `_build/runtime-assets/`.
 
+The experiment pins SysArmor `v0.1.0-rc.5`. The injector verifies the installed
+Agent binary reports that exact version before accepting the health gate or an
+idempotent reinjection.
+
 ## Materialize
 
 From the CVELab repository root:

@@ -1,0 +1,102 @@
+import json
+import subprocess
+from pathlib import Path
+from unittest.mock import patch
+
+from clab_builder.orchestrator.composer import sysarmor_runtime
+
+
+def test_patch_clab_for_sysarmor_targets_only_attack_path_nodes():
+    clab = {
+        "name": "case-a",
+        "topology": {
+            "nodes": {
+                "attacker": {"image": "attacker"},
+                "target-1": {
+                    "image": "original-1",
+                    "cmd": "run-1",
+                    "binds": ["/data:/data:ro"],
+                },
+                "target-2": {"image": "original-2", "privileged": True},
+            }
+        },
+    }
+    ground_truth = {
+        "attack_path": [
+            {"service_node": "target-1"},
+            {"target_node": "target-2"},
+        ]
+    }
+
+    targets = sysarmor_runtime.patch_clab_for_sysarmor(clab, ground_truth)
+
+    assert targets == ["target-1", "target-2"]
+    assert clab["topology"]["nodes"]["target-1"]["image"] == "original-1"
+    assert clab["topology"]["nodes"]["target-1"]["cmd"] == "run-1"
+    assert clab["topology"]["nodes"]["target-1"]["restart-policy"] == "unless-stopped"
+    assert "/data:/data:ro" in clab["topology"]["nodes"]["target-1"]["binds"]
+    assert "/sys/kernel/btf/vmlinux:/sys/kernel/btf/vmlinux:ro" in clab["topology"]["nodes"]["target-1"]["binds"]
+    assert "/sys/fs/bpf:/sys/fs/bpf" in clab["topology"]["nodes"]["target-2"]["binds"]
+    assert "privileged" not in clab["topology"]["nodes"]["target-2"]
+    assert clab["topology"]["nodes"]["attacker"] == {"image": "attacker"}
+
+
+def test_signal_delta_reports_detected_when_after_count_increases():
+    result = sysarmor_runtime.evaluate_signal_delta(
+        before={"target-1": [{"id": "old"}]},
+        after={"target-1": [{"id": "old"}, {"id": "new"}], "target-2": []},
+        attack_executed=True,
+        attack_success=True,
+    )
+
+    assert result["signal_count_before"] == 1
+    assert result["signal_count_after"] == 2
+    assert result["signal_detected"] is True
+    assert result["attack_executed"] is True
+    assert result["attack_success"] is True
+
+
+def test_signal_delta_requires_attack_execution():
+    result = sysarmor_runtime.evaluate_signal_delta(
+        before={},
+        after={"target-1": [{"id": "new"}]},
+        attack_executed=False,
+        attack_success=False,
+    )
+
+    assert result["signal_detected"] is False
+    assert result["not_evaluable_reason"] == "attack_not_executed"
+
+
+def test_collect_recent_signals_counts_json_lines_per_target(tmp_path):
+    scenario = tmp_path / "scenario"
+    scenario.mkdir()
+    (scenario / "clab.yaml").write_text("name: lab-a\n", encoding="utf-8")
+    completed = subprocess.CompletedProcess(
+        [],
+        0,
+        '{"signalFrame":{"signal":{"id":"a"}}}\nnot-json\n{"signalFrame":{"signal":{"id":"b"}}}\n',
+        "",
+    )
+    with patch.object(sysarmor_runtime.subprocess, "run", return_value=completed) as run:
+        signals = sysarmor_runtime.collect_recent_signals(scenario, ["target-1"], limit=20)
+
+    assert list(signals) == ["target-1"]
+    assert [item["signalFrame"]["signal"]["id"] for item in signals["target-1"]] == ["a", "b"]
+    command = run.call_args.args[0]
+    assert command[:3] == ["docker", "exec", "clab-lab-a-target-1"]
+    assert command[-6:] == ["--include-recent", "--include-events", "--limit", "20", "--timeout", "10s"]
+
+
+def test_inject_sysarmor_runtime_invokes_checked_in_injector(tmp_path):
+    scenario = tmp_path / "scenario"
+    scenario.mkdir()
+    (scenario / "clab.yaml").write_text("name: lab-a\n", encoding="utf-8")
+    with patch.object(sysarmor_runtime.subprocess, "run") as run:
+        run.return_value = subprocess.CompletedProcess([], 0, "ok", "")
+        result = sysarmor_runtime.inject_sysarmor_runtime(scenario, ["target-1", "target-2"])
+
+    assert result["ok"] is True
+    command = run.call_args.args[0]
+    assert command[0].endswith("inject-runtime.sh")
+    assert command[-4:] == ["--target", "target-1", "--target", "target-2"]

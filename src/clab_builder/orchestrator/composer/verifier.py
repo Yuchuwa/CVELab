@@ -36,6 +36,7 @@ from clab_builder.orchestrator.composer.scenario_runner import (
     DEFAULT_MAX_TURNS as DEFAULT_AGENT_TURNS,
     extract_observed_progress,
 )
+from clab_builder.orchestrator.composer import sysarmor_runtime
 from clab_builder.orchestrator.composer.sysfield_runner import SysFieldRunner
 
 SCENARIO_RUNNER_SRC = Path(__file__).parent / "scenario_runner.py"
@@ -997,6 +998,7 @@ class ScenarioVerifier:
         execution_context: dict[str, Any] | None = None,
         agent_context: str = "guided",
         agent_runner: str = "claude",
+        sysarmor: dict[str, Any] | None = None,
     ) -> dict:
         """Run deployment validation, optionally followed by Agent evaluation.
 
@@ -1011,6 +1013,10 @@ class ScenarioVerifier:
             raise ValueError(f"agent_context must be one of {AGENT_CONTEXTS}")
         scenario_path = Path(scenario_dir)
         self.execution_context = dict(execution_context or {})
+        sysarmor_config = dict(sysarmor or {})
+        sysarmor_enabled = bool(sysarmor_config.get("enabled"))
+        sysarmor_detection_enabled = bool(sysarmor_config.get("detection"))
+        sysarmor_signal_window = int(sysarmor_config.get("signal_window", 30) or 30)
 
         ground_truth, ip_alloc, _meta = self._load_scenario_context(scenario_dir)
         scenario_mode = _meta.get("validation_mode")
@@ -1032,6 +1038,11 @@ class ScenarioVerifier:
                 "overall_status": "not_requested",
                 "agent_context": agent_context,
             })
+        sysarmor_result: dict[str, Any] = {
+            "enabled": sysarmor_enabled,
+            "detection_requested": sysarmor_detection_enabled,
+            "signal_window": sysarmor_signal_window,
+        }
 
         try:
             # 1. Materialize Atom-declared runtime images, then deploy.
@@ -1064,7 +1075,40 @@ class ScenarioVerifier:
                     "guide_advisories": guide_preflight,
                     "guide_compatibility": guide_preflight,
                     "agent_transport": agent_transport,
+                    "sysarmor": sysarmor_result,
                 })
+
+            if sysarmor_enabled:
+                patch = sysarmor_runtime.patch_scenario_clab(scenario_dir, ground_truth)
+                sysarmor_result["patch"] = patch
+                if not patch.get("ok"):
+                    return self._save_result(scenario_path, {
+                        "success": False,
+                        "agent_context": agent_context,
+                        "error": "SysArmor target patching failed",
+                        "runtime_materialization": runtime_materialization,
+                        "environment_verified": False,
+                        "environment_success": False,
+                        "range_build_verified": False,
+                        "failure_stage": "sysarmor:patch",
+                        "reference_path_verified": False if self.validation_mode == "sysfield" else None,
+                        "attack_graph_valid": False,
+                        "attack_path_reachable": False,
+                        "guided_trial_evaluated": False,
+                        "guided_trial_success": False,
+                        "objective_achieved": False,
+                        "guided_reference_evaluated": False,
+                        "guided_reference_success": False,
+                        "agent_evaluated": False,
+                        "agent_success": False,
+                        "guide_integrity": {
+                            "evaluated": False, "valid": True, "entries": []
+                        },
+                        "guide_advisories": guide_preflight,
+                        "guide_compatibility": guide_preflight,
+                        "agent_transport": agent_transport,
+                        "sysarmor": sysarmor_result,
+                    })
 
             # 2. Deploy
             print("[1/5] Deploying...")
@@ -1095,6 +1139,7 @@ class ScenarioVerifier:
                     "guide_advisories": guide_preflight,
                     "guide_compatibility": guide_preflight,
                     "agent_transport": agent_transport,
+                    "sysarmor": sysarmor_result,
                 })
 
             # 3. Ansible base (IP config + routing)
@@ -1118,6 +1163,39 @@ class ScenarioVerifier:
                 timeout=600,
             )
             cve = self._run_ansible(scenario_dir, "cve-setup.yaml")
+            if sysarmor_enabled and all(item.get("ok", True) for item in (base, asset, asset_verify, cve)):
+                targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
+                injection = sysarmor_runtime.inject_sysarmor_runtime(scenario_dir, targets)
+                sysarmor_result["injection"] = injection
+                if not injection.get("ok"):
+                    return self._save_result(scenario_path, {
+                        "success": False,
+                        "agent_context": agent_context,
+                        "error": "SysArmor injection failed",
+                        "runtime_materialization": runtime_materialization,
+                        "deploy": deploy,
+                        "environment_verified": False,
+                        "environment_success": False,
+                        "range_build_verified": False,
+                        "failure_stage": "sysarmor:inject",
+                        "reference_path_verified": False if self.validation_mode == "sysfield" else None,
+                        "attack_graph_valid": False,
+                        "attack_path_reachable": False,
+                        "guided_trial_evaluated": False,
+                        "guided_trial_success": False,
+                        "objective_achieved": False,
+                        "guided_reference_evaluated": False,
+                        "guided_reference_success": False,
+                        "agent_evaluated": False,
+                        "agent_success": False,
+                        "guide_integrity": {
+                            "evaluated": False, "valid": True, "entries": []
+                        },
+                        "guide_advisories": guide_preflight,
+                        "guide_compatibility": guide_preflight,
+                        "agent_transport": agent_transport,
+                        "sysarmor": sysarmor_result,
+                    })
 
             environment = self._verify_environment(ground_truth, scenario_dir)
             environment_success = bool(environment.get("all_targets_verified")) and all(
@@ -1151,7 +1229,6 @@ class ScenarioVerifier:
                 environment_success
                 and attack_graph_valid
                 and attack_path_reachable
-                and not environment_only
                 and self.validation_mode == "sysfield"
             ):
                 reference = self._run_reference_path(scenario_dir)
@@ -1173,6 +1250,36 @@ class ScenarioVerifier:
             range_build_verified = bool(
                 environment_success and attack_graph_valid and attack_path_reachable
             )
+            if (
+                sysarmor_enabled
+                and sysarmor_detection_enabled
+                and environment_only
+                and environment_success
+                and attack_graph_valid
+                and attack_path_reachable
+            ):
+                targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
+                before = sysarmor_runtime.collect_recent_signals(scenario_dir, targets)
+                attack_started_at = datetime.now(timezone.utc).isoformat()
+                reference = self._run_reference_path(scenario_dir)
+                reference_verified = bool(reference.get("ok"))
+                attack_finished_at = datetime.now(timezone.utc).isoformat()
+                attack_executed = bool(reference.get("command"))
+                if attack_executed:
+                    time.sleep(max(0, sysarmor_signal_window))
+                after = sysarmor_runtime.collect_recent_signals(scenario_dir, targets)
+                sysarmor_result["detection"] = sysarmor_runtime.evaluate_signal_delta(
+                    before=before,
+                    after=after,
+                    attack_executed=attack_executed,
+                    attack_success=reference_verified,
+                )
+                sysarmor_result["detection"]["attack_started_at"] = attack_started_at
+                sysarmor_result["detection"]["attack_finished_at"] = attack_finished_at
+                if not attack_executed:
+                    sysarmor_result["detection"]["not_evaluable_reason"] = "attack_not_available"
+                sysarmor_result["signals_before"] = before
+                sysarmor_result["signals_after"] = after
             if environment_only:
                 print("[4/5] Skipping Agent: environment-only validation requested")
                 agent_transport = {
@@ -1231,6 +1338,14 @@ class ScenarioVerifier:
                     path_reachability = post_transport_path
                     if attack_path_reachable:
                         print("[4/5] Running agent verification...")
+                        sysarmor_signal_before = {}
+                        sysarmor_attack_started_at = ""
+                        if sysarmor_enabled and sysarmor_detection_enabled:
+                            targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
+                            sysarmor_signal_before = sysarmor_runtime.collect_recent_signals(
+                                scenario_dir, targets
+                            )
+                            sysarmor_attack_started_at = datetime.now(timezone.utc).isoformat()
                         agent_result = self._run_agent(
                             scenario_dir, ground_truth, ip_alloc,
                             api_key=api_key, base_url=base_url, model=model,
@@ -1239,6 +1354,23 @@ class ScenarioVerifier:
                             agent_context=agent_context,
                             agent_runner=agent_runner,
                         )
+                        if sysarmor_enabled and sysarmor_detection_enabled:
+                            sysarmor_attack_finished_at = datetime.now(timezone.utc).isoformat()
+                            time.sleep(max(0, sysarmor_signal_window))
+                            targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
+                            sysarmor_signal_after = sysarmor_runtime.collect_recent_signals(
+                                scenario_dir, targets
+                            )
+                            sysarmor_result["detection"] = sysarmor_runtime.evaluate_signal_delta(
+                                before=sysarmor_signal_before,
+                                after=sysarmor_signal_after,
+                                attack_executed=True,
+                                attack_success=bool(agent_result.get("success", False)),
+                            )
+                            sysarmor_result["detection"]["attack_started_at"] = sysarmor_attack_started_at
+                            sysarmor_result["detection"]["attack_finished_at"] = sysarmor_attack_finished_at
+                            sysarmor_result["signals_before"] = sysarmor_signal_before
+                            sysarmor_result["signals_after"] = sysarmor_signal_after
                         agent_evaluated = True
                         guided_reference_evaluated = self.validation_mode == "guided_agent"
                         print("[5/5] Verifying results...")
@@ -1315,6 +1447,7 @@ class ScenarioVerifier:
                 # used to decide whether the Agent starts.
                 "guide_compatibility": guide_preflight,
                 "agent_transport": agent_transport,
+                "sysarmor": sysarmor_result,
                 "reference_path_verification": reference,
                 "reference_path_verified": reference_verified if self.validation_mode == "sysfield" else None,
                 "attack_graph_valid": attack_graph_valid,
