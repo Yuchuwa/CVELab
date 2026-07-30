@@ -89,10 +89,6 @@
                 "required": ["ctx:cvelab-execution-tools"]
               }
             },
-            "suppress": {
-              "within": "5m",
-              "by": ["lineage_id", "process.binary"]
-            },
             "output": {
               "terminal": false
             }

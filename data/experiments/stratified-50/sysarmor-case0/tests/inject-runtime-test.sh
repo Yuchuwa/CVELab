@@ -37,7 +37,7 @@ elif [[ "$1" == "exec" && "$2" == "-u" && "$3" == "0" && "$4" == "clab-exact-lab
     elif [[ "$*" == *"policy apply"* ]]; then
       echo '{"status":"accepted"}'
     elif [[ "$*" == *"policy current"* ]]; then
-      echo '{"detection":{"rulesets":[{"ref":"ruleset:cep-endpoint","enabled":true},{"ref":"ruleset:cvelab-general-behavior","enabled":true}]}}'
+      echo '{"detection":{"rulesets":[{"ref":"ruleset:cep-endpoint"},{"ref":"ruleset:cvelab-general-behavior"}]}}'
     elif [[ "$*" == *"sysarmor-agent version"* ]]; then
       [[ -f "$FAKE_HEALTHY" ]] && echo "${FAKE_INSTALLED_VERSION:-$SYSARMOR_RELEASE_TAG}"
     elif [[ " $* " == *" .sysarmor-release "* && " $* " == *" cat "* ]]; then
