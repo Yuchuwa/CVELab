@@ -47,6 +47,28 @@ def test_case0_sysarmor_scripts_exist_and_are_executable():
         assert path.stat().st_mode & 0o111
 
 
+def test_case0_pins_sysarmor_rc5_release_asset():
+    manifest = (VARIANT / "scripts/runtime-assets.env").read_text()
+    assert 'SYSARMOR_RELEASE_TAG="v0.1.0-rc.5"' in manifest
+    assert (
+        'SYSARMOR_PACKAGE_FILE="sysarmor-agent-linux-amd64-v0.1.0-rc.5.tar.gz"'
+        in manifest
+    )
+    assert (
+        'SYSARMOR_PACKAGE_URL="https://github.com/PKU-ASAL/sysarmor/releases/download/'
+        'v0.1.0-rc.5/sysarmor-agent-linux-amd64-v0.1.0-rc.5.tar.gz"'
+        in manifest
+    )
+    assert (
+        'SYSARMOR_PACKAGE_SHA256="e2ea105552b1e37ab8badb2f03da0f622309bdabaa1010a257cf19c2cca7eb26"'
+        in manifest
+    )
+    assert (
+        'JQ_SHA256="5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5"'
+        in manifest
+    )
+
+
 def test_materializer_declares_sysarmor_runtime_requirements():
     text = (VARIANT / "scripts/materialize-defended-scenario.py").read_text()
     for needle in [
@@ -73,3 +95,10 @@ def test_target1_smoke_mounts_original_atom_runtime_content():
     smoke = (VARIANT / "scripts/smoke-target1.sh").read_text()
     assert "data/atoms/CVE-2018-16509/init/index.php:/var/www/html/index.php:ro" in smoke
     assert "pgrep -xc sysarmor-agent" in smoke
+
+
+def test_injector_runs_sysarmor_operations_as_root_without_changing_workload_user():
+    script = (VARIANT / "scripts/inject-runtime.sh").read_text()
+    assert "docker exec -u 0" in script
+    assert "docker update" not in script
+    assert "docker commit" not in script

@@ -66,10 +66,25 @@ fi
 
 mkdir -p "$LOG_DIR"
 
+docker_exec_root() {
+  docker exec -u 0 "$@"
+}
+
+docker_exec_root_timeout() {
+  local seconds="$1"
+  shift
+  timeout "${seconds}s" docker exec -u 0 "$@"
+}
+
 health_check() {
-  timeout "${HEALTH_COMMAND_TIMEOUT}s" docker exec "$1" \
+  docker_exec_root_timeout "$HEALTH_COMMAND_TIMEOUT" "$1" \
     /usr/local/bin/sysarmorctl --socket /run/sysarmor/agent/control.sock --json agent health \
     >/dev/null 2>&1
+}
+
+installed_version() {
+  docker_exec_root_timeout "$HEALTH_COMMAND_TIMEOUT" "$1" \
+    /opt/sysarmor/agent/bin/sysarmor-agent version 2>/dev/null
 }
 
 for target in "${TARGETS[@]}"; do
@@ -81,18 +96,19 @@ for target in "${TARGETS[@]}"; do
   read -r image_os image_arch < <(docker image inspect -f '{{.Os}} {{.Architecture}}' "$image")
   [[ "$image_os $image_arch" == "linux amd64" ]] || fail "$target: unsupported image platform $image_os/$image_arch"
 
-  if docker exec "$container" sh -c \
+  if docker_exec_root "$container" sh -c \
     "test \"\$(cat /var/lib/sysarmor/agent/.sysarmor-release 2>/dev/null)\" = '$SYSARMOR_RELEASE_TAG'" \
+    && [[ "$(installed_version "$container")" == "$SYSARMOR_RELEASE_TAG" ]] \
     && health_check "$container"; then
     echo "[sysarmor-inject] $target: already healthy at $SYSARMOR_RELEASE_TAG"
     continue
   fi
 
-  docker exec "$container" sh -c \
+  docker_exec_root "$container" sh -c \
     'test "$(id -u)" = 0 && for d in /opt /etc /var/lib /run /usr/local/bin; do test -w "$d"; done && for x in sh tar gzip install cp mv mktemp find sha256sum awk sed; do command -v "$x" >/dev/null; done' \
     || fail "$target: container preflight failed"
 
-  docker exec "$container" sh -c '
+  docker_exec_root "$container" sh -c '
     stop_existing_agent() {
       for comm in /proc/[0-9]*/comm; do
         read -r name <"$comm" || continue
@@ -106,19 +122,19 @@ for target in "${TARGETS[@]}"; do
   '
 
   remote="/tmp/sysarmor-inject-$SYSARMOR_RELEASE_TAG"
-  docker exec "$container" sh -c "rm -rf '$remote' && mkdir -m 0700 -p '$remote/release' '$remote/bin'"
+  docker_exec_root "$container" sh -c "rm -rf '$remote' && mkdir -m 0700 -p '$remote/release' '$remote/bin'"
   docker cp "$agent_package" "$container:$remote/agent.tar.gz"
   docker cp "$tetragon_archive" "$container:$remote/tetragon.tar.gz"
   docker cp "$jq_binary" "$container:$remote/bin/jq"
 
-  if ! docker exec "$container" sh -c \
+  if ! docker_exec_root "$container" sh -c \
     "chmod 0755 '$remote/bin/jq' && tar -xzf '$remote/agent.tar.gz' -C '$remote/release' && PATH='$remote/bin':\$PATH SYSARMOR_TETRAGON_ARCHIVE='$remote/tetragon.tar.gz' '$remote/release/install.sh' --profile linux-container >'$remote/install.log' 2>&1 && sed -i -e 's/^    type: namespace$/    type: container/' -e 's/^    selector: self$/    selector: $container_id/' /etc/sysarmor/agent/agent.yaml && printf '%s\\n' '$SYSARMOR_RELEASE_TAG' > /var/lib/sysarmor/agent/.sysarmor-release"; then
     docker cp "$container:$remote/install.log" "$LOG_DIR/$target-install.log" 2>/dev/null || true
-    docker exec "$container" rm -rf "$remote" >/dev/null 2>&1 || true
+    docker_exec_root "$container" rm -rf "$remote" >/dev/null 2>&1 || true
     fail "$target: installation failed; see $LOG_DIR/$target-install.log"
   fi
 
-  docker exec "$container" sh -c \
+  docker_exec_root "$container" sh -c \
     "nohup /opt/sysarmor/agent/bin/sysarmor-agent run --config /etc/sysarmor/agent/agent.yaml >'$remote/agent.log' 2>&1 </dev/null &"
 
   healthy=0
@@ -131,8 +147,11 @@ for target in "${TARGETS[@]}"; do
   done
   docker cp "$container:$remote/install.log" "$LOG_DIR/$target-install.log" 2>/dev/null || true
   docker cp "$container:$remote/agent.log" "$LOG_DIR/$target-agent.log" 2>/dev/null || true
-  docker exec "$container" rm -rf "$remote" >/dev/null 2>&1 || true
+  docker_exec_root "$container" rm -rf "$remote" >/dev/null 2>&1 || true
   [[ "$healthy" == 1 ]] || fail "$target: Agent health timeout; see $LOG_DIR/$target-agent.log"
+  actual_version="$(installed_version "$container" || true)"
+  [[ "$actual_version" == "$SYSARMOR_RELEASE_TAG" ]] || \
+    fail "$target: installed Agent version mismatch: got=${actual_version:-missing} want=$SYSARMOR_RELEASE_TAG"
   echo "[sysarmor-inject] $target: healthy"
 done
 
