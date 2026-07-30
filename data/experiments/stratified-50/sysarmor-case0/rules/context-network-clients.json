@@ -1,0 +1,34 @@
+{
+  "api_version": "sysarmor.content/v1",
+  "kind": "contextset",
+  "metadata": {
+    "id": "ctx:cvelab-network-clients",
+    "version": "v1"
+  },
+  "spec": {
+    "value_type": "process_binary_name",
+    "values": [
+      "busybox",
+      "curl",
+      "ftp",
+      "lua",
+      "nc",
+      "ncat",
+      "netcat",
+      "node",
+      "openssl",
+      "perl",
+      "php",
+      "python",
+      "python3",
+      "ruby",
+      "scp",
+      "sftp",
+      "socat",
+      "ssh",
+      "telnet",
+      "tftp",
+      "wget"
+    ]
+  }
+}

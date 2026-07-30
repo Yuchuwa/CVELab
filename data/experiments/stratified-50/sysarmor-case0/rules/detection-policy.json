@@ -1,0 +1,17 @@
+{
+  "policy_id": "cvelab-general-behavior",
+  "version": 1,
+  "mode": "observe",
+  "rulesets": [
+    {
+      "ref": "ruleset:cep-endpoint",
+      "version": "v1",
+      "enabled": true
+    },
+    {
+      "ref": "ruleset:cvelab-general-behavior",
+      "version": "v1",
+      "enabled": true
+    }
+  ]
+}
