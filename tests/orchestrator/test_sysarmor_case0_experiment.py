@@ -148,3 +148,10 @@ def test_general_behavior_rules_are_additive_and_product_agnostic():
         "/opt/cvelab",
     ):
         assert forbidden not in raw
+
+
+def test_readme_documents_additive_general_behavior_rules():
+    readme = (VARIANT / "README.md").read_text()
+    assert "ruleset:cvelab-general-behavior" in readme
+    assert "product/CVE independent" in readme
+    assert "blocks attack execution" in readme
