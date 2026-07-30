@@ -24,15 +24,22 @@
    - 按 runner 的新增 signal 口径（`after > before`）：4/5 有新增 signal，case3 没有新增。
    - 按 expected ruleIds 是否出现在 after-signals：4/5 通过；case1 缺 `execution_tool_opens_network_connection`；case3 虽 after 中有 expected ruleIds，但 before=after，后续报告中应单独标注为“无新增 signal”。
 
-### rerun B first5 结果
+### rerun B first5 统计表
 
-| case | 攻击结果 | flag 结果 | signal count | expected signal |
-|---|---:|---|---:|---:|
-| `matrix-2018-16509-2012-1823-2015-1427` | FAIL | 0/3 | 12 → 139 | FAIL，缺 `execution_tool_opens_network_connection` |
-| `matrix-2024-9264-2021-42013-2019-9193` | FAIL | 0/3 | 10 → 12 | PASS |
-| `matrix-2016-3088-2018-16509-2019-9193` | FAIL | 0/3 | 18 → 18 | PASS，但无新增 signal |
-| `matrix-2018-16509-2021-42013-2019-9193` | FAIL | 1/3：target-1 `flag{de4a43264503d880f545ed5e02755f68}` | 12 → 206 | PASS |
-| `matrix-2021-42013-2012-1823-2015-1427` | PASS | 3/3：`flag{ac6043c645eaf82f00ecc698dc845109}`、`flag{d1b477873ca571dea1d5e12fa46655a0}`、`flag{f648b129616c02ef6ec4aa838dad56f5}` | 12 → 34 | PASS |
+这张表按 50 cases 扩展设计：每个 case 一行，三段 flag 分列，signal 保留两个判定口径。`new signal` 表示攻击后 signal 数量有新增（`after > before`）；`expected signal` 表示该 case 期望的通用 ruleIds 是否在 after-signals 中出现。
+
+| case | L | t1 flag | t2 flag | t3 flag | attack | signal count | new signal | expected signal | missing signal |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| `matrix-2018-16509-2012-1823-2015-1427` | L2 | ❌ | ❌ | ❌ | FAIL | 12 → 139 | ✅ | ❌ | `execution_tool_opens_network_connection` |
+| `matrix-2024-9264-2021-42013-2019-9193` | L2 | ❌ | ❌ | ❌ | FAIL | 10 → 12 | ✅ | ✅ | - |
+| `matrix-2016-3088-2018-16509-2019-9193` | L2 | ❌ | ❌ | ❌ | FAIL | 18 → 18 | ❌ | ✅ | - |
+| `matrix-2018-16509-2021-42013-2019-9193` | L2 | ✅ | ❌ | ❌ | FAIL | 12 → 206 | ✅ | ✅ | - |
+| `matrix-2021-42013-2012-1823-2015-1427` | L2 | ✅ | ✅ | ✅ | PASS | 12 → 34 | ✅ | ✅ | - |
+
+Captured flags:
+
+- `matrix-2018-16509-2021-42013-2019-9193`：target-1 `flag{de4a43264503d880f545ed5e02755f68}`
+- `matrix-2021-42013-2012-1823-2015-1427`：target-1 `flag{ac6043c645eaf82f00ecc698dc845109}`；target-2 `flag{d1b477873ca571dea1d5e12fa46655a0}`；target-3 `flag{f648b129616c02ef6ec4aa838dad56f5}`
 
 ### 关于 case1-4 为什么没拿齐 flag
 
