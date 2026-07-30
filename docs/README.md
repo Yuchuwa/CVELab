@@ -14,6 +14,7 @@ or a historical experiment.
 |---|---|
 | What is the project and how do I run it? | [`../README.md`](../README.md) |
 | How are modules separated? | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| How is work divided and handed off? | [`COLLABORATION_PLAYBOOK.md`](COLLABORATION_PLAYBOOK.md) |
 | What files and interfaces connect modules? | [`INTERFACES.md`](INTERFACES.md) |
 | What is complete and what is not? | [`CURRENT_STATUS.md`](CURRENT_STATUS.md) |
 | What should be done next? | [`ROADMAP.md`](ROADMAP.md) |

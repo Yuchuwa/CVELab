@@ -5,6 +5,7 @@
 Before editing code, read:
 
 - `docs/ARCHITECTURE.md`
+- `docs/COLLABORATION_PLAYBOOK.md`
 - `docs/INTERFACES.md`
 - `docs/CURRENT_STATUS.md`
 - the active contract linked for the subsystem

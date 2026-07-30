@@ -3705,3 +3705,23 @@ AGENT_CONTEXT=l1 \
 AGENT_RUNNER=openai \
 bash scripts/run_decoy_ablation.sh 2>&1 | tee data/guide_ablation/decoy_l1_kimi_v3.log
 ```
+
+### 2026-07-30 — docs/release: collaboration execution baseline
+
+- Scope: reviewed the active source layout, CLI, shared models, templates,
+  tests, CI workflow and the existing architecture/interface/status
+  documentation; added the execution-level collaboration playbook.
+- Classification: docs.
+- Result: defined ten ownership areas, cross-area handoff rules, a common
+  standard for Python and artifact interfaces, distinct current-status/roadmap/
+  append-only-ledger responsibilities, parallel-work rules and five first-sprint
+  work packages. No Atom, Range, experiment or SFT implementation was changed.
+- Verification: Markdown link validation checked 35 relative links with
+  `missing=0`; the scoped staged diff passed `git diff --cached --check`.
+- Evidence: `docs/COLLABORATION_PLAYBOOK.md`, `docs/README.md`,
+  `CONTRIBUTING.md`.
+- Limitations: people are not assigned; maintainers must name an owner and
+  backup/reviewer for each active area. Scenario/result/batch schemas and CI
+  alignment remain planned implementation work.
+- Next owner: docs/release coordinates the first sprint; shared-contracts owns
+  versioned Scenario and Verification Result contracts.
