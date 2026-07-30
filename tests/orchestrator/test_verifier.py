@@ -2193,6 +2193,28 @@ class TestRunnerExtractJson:
         }
         assert progress["flag_claims"][0]["source"] == "assistant_text"
 
+    def test_finalization_reminder_requires_partial_structured_json(self):
+        from clab_builder.orchestrator.composer.scenario_runner import (
+            build_finalization_reminder,
+        )
+
+        reminder = build_finalization_reminder({
+            "targets": [
+                {"node_name": "target-1"},
+                {"node_name": "target-2"},
+                {"node_name": "target-3"},
+            ],
+            "objectives": [{"id": "read-customer-records"}],
+        })
+
+        assert "turn budget is almost exhausted" in reminder
+        assert "verified_flags" in reminder
+        assert "attack_log" in reminder
+        assert "objective_results" in reminder
+        assert "failed_targets" in reminder
+        assert "target-1" in reminder
+        assert "read-customer-records" in reminder
+
     def test_turn_limit_is_distinguished_from_completed_output(self):
         from clab_builder.orchestrator.composer.scenario_runner import (
             classify_termination,

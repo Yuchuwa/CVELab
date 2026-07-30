@@ -27,6 +27,83 @@ def _signals_by_target(payload: Any) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
+def _load_expected_signals(path: str | Path | None) -> dict[str, Any]:
+    if not path:
+        return {}
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _signal_rule_id(frame: dict[str, Any]) -> str:
+    signal_frame = frame.get("signalFrame")
+    if not isinstance(signal_frame, dict):
+        return ""
+    signal = signal_frame.get("signal")
+    if not isinstance(signal, dict):
+        return ""
+    return str(signal.get("ruleId") or "")
+
+
+def _rule_ids_by_target(after: dict[str, list[dict[str, Any]]]) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for target, frames in after.items():
+        ids = sorted({
+            rule_id
+            for rule_id in (_signal_rule_id(frame) for frame in frames)
+            if rule_id
+        })
+        out[target] = ids
+    return out
+
+
+def evaluate_expected_signals(
+    case_id: str,
+    after: dict[str, list[dict[str, Any]]],
+    expected_signals: dict[str, Any],
+) -> dict[str, Any]:
+    cases = expected_signals.get("cases") if isinstance(expected_signals, dict) else {}
+    spec = cases.get(case_id) if isinstance(cases, dict) else None
+    if not isinstance(spec, dict):
+        return {
+            "evaluated": False,
+            "detected": False,
+            "expected_rule_ids": [],
+            "matched_rule_ids": [],
+            "missing_rule_ids": [],
+            "observed_rule_ids": sorted({
+                rule_id
+                for ids in _rule_ids_by_target(after).values()
+                for rule_id in ids
+            }),
+            "rule_ids_by_target": _rule_ids_by_target(after),
+        }
+
+    expected_rule_ids = [
+        str(rule_id)
+        for rule_id in spec.get("expected_rule_ids", [])
+        if str(rule_id)
+    ]
+    observed = sorted({
+        rule_id
+        for ids in _rule_ids_by_target(after).values()
+        for rule_id in ids
+    })
+    matched = sorted(set(expected_rule_ids) & set(observed))
+    missing = sorted(set(expected_rule_ids) - set(observed))
+    return {
+        "evaluated": True,
+        "detected": bool(expected_rule_ids) and not missing,
+        "expected_rule_ids": expected_rule_ids,
+        "matched_rule_ids": matched,
+        "missing_rule_ids": missing,
+        "observed_rule_ids": observed,
+        "rule_ids_by_target": _rule_ids_by_target(after),
+    }
+
+
 def _load_full_result(result: dict[str, Any]) -> dict[str, Any]:
     scenario_dir = result.get("scenario_dir")
     if not scenario_dir:
@@ -43,9 +120,14 @@ def _load_full_result(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def export_signals(batch_dir: str | Path, output_dir: str | Path | None = None) -> dict[str, Any]:
+def export_signals(
+    batch_dir: str | Path,
+    output_dir: str | Path | None = None,
+    expected_signals_path: str | Path | None = None,
+) -> dict[str, Any]:
     batch_path = Path(batch_dir)
     out_path = Path(output_dir) if output_dir is not None else batch_path / "signals"
+    expected_signals = _load_expected_signals(expected_signals_path)
     summary_path = batch_path / "summary.json"
     payload = json.loads(summary_path.read_text(encoding="utf-8"))
     results = payload.get("results", []) if isinstance(payload, dict) else []
@@ -81,6 +163,11 @@ def export_signals(batch_dir: str | Path, output_dir: str | Path | None = None) 
             "signals_after_total": sum(len(items) for items in after.values()),
             "targets": targets,
             "case_dir": str(case_dir),
+            "expected_signal_detection": evaluate_expected_signals(
+                case_id,
+                after,
+                expected_signals,
+            ),
         })
 
     summary = {
@@ -105,12 +192,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="",
         help="Output directory; defaults to BATCH_DIR/signals",
     )
+    parser.add_argument(
+        "--expected-signals",
+        default="",
+        help="Optional JSON spec mapping case IDs to expected generic SysArmor rule IDs",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    summary = export_signals(args.batch_dir, args.output or None)
+    summary = export_signals(
+        args.batch_dir,
+        args.output or None,
+        args.expected_signals or None,
+    )
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
