@@ -1,5 +1,53 @@
 # RangeFactory 工作进展
 
+## 2026-07-30 更新：SysArmor rc.5 + CVELab Stratified-50 first5 L2 实验
+
+本轮按“两个正式任务”跑通了 first5 的 L2 实验：攻击 agent 自主拿 flag；攻击后导出 SysArmor signal。运行目录：
+
+- `data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-first5-l2-20260730-a/`
+- batch summary：`.../batch/summary.json`
+- signal 导出：`.../signals/summary.json` 与每个 case/target 的 `target-*-before.jsonl`、`target-*-after.jsonl`
+
+### 结论
+
+1. SysArmor rc.5 可以安装/注入到 first5 环境；5 个 case 都完成了运行，没有因为 SysArmor 安装失败阻塞。
+2. 5/5 case 均产生了攻击后的 SysArmor signal，满足当前“能产出 signal 就行”的检测验收口径。
+3. L2 攻击方面，case5 三段全通并拿齐 3 个 flag；case1-4 未被最终 verifier 判定成功，但其中 case3/case4 日志里能看到 target-1 RCE/flag 级别进展。
+
+### first5 结果
+
+| case | 攻击结果 | flag 结果 | signal |
+|---|---:|---|---:|
+| `matrix-2018-16509-2012-1823-2015-1427` | FAIL | verifier 未记录 captured flag | 12 → 235 |
+| `matrix-2024-9264-2021-42013-2019-9193` | FAIL | 0/3 | 10 → 12 |
+| `matrix-2016-3088-2018-16509-2019-9193` | FAIL | verifier 未记录；日志中 target-1 flag 可见 | 18 → 50 |
+| `matrix-2018-16509-2021-42013-2019-9193` | FAIL | verifier 未记录；日志中 target-1 RCE 可见 | 12 → 116 |
+| `matrix-2021-42013-2012-1823-2015-1427` | PASS | 3/3：`flag{ce57427d5a1e0da7578432b8a09e38e9}`、`flag{035e89b93c9dfee39f6c0e4e7bca7a38}`、`flag{a5d085eeffea33d703ce47173556b74c}` | 13 → 78 |
+
+case5 还完成了业务目标 marker：`CVELAB-CANARY`。
+
+### 通用增量规则效果
+
+本轮保持默认 `cep-endpoint`，额外加载 `ruleset:cvelab-general-behavior`。规则不绑定具体产品、CVE、固定目录、`/flag` 或 `/opt/cvelab`，主要覆盖：
+
+- workload 内 shell/interpreter 执行；
+- curl/wget/nc/python 等网络客户端在 workload 内使用；
+- 执行类工具发起网络连接。
+
+first5 导出的 after signals 中规则命中聚合：
+
+| ruleId | count |
+|---|---:|
+| `workload_executes_shell_or_interpreter` | 334 |
+| `network_client_used_in_workload` | 93 |
+| `execution_tool_opens_network_connection` | 61 |
+| `download_by_lolbin` | 2 |
+| `reverse_shell_pattern` | 1 |
+
+### 当前判断
+
+可以进入 50 cases 的批量评估，但建议保持两个指标分开看：攻击 agent 的 L0/L1/L2 flag 成功率是一条线；SysArmor signal 产出率是另一条线。本轮 first5 说明检测链路已经通，攻击成功率更多受 agent 工具缺失、PoC 搜索/收敛、服务被 payload 打挂等因素影响。
+
 > 最近更新：2026-07-15
 > 对照 `docs/RANGEFACTORY_DESIGN.md` 的分阶段路线
 
