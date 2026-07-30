@@ -8,10 +8,47 @@ from clab_builder.shared.models.atom import AtomConfig
 from clab_builder.orchestrator.composer.atom_loader import AtomLoader
 
 
+def _write_atom(root: Path, cve_id: str, *, verified: bool = True, services=None) -> None:
+    atom_dir = root / cve_id
+    atom_dir.mkdir(parents=True)
+    (atom_dir / "atom.yaml").write_text(yaml.safe_dump({
+        "version": 2,
+        "cve_id": cve_id,
+        "category": "test",
+        "docker_image": "test:latest",
+        "ports": [80],
+        "services": services if services is not None else [
+            {"name": "web", "image": "test:latest", "is_target": True}
+        ],
+        "vuln_category": "RCE",
+        "primary_mitre_phase": "initial_access",
+        "service_role": "web_application",
+        "exploit_complexity": "simple",
+        "attack_method": "single_request",
+        "verified": verified,
+    }))
+
+
+@pytest.fixture
+def atom_root(tmp_path):
+    _write_atom(tmp_path, "CVE-2014-6271")
+    for index in range(2, 13):
+        _write_atom(tmp_path, f"CVE-TEST-{index:04d}")
+    _write_atom(
+        tmp_path,
+        "CVE-MULTI-0001",
+        services=[
+            {"name": "web", "image": "test:latest"},
+            {"name": "db", "image": "test-db:latest"},
+        ],
+    )
+    return tmp_path
+
+
 class TestAtomLoaderLoad:
     @pytest.fixture
-    def loader(self):
-        return AtomLoader(atoms_dir="data/atoms")
+    def loader(self, atom_root):
+        return AtomLoader(atoms_dir=str(atom_root))
 
     def test_load_known_atom(self, loader):
         atom = loader.load("CVE-2014-6271")
@@ -36,8 +73,8 @@ class TestAtomLoaderLoad:
 
 class TestAtomLoaderAllVerified:
     @pytest.fixture
-    def loader(self):
-        return AtomLoader(atoms_dir="data/atoms")
+    def loader(self, atom_root):
+        return AtomLoader(atoms_dir=str(atom_root))
 
     def test_load_all_verified(self, loader):
         atoms = loader.load_all_verified()
@@ -60,13 +97,13 @@ class TestAtomLoaderAllVerified:
 
 class TestAtomLoaderList:
     @pytest.fixture
-    def loader(self):
-        return AtomLoader(atoms_dir="data/atoms")
+    def loader(self, atom_root):
+        return AtomLoader(atoms_dir=str(atom_root))
 
     def test_list_available(self, loader):
         names = loader.list_available()
         assert "CVE-2014-6271" in names
-        assert len(names) >= 15
+        assert len(names) == 13
 
 
 class TestAtomLoaderRoundtrip:

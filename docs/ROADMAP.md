@@ -29,12 +29,11 @@ Acceptance:
 
 ## Phase 2: Version File Contracts
 
-Add versioned models or JSON Schemas for:
+Scenario Manifest v1 and Verification Result v1 are the first implemented
+contracts. Continue with versioned models or JSON Schemas for:
 
-- generated scenario manifest;
 - private Ground Truth;
 - Agent input and output;
-- verification result;
 - experiment manifest, batch state and batch summary.
 
 Acceptance:
@@ -47,9 +46,10 @@ Acceptance:
 
 Deliverables:
 
-- one canonical Atom-pool JSON with generated CSV/Markdown views;
-- explicit population definitions for discovered, managed, candidate, anchor and
-  matrix-eligible Atoms;
+- one canonical Atom build-status JSON with generated CSV/Markdown views;
+- exactly three Atom lifecycle states: planned, building and completed;
+- Range-owned, versioned matrix manifests with selected bindings and structured
+  rejection reasons;
 - experiment registry with model, runner, context, template/Atom fingerprints,
   code revision, denominators and supersession;
 - a curated public export format.
@@ -93,8 +93,8 @@ After the collaboration and contract baseline is stable:
 |---|---|---|
 | P0 | Review and merge collaboration baseline | Docs and ignore policy are on GitHub |
 | P0 | Establish a clean code/data release boundary | Intended code changes are reviewed in scoped commits |
-| P1 | Add Scenario and Verification Result models | Round-trip and privacy tests pass |
-| P1 | Regenerate canonical Atom status | JSON/CSV/Markdown share one timestamp and hash |
+| P1 | Complete Ground Truth, Agent I/O and batch models | Round-trip and privacy tests pass |
+| Done | Regenerate canonical Atom status | JSON/CSV/Markdown share one timestamp and hash |
 | P1 | Add experiment registry | Existing benchmark runs can be indexed without rewriting them |
 | P2 | Mark legacy modules and documents | New contributors no longer enter old architecture paths |
 | P2 | Build sanitized public exporter | Secret/leak scan passes on exported data |

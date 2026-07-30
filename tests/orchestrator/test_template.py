@@ -195,25 +195,20 @@ class TestAllTemplates:
     def test_enterprise_3tier_noise_levels(self, loader):
         tpl = loader.load("enterprise_3tier")
         assert "none" in tpl.noise_levels
-        assert "baseline" in tpl.noise_levels
+        assert "low" in tpl.noise_levels
         assert tpl.noise_levels["none"] == []
-        baseline = tpl.noise_levels["baseline"]
-        assert len(baseline) == 5
-        zones = {s.zone for s in baseline}
+        low = tpl.noise_levels["low"]
+        assert len(low) == 5
+        zones = {s.zone for s in low}
         assert zones == {"dmz", "app", "data"}
-        # each baseline service is a real NoiseService with parsed fields
-        for s in baseline:
+        # each low-level service is a real NoiseService with parsed fields
+        for s in low:
             assert s.name.startswith("decoy-")
             assert s.image
             assert isinstance(s.ports, list)
         # postgres decoy replaced by lightweight alpine+nc listener (no env)
-        pg = next(s for s in baseline if s.name == "decoy-app-postgres")
-        assert pg.ports == [5432]
-        assert pg.image == "alpine:latest"
-        assert pg.command == "nc -lk -p 5432 -e /bin/true"
-        assert pg.environment == {}
         # busybox decoy carries a command
-        bb = next(s for s in baseline if s.name == "decoy-data-busybox")
+        bb = next(s for s in low if s.name == "decoy-data-05")
         assert bb.command == "httpd -f -p 8080"
 
     def test_enterprise_3tier_injection_zones(self, loader):

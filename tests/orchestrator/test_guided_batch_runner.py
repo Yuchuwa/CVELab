@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -11,6 +12,8 @@ SPEC.loader.exec_module(MODULE)
 _should_retry = MODULE._should_retry
 summarize = MODULE.summarize
 parse_args = MODULE.parse_args
+digest_inputs = MODULE._digest_inputs
+write_summary = MODULE._write_summary
 
 
 def test_cleanup_failure_after_agent_trial_is_not_retried():
@@ -77,3 +80,43 @@ def test_no_hint_context_is_supported_and_recorded():
     assert summary["agent_context"] == "no_hint"
     assert summary["hint_profile"] == "exploit_hints_removed"
     assert summary["prompt_hygiene"]["ok"] is True
+
+
+def test_model_is_part_of_experiment_fingerprint():
+    first = parse_args(["--model", "model-a"])
+    second = parse_args(["--model", "model-b"])
+
+    assert digest_inputs([], first) != digest_inputs([], second)
+
+
+def test_batch_summary_records_model_and_runner(tmp_path):
+    result_path = tmp_path / "result.json"
+    result_path.write_text(json.dumps({"case_id": "case-1"}))
+    state = {
+        "run_id": "run-1",
+        "created_at": "2026-07-30T00:00:00+00:00",
+        "fingerprint": "fingerprint",
+        "selected_case_ids": ["case-1"],
+        "cases": {
+            "case-1": {
+                "result_path": str(result_path),
+                "status": "completed",
+            }
+        },
+        "options": {
+            "environment_only": False,
+            "agent_context": "l2",
+            "noise_level": "none",
+            "model": "model-a",
+            "agent_runner": "openai",
+            "max_turns": 100,
+            "agent_timeout": 1800,
+        },
+    }
+
+    write_summary(tmp_path, state)
+    summary = json.loads((tmp_path / "summary.json").read_text())
+
+    assert summary["model"] == "model-a"
+    assert summary["agent_runner"] == "openai"
+    assert summary["validation_round"]["model"] == "model-a"

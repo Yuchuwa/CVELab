@@ -1,0 +1,279 @@
+# Atom Build Status
+
+Status: generated snapshot
+
+Generated at: `2026-07-30T17:05:00.766779+00:00`
+
+Snapshot hash: `1649e1ba411a85e2a29f8ce3be88daae737173169d49581c15964addc311a2e5`
+
+## Lifecycle Definitions
+
+- `planned`: accepted into the Atom build queue; atom.yaml does not exist yet
+- `building`: Atom construction or verification has started but strict completion gates do not all pass
+- `completed`: strict high-confidence Atom contract passes every recorded completion gate
+
+## Strict Completion Gates
+
+- `schema_v3`
+- `source_bundle_complete`
+- `source_bundle_hashed`
+- `self_contained_paths`
+- `runtime_spec_explicit`
+- `runtime_ready`
+- `runtime_build_reproducible`
+- `flag_contract_explicit`
+- `validation_contract_explicit`
+- `native_verified`
+- `service_contract_complete`
+- `verified_capability`
+- `guide_ready_valid`
+- `orchestrated_environment_verified`
+
+## Summary
+
+- `total`: 239
+- `planned`: 0
+- `building`: 193
+- `completed`: 46
+
+## Atoms
+
+- `CVE-2010-2861` — `completed`; blockers: none
+- `CVE-2010-3863` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2012-1823` — `completed`; blockers: none
+- `CVE-2012-2122` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2013-4547` — `building`; blockers: runtime_ready, runtime_build_reproducible
+- `CVE-2014-0160` — `building`; blockers: verified_capability, guide_ready_valid
+- `CVE-2014-3120` — `completed`; blockers: none
+- `CVE-2014-3704` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2014-6271` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2015-1427` — `completed`; blockers: none
+- `CVE-2015-3337` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2015-5254` — `building`; blockers: runtime_ready, runtime_build_reproducible, service_contract_complete, verified_capability
+- `CVE-2015-5531` — `completed`; blockers: none
+- `CVE-2015-8562` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2016-1897` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2016-3088` — `completed`; blockers: none
+- `CVE-2016-3714` — `completed`; blockers: none
+- `CVE-2016-4437` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2016-4977` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2016-5385` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2016-5734` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2016-9086` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-1000028` — `completed`; blockers: none
+- `CVE-2017-1000353` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-10271` — `building`; blockers: runtime_ready
+- `CVE-2017-11610` — `completed`; blockers: none
+- `CVE-2017-12149` — `completed`; blockers: none
+- `CVE-2017-12615` — `completed`; blockers: none
+- `CVE-2017-12629-RCE` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-12635` — `completed`; blockers: none
+- `CVE-2017-12636` — `building`; blockers: runtime_ready, runtime_build_reproducible, service_contract_complete, verified_capability
+- `CVE-2017-12794` — `building`; blockers: source_bundle_complete, runtime_ready, runtime_build_reproducible, orchestrated_environment_verified
+- `CVE-2017-14849` — `completed`; blockers: none
+- `CVE-2017-15715` — `completed`; blockers: none
+- `CVE-2017-16082` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-17405` — `building`; blockers: runtime_ready, runtime_build_reproducible
+- `CVE-2017-17562` — `completed`; blockers: none
+- `CVE-2017-3066` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-4971` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-5223` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-5645` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-6920` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-7494` — `building`; blockers: runtime_ready, runtime_build_reproducible, service_contract_complete, verified_capability
+- `CVE-2017-7504` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-7525` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-7529` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-8046` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-8386` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-8917` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-9841` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2017-9993` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-1000006` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-1000533` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-1000861` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-10054` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-1058` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-10933` — `completed`; blockers: none
+- `CVE-2018-12613` — `completed`; blockers: none
+- `CVE-2018-1270` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-1273` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-1297` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-14574` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-15473` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-15685` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-16509` — `completed`; blockers: none
+- `CVE-2018-18778` — `completed`; blockers: none
+- `CVE-2018-18925` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-19475` — `completed`; blockers: none
+- `CVE-2018-19518` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-2628` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-2894` — `building`; blockers: runtime_ready, runtime_build_reproducible
+- `CVE-2018-3760` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-7490` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-7600` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-7602` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2018-8715` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-0193` — `completed`; blockers: none
+- `CVE-2019-10758` — `completed`; blockers: none
+- `CVE-2019-11043` — `completed`; blockers: none
+- `CVE-2019-11581` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-14234` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-15107` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-17558` — `completed`; blockers: none
+- `CVE-2019-17564` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-20933` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-3396` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-5418` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-6116` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-6339` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-6341` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-7238` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-7609` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-9053` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-9193` — `completed`; blockers: none
+- `CVE-2020-10199` — `building`; blockers: runtime_ready, runtime_build_reproducible, service_contract_complete
+- `CVE-2020-10204` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-11651` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-11652` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-11981` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-13942` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-13945` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-14882` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-15906` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-16846` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-17518` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-17519` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-17526` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-1938` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-1957` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-35476` — `building`; blockers: verified_capability
+- `CVE-2020-7012` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-7247` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-7961` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-9402` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-9496` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-21311` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-21351` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-22205` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-22911` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-23592` — `building`; blockers: source_bundle_complete, source_bundle_hashed, runtime_ready, runtime_build_reproducible, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-25646` — `completed`; blockers: none
+- `CVE-2021-26084` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-26120` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-27341` — `building`; blockers: source_bundle_complete, runtime_ready, runtime_build_reproducible, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-28073` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-28164` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-28169` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-29441` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-29442` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-29505` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-3129` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-32568` — `building`; blockers: source_bundle_complete, source_bundle_hashed, runtime_ready, runtime_build_reproducible, orchestrated_environment_verified
+- `CVE-2021-32682` — `completed`; blockers: none
+- `CVE-2021-34371` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-34429` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-35042` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-4034` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-40438` — `building`; blockers: runtime_ready, runtime_build_reproducible, guide_ready_valid
+- `CVE-2021-40822` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-41277` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-41773` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-42013` — `completed`; blockers: none
+- `CVE-2021-42342` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-42392` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-43008` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-43798` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-44228` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-45232` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-45788` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-0543` — `completed`; blockers: none
+- `CVE-2022-0778` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-22947` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-22963` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-22965` — `completed`; blockers: none
+- `CVE-2022-22978` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-23221` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-24706` — `building`; blockers: native_verified, verified_capability, orchestrated_environment_verified
+- `CVE-2022-24816` — `completed`; blockers: none
+- `CVE-2022-26134` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-34265` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-41678` — `completed`; blockers: none
+- `CVE-2022-4223` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-44268` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-44645` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-46169` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-2160` — `building`; blockers: source_bundle_complete, source_bundle_hashed, runtime_ready, runtime_build_reproducible, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-21839` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-22515` — `building`; blockers: native_verified, verified_capability, orchestrated_environment_verified
+- `CVE-2023-22527` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-23752` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-25157` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-25194` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-25826` — `building`; blockers: verified_capability
+- `CVE-2023-26360` — `completed`; blockers: none
+- `CVE-2023-27524` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-28432` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-29300` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-32315` — `building`; blockers: runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-33246` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-37582` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-37941` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-38633` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-38646` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-39361` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-41892` — `completed`; blockers: none
+- `CVE-2023-42793` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-42820` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-4450` — `completed`; blockers: none
+- `CVE-2023-46604` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-49070` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-49103` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-5002` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-51449` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-51467` — `completed`; blockers: none
+- `CVE-2024-1561` — `building`; blockers: runtime_ready, runtime_build_reproducible
+- `CVE-2024-23897` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-27198` — `building`; blockers: runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-27348` — `completed`; blockers: none
+- `CVE-2024-28752` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-2961` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-32114` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-36401` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-38856` — `completed`; blockers: none
+- `CVE-2024-39907` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-42323` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-43441` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-4367` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-45195` — `completed`; blockers: none
+- `CVE-2024-45507` — `building`; blockers: guide_ready_valid
+- `CVE-2024-47177` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-4956` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-56145` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-9264` — `completed`; blockers: none
+- `CVE-2025-13780` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-1974` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-24813` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-2945` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-29927` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-30208` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-32395` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-32433` — `completed`; blockers: none
+- `CVE-2025-3248` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-41242` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-49001` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-54068` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-55182` — `completed`; blockers: none
+- `CVE-2025-67303` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2025-68613` — `completed`; blockers: none
+- `CVE-2026-21858` — `completed`; blockers: none
+- `CVE-2026-22777` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2026-24061` — `completed`; blockers: none
+- `CVE-2026-25253` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2026-25887` — `completed`; blockers: none
+- `CVE-2026-27944` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2026-31816` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2026-34197` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2026-34486` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2026-39363` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `PIL-CVE-2017-8291` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified

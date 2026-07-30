@@ -233,20 +233,23 @@ The project has now completed a full **structure rebuild** of the current verifi
    - `CVE-2015-5254` — protocol-payload construction instability (OpenWire)
    - `CVE-2017-7494` — SMB exploit automation instability
 
-#### Important operational distinction
+#### Current Atom lifecycle
 
-The project now needs to distinguish three different notions of “usable atom”:
+Atom has exactly three build states:
 
-1. **structure-healthy**
-   - The atom has complete schema/runtime/source_bundle and can be managed as a project asset.
+1. **planned** — accepted into the build queue; `atom.yaml` does not exist.
+2. **building** — construction or verification started, but at least one strict
+   completion gate is missing or failed.
+3. **completed** — every strict high-confidence gate in
+   `docs/ATOM_BUILD_GUIDE.md` passes.
 
-2. **template-candidate**
-   - The atom is structurally healthy and suitable to be considered in template design / slot mapping.
-
-3. **template-anchor**
-   - The atom has also passed a fresh full rebuild under the current native + orchestrated validation chain and can serve as a high-confidence template baseline.
-
-These must not be conflated.
+Structure, runtime, native verification, Guide and environment results are
+evidence fields, not additional Atom types. Failed or deferred attempts remain
+`building` with an explicit failure class. Matrix membership and template-slot
+selection are owned by Range and must not be recorded as Atom lifecycle state.
+Use the structured `verification.orchestrated_verification` record as
+environment evidence; the legacy `environment_ready` mirror is not an
+independent completion gate.
 
 #### Current pool-management rule
 
@@ -274,9 +277,9 @@ The following files should be treated as current project bookkeeping sources:
 
 Atom and Range progress must be recorded promptly in
 `docs/WORK_PROGRESS_REPORT.md`. Record only established facts, with the date,
-scope, classification (`structure-healthy`, `template-candidate`, or
-`template-anchor`), verification/runtime result, known limitations, and the
-next owner when work crosses the Atom/Range boundary.
+scope, Atom build status (`planned`, `building`, or `completed`) when
+applicable, failed completion gates, verification/runtime result, known
+limitations, and the next owner when work crosses the Atom/Range boundary.
 
 **Mandatory recording rule:** Every work session must append a dated entry to
 `docs/WORK_PROGRESS_REPORT.md` before the session ends, even if the work only
@@ -371,8 +374,8 @@ Work is split by responsibility:
      adding duplicate RCE atoms.
    - Every new or rebuilt Atom must pass structure/source-bundle/native
      verification and produce a reviewed exploit Guide.
-   - Keep `structure-healthy`, `template-candidate`, and `template-anchor`
-     classifications separate.
+   - Keep the Atom lifecycle limited to `planned`, `building`, and `completed`;
+     record individual gate results as evidence rather than additional types.
 
 2. **Range-side coverage and matching (CVELab/Codex)**
    - Build a slot-to-Atom coverage matrix using `exploit_access`, verified

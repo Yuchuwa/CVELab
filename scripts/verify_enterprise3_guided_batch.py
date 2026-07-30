@@ -47,6 +47,10 @@ except ImportError:  # The caller may provide all settings through the environme
 
 from clab_builder.orchestrator.composer.scenario import ScenarioPipeline
 from clab_builder.orchestrator.composer.verifier import ScenarioVerifier
+from clab_builder.shared.models.artifact_contracts import (
+    load_scenario_manifest,
+    load_verification_result,
+)
 
 
 # Keep the baseline and the controlled slot substitutions together.  The order
@@ -405,6 +409,7 @@ def _digest_inputs(selected: list[dict[str, object]], args: argparse.Namespace) 
         "agent_context": args.agent_context,
         "noise_level": str(getattr(args, "noise_level", "none")),
         "agent_runner": args.agent_runner,
+        "model": args.model,
     }, sort_keys=True).encode())
     paths = [ROOT / "templates" / "enterprise_3tier" / "template.yaml", Path(__file__),
              ROOT / "src/clab_builder/orchestrator/composer/verifier.py",
@@ -513,7 +518,9 @@ def release_control_lease(lease: dict[str, Any] | None) -> None:
 def scenario_reserved_subnets(scenario_dir: Path) -> list[str]:
     try:
         import yaml
-        data = yaml.safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+        data = load_scenario_manifest(
+            yaml.safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+        ).model_dump(mode="json", exclude_none=True)
         return [str(item) for item in data.get("network_subnets") or []]
     except Exception:
         return []
@@ -575,7 +582,9 @@ def run_worker(spec_path: Path) -> int:
             persisted_path = Path(spec["scenario_dir"]) / "verify_result.json"
             if persisted_path.exists():
                 try:
-                    raw = json.loads(persisted_path.read_text())
+                    raw = load_verification_result(
+                        json.loads(persisted_path.read_text())
+                    ).model_dump(mode="json", exclude_none=True)
                 except json.JSONDecodeError:
                     pass
             result = summarize(spec["case"], Path(spec["scenario_dir"]), raw)
@@ -616,6 +625,8 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
         "validation_mode": "guided_agent", "environment_only": state["options"]["environment_only"],
         "agent_context": state["options"].get("agent_context", "guided"),
         "noise_level": state["options"].get("noise_level", "none"),
+        "model": state["options"].get("model", ""),
+        "agent_runner": state["options"].get("agent_runner", "claude"),
         # Top-level validation-round tag: identifies which batch this summary
         # belongs to so downstream level/agent experiments can reuse a set of
         # Ranges with a traceable "validated in round X" provenance. Each
@@ -624,6 +635,8 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
             "run_id": state["run_id"],
             "agent_context": state["options"].get("agent_context", "guided"),
             "noise_level": state["options"].get("noise_level", "none"),
+            "model": state["options"].get("model", ""),
+            "agent_runner": state["options"].get("agent_runner", "claude"),
             "environment_only": state["options"]["environment_only"],
             "max_turns": state["options"].get("max_turns"),
             "agent_timeout": state["options"].get("agent_timeout"),
@@ -690,7 +703,9 @@ def _prewarm_cases(state: dict[str, Any], args: argparse.Namespace, output_dir: 
         scenario_dir = Path(item["scenario_dir"])
         try:
             import yaml
-            meta = yaml.safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+            meta = load_scenario_manifest(
+                yaml.safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+            ).model_dump(mode="json", exclude_none=True)
             images = meta.get("runtime_images") or []
             key = hashlib.sha256(json.dumps(images, sort_keys=True).encode()).hexdigest()
             if key in prepared:
@@ -1062,7 +1077,8 @@ def main() -> int:
             "options": {"environment_only": args.environment_only, "generate_only": args.generate_only,
                         "parallel": args.parallel, "agent_timeout": args.agent_timeout, "max_turns": args.max_turns,
                         "agent_context": args.agent_context,
-                        "noise_level": str(getattr(args, "noise_level", "none"))},
+                        "noise_level": str(getattr(args, "noise_level", "none")),
+                        "model": args.model, "agent_runner": args.agent_runner},
             "selected_case_ids": [str(case["id"]) for case in selected], "cases": {},
         }
         for case in selected:

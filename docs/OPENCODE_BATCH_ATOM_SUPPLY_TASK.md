@@ -93,10 +93,10 @@ trying to force a low-value or unstable candidate through the pipeline.
 3. Update `data/atom_pool_status.*` and any relevant rebuild/runtime status
    artifacts for each accepted or downgraded Atom.
 4. Append established facts to `docs/WORK_PROGRESS_REPORT.md`, including
-   classification (`structure-healthy`, `template-candidate`, or
-   `template-anchor`), validation results, limitations, and handoff boundary.
+   build status (`planned`, `building`, or `completed`), failed completion
+   gates, validation results, limitations, and handoff boundary.
 5. Provide a concise final table: CVE, role/family, verified capabilities,
-   Guide state, runtime state, classification, and failure class if rejected.
+   Guide state, runtime state, build status, and failure class if rejected.
 
 ## 6. Acceptance criteria
 

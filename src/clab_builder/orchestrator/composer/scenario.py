@@ -14,6 +14,7 @@ from clab_builder.orchestrator.composer.scenario_assembler import ScenarioAssemb
 from clab_builder.orchestrator.composer.sysfield_exporter import SysFieldExporter
 from clab_builder.atomizer.output.sysfield_playbook import SysFieldPlaybookGenerator
 from clab_builder.shared.models.atom import CapabilityType
+from clab_builder.shared.models.artifact_contracts import ScenarioManifestV1
 from clab_builder.shared.models.exploit_guide import ExploitGuide, validate_exploit_guide
 
 
@@ -255,6 +256,9 @@ class ScenarioPipeline:
             scenario_meta["guide_compatibility"] = scenario["guide_compatibility"]
         if scenario.get("guide_advisories"):
             scenario_meta["guide_advisories"] = scenario["guide_advisories"]
+        scenario_meta = ScenarioManifestV1.model_validate(scenario_meta).model_dump(
+            mode="json"
+        )
         scenario_meta_path.write_text(
             yaml.safe_dump(scenario_meta, sort_keys=False, allow_unicode=True)
         )

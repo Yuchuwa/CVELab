@@ -17,6 +17,10 @@ or a historical experiment.
 | How is work divided and handed off? | [`COLLABORATION_PLAYBOOK.md`](COLLABORATION_PLAYBOOK.md) |
 | What files and interfaces connect modules? | [`INTERFACES.md`](INTERFACES.md) |
 | What is complete and what is not? | [`CURRENT_STATUS.md`](CURRENT_STATUS.md) |
+| How is an Atom built and completed? | [`ATOM_BUILD_GUIDE.md`](ATOM_BUILD_GUIDE.md) |
+| How is a Range selected and validated? | [`RANGE_BUILD_GUIDE.md`](RANGE_BUILD_GUIDE.md) |
+| What is the current Range progress? | [`RANGE_PROGRESS.md`](RANGE_PROGRESS.md) |
+| How are model/Agent experiments maintained? | [`EXPERIMENT_PROGRESS.md`](EXPERIMENT_PROGRESS.md) |
 | What should be done next? | [`ROADMAP.md`](ROADMAP.md) |
 | How should changes be developed and reviewed? | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | What data can be committed or published? | [`DATA_POLICY.md`](DATA_POLICY.md) |
@@ -28,12 +32,16 @@ or a historical experiment.
 - [`ATOM_RUNTIME_TO_RANGE_HANDOFF.md`](ATOM_RUNTIME_TO_RANGE_HANDOFF.md): runtime and source-bundle handoff.
 - [`AGENT_INPUT_LEVEL_INTERFACE.md`](AGENT_INPUT_LEVEL_INTERFACE.md): Guided and L0/L1/L2 information exposure.
 - [`INTERFACES.md`](INTERFACES.md): current contract registry and compatibility rules.
+- [`ATOM_BUILD_GUIDE.md`](ATOM_BUILD_GUIDE.md): three-state Atom lifecycle and strict completion gates.
+- [`RANGE_BUILD_GUIDE.md`](RANGE_BUILD_GUIDE.md): Range-owned matrix selection and validation gates.
+- [`EXPERIMENT_PROGRESS.md`](EXPERIMENT_PROGRESS.md): experiment code, dimensions, ownership and progress.
 
 The Pydantic models and contract tests remain authoritative over prose.
 
 ## Progress Records
 
 - [`CURRENT_STATUS.md`](CURRENT_STATUS.md) is the current-state dashboard.
+- [`RANGE_PROGRESS.md`](RANGE_PROGRESS.md) is the Range stage dashboard.
 - [`ROADMAP.md`](ROADMAP.md) contains planned work and acceptance gates.
 - [`WORK_PROGRESS_REPORT.md`](WORK_PROGRESS_REPORT.md) is an append-only historical ledger.
 

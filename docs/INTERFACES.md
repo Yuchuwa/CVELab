@@ -25,19 +25,23 @@ this registry in the same change.
 | Contract | Producer | Consumer | Authority | Stability |
 |---|---|---|---|---|
 | Atom v3 | Atomizer | Atom loader, matcher, assembler | `shared/models/atom.py` | stable |
+| Atom build status v2 | Shared status generator | Atom planning and handoff | `shared/atom_pool_status.py` | versioned generated snapshot |
 | Exploit Guide | Atomizer | Guided Agent preflight and prompt | `shared/models/exploit_guide.py` | stable, version semantics need cleanup |
 | Topology Template | Template authors | Template loader, matcher, assembler | `shared/models/template.py` | stable |
-| Scenario manifest | Scenario assembler | Verifier, exporters | `scenario_assembler.py` | internal, untyped |
+| Scenario manifest v1 | Scenario assembler | Verifier, batch runner, exporters | `shared/models/artifact_contracts.py` | versioned |
 | Ground Truth | Scenario assembler | Verifier only | `scenario_assembler.py` | private, untyped |
 | Agent input | Verifier | Agent runner | `verifier.py`, `scenario_runner.py` | stable behavior, untyped |
 | Agent output | Agent runner | Verifier | runner implementations | stable behavior, untyped |
-| Verification result | Verifier | Batch runner, analysis, SFT | `verifier.py` | stable behavior, untyped |
+| Verification result v1 | Verifier | Batch runner, analysis, SFT | `shared/models/artifact_contracts.py` | versioned |
+| Range matrix status v1 | Range matrix generator | Planning, docs, batch preparation | `generate_enterprise3_matrix.py` | versioned compact view |
+| Range build status v1 | Range progress generator | Range planning and experiment denominators | `shared/range_progress.py` | versioned sanitized snapshot |
+| Experiment status v1 | Range progress generator | Research planning and reporting | `shared/range_progress.py` | versioned sanitized snapshot |
 | Experiment manifest | Matrix/select scripts | Batch runner | batch script loaders | operational |
 | Batch state/summary | Batch runner | Resume and analysis tools | batch runner | operational |
 
-`Scenario`, Ground Truth, Agent I/O, verification result and batch files need
-versioned Pydantic or JSON Schema models. Until those exist, field removals or
-renames are breaking changes.
+Ground Truth, Agent I/O and batch files still need versioned Pydantic or JSON
+Schema models. Until those exist, field removals or renames are breaking
+changes.
 
 ## Atom v3
 
@@ -54,14 +58,37 @@ Key contract groups:
 - native, runtime and orchestrated verification records.
 - reference to `exploit_guide.yaml`.
 
-Qualification levels are defined in `shared/atom_qualification.py`:
+Atom lifecycle has exactly three states: `planned`, `building` and `completed`.
+The internal qualification checks remain compatibility diagnostics for current
+loaders; they are not lifecycle states and must not be reported as Atom types.
+Do not use `verified=true` or one successful check as a substitute for strict
+`completed`.
 
-- `structure_healthy`
-- `template_candidate`
-- `template_anchor`
+## Atom Pool Status
 
-Do not use `verified=true`, `template_ready=true`, or runtime readiness as
-interchangeable meanings.
+`data/atom_pool_status.json` is the authoritative generated build snapshot.
+`atom_pool_status.csv` and `atom_pool_status.md` are views produced by
+`scripts/generate_atom_pool_status.py`; they are not edited independently.
+
+The snapshot defines and counts only `planned`, `building` and `completed`.
+Every view carries the same `generated_at` and `snapshot_hash`. Completion
+checks and blockers explain status without creating additional Atom types.
+The strict gates are defined in
+[`ATOM_BUILD_GUIDE.md`](ATOM_BUILD_GUIDE.md).
+
+Matrix candidates, accepted bindings and rejection reasons belong to Range
+manifests under `data/range_matrices/`; they are template- and rule-specific.
+See [`RANGE_BUILD_GUIDE.md`](RANGE_BUILD_GUIDE.md).
+
+`data/range_matrix_status.json` is the tracked Range-side summary. It records
+the source Atom snapshot hash, Range candidate IDs, selected IDs and rejection
+counts. Full manifests remain local experiment artifacts.
+
+`data/range_build_status.json` records every discovered sanitized Range attempt
+with generation, environment, Range build, attack graph, attack path, cleanup,
+Agent and objective stages. Its CSV and Markdown views are generated from the
+same snapshot. `data/experiment_status.*` groups those attempts by batch and
+records the declared model, runner and experiment dimensions.
 
 ## Exploit Guide
 
@@ -115,6 +142,12 @@ verify_result.json
 and must never be used as Agent input. Generated scenario directories are run
 artifacts, not canonical repository assets.
 
+New `scenario.yaml` files carry `schema_version: 1` and are validated by
+`ScenarioManifestV1` before persistence. Version 1 requires `name`, `hash`,
+`template` and `injections`, and types the major asset/runtime/Guide metadata
+groups while preserving extension diagnostics. Historical manifests without a
+version are read as legacy version 0; new writers must not emit version 0.
+
 ## Agent Input Profiles
 
 Supported contexts are `guided`, `no_guide`, legacy `no_hint`, and explicit
@@ -149,6 +182,12 @@ of profile, Agent input must not contain:
 
 Never use `success` alone to aggregate research results. Select an explicit
 denominator and report deterministic, Agent and objective outcomes separately.
+
+New results carry `schema_version: 1`. `VerificationResultV1` applies defaults
+and validates every verifier exit through the shared persistence boundary,
+including early infrastructure failures and final cleanup updates. Historical
+unversioned results remain readable as legacy version 0. Unknown future schema
+versions are rejected instead of being silently interpreted as version 1.
 
 ## Batch Interface
 
