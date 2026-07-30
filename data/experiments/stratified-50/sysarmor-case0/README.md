@@ -40,8 +40,29 @@ data/experiments/stratified-50/sysarmor-case0/scripts/deploy-and-inject.sh
 
 The command prepares verified offline assets, deploys the scenario, injects
 SysArmor into `target-1`, `target-2`, and `target-3`, and exits successfully only
-after every Agent reports healthy. Do not start attack or validation traffic
-before this command returns.
+after every Agent reports healthy and the additive detection rules load. Do not
+start attack or validation traffic before this command returns.
+
+During injection, the default rc.5 `ruleset:cep-endpoint` remains enabled and
+the CVELab-owned `ruleset:cvelab-general-behavior` is added in observe mode. The
+local unsigned content is product/CVE independent: it does not match product
+names, CVE IDs, fixed ports, fixed IPs, `/flag`, or lab-private paths. The
+ruleset contains:
+
+- `workload_executes_shell_or_interpreter`
+- `execution_tool_opens_network_connection`
+- `network_client_used_in_workload`
+
+The injector loads content in this order: execution-tool context, network-client
+context, general-behavior rulepack, detection-policy dry-run, detection-policy
+apply, then `policy current` verification. Any content, policy, or verification
+failure blocks attack execution for that target and writes `*-rules.log` under
+`_build/logs/`.
+
+Current rc.5 rule support does not include CIDR membership or declared normal
+upstream baselines. Because SysArmor is injected after vulnerable services start,
+these rules also do not require seeing the original service parent process
+startup event.
 
 To prepare assets separately:
 
