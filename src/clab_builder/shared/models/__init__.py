@@ -26,6 +26,12 @@ from .exploit_guide import (
     ExploitGuidePostExploit, ExploitGuideCommandChannel,
     ExploitGuideRequirements, validate_exploit_guide,
 )
+from .artifact_contracts import (
+    ScenarioManifestV1, LegacyScenarioManifest,
+    VerificationResultV1, LegacyVerificationResult,
+    load_scenario_manifest, load_verification_result,
+    normalize_verification_result,
+)
 
 __all__ = [
     "ContainerLabTopology", "NetworkNode", "NetworkLink",
@@ -45,4 +51,8 @@ __all__ = [
     "ExploitGuidePreconditions", "ExploitGuideStep", "GuideToolRequirement",
     "GuideMaterialRequirement", "ExploitGuideExecution", "ExploitGuidePostExploit",
     "ExploitGuideCommandChannel", "ExploitGuideRequirements", "validate_exploit_guide",
+    "ScenarioManifestV1", "LegacyScenarioManifest",
+    "VerificationResultV1", "LegacyVerificationResult",
+    "load_scenario_manifest", "load_verification_result",
+    "normalize_verification_result",
 ]

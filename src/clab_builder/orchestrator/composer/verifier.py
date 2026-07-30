@@ -36,6 +36,10 @@ from clab_builder.orchestrator.composer.scenario_runner import (
     extract_observed_progress,
 )
 from clab_builder.orchestrator.composer.sysfield_runner import SysFieldRunner
+from clab_builder.shared.models.artifact_contracts import (
+    load_scenario_manifest,
+    normalize_verification_result,
+)
 
 SCENARIO_RUNNER_SRC = Path(__file__).parent / "scenario_runner.py"
 
@@ -503,7 +507,10 @@ class ScenarioVerifier:
         scenario_meta = scenario_path / "scenario.yaml"
         if scenario_meta.exists():
             import yaml
-            meta = yaml.safe_load(scenario_meta.read_text()) or {}
+            raw_meta = yaml.safe_load(scenario_meta.read_text()) or {}
+            meta = load_scenario_manifest(raw_meta).model_dump(
+                mode="json", exclude_none=True
+            )
         return ground_truth, meta.get("ip_allocations", {}), meta
 
     @staticmethod
@@ -1364,7 +1371,10 @@ class ScenarioVerifier:
                     persisted["execution_complete"] = bool(
                         destroy.get("ok", False) and transport_cleanup.get("ok", False)
                     )
-                    self._atomic_write_json(result_file, persisted)
+                    persisted["cleanup_failed"] = not persisted["execution_complete"]
+                    self._atomic_write_json(
+                        result_file, normalize_verification_result(persisted)
+                    )
                 except (OSError, json.JSONDecodeError):
                     pass
 
@@ -2921,6 +2931,7 @@ class ScenarioVerifier:
                 "validated_at": datetime.now(timezone.utc).isoformat(),
             }
         result_file = scenario_path / "verify_result.json"
+        result = normalize_verification_result(result)
         self._atomic_write_json(result_file, result)
         print(f"  Result saved: {result_file}")
 

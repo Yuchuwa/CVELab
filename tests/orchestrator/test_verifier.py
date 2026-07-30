@@ -2095,6 +2095,8 @@ class TestVerifierDefaults:
         assert vr["validated_at"]  # ISO timestamp present
         # Persisted file carries the tag too.
         saved = json.loads((scenario_dir / "verify_result.json").read_text())
+        assert result["schema_version"] == 1
+        assert saved["schema_version"] == 1
         assert saved["validation_round"]["run_id"] == "round123abc"
 
     def test_save_result_no_validation_round_without_run_id(self, tmp_path):

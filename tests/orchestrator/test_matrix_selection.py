@@ -1,10 +1,15 @@
 """Regression tests for bounded, coverage-first Range matrix selection."""
 
 import importlib.util
+import json
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "generate_enterprise3_matrix.py"
+SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "generate_enterprise3_matrix.py"
+)
 SPEC = importlib.util.spec_from_file_location("enterprise3_matrix", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
@@ -62,6 +67,62 @@ def test_runtime_ready_for_batch_requires_full_runtime_selection(monkeypatch):
         lambda _: {"selection": "runtime_image"},
     )
     assert MODULE.runtime_ready_for_batch(atom) is True
+
+
+def test_range_matrix_reads_only_completed_atoms_from_v2_status(tmp_path):
+    status_path = tmp_path / "atom-status.json"
+    status_path.write_text(json.dumps({
+        "schema_version": 2,
+        "snapshot_hash": "snapshot-123",
+        "atoms": [
+            {"cve_id": "CVE-DONE", "build_status": "completed", "blockers": []},
+            {
+                "cve_id": "CVE-WIP",
+                "build_status": "building",
+                "blockers": ["environment_verified"],
+            },
+            {"cve_id": "CVE-NEXT", "build_status": "planned"},
+        ],
+    }))
+
+    completed, metadata = MODULE.load_completed_atom_status(status_path)
+
+    assert completed == {"CVE-DONE"}
+    assert metadata["snapshot_hash"] == "snapshot-123"
+    assert metadata["completed_count"] == 1
+    assert {row["cve_id"] for row in metadata["rejections"]} == {
+        "CVE-WIP",
+        "CVE-NEXT",
+    }
+
+
+def test_compact_matrix_status_is_range_owned(tmp_path):
+    manifest_path = tmp_path / "matrix.json"
+    manifest_path.write_text("{}\n")
+    payload = {
+        "created_at": "2026-07-30T00:00:00+00:00",
+        "template": "enterprise_3tier",
+        "atom_status": {"schema_version": 2, "snapshot_hash": "atom-hash"},
+        "candidate_atom_count": 2,
+        "candidate_atom_ids": ["CVE-A", "CVE-B"],
+        "accepted_case_count": 1,
+        "cases": [{"cves": ["CVE-A"]}],
+        "range_input_rejections": [
+            {"cve_id": "CVE-C", "reason": "atom_build_not_completed"}
+        ],
+        "rejections": [
+            {"candidate": "CVE-B", "reason": "slot_or_dependency_constraint"}
+        ],
+    }
+
+    status = MODULE.build_matrix_status(payload, manifest_path)
+
+    assert status["range_candidate_atom_ids"] == ["CVE-A", "CVE-B"]
+    assert status["selected_atom_ids"] == ["CVE-A"]
+    assert status["summary"]["selected_atoms"] == 1
+    assert status["range_input_rejection_counts"] == {
+        "atom_build_not_completed": 1
+    }
 
 
 def test_tie_breaking_spreads_entry_cves_instead_of_one_dominating():

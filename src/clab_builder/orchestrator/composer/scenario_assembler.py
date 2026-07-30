@@ -17,6 +17,7 @@ from typing import Any, Optional
 import yaml
 
 from clab_builder.shared.models.atom import AtomConfig
+from clab_builder.shared.models.artifact_contracts import ScenarioManifestV1
 from clab_builder.shared.models.template import TopologyTemplate, InjectionPoint
 from clab_builder.orchestrator.composer.template_loader import TemplateLoader
 from clab_builder.orchestrator.composer.capability_closure import (
@@ -1542,7 +1543,8 @@ class ScenarioAssembler:
         )
 
         # Scenario metadata
-        meta = {
+        meta = ScenarioManifestV1.model_validate({
+            "schema_version": 1,
             "name": scenario["name"],
             "hash": scenario["hash"],
             "template": scenario["template"],
@@ -1557,7 +1559,7 @@ class ScenarioAssembler:
             "match_report": scenario.get("match_report", []),
             "runtime_builds": scenario.get("runtime_builds", []),
             "runtime_images": scenario.get("runtime_images", []),
-        }
+        }).model_dump(mode="json")
         (out / "scenario.yaml").write_text(
             yaml.dump(meta, default_flow_style=False, sort_keys=False)
         )

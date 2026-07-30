@@ -88,12 +88,20 @@ def _write_pipeline_atom(
         }, sort_keys=False))
 
 
+def _write_pipeline_atoms(atoms_dir: Path, count: int = 3) -> None:
+    _write_pipeline_atom(atoms_dir, "CVE-2014-6271")
+    for index in range(2, count + 1):
+        _write_pipeline_atom(atoms_dir, f"CVE-PIPELINE-{index:04d}")
+
+
 class TestScenarioPipelineGenerate:
     @pytest.fixture
-    def pipeline(self):
+    def pipeline(self, tmp_path):
+        atoms_dir = tmp_path / "pipeline-atoms"
+        _write_pipeline_atoms(atoms_dir)
         return ScenarioPipeline(
             templates_dir="templates",
-            atoms_dir="data/atoms",
+            atoms_dir=str(atoms_dir),
             default_validation_mode="sysfield",
         )
 
@@ -114,6 +122,9 @@ class TestScenarioPipelineGenerate:
         assert (out / "ground_truth.json").exists()
         assert (out / "sysfield" / "playbook.yaml").exists()
         assert result["sysfield_playbook"] == str(out / "sysfield" / "playbook.yaml")
+        scenario_meta = yaml.safe_load((out / "scenario.yaml").read_text())
+        assert scenario_meta["schema_version"] == 1
+        assert "ground_truth" not in scenario_meta
 
     def test_generate_guided_agent_copies_guides(self, tmp_path):
         atoms_dir = tmp_path / "atoms"
@@ -130,7 +141,9 @@ class TestScenarioPipelineGenerate:
         assert (out / "exploit_guides" / "dmz-target-1.yaml").exists()
         assert "sysfield_playbook" not in result
         assert result["guide_compatibility"]["overall_status"] == "unknown_legacy"
-        assert yaml.safe_load((out / "scenario.yaml").read_text())["guide_compatibility"]["overall_status"] == "unknown_legacy"
+        scenario_meta = yaml.safe_load((out / "scenario.yaml").read_text())
+        assert scenario_meta["schema_version"] == 1
+        assert scenario_meta["guide_compatibility"]["overall_status"] == "unknown_legacy"
 
     def test_guide_alignment_difference_is_advisory(self, tmp_path):
         atoms_dir = tmp_path / "atoms"
@@ -210,10 +223,12 @@ class TestScenarioPipelineGenerate:
 
 class TestScenarioPipelineBatch:
     @pytest.fixture
-    def pipeline(self):
+    def pipeline(self, tmp_path):
+        atoms_dir = tmp_path / "batch-atoms"
+        _write_pipeline_atoms(atoms_dir)
         return ScenarioPipeline(
             templates_dir="templates",
-            atoms_dir="data/atoms",
+            atoms_dir=str(atoms_dir),
             default_validation_mode="sysfield",
         )
 
@@ -242,10 +257,12 @@ class TestScenarioPipelineMultiTemplate:
     """测试多个模板的场景生成"""
 
     @pytest.fixture
-    def pipeline(self):
+    def pipeline(self, tmp_path):
+        atoms_dir = tmp_path / "multi-atoms"
+        _write_pipeline_atoms(atoms_dir)
         return ScenarioPipeline(
             templates_dir="templates",
-            atoms_dir="data/atoms",
+            atoms_dir=str(atoms_dir),
             default_validation_mode="sysfield",
         )
 
@@ -285,7 +302,7 @@ class TestScenarioPipelineMultiTemplate:
         assert gt["attack_path"][1]["step"] == 2
 
     def test_enterprise_3tier_three_targets(self, pipeline, tmp_path):
-        with pytest.raises(ValueError, match="execution_adapter"):
+        with pytest.raises(ValueError, match="No matching atom"):
             pipeline.generate(
                 template_name="enterprise_3tier",
                 output_dir=str(tmp_path),
@@ -293,7 +310,7 @@ class TestScenarioPipelineMultiTemplate:
             )
 
     def test_enterprise_3tier_three_links(self, pipeline, tmp_path):
-        with pytest.raises(ValueError, match="execution_adapter"):
+        with pytest.raises(ValueError, match="No matching atom"):
             pipeline.generate(
                 template_name="enterprise_3tier",
                 output_dir=str(tmp_path),
@@ -301,7 +318,7 @@ class TestScenarioPipelineMultiTemplate:
             )
 
     def test_enterprise_3tier_cve_setup_three_playbooks(self, pipeline, tmp_path):
-        with pytest.raises(ValueError, match="execution_adapter"):
+        with pytest.raises(ValueError, match="No matching atom"):
             pipeline.generate(
                 template_name="enterprise_3tier",
                 output_dir=str(tmp_path),
@@ -309,14 +326,14 @@ class TestScenarioPipelineMultiTemplate:
             )
 
     def test_enterprise_3tier_output_files(self, pipeline, tmp_path):
-        with pytest.raises(ValueError, match="execution_adapter"):
+        with pytest.raises(ValueError, match="No matching atom"):
             pipeline.generate(
                 template_name="enterprise_3tier",
                 output_dir=str(tmp_path),
             )
 
     def test_enterprise_3tier_three_unique_cves(self, pipeline, tmp_path):
-        with pytest.raises(ValueError, match="execution_adapter"):
+        with pytest.raises(ValueError, match="No matching atom"):
             pipeline.generate(
                 template_name="enterprise_3tier",
                 output_dir=str(tmp_path),
@@ -367,12 +384,15 @@ class TestCLIIntegration:
         from click.testing import CliRunner
         from clab_builder.cli import main
 
+        atoms_dir = tmp_path / "cli-atoms"
+        _write_pipeline_atoms(atoms_dir)
         runner = CliRunner()
         result = runner.invoke(main, [
             "generate", "dmz_simple",
             "--cve", "CVE-2014-6271",
             "--name", "cli-test",
             "--output", str(tmp_path),
+            "--atoms-dir", str(atoms_dir),
             "--validation-mode", "sysfield",
         ])
         assert result.exit_code == 0, result.output
@@ -384,11 +404,14 @@ class TestCLIIntegration:
         from click.testing import CliRunner
         from clab_builder.cli import main
 
+        atoms_dir = tmp_path / "cli-batch-atoms"
+        _write_pipeline_atoms(atoms_dir)
         runner = CliRunner()
         result = runner.invoke(main, [
             "batch", "dmz_simple",
             "--count", "2",
             "--output", str(tmp_path),
+            "--atoms-dir", str(atoms_dir),
             "--seed", "42",
         ])
         assert result.exit_code == 0, result.output

@@ -13,12 +13,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from clab_builder.shared.models.artifact_contracts import load_verification_result
+
 
 def _scenario_to_record(
     scenario: dict,
     verify_result: dict,
 ) -> dict:
     """将场景 + 验证结果转换为 flat record"""
+    verify_result = load_verification_result(verify_result).model_dump(
+        mode="json", exclude_none=True
+    )
     gt = scenario.get("ground_truth", {})
     injections = scenario.get("injections", [])
     agent_result = verify_result.get("agent_result", {})
