@@ -10,7 +10,7 @@
 ```yaml
 exploit_guide:
   path: exploit_guide.yaml
-  format_version: 1
+  format_version: 2
   provenance: native_agent
   status: ready
 ```
