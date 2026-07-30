@@ -27,6 +27,22 @@ def _signals_by_target(payload: Any) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
+def _load_full_result(result: dict[str, Any]) -> dict[str, Any]:
+    scenario_dir = result.get("scenario_dir")
+    if not scenario_dir:
+        return result
+    verify_path = Path(str(scenario_dir)) / "verify_result.json"
+    try:
+        payload = json.loads(verify_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return result
+    if isinstance(payload, dict):
+        merged = dict(result)
+        merged.update(payload)
+        return merged
+    return result
+
+
 def export_signals(batch_dir: str | Path, output_dir: str | Path | None = None) -> dict[str, Any]:
     batch_path = Path(batch_dir)
     out_path = Path(output_dir) if output_dir is not None else batch_path / "signals"
@@ -38,6 +54,7 @@ def export_signals(batch_dir: str | Path, output_dir: str | Path | None = None) 
     for result in results:
         if not isinstance(result, dict):
             continue
+        result = _load_full_result(result)
         case_id = str(result.get("case_id") or "unknown-case")
         sysarmor = result.get("sysarmor") if isinstance(result.get("sysarmor"), dict) else {}
         before = _signals_by_target(sysarmor.get("signals_before"))
