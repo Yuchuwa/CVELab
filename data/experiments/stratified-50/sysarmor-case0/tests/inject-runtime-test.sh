@@ -29,8 +29,15 @@ elif [[ "$1" == "image" && "$2" == "inspect" ]]; then
   echo "linux amd64"
 elif [[ "$1" == "exec" && "$2" == "-u" && "$3" == "0" && "$4" == "clab-exact-lab-target-1" ]]; then
     shift 4
-    if [[ "$*" == *sysarmorctl* ]]; then
+    if [[ "$*" == *"agent health"* ]]; then
       [[ -f "$FAKE_HEALTHY" ]]
+    elif [[ "$*" == *"content apply"* ]]; then
+      [[ "${FAKE_RULE_FAILURE:-0}" != 1 ]] || exit 44
+      echo '{"status":"accepted"}'
+    elif [[ "$*" == *"policy apply"* ]]; then
+      echo '{"status":"accepted"}'
+    elif [[ "$*" == *"policy current"* ]]; then
+      echo '{"detection":{"rulesets":[{"ref":"ruleset:cep-endpoint","enabled":true},{"ref":"ruleset:cvelab-general-behavior","enabled":true}]}}'
     elif [[ "$*" == *"sysarmor-agent version"* ]]; then
       [[ -f "$FAKE_HEALTHY" ]] && echo "${FAKE_INSTALLED_VERSION:-$SYSARMOR_RELEASE_TAG}"
     elif [[ " $* " == *" .sysarmor-release "* && " $* " == *" cat "* ]]; then
@@ -67,11 +74,51 @@ grep -Fq 'type:\ container' "$WORK/docker.log"
 grep -Fq '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' "$WORK/docker.log"
 first_starts="$(grep -c 'sysarmor-agent\\ run' "$WORK/docker.log")"
 test "$first_starts" -eq 1
+first_content_applies="$(grep -c 'content\\ apply' "$WORK/docker.log")"
+test "$first_content_applies" -eq 3
+grep -Fq 'context-execution-tools.json' "$WORK/docker.log"
+grep -Fq 'context-network-clients.json' "$WORK/docker.log"
+grep -Fq 'rulepack-general-behavior.json' "$WORK/docker.log"
+grep -Fq 'detection-policy.json' "$WORK/docker.log"
+
+line_no() {
+  grep -n "$1" "$WORK/docker.log" | head -1 | cut -d: -f1
+}
+
+last_line_no() {
+  grep -n "$1" "$WORK/docker.log" | tail -1 | cut -d: -f1
+}
+
+context_line="$(line_no 'context-execution-tools.json')"
+network_context_line="$(line_no 'context-network-clients.json')"
+rulepack_line="$(line_no 'rulepack-general-behavior.json')"
+dry_run_line="$(line_no 'policy\\ apply.*--dry-run')"
+apply_line="$(last_line_no 'policy\\ apply.*detection-policy.json')"
+current_line="$(line_no 'policy.*current')"
+test "$context_line" -lt "$rulepack_line"
+test "$network_context_line" -lt "$rulepack_line"
+test "$rulepack_line" -lt "$dry_run_line"
+test "$dry_run_line" -lt "$apply_line"
+test "$apply_line" -lt "$current_line"
 
 "$INJECT" --topology "$WORK/topology.yaml" --target target-1
 second_starts="$(grep -c 'sysarmor-agent\\ run' "$WORK/docker.log")"
 test "$second_starts" -eq 1
 grep -Fq 'sysarmor-agent version' "$WORK/docker.log"
+second_content_applies="$(grep -c 'content\\ apply' "$WORK/docker.log")"
+test "$second_content_applies" -eq 6
+
+export FAKE_RULE_FAILURE=1
+if "$INJECT" --topology "$WORK/topology.yaml" --target target-1 >"$WORK/rule-failure.log" 2>&1; then
+  echo "[inject-runtime-test][ERROR] accepted failed additive rule loading" >&2
+  exit 1
+fi
+grep -Fq 'rule loading failed' "$WORK/rule-failure.log"
+if grep -Fq 'all targets healthy' "$WORK/rule-failure.log"; then
+  echo "[inject-runtime-test][ERROR] reported all targets healthy after rule failure" >&2
+  exit 1
+fi
+unset FAKE_RULE_FAILURE
 
 export FAKE_INSTALLED_VERSION="dev"
 if "$INJECT" --topology "$WORK/topology.yaml" --target target-1 >"$WORK/mismatch-existing.log" 2>&1; then
