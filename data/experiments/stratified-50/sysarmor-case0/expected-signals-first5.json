@@ -1,0 +1,39 @@
+{
+  "description": "Case-level expected generic SysArmor signals for Stratified-50 first5 L2 runs. Rules are intentionally behavior-based and avoid product, CVE, fixed path, flag, or lab-private directory coupling.",
+  "cases": {
+    "matrix-2018-16509-2012-1823-2015-1427": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2024-9264-2021-42013-2019-9193": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ]
+    },
+    "matrix-2016-3088-2018-16509-2019-9193": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2018-16509-2021-42013-2019-9193": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2021-42013-2012-1823-2015-1427": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    }
+  }
+}

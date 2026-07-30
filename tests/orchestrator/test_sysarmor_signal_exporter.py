@@ -100,3 +100,113 @@ def test_export_prefers_full_scenario_flag_verification(tmp_path):
     case = summary["cases"][0]
     assert case["flags_all_captured"] is True
     assert case["flags_per_target"]["target-3"]["captured"] == "flag{three}"
+
+
+def test_expected_signal_detection_is_case_level(tmp_path):
+    exporter = load_exporter()
+    batch = tmp_path / "batch"
+    batch.mkdir()
+    expected = tmp_path / "expected.json"
+    expected.write_text(json.dumps({
+        "cases": {
+            "case-a": {
+                "expected_rule_ids": [
+                    "workload_executes_shell_or_interpreter",
+                    "network_client_used_in_workload",
+                ]
+            }
+        }
+    }), encoding="utf-8")
+    (batch / "summary.json").write_text(json.dumps({
+        "results": [
+            {
+                "case_id": "case-a",
+                "sysarmor": {
+                    "detection": {"signal_detected": True},
+                    "signals_before": {},
+                    "signals_after": {
+                        "target-1": [
+                            {
+                                "signalFrame": {
+                                    "signal": {
+                                        "ruleId": "workload_executes_shell_or_interpreter"
+                                    }
+                                }
+                            }
+                        ],
+                        "target-2": [
+                            {
+                                "signalFrame": {
+                                    "signal": {
+                                        "ruleId": "network_client_used_in_workload"
+                                    }
+                                }
+                            }
+                        ],
+                    },
+                },
+            }
+        ],
+    }), encoding="utf-8")
+
+    summary = exporter.export_signals(batch, tmp_path / "signals", expected)
+
+    verdict = summary["cases"][0]["expected_signal_detection"]
+    assert verdict["evaluated"] is True
+    assert verdict["detected"] is True
+    assert verdict["expected_rule_ids"] == [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+    ]
+    assert verdict["missing_rule_ids"] == []
+    assert verdict["matched_rule_ids"] == [
+        "network_client_used_in_workload",
+        "workload_executes_shell_or_interpreter",
+    ]
+
+
+def test_expected_signal_detection_reports_missing_rules(tmp_path):
+    exporter = load_exporter()
+    batch = tmp_path / "batch"
+    batch.mkdir()
+    expected = tmp_path / "expected.json"
+    expected.write_text(json.dumps({
+        "cases": {
+            "case-a": {
+                "expected_rule_ids": [
+                    "workload_executes_shell_or_interpreter",
+                    "execution_tool_opens_network_connection",
+                ]
+            }
+        }
+    }), encoding="utf-8")
+    (batch / "summary.json").write_text(json.dumps({
+        "results": [
+            {
+                "case_id": "case-a",
+                "sysarmor": {
+                    "detection": {"signal_detected": True},
+                    "signals_before": {},
+                    "signals_after": {
+                        "target-1": [
+                            {
+                                "signalFrame": {
+                                    "signal": {
+                                        "ruleId": "workload_executes_shell_or_interpreter"
+                                    }
+                                }
+                            }
+                        ],
+                    },
+                },
+            }
+        ],
+    }), encoding="utf-8")
+
+    summary = exporter.export_signals(batch, tmp_path / "signals", expected)
+
+    verdict = summary["cases"][0]["expected_signal_detection"]
+    assert verdict["detected"] is False
+    assert verdict["missing_rule_ids"] == [
+        "execution_tool_opens_network_connection"
+    ]

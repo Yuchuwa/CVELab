@@ -50,6 +50,7 @@ try:
         SYSTEM_PROMPT,
         NO_HINT_SYSTEM_PROMPT,
         build_prompt,
+        build_finalization_reminder,
         extract_json,
         extract_observed_progress,
         classify_termination,
@@ -61,6 +62,7 @@ except ImportError:
         SYSTEM_PROMPT,
         NO_HINT_SYSTEM_PROMPT,
         build_prompt,
+        build_finalization_reminder,
         extract_json,
         extract_observed_progress,
         classify_termination,
@@ -402,9 +404,26 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
     full_text = ""
     session_events: list[dict] = []
     termination_hint = ""
+    finalization_reminder_sent = False
+    finalization_turn = max(0, max_turns - 4)
 
     try:
         for turn in range(max_turns):
+            if (
+                not finalization_reminder_sent
+                and turn >= finalization_turn
+                and not extract_json(full_text)
+            ):
+                reminder = build_finalization_reminder(input_data)
+                messages.append({"role": "user", "content": reminder})
+                session_events.append({
+                    "type": "user",
+                    "message": {"role": "user", "content": reminder},
+                    "turn": turn,
+                })
+                print("[Reminder] final structured JSON requested", file=sys.stderr)
+                finalization_reminder_sent = True
+
             content, tool_calls = _stream_completion(client, model, messages, max_tokens)
             if content:
                 full_text += content + "\n"
