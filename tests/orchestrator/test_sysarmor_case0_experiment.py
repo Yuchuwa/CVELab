@@ -1,3 +1,4 @@
+import json
 import importlib.util
 from pathlib import Path
 
@@ -102,3 +103,48 @@ def test_injector_runs_sysarmor_operations_as_root_without_changing_workload_use
     assert "docker exec -u 0" in script
     assert "docker update" not in script
     assert "docker commit" not in script
+
+
+def test_general_behavior_rules_are_additive_and_product_agnostic():
+    rules = VARIANT / "rules"
+    rulepack = json.loads((rules / "rulepack-general-behavior.json").read_text())
+    policy = json.loads((rules / "detection-policy.json").read_text())
+
+    assert policy["policy_id"] == "cvelab-general-behavior"
+    assert policy["mode"] == "observe"
+    assert {ruleset["ref"] for ruleset in policy["rulesets"]} == {
+        "ruleset:cep-endpoint",
+        "ruleset:cvelab-general-behavior",
+    }
+    assert all(ruleset["enabled"] is True for ruleset in policy["rulesets"])
+
+    assert rulepack["metadata"] == {
+        "id": "rulepack:cvelab-general-behavior",
+        "version": "v1",
+    }
+    rulesets = rulepack["spec"]["rulesets"]
+    assert len(rulesets) == 1
+    assert rulesets[0]["id"] == "ruleset:cvelab-general-behavior"
+    assert rulesets[0]["version"] == "v1"
+    assert {rule["rule_id"] for rule in rulesets[0]["rules"]} == {
+        "workload_executes_shell_or_interpreter",
+        "execution_tool_opens_network_connection",
+        "network_client_used_in_workload",
+    }
+    assert {rule["runtime"]["type"] for rule in rulesets[0]["rules"]} == {
+        "expr",
+        "sequence",
+    }
+    assert all("suppress" in rule for rule in rulesets[0]["rules"])
+
+    raw = "\n".join(path.read_text().lower() for path in rules.glob("*.json"))
+    for forbidden in (
+        "elasticsearch",
+        "grafana",
+        "apache",
+        "postgresql",
+        "cve-",
+        "/flag",
+        "/opt/cvelab",
+    ):
+        assert forbidden not in raw
