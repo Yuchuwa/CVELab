@@ -33,6 +33,9 @@ class FormalRunConfig:
     agent_timeout: int = 1800
     case_timeout: int = 0
     noise_level: str = "none"
+    sysarmor: bool = False
+    sysarmor_detection: bool = False
+    sysarmor_signal_window: int = 30
     environment_only: bool | None = None
     parent_qualification_run: str = ""
     batch_script: str = "scripts/verify_enterprise3_guided_batch.py"
@@ -165,6 +168,11 @@ def build_batch_command(config: FormalRunConfig, batch_output_dir: Path) -> list
         command.extend(["--model", config.model_id])
     if environment_only:
         command.append("--environment-only")
+    if config.sysarmor:
+        command.append("--sysarmor")
+    if config.sysarmor_detection:
+        command.append("--sysarmor-detection")
+        command.extend(["--sysarmor-signal-window", str(config.sysarmor_signal_window)])
     return command
 
 
@@ -245,6 +253,9 @@ def create_formal_run(config: FormalRunConfig) -> FormalRun:
             "parallel": config.parallel,
             "case_timeout": config.case_timeout,
             "noise_level": config.noise_level,
+            "sysarmor": config.sysarmor,
+            "sysarmor_detection": config.sysarmor_detection,
+            "sysarmor_signal_window": config.sysarmor_signal_window,
         },
         "parent_qualification_run": config.parent_qualification_run,
         "paths": {

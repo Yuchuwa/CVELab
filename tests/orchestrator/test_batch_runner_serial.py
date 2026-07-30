@@ -57,6 +57,8 @@ def test_worker_spec_is_unique_and_does_not_persist_api_key(tmp_path):
     args = type("Args", (), {
         "atoms_dir": "data/atoms", "max_turns": 2, "agent_timeout": 3,
         "environment_only": True, "strict_guide_compatibility": False,
+        "sysarmor": True, "sysarmor_detection": True,
+        "sysarmor_signal_window": 30,
     })()
     spec_path = MODULE._worker_spec(
         state, case_state, args, tmp_path, 1, {"name": "cvelab-range-mgmt", "subnet": "172.30.240.0/24"}
@@ -66,6 +68,33 @@ def test_worker_spec_is_unique_and_does_not_persist_api_key(tmp_path):
     assert "LLM_API_KEY" not in content
     assert spec["lab_name"] == case_state["lab_name"]
     assert Path(spec["ansible_paths"]["ANSIBLE_LOCAL_TEMP"]).parent.name == "case-a"
+    assert spec["sysarmor"]["enabled"] is True
+    assert spec["sysarmor"]["detection"] is True
+    assert spec["sysarmor"]["signal_window"] == 30
+
+
+def test_summarize_preserves_sysarmor_detection_result(tmp_path):
+    raw = {
+        "success": True,
+        "environment_success": True,
+        "sysarmor": {
+            "enabled": True,
+            "detection": {
+                "signal_count_before": 0,
+                "signal_count_after": 2,
+                "signal_detected": True,
+            },
+        },
+    }
+
+    summary = MODULE.summarize(
+        {"id": "case-a", "purpose": "test", "cves": ["CVE-1"]},
+        tmp_path,
+        raw,
+    )
+
+    assert summary["sysarmor"]["enabled"] is True
+    assert summary["sysarmor"]["detection"]["signal_detected"] is True
 
 
 def test_atomic_json_never_leaves_temporary_file(tmp_path):
@@ -86,6 +115,17 @@ def test_control_lease_uses_scoped_bridge_network():
     create = run.call_args.args[0]
     assert create[:5] == ["docker", "network", "create", "--driver", "bridge"]
     assert "--internal" not in create
+
+
+def test_openai_runner_strips_anthropic_suffix_from_base_url():
+    assert (
+        MODULE._runner_base_url("openai", "https://api.deepseek.com/anthropic")
+        == "https://api.deepseek.com"
+    )
+    assert (
+        MODULE._runner_base_url("claude", "https://api.deepseek.com/anthropic")
+        == "https://api.deepseek.com/anthropic"
+    )
 
 
 def test_live_output_streams_new_worker_log_lines(tmp_path, capsys):

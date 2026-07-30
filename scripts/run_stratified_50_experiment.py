@@ -41,6 +41,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--agent-timeout", type=int, default=1800)
     parser.add_argument("--case-timeout", type=int, default=0)
     parser.add_argument("--noise-level", default="none")
+    parser.add_argument("--sysarmor", action="store_true")
+    parser.add_argument("--sysarmor-detection", action="store_true")
+    parser.add_argument("--sysarmor-signal-window", type=int, default=30)
     parser.add_argument(
         "--execute",
         action="store_true",
@@ -68,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
         agent_timeout=args.agent_timeout,
         case_timeout=args.case_timeout,
         noise_level=args.noise_level,
+        sysarmor=args.sysarmor,
+        sysarmor_detection=args.sysarmor_detection,
+        sysarmor_signal_window=args.sysarmor_signal_window,
         environment_only=args.kind == "qualification",
         parent_qualification_run=args.parent_qualification_run,
     )
