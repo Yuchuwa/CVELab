@@ -89,7 +89,27 @@ packages/*/build/
 packages/*/.eggs/
 packages/*/*.egg-info/
 data/scenarios/
+data/scenarios_*/
+data/guide_ablation/
+data/range_matrices/
+data/sft/adapter*/
+data/sft/*.log
+data/sft/*.bak
 data/vulhub/
 data/atoms/**/.workspace/
 data/atoms/**/node_modules/
 src/sysfield/
+
+# Local vulnerability/source repositories and runtime workspaces
+CVE-Factory/
+vulhub/
+db_vulns/
+tmp_venvs/
+.tmp/
+opencode.json
+/1
+/EOF
+
+# Local research and model artifacts
+*.pdf
+*.key
