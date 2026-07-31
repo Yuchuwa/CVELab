@@ -97,6 +97,7 @@ def test_inject_sysarmor_runtime_invokes_checked_in_injector(tmp_path):
         result = sysarmor_runtime.inject_sysarmor_runtime(scenario, ["target-1", "target-2"])
 
     assert result["ok"] is True
+    assert run.call_args.kwargs["timeout"] == 900
     command = run.call_args.args[0]
     assert command[0].endswith("inject-runtime.sh")
     assert command[-4:] == ["--target", "target-1", "--target", "target-2"]

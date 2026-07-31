@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -68,8 +69,9 @@ def inject_sysarmor_runtime(scenario_dir: str | Path, targets: list[str]) -> dic
     command = [str(INJECTOR), "--topology", str(Path(scenario_dir) / "clab.yaml")]
     for target in targets:
         command.extend(["--target", target])
+    timeout = _positive_int_env("SYSARMOR_INJECT_TIMEOUT", 900)
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired as exc:
         return {
             "ok": False,
@@ -88,6 +90,14 @@ def inject_sysarmor_runtime(scenario_dir: str | Path, targets: list[str]) -> dic
         "stderr": result.stderr[-4000:],
         "error": "" if result.returncode == 0 else (result.stderr.strip() or result.stdout.strip())[-1000:],
     }
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    try:
+        value = int(os.environ.get(name, ""))
+    except ValueError:
+        return default
+    return value if value > 0 else default
 
 
 def _to_text(value: Any) -> str:
