@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-07-25T04:41:08.946529+00:00",
+  "run_id": "9db649a74b1d5a2a48775cbe",
+  "fingerprint": "72403465182c1b3377ff77198791704ceb5a756d3f23df8d9c7e84dc8f37fcab",
+  "options": {
+    "environment_only": false,
+    "generate_only": false,
+    "parallel": 1,
+    "agent_timeout": 1800,
+    "max_turns": 50,
+    "agent_context": "l2",
+    "noise_level": "none"
+  },
+  "selected_case_ids": [
+    "matrix-2012-1823-3120"
+  ],
+  "cases": {
+    "matrix-2012-1823-3120": {
+      "case": {
+        "id": "matrix-2012-1823-3120",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2014-3120"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-9db649a7-7d691c621f802fa5",
+      "status": "completed",
+      "attempts": 1,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_agent/scenarios/e3-9db649a7-7d691c621f802fa5",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_agent/.batch/results/matrix-2012-1823-3120.json",
+      "runtime_preparation": {
+        "ok": true,
+        "builds": [],
+        "runtime_images": []
+      },
+      "control_network_lease": null,
+      "attempt_records": [
+        {
+          "attempt": 1,
+          "started_at": "2026-07-25T04:41:10.928527+00:00",
+          "log_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_agent/.batch/logs/matrix-2012-1823-3120-a1.log",
+          "finished_at": "2026-07-25T04:45:45.686180+00:00",
+          "failure_stage": "agent",
+          "success": false,
+          "cleanup_failed": false,
+          "cleanup": {
+            "ok": true,
+            "stdout": "",
+            "stderr": "12:45:45 INFO Parsing & checking topology file=clab.yaml\n12:45:45 INFO no containerlab containers found\n"
+          }
+        }
+      ],
+      "last_failure_stage": "agent"
+    }
+  },
+  "updated_at": "2026-07-25T04:45:45.707091+00:00"
+}

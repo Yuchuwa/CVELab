@@ -1,0 +1,13 @@
+{
+  "case_id": "matrix-2021-25646-3120",
+  "purpose": "matrix-generated combination",
+  "cves": [
+    "CVE-2021-25646",
+    "CVE-2014-3120"
+  ],
+  "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_expanded/scenarios/e3-03f73c40-e87d77b3f6985e07",
+  "success": false,
+  "failure_stage": "generation",
+  "error": "ValueError('Atom CVE-2021-25646 guide integrity failed: guide file missing: exploit_guide.yaml')",
+  "execution_complete": false
+}

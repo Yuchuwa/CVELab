@@ -1,0 +1,13 @@
+{
+  "case_id": "matrix-2012-1823-2019-9193",
+  "purpose": "matrix-generated combination",
+  "cves": [
+    "CVE-2012-1823",
+    "CVE-2019-9193"
+  ],
+  "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-fbea11eb74bbe06a",
+  "success": false,
+  "failure_stage": "runtime_materialization",
+  "error": "{\"ok\": false, \"builds\": [], \"runtime_images\": [{\"cve_id\": \"CVE-2019-9193\", \"image\": \"cvelab-runtime-2019-9193-e8b2723eae7f\", \"expected_runtime_image_digest\": \"sha256:3e6b00e6f4f4e30033ba05684026815264ac4f83300a8c4a547de955fab42664\", \"actual_runtime_image_id\": \"\", \"actual_repo_digests\": [], \"ok\": false, \"error\": \"runtime build inputs changed since scenario generation\", \"identity_error\": \"Error response from daemon: No such image: cvelab-runtime-2019-9193-e8b2723eae7f:latest\"}]}",
+  "execution_complete": false
+}

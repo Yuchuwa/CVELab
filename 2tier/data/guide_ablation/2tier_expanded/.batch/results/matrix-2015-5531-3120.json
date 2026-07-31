@@ -1,0 +1,13 @@
+{
+  "case_id": "matrix-2015-5531-3120",
+  "purpose": "matrix-generated combination",
+  "cves": [
+    "CVE-2015-5531",
+    "CVE-2014-3120"
+  ],
+  "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_expanded/scenarios/e3-03f73c40-aec1ae9dbbc03372",
+  "success": false,
+  "failure_stage": "generation",
+  "error": "ValueError(\"Atom CVE-2015-5531 does not satisfy injection_point 'dmz-web' constraints (required_capabilities=[], required_mitre=['initial_access', 'execution'], vuln_category=['RCE', 'LFI', 'SSRF', 'Deserialization', 'Auth_Bypass'], service_role=['web_application', 'middleware', 'framework'], service_access={}, atom_service_access={'protocol': 'http', 'port': 9200})\")",
+  "execution_complete": false
+}

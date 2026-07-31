@@ -1,0 +1,12 @@
+- name: verify_command customer-records
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: verify_command customer-records
+    ansible.builtin.shell: docker exec clab-e3-e5c12f03-02d8703aff5274c0-target-2
+      sh -c 'curl -fsS http://127.0.0.1:9200/customers/customer/1 | grep -Fq '"'"'CVELAB-CANARY'"'"''
+    changed_when: false
+    register: asset_verify_command_customer_records
+    until: asset_verify_command_customer_records.rc == 0
+    retries: 18
+    delay: 10

@@ -1,0 +1,51 @@
+---
+attacker:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.2
+data-router:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.8
+decoy-data-01:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.3
+decoy-data-02:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.5
+decoy-dmz-01:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.4
+decoy-dmz-02:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.9
+decoy-dmz-03:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.10
+edge-router:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.11
+target-1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.7
+target-2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.240.6

@@ -1,0 +1,43 @@
+name: e3-03f73c40-fb584d0d5611be94
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data-router:
+      kind: linux
+      image: frrouting/frr:latest
+    target-1:
+      kind: linux
+      image: vulhub/weblogic:10.3.6.0-2017
+      env:
+        FLAG: flag{2099c72b0ecf8a89d2b8b1ebdb85e563}
+      cmd: startWebLogic.sh
+      binds:
+      - flag-target-1.txt:/flag
+    target-2:
+      kind: linux
+      image: vulhub/elasticsearch:1.1.1
+      env:
+        FLAG: flag{abc4b497de145ea0c667af08d5e91e84}
+      binds:
+      - flag-target-2.txt:/flag
+  links:
+  - endpoints:
+    - attacker:eth1
+    - edge-router:eth1
+  - endpoints:
+    - edge-router:eth2
+    - data-router:eth1
+  - endpoints:
+    - target-1:eth1
+    - edge-router:eth3
+  - endpoints:
+    - target-2:eth1
+    - data-router:eth2
+mgmt:
+  network: cvelab-range-mgmt-v2
+  ipv4-subnet: 172.30.240.0/23

@@ -1,0 +1,13 @@
+{
+  "case_id": "matrix-2021-42013-2019-9193",
+  "purpose": "matrix-generated combination",
+  "cves": [
+    "CVE-2021-42013",
+    "CVE-2019-9193"
+  ],
+  "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-c6ce29aa93bb10d1",
+  "success": false,
+  "failure_stage": "runtime_materialization",
+  "error": "{\"ok\": false, \"builds\": [], \"runtime_images\": [{\"cve_id\": \"CVE-2021-42013\", \"image\": \"cvelab-runtime-2021-42013-3d625bc3c037\", \"expected_runtime_image_digest\": \"sha256:24fca2cb3883091623521aff0de246e7b74b27f55517d64a105615d34762b71d\", \"actual_runtime_image_id\": \"\", \"actual_repo_digests\": [], \"ok\": false, \"error\": \"runtime build inputs changed since scenario generation\", \"identity_error\": \"Error response from daemon: No such image: cvelab-runtime-2021-42013-3d625bc3c037:latest\"}]}",
+  "execution_complete": false
+}

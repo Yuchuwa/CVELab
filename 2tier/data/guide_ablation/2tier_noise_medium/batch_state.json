@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-07-25T07:15:13.545994+00:00",
+  "run_id": "e4172ac792aab490b7607772",
+  "fingerprint": "a4ec4f386ac42ad8694ebcb1e449293c712e55aa700c314499cbf0da661e12be",
+  "options": {
+    "environment_only": true,
+    "generate_only": false,
+    "parallel": 1,
+    "agent_timeout": 1800,
+    "max_turns": 50,
+    "agent_context": "l2",
+    "noise_level": "medium"
+  },
+  "selected_case_ids": [
+    "noise-low"
+  ],
+  "cases": {
+    "noise-low": {
+      "case": {
+        "id": "noise-low",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2014-3120"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-e4172ac7-983b28dfdb06ddd7",
+      "status": "completed",
+      "attempts": 1,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_noise_medium/scenarios/e3-e4172ac7-983b28dfdb06ddd7",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_noise_medium/.batch/results/noise-low.json",
+      "runtime_preparation": {
+        "ok": true,
+        "builds": [],
+        "runtime_images": []
+      },
+      "attempt_records": [
+        {
+          "attempt": 1,
+          "started_at": "2026-07-25T07:15:15.212612+00:00",
+          "log_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_noise_medium/.batch/logs/noise-low-a1.log",
+          "finished_at": "2026-07-25T07:16:45.757585+00:00",
+          "failure_stage": "",
+          "success": true,
+          "cleanup_failed": false,
+          "cleanup": {
+            "ok": true,
+            "stdout": "",
+            "stderr": "15:16:45 INFO Parsing & checking topology file=clab.yaml\n15:16:45 INFO no containerlab containers found\n"
+          }
+        }
+      ],
+      "control_network_lease": null,
+      "last_failure_stage": ""
+    }
+  },
+  "updated_at": "2026-07-25T07:16:45.772891+00:00"
+}

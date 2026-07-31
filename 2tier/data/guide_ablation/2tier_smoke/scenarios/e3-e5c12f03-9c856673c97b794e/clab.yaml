@@ -1,0 +1,39 @@
+name: e3-e5c12f03-9c856673c97b794e
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data-router:
+      kind: linux
+      image: frrouting/frr:latest
+    target-1:
+      kind: linux
+      image: cvelab-atom-cve-2017-12615-44026dd4ba86
+      env:
+        FLAG: flag{b0d8e284157cd1be547f9ae205a83169}
+      binds:
+      - flag-target-1.txt:/flag
+    target-2:
+      kind: linux
+      image: vulhub/elasticsearch:1.1.1
+      env:
+        FLAG: flag{3941104a98b49d52a7711cd52793cf2d}
+      binds:
+      - flag-target-2.txt:/flag
+  links:
+  - endpoints:
+    - attacker:eth1
+    - edge-router:eth1
+  - endpoints:
+    - edge-router:eth2
+    - data-router:eth1
+  - endpoints:
+    - target-1:eth1
+    - edge-router:eth3
+  - endpoints:
+    - target-2:eth1
+    - data-router:eth2

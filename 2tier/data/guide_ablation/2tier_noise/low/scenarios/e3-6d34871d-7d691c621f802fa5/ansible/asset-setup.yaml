@@ -1,0 +1,14 @@
+- name: setup_command customer-records
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: setup_command customer-records
+    ansible.builtin.shell: 'docker exec clab-e3-6d34871d-7d691c621f802fa5-target-2
+      sh -c ''(curl -fsS -XDELETE http://127.0.0.1:9200/customers >/dev/null 2>&1
+      || true); curl -fsS -XPUT http://127.0.0.1:9200/customers/customer/1 -H ''"''"''Content-Type:
+      application/json''"''"'' -d ''"''"''{"marker":"CVELAB-CANARY"}''"''"'' >/dev/null'''
+    changed_when: false
+    register: asset_setup_command_customer_records
+    until: asset_setup_command_customer_records.rc == 0
+    retries: 18
+    delay: 10

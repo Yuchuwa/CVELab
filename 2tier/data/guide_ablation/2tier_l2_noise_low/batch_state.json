@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-07-25T07:57:50.292932+00:00",
+  "run_id": "9cfba089e0eefeb23a2f13d7",
+  "fingerprint": "c00b0abcb621ef062f2d226a1a7f3a4ea408c486859fff3560634fc6618814aa",
+  "options": {
+    "environment_only": false,
+    "generate_only": false,
+    "parallel": 1,
+    "agent_timeout": 2400,
+    "max_turns": 80,
+    "agent_context": "l2",
+    "noise_level": "low"
+  },
+  "selected_case_ids": [
+    "l2-low"
+  ],
+  "cases": {
+    "l2-low": {
+      "case": {
+        "id": "l2-low",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2014-3120"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-9cfba089-499ee7d77767e545",
+      "status": "running",
+      "attempts": 1,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_l2_noise_low/scenarios/e3-9cfba089-499ee7d77767e545",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_l2_noise_low/.batch/results/l2-low.json",
+      "runtime_preparation": {
+        "ok": true,
+        "builds": [],
+        "runtime_images": []
+      },
+      "control_network_lease": {
+        "network_name": "cvelab-agent-9cfba089-499ee7d77767-cbf2ab",
+        "subnet": "172.31.241.0/28",
+        "gateway": "172.31.241.1"
+      },
+      "attempt_records": [
+        {
+          "attempt": 1,
+          "started_at": "2026-07-25T07:57:52.427654+00:00",
+          "log_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_l2_noise_low/.batch/logs/l2-low-a1.log"
+        }
+      ]
+    }
+  },
+  "updated_at": "2026-07-25T07:57:52.428645+00:00"
+}

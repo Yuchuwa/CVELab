@@ -1,0 +1,3 @@
+[Error] Error code: 400 - {'error': {'message': 'The supported API model names are deepseek-v4-pro or deepseek-v4-flash, but you passed deepseek-chat.', 'type': 'invalid_request_error', 'param': '', 'code': 'invalid_request_error'}}
+[Output] /tmp/scenario_output.json
+[Session] openai runner -> /tmp/scenario_session.json (0 events)

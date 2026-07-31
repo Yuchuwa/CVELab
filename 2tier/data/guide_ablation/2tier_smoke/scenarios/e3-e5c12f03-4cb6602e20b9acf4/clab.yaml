@@ -1,0 +1,42 @@
+name: e3-e5c12f03-4cb6602e20b9acf4
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data-router:
+      kind: linux
+      image: frrouting/frr:latest
+    target-1:
+      kind: linux
+      image: cvelab-runtime-2018-16509-6690af7aec2e
+      env:
+        FLAG: flag{9ca2e0e4d6923a8edd77ec975b3c8871}
+      cmd: php -t /var/www/html -S 0.0.0.0:8080
+      binds:
+      - /home/htxxp/sys-factory/CVELab-dev/data/atoms/CVE-2018-16509/init/index.php:/var/www/html/index.php
+      - flag-target-1.txt:/flag
+    target-2:
+      kind: linux
+      image: cvelab-runtime-2019-9193-e8b2723eae7f
+      env:
+        POSTGRES_PASSWORD: postgres
+        FLAG: flag{dd070e418c0247de43da2b892f60bc2e}
+      binds:
+      - flag-target-2.txt:/flag
+  links:
+  - endpoints:
+    - attacker:eth1
+    - edge-router:eth1
+  - endpoints:
+    - edge-router:eth2
+    - data-router:eth1
+  - endpoints:
+    - target-1:eth1
+    - edge-router:eth3
+  - endpoints:
+    - target-2:eth1
+    - data-router:eth2

@@ -1,0 +1,15 @@
+name: enterprise_2tier_base
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data-router:
+      kind: linux
+      image: frrouting/frr:latest
+  links:
+    - endpoints: ["attacker:eth1", "edge-router:eth1"]
+    - endpoints: ["edge-router:eth2", "data-router:eth1"]

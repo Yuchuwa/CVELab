@@ -1,0 +1,43 @@
+name: e3-119ad48d-14713de982472b50
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data-router:
+      kind: linux
+      image: frrouting/frr:latest
+    target-1:
+      kind: linux
+      image: vulhub/php:5.4.1-cgi
+      env:
+        FLAG: flag{d48949d0aa5005467cc2544944578820}
+      binds:
+      - /home/htxxp/sys-factory/CVELab-dev/data/atoms/CVE-2012-1823/init/www:/var/www/html
+      - flag-target-1.txt:/flag
+    target-2:
+      kind: linux
+      image: vulhub/elasticsearch:1.1.1
+      env:
+        FLAG: flag{014c746ce1737cc6c707cfb322e1623d}
+      binds:
+      - flag-target-2.txt:/flag
+  links:
+  - endpoints:
+    - attacker:eth1
+    - edge-router:eth1
+  - endpoints:
+    - edge-router:eth2
+    - data-router:eth1
+  - endpoints:
+    - target-1:eth1
+    - edge-router:eth3
+  - endpoints:
+    - target-2:eth1
+    - data-router:eth2
+mgmt:
+  network: cvelab-range-mgmt-v2
+  ipv4-subnet: 172.30.240.0/23

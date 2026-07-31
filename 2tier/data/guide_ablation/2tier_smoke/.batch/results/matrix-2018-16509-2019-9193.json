@@ -1,0 +1,13 @@
+{
+  "case_id": "matrix-2018-16509-2019-9193",
+  "purpose": "matrix-generated combination",
+  "cves": [
+    "CVE-2018-16509",
+    "CVE-2019-9193"
+  ],
+  "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-4cb6602e20b9acf4",
+  "success": false,
+  "failure_stage": "runtime_materialization",
+  "error": "{\"ok\": false, \"builds\": [], \"runtime_images\": [{\"cve_id\": \"CVE-2018-16509\", \"image\": \"cvelab-runtime-2018-16509-6690af7aec2e\", \"expected_runtime_image_digest\": \"sha256:f481cb0762484e48c6c3b9b623e8d0530657957b06b823646829e5483b380504\", \"actual_runtime_image_id\": \"\", \"actual_repo_digests\": [], \"ok\": false, \"error\": \"runtime build inputs changed since scenario generation\", \"identity_error\": \"Error response from daemon: No such image: cvelab-runtime-2018-16509-6690af7aec2e:latest\"}]}",
+  "execution_complete": false
+}

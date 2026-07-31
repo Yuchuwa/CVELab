@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-07-25T07:30:11.085942+00:00",
+  "run_id": "6d34871def095dbcaa75ad4d",
+  "fingerprint": "dc22c3b6300a79a7a4fcfa8626fd00a4fafa54a65a67d41fa0ea6f2771c14dc8",
+  "options": {
+    "environment_only": true,
+    "generate_only": false,
+    "parallel": 1,
+    "agent_timeout": 1800,
+    "max_turns": 50,
+    "agent_context": "l2",
+    "noise_level": "low"
+  },
+  "selected_case_ids": [
+    "matrix-2012-1823-3120"
+  ],
+  "cases": {
+    "matrix-2012-1823-3120": {
+      "case": {
+        "id": "matrix-2012-1823-3120",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2014-3120"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-6d34871d-7d691c621f802fa5",
+      "status": "completed",
+      "attempts": 1,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_noise/low/scenarios/e3-6d34871d-7d691c621f802fa5",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_noise/low/.batch/results/matrix-2012-1823-3120.json",
+      "runtime_preparation": {
+        "ok": true,
+        "builds": [],
+        "runtime_images": []
+      },
+      "attempt_records": [
+        {
+          "attempt": 1,
+          "started_at": "2026-07-25T07:30:12.790045+00:00",
+          "log_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_noise/low/.batch/logs/matrix-2012-1823-3120-a1.log",
+          "finished_at": "2026-07-25T07:31:00.765047+00:00",
+          "failure_stage": "",
+          "success": true,
+          "cleanup_failed": false,
+          "cleanup": {
+            "ok": true,
+            "stdout": "",
+            "stderr": "15:31:00 INFO Parsing & checking topology file=clab.yaml\n15:31:00 INFO no containerlab containers found\n"
+          }
+        }
+      ],
+      "control_network_lease": null,
+      "last_failure_stage": ""
+    }
+  },
+  "updated_at": "2026-07-25T07:31:00.780278+00:00"
+}

@@ -1,0 +1,13 @@
+{
+  "case_id": "matrix-2022-22965-3120",
+  "purpose": "matrix-generated combination",
+  "cves": [
+    "CVE-2022-22965",
+    "CVE-2014-3120"
+  ],
+  "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_expanded/scenarios/e3-03f73c40-5ec8842cbe804e51",
+  "success": false,
+  "failure_stage": "runtime_materialization",
+  "error": "{\"ok\": false, \"builds\": [], \"runtime_images\": [{\"cve_id\": \"CVE-2022-22965\", \"image\": \"cvelab-runtime-2022-22965-b954ca0d33e2\", \"expected_runtime_image_digest\": \"sha256:75cc7eb5d93f0881d31b0d288e1163ced82c7dd220cdc3398a599f0c0c48fb93\", \"actual_runtime_image_id\": \"\", \"actual_repo_digests\": [], \"ok\": false, \"error\": \"runtime build inputs changed since scenario generation\", \"identity_error\": \"Error response from daemon: No such image: cvelab-runtime-2022-22965-b954ca0d33e2:latest\"}]}",
+  "execution_complete": false
+}

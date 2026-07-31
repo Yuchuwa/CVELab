@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-07-24T16:45:06.598174+00:00",
+  "run_id": "e5c12f033bd62ba445360ee6",
+  "fingerprint": "61632c26d5ab2b2e31c12fa71ee86cdbed6401dc182c26b5f30b9b86cc59dad8",
+  "options": {
+    "environment_only": true,
+    "generate_only": false,
+    "parallel": 2,
+    "agent_timeout": 1800,
+    "max_turns": 50,
+    "agent_context": "l2",
+    "noise_level": "none"
+  },
+  "selected_case_ids": [
+    "matrix-2012-1823-2019-9193",
+    "matrix-2012-1823-2014-3120",
+    "matrix-2018-16509-2019-9193",
+    "matrix-2017-10271-2014-3120",
+    "matrix-2021-42013-2019-9193",
+    "matrix-2017-12615-2014-3120"
+  ],
+  "cases": {
+    "matrix-2012-1823-2019-9193": {
+      "case": {
+        "id": "matrix-2012-1823-2019-9193",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2019-9193"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-e5c12f03-fbea11eb74bbe06a",
+      "status": "completed",
+      "attempts": 0,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-fbea11eb74bbe06a",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/results/matrix-2012-1823-2019-9193.json"
+    },
+    "matrix-2012-1823-2014-3120": {
+      "case": {
+        "id": "matrix-2012-1823-2014-3120",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2014-3120"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-e5c12f03-02d8703aff5274c0",
+      "status": "completed",
+      "attempts": 1,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-02d8703aff5274c0",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/results/matrix-2012-1823-2014-3120.json",
+      "runtime_preparation": {
+        "ok": true,
+        "builds": [],
+        "runtime_images": []
+      },
+      "attempt_records": [
+        {
+          "attempt": 1,
+          "started_at": "2026-07-24T16:45:14.226871+00:00",
+          "log_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/logs/matrix-2012-1823-2014-3120-a1.log",
+          "finished_at": "2026-07-24T16:48:43.388181+00:00",
+          "failure_stage": "",
+          "success": true,
+          "cleanup_failed": false,
+          "cleanup": {
+            "ok": true,
+            "stdout": "",
+            "stderr": "00:48:43 INFO Parsing & checking topology file=clab.yaml\n00:48:43 INFO no containerlab containers found\n"
+          }
+        }
+      ],
+      "control_network_lease": null,
+      "last_failure_stage": ""
+    },
+    "matrix-2018-16509-2019-9193": {
+      "case": {
+        "id": "matrix-2018-16509-2019-9193",
+        "cves": [
+          "CVE-2018-16509",
+          "CVE-2019-9193"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-e5c12f03-4cb6602e20b9acf4",
+      "status": "completed",
+      "attempts": 0,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-4cb6602e20b9acf4",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/results/matrix-2018-16509-2019-9193.json"
+    },
+    "matrix-2017-10271-2014-3120": {
+      "case": {
+        "id": "matrix-2017-10271-2014-3120",
+        "cves": [
+          "CVE-2017-10271",
+          "CVE-2014-3120"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-e5c12f03-61f7ef2cb668c1eb",
+      "status": "completed",
+      "attempts": 1,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-61f7ef2cb668c1eb",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/results/matrix-2017-10271-2014-3120.json",
+      "runtime_preparation": {
+        "ok": true,
+        "builds": [],
+        "runtime_images": []
+      },
+      "attempt_records": [
+        {
+          "attempt": 1,
+          "started_at": "2026-07-24T16:45:14.249437+00:00",
+          "log_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/logs/matrix-2017-10271-2014-3120-a1.log",
+          "finished_at": "2026-07-24T16:47:19.699046+00:00",
+          "failure_stage": "attack_path_reachability",
+          "success": false,
+          "cleanup_failed": false,
+          "cleanup": {
+            "ok": true,
+            "stdout": "",
+            "stderr": "00:47:19 INFO Parsing & checking topology file=clab.yaml\n00:47:19 INFO no containerlab containers found\n"
+          }
+        }
+      ],
+      "control_network_lease": null,
+      "last_failure_stage": "attack_path_reachability"
+    },
+    "matrix-2021-42013-2019-9193": {
+      "case": {
+        "id": "matrix-2021-42013-2019-9193",
+        "cves": [
+          "CVE-2021-42013",
+          "CVE-2019-9193"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-e5c12f03-c6ce29aa93bb10d1",
+      "status": "completed",
+      "attempts": 0,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-c6ce29aa93bb10d1",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/results/matrix-2021-42013-2019-9193.json"
+    },
+    "matrix-2017-12615-2014-3120": {
+      "case": {
+        "id": "matrix-2017-12615-2014-3120",
+        "cves": [
+          "CVE-2017-12615",
+          "CVE-2014-3120"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-e5c12f03-9c856673c97b794e",
+      "status": "completed",
+      "attempts": 1,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-9c856673c97b794e",
+      "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/results/matrix-2017-12615-2014-3120.json",
+      "runtime_preparation": {
+        "ok": true,
+        "builds": [
+          {
+            "ok": true,
+            "cve_id": "CVE-2017-12615",
+            "image": "cvelab-atom-cve-2017-12615-44026dd4ba86",
+            "context": "/home/htxxp/sys-factory/CVELab-dev/data/atoms/CVE-2017-12615/source_bundle",
+            "dockerfile": "/home/htxxp/sys-factory/CVELab-dev/data/atoms/CVE-2017-12615/source_bundle/Dockerfile",
+            "stdout": "",
+            "stderr": "#0 building with \"default\" instance using docker driver\n\n#1 [internal] load build definition from Dockerfile\n#1 transferring dockerfile: 374B done\n#1 DONE 0.0s\n\n#2 [internal] load metadata for docker.io/vulhub/tomcat:8.5.19\n#2 DONE 0.0s\n\n#3 [internal] load .dockerignore\n#3 transferring context: 2B done\n#3 DONE 0.0s\n\n#4 [1/2] FROM docker.io/vulhub/tomcat:8.5.19\n#4 DONE 0.0s\n\n#5 [2/2] RUN cd /usr/local/tomcat/conf     && LINE=$(nl -ba web.xml | grep '<load-on-startup>1' | awk '{print $1}')     && ADDON=\"<init-param><param-name>readonly</param-name><param-value>false</param-value></init-param>\"     && sed -i \"$LINE i $ADDON\" web.xml\n#5 CACHED\n\n#6 exporting to image\n#6 exporting layers done\n#6 writing image sha256:40f8394e7289dcccba7a2b04c071d037ad788c6db87ad3414386b2b666220268 done\n#6 naming to docker.io/library/cvelab-atom-cve-2017-12615-44026dd4ba86 done\n#6 DONE 0.0s\n"
+          }
+        ],
+        "runtime_images": []
+      },
+      "attempt_records": [
+        {
+          "attempt": 1,
+          "started_at": "2026-07-24T16:47:19.721338+00:00",
+          "log_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/logs/matrix-2017-12615-2014-3120-a1.log",
+          "finished_at": "2026-07-24T16:47:20.786823+00:00",
+          "failure_stage": "runtime_materialization",
+          "success": false,
+          "cleanup_failed": false,
+          "cleanup": {
+            "ok": true,
+            "stdout": "",
+            "stderr": "00:47:20 INFO Parsing & checking topology file=clab.yaml\n00:47:20 INFO no containerlab containers found\n"
+          }
+        }
+      ],
+      "control_network_lease": null,
+      "last_failure_stage": "runtime_materialization"
+    }
+  },
+  "updated_at": "2026-07-24T16:48:43.412081+00:00"
+}

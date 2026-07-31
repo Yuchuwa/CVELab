@@ -1,0 +1,26 @@
+{
+  "created_at": "2026-07-25T07:57:52.435960+00:00",
+  "run_id": "9cfba089e0eefeb23a2f13d7",
+  "template": "enterprise_3tier",
+  "validation_mode": "guided_agent",
+  "environment_only": false,
+  "agent_context": "l2",
+  "noise_level": "low",
+  "validation_round": {
+    "run_id": "9cfba089e0eefeb23a2f13d7",
+    "agent_context": "l2",
+    "noise_level": "low",
+    "environment_only": false,
+    "max_turns": 80,
+    "agent_timeout": 2400,
+    "created_at": "2026-07-25T07:57:50.292932+00:00"
+  },
+  "selected_cases": [
+    "l2-low"
+  ],
+  "results": [],
+  "case_states": {
+    "l2-low": "running"
+  },
+  "fingerprint": "c00b0abcb621ef062f2d226a1a7f3a4ea408c486859fff3560634fc6618814aa"
+}

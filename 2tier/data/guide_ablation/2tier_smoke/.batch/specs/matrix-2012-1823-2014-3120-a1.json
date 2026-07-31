@@ -1,0 +1,36 @@
+{
+  "run_id": "e5c12f033bd62ba445360ee6",
+  "worker_id": "1",
+  "case": {
+    "id": "matrix-2012-1823-2014-3120",
+    "cves": [
+      "CVE-2012-1823",
+      "CVE-2014-3120"
+    ],
+    "purpose": "matrix-generated combination",
+    "asset_variants": {}
+  },
+  "lab_name": "e3-e5c12f03-02d8703aff5274c0",
+  "scenario_dir": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/scenarios/e3-e5c12f03-02d8703aff5274c0",
+  "result_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/results/matrix-2012-1823-2014-3120.json",
+  "lab_lock_path": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/work/matrix-2012-1823-2014-3120/lab.lock",
+  "atoms_dir": "data/atoms",
+  "max_turns": 50,
+  "agent_timeout": 1800,
+  "environment_only": true,
+  "agent_context": "l2",
+  "noise_level": "none",
+  "agent_runner": "claude",
+  "strict_guide_compatibility": false,
+  "mgmt_network": {
+    "name": "cvelab-range-mgmt-v2",
+    "subnet": "172.30.240.0/23",
+    "endpoints": "0"
+  },
+  "control_network_lease": {},
+  "ansible_paths": {
+    "ANSIBLE_HOME": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/work/matrix-2012-1823-2014-3120/ansible-home",
+    "ANSIBLE_LOCAL_TEMP": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/work/matrix-2012-1823-2014-3120/ansible-local-tmp",
+    "ANSIBLE_REMOTE_TEMP": "/home/htxxp/sys-factory/CVELab-dev/data/guide_ablation/2tier_smoke/.batch/work/matrix-2012-1823-2014-3120/ansible-remote-tmp"
+  }
+}

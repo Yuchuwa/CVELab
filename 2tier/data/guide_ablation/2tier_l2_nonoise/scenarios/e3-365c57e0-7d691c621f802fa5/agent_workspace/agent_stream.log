@@ -1,0 +1,3 @@
+[Error] Error code: 403 - {'error': {'message': '余额不足', 'type': 'bad_response_status_code', 'param': '', 'code': 'bad_response_status_code'}}
+[Output] /tmp/scenario_output.json
+[Session] openai runner -> /tmp/scenario_session.json (0 events)

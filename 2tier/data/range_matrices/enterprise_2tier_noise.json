@@ -1,0 +1,5 @@
+{"cases": [
+  {"id": "noise-low", "cves": ["CVE-2012-1823", "CVE-2014-3120"]},
+  {"id": "noise-medium", "cves": ["CVE-2012-1823", "CVE-2014-3120"]},
+  {"id": "noise-high", "cves": ["CVE-2012-1823", "CVE-2014-3120"]}
+]}
