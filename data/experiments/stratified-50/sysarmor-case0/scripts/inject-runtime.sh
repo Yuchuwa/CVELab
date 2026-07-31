@@ -92,6 +92,24 @@ health_check() {
     >/dev/null 2>&1
 }
 
+agent_running() {
+  docker_exec_root_timeout "$HEALTH_COMMAND_TIMEOUT" "$1" sh -c '
+    for comm in /proc/[0-9]*/comm; do
+      read -r name <"$comm" || continue
+      if [ "$name" = sysarmor-agent ]; then
+        exit 0
+      fi
+    done
+    exit 1
+  ' >/dev/null 2>&1
+}
+
+start_agent() {
+  local container="$1" remote="$2"
+  docker_exec_root "$container" sh -c \
+    "nohup /opt/sysarmor/agent/bin/sysarmor-agent run --config /etc/sysarmor/agent/agent.yaml >'$remote/agent.log' 2>&1 </dev/null &"
+}
+
 installed_version() {
   docker_exec_root_timeout "$HEALTH_COMMAND_TIMEOUT" "$1" \
     /opt/sysarmor/agent/bin/sysarmor-agent version 2>/dev/null
@@ -202,14 +220,16 @@ for target in "${TARGETS[@]}"; do
       fail "$target: installation failed; see $LOG_DIR/$target-install.log"
     fi
 
-    docker_exec_root "$container" sh -c \
-      "nohup /opt/sysarmor/agent/bin/sysarmor-agent run --config /etc/sysarmor/agent/agent.yaml >'$remote/agent.log' 2>&1 </dev/null &"
+    start_agent "$container" "$remote"
 
     healthy=0
     for ((attempt=0; attempt<HEALTH_TIMEOUT; attempt++)); do
       if health_check "$container"; then
         healthy=1
         break
+      fi
+      if ! agent_running "$container"; then
+        start_agent "$container" "$remote"
       fi
       sleep 1
     done

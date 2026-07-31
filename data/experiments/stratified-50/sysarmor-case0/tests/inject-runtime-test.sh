@@ -42,8 +42,16 @@ elif [[ "$1" == "exec" && "$2" == "-u" && "$3" == "0" && "$4" == "clab-exact-lab
       [[ -f "$FAKE_HEALTHY" ]] && echo "${FAKE_INSTALLED_VERSION:-$SYSARMOR_RELEASE_TAG}"
     elif [[ " $* " == *" .sysarmor-release "* && " $* " == *" cat "* ]]; then
       [[ -f "$FAKE_HEALTHY" ]] && echo "$SYSARMOR_RELEASE_TAG"
+    elif [[ "$*" == *"/proc/[0-9]*/comm"* && "$*" == *"sysarmor-agent"* && "$*" == *"exit 1"* ]]; then
+      [[ -f "$FAKE_HEALTHY" ]]
     elif [[ "$*" == *"sysarmor-agent run"* || "$*" == *"/opt/sysarmor/agent/bin/sysarmor-agent"* ]]; then
-      touch "$FAKE_HEALTHY"
+      starts=0
+      [[ -f "$FAKE_AGENT_STARTS" ]] && starts="$(cat "$FAKE_AGENT_STARTS")"
+      starts=$((starts + 1))
+      printf '%s\n' "$starts" >"$FAKE_AGENT_STARTS"
+      if [[ "$starts" -ge "${FAKE_AGENT_READY_AFTER:-1}" ]]; then
+        touch "$FAKE_HEALTHY"
+      fi
     fi
 elif [[ "$1" == "cp" ]]; then
   :
@@ -54,6 +62,7 @@ chmod +x "$WORK/bin/docker"
 export PATH="$WORK/bin:$PATH"
 export FAKE_DOCKER_LOG="$WORK/docker.log"
 export FAKE_HEALTHY="$WORK/healthy"
+export FAKE_AGENT_STARTS="$WORK/agent-starts"
 export SYSARMOR_RELEASE_TAG="test-release"
 export SYSARMOR_CASE0_CACHE_DIR="$WORK/cache"
 export SYSARMOR_PACKAGE_FILE="agent.tar.gz"
@@ -119,6 +128,13 @@ if grep -Fq 'all targets healthy' "$WORK/rule-failure.log"; then
   exit 1
 fi
 unset FAKE_RULE_FAILURE
+
+rm -f "$FAKE_HEALTHY" "$FAKE_AGENT_STARTS"
+export FAKE_AGENT_READY_AFTER=2
+"$INJECT" --topology "$WORK/topology.yaml" --target target-1
+retry_starts="$(cat "$FAKE_AGENT_STARTS")"
+test "$retry_starts" -eq 2
+unset FAKE_AGENT_READY_AFTER
 
 export FAKE_INSTALLED_VERSION="dev"
 if "$INJECT" --topology "$WORK/topology.yaml" --target target-1 >"$WORK/mismatch-existing.log" 2>&1; then
