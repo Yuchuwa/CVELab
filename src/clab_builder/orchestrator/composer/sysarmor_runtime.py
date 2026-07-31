@@ -76,8 +76,8 @@ def inject_sysarmor_runtime(scenario_dir: str | Path, targets: list[str]) -> dic
             "stage": "sysarmor_inject",
             "timed_out": True,
             "command": command,
-            "stdout": exc.stdout or "",
-            "stderr": exc.stderr or "",
+            "stdout": _to_text(exc.stdout),
+            "stderr": _to_text(exc.stderr),
             "error": "SysArmor injection timed out",
         }
     return {
@@ -88,6 +88,14 @@ def inject_sysarmor_runtime(scenario_dir: str | Path, targets: list[str]) -> dic
         "stderr": result.stderr[-4000:],
         "error": "" if result.returncode == 0 else (result.stderr.strip() or result.stdout.strip())[-1000:],
     }
+
+
+def _to_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
 
 
 def collect_recent_signals(
