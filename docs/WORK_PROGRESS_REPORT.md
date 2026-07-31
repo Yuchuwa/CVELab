@@ -1,5 +1,68 @@
 # RangeFactory 工作进展
 
+## 2026-07-31 更新：SysArmor rc.5 + CVELab Stratified-50 case6-50 安装资格调试
+
+本轮目标是先把 case6-50 的 SysArmor rc.5 安装/patch/injection 链路调通，不跑正式攻击、不做 detection policy 评估。运行口径是 `--sysarmor`、`--environment-only`，暂不使用 `--sysarmor-detection`，避免把缺少 verified execution adapter 的 SysField 导出问题混入安装资格判断。
+
+### 结论
+
+1. case6-50 的 SysArmor rc.5 安装资格链路已经打通。
+2. case6-30 原批次 + 定点 rerun 后全部 PASS。
+3. case31-40 初始 parallel=2 clean rerun 为 7/10 PASS；失败 case31/33/35 均为 `sysarmor:inject` 超时。修复 injector 后用 parallel=1 单例 rerun，三例全部 PASS。
+4. case41-50 parallel=2 会复现 Tetragon/bpffs 并发冲突；改用 parallel=1 后 10/10 PASS。
+5. 经验约束：当前 SysArmor/Tetragon defended range 不应并发跑多个 case。正式 50-case 实验建议 `--parallel 1`，否则多个 Tetragon 实例共享 host `/sys/fs/bpf/tetragon/*` 时会偶发 pinned map/health 竞态。
+
+### 关键运行目录
+
+| 范围 | run | 结果 |
+|---|---|---:|
+| case6-10 | `data/experiments/stratified-50/runs/qual-sysarmor-rc5-case6-10-install-debug2-20260731/` | 5/5 PASS |
+| case11-20 | `data/experiments/stratified-50/runs/qual-sysarmor-rc5-case11-20-install-20260731/` | 10/10 PASS |
+| case21-30 | `qual-sysarmor-rc5-case21-30-install-20260731` + case22/case26 rerun | 10/10 PASS |
+| case31-40 | `qual-sysarmor-rc5-case31-40-install-rerun-20260731` + case31/33/35 rerun2 | 10/10 PASS（综合） |
+| case41-50 | `data/experiments/stratified-50/runs/qual-sysarmor-rc5-case41-50-install-p1-20260731/` | 10/10 PASS |
+
+case31/33/35 定点 rerun：
+
+- `qual-sysarmor-rc5-case31-install-rerun2-20260731`：PASS
+- `qual-sysarmor-rc5-case33-install-rerun2-20260731`：PASS
+- `qual-sysarmor-rc5-case35-install-rerun2-20260731`：PASS
+
+### 本轮修复
+
+- `a1d34fe fix(cvelab): harden sysarmor qualification for later cases`
+  - source bundle material validation 不再因未执行的源码/构建文件阻断。
+  - `base.yaml` 的网络 fallback 改用 Docker privileged helper，避免 minimal target 镜像无 `ip` 且 host 无 passwordless sudo 时失败。
+  - 重建 stale runtime 资产：`CVE-2019-17558`、`CVE-2018-16509`、`CVE-2022-22965`。
+- `b17a0d9 fix(cvelab): serialize sysarmor timeout output`
+  - 修复 `TimeoutExpired.stdout/stderr` 为 bytes 时 JSON serialization 崩溃，保留真实超时错误。
+- `4c6cf43 fix(cvelab): extend sysarmor injection timeout`
+  - `SYSARMOR_INJECT_TIMEOUT` 默认从 300s 提高到 900s。
+- `7af4a81 fix(cvelab): prepare custom dockerfile runtimes`
+  - 补齐 `CVE-2017-12615`、`CVE-2017-15715` runtime image/metadata。
+  - injector 内部 `SYSARMOR_HEALTH_TIMEOUT` 默认从 60s 提高到 180s。
+- `ba63b45 fix(cvelab): retry sysarmor agent startup during injection`
+  - 健康等待期间若 `sysarmor-agent` 因 Tetragon early-ready/BPF 竞态退出，injector 会重新拉起 agent。
+  - `inject-runtime-test.sh` 覆盖首次启动失败、第二次恢复的回归。
+
+### 失败根因梳理
+
+| 症状 | 根因 | 处理 |
+|---|---|---|
+| case6/类似 minimal image base setup 失败 | target 镜像缺 `ip`，fallback 依赖 host `sudo -n nsenter` | 改 Docker privileged helper |
+| case8/若干 atom runtime hash/materialization 失败 | runtime image/metadata stale 或缺失 | 重建 runtime 资产 |
+| case22 隐藏真实超时 | `TimeoutExpired` bytes 输出不可 JSON serialize | 序列化前 normalize |
+| case26 inject 超时 | 多 target 安装慢，外层 300s 太紧 | 默认 900s |
+| case35/37/39/42/44/50 runtime 缺失风险 | custom Dockerfile atom 缺 ready runtime image | 补 `12615`/`15715` runtime |
+| case31/33/35 inject timeout | agent 首次启动遇到 Tetragon ready/BPF 竞态后退出，旧 injector 不重启 | injector health loop 中检测 agent 退出并重启 |
+| case41-50 parallel=2 下 BPF pinned map 错误 | 多个 defended case 并发，共享 host bpffs `/sys/fs/bpf/tetragon/*`，Tetragon 实例互相干扰 | SysArmor run 使用 `--parallel 1` |
+
+### 对正式实验的影响
+
+- 可以进入 case6-50 的正式任务：攻击拿 flag、导出 signal。
+- 正式跑 SysArmor defended range 时建议固定 `--parallel 1`；如果需要并行，应先设计隔离方案，例如独立 VM/独立 bpffs namespace，而不是在同一 host 上并发多个 Tetragon defended case。
+- `--sysarmor-detection` 仍不适合直接作为安装资格开关；它会触发 SysField reference playbook export，对很多 case6-50 atom 的 verified stateless executor 有额外要求。正式 signal 检测阶段应按我们已有的增量通用规则和 expected signal spec 单独组织。
+
 ## 2026-07-30 更新：SysArmor rc.5 + CVELab Stratified-50 first5 L2 rerun B
 
 按新的正式口径重跑了 first5 L2：
