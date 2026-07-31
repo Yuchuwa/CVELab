@@ -1377,13 +1377,14 @@ class ScenarioAssembler:
         tasks = []
 
         def node_cmd(node: str, cmd: str) -> dict:
-            """Prefer Docker root exec; retain nsenter for images without tools."""
+            """Prefer Docker root exec; use a privileged helper for minimal images."""
             container = f"clab-{scenario_name}-{node}"
             tool = cmd.split(maxsplit=1)[0]
             direct_probe = shlex.quote(f"command -v {tool} >/dev/null 2>&1")
             direct = f"docker exec -u 0 {shlex.quote(container)} sh -c {shlex.quote(cmd)}"
             fallback = (
-                "sudo -n nsenter -t $(docker inspect -f '{{.State.Pid}}' "
+                "docker run --rm --privileged --pid host --network none alpine:latest "
+                "nsenter -t $(docker inspect -f '{{.State.Pid}}' "
                 + shlex.quote(container)
                 + ") -n sh -c " + shlex.quote(cmd)
             )
