@@ -105,6 +105,11 @@ def test_injector_runs_sysarmor_operations_as_root_without_changing_workload_use
     assert "docker commit" not in script
 
 
+def test_injector_allows_slow_agent_health_startup():
+    script = (VARIANT / "scripts/inject-runtime.sh").read_text()
+    assert 'HEALTH_TIMEOUT="${SYSARMOR_HEALTH_TIMEOUT:-180}"' in script
+
+
 def test_general_behavior_rules_are_additive_and_product_agnostic():
     rules = VARIANT / "rules"
     rulepack = json.loads((rules / "rulepack-general-behavior.json").read_text())
