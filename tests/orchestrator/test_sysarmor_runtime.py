@@ -100,3 +100,21 @@ def test_inject_sysarmor_runtime_invokes_checked_in_injector(tmp_path):
     command = run.call_args.args[0]
     assert command[0].endswith("inject-runtime.sh")
     assert command[-4:] == ["--target", "target-1", "--target", "target-2"]
+
+
+def test_inject_sysarmor_runtime_timeout_output_is_json_serializable(tmp_path):
+    scenario = tmp_path / "scenario"
+    scenario.mkdir()
+    (scenario / "clab.yaml").write_text("name: lab-a\n", encoding="utf-8")
+
+    timeout = subprocess.TimeoutExpired(
+        ["inject-runtime.sh"], timeout=300, output=b"partial stdout", stderr=b"partial stderr"
+    )
+    with patch.object(sysarmor_runtime.subprocess, "run", side_effect=timeout):
+        result = sysarmor_runtime.inject_sysarmor_runtime(scenario, ["target-1"])
+
+    assert result["ok"] is False
+    assert result["timed_out"] is True
+    assert result["stdout"] == "partial stdout"
+    assert result["stderr"] == "partial stderr"
+    json.dumps(result)
