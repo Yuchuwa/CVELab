@@ -316,19 +316,20 @@ class SysFieldExporter:
         return rendered
 
     def _validate_actor_materials(self, atom, target, actor_node, topology_nodes):
-        """Fail before SysField when a local actor cannot see its PoC files."""
+        """Fail before SysField when a local actor cannot see executed PoC files."""
         bundle = getattr(atom, "source_bundle", None)
         materials = list(getattr(bundle, "poc_materials", []) if bundle else [])
         if not materials:
             return
         if target.get("material_staging"):
             return
+        required = self._required_actor_material_mounts(atom, materials)
+        if not required:
+            return
         node = topology_nodes.get(actor_node, {}) or {}
         binds = [str(item) for item in node.get("binds", [])]
         missing = []
-        for material in materials:
-            name = Path(material).name
-            mounted = f"/vulhub/{atom.cve_id}__{name}"
+        for mounted in required:
             if not any(mounted in bind for bind in binds):
                 missing.append(mounted)
         if missing:
@@ -336,6 +337,35 @@ class SysFieldExporter:
                 f"Atom {atom.cve_id} materials are not available on actor {actor_node}: "
                 + ", ".join(missing)
             )
+
+    def _required_actor_material_mounts(self, atom, materials: list[str]) -> list[str]:
+        """Return source_bundle materials actually referenced by SysField commands."""
+        commands = [
+            str(step.get("command", ""))
+            for step in self._extract(atom.cve_id)
+        ]
+        required: list[str] = []
+        for material in materials:
+            name = Path(material).name
+            mounted = f"/vulhub/{atom.cve_id}__{name}"
+            if any(
+                mounted in command
+                or f"/vulhub/{name}" in command
+                or material in command
+                or f"source_bundle/{name}" in command
+                for command in commands
+            ):
+                required.append(mounted)
+
+        if any("{{poc_path}}" in command for command in commands):
+            for material in materials:
+                name = Path(material).name
+                if Path(name).suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".py", ".sh"}:
+                    mounted = f"/vulhub/{atom.cve_id}__{name}"
+                    if mounted not in required:
+                        required.append(mounted)
+                    break
+        return required
 
     def _load_meta(self, root):
         path = root / "scenario.yaml"

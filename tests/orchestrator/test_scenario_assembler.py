@@ -530,7 +530,8 @@ class TestAssemblerDMZSimple:
         assert "2>/dev/null; ip link set" not in result["ansible_base"]
         assert "docker exec -u 0" in result["ansible_base"]
         assert "command -v ip" in result["ansible_base"]
-        assert "sudo -n nsenter" in result["ansible_base"]
+        assert "docker run --rm --privileged --pid host --network none" in result["ansible_base"]
+        assert "sudo -n nsenter" not in result["ansible_base"]
 
     def test_pivot_host_atom_generates_host_and_service_nodes(self, assembler):
         atom = _make_atom(requires_pivot_host=True)
