@@ -5272,3 +5272,37 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
 - Next owner: B uses the generated failed/incomplete lists to classify shared
   Range contract gaps and records future model-aware batches. No commit is
   created until explicit user approval.
+
+### 2026-08-01 — 最小提交范围审查（仅检查，未暂存）
+
+- 范围：审查当前 Atom 与 Range 工作树改动，按“可消费的源数据/接口代码”与
+  “实验、会话、历史兼容或生成物”分离；本轮没有暂存、提交或删除文件。
+- Atom：实时重算与 `data/atom_pool_status.{json,csv,md}` 完全一致，仍为
+  239 个 Atom：`planned=0`、`building=193`、`completed=46`。当前有改动的
+  116 个 Atom 目录中，42 个为 `completed`，74 个仍为 `building`；后者不进入
+  下一次 Atom 数据提交。
+- 拟保留的 Atom 源数据范围：仅考虑这 42 个已完成目录中的 `atom.yaml`、
+  `runtime/`、`exploit_guide.yaml` 和声明必需的 `source_bundle/`，当前候选
+  共 194 个路径（41 个 `atom.yaml`、119 个 runtime 文件、8 个 Guide、26 个
+  source bundle 文件）。会话文件、playbook/ansible/init 等旧运行产物不纳入；
+  其中 `CVE-2016-3714/init/index.php` 的工作树改动含字面量 flag，已明确排除。
+- Range：当前 14 个受影响的代码/模板/测试/说明文件混合了网络噪声、编排、
+  Agent 上下文和 API 重试实验；虽非 Docker 回归已通过，但尚无本轮代表性
+  ContainerLab environment-only 证据，因此本轮不纳入提交。已提交的
+  ScenarioManifestV1/VerificationResultV1 接口基线保持不变。
+- 验证：完整非 Docker/non-slow 回归 `673 passed, 7 skipped`；变更 Python
+  文件编译通过，`git diff --check` 通过；当前环境未安装 Ruff，未宣称 Ruff 结果。
+- 下一步：先向用户展示 Atom 的精确暂存清单、排除清单、验证命令和 commit
+  message；获得明确同意后，才创建一个仅包含必要 Atom 源数据与本账本的提交。
+
+### 2026-08-01 — 最小提交范围已获批准并暂存（未提交）
+
+- 用户已批准暂存范围；当前 Git index 只包含 195 个路径：42 个已完成 Atom
+  目录的 194 个契约/运行时/source bundle 文件，以及本进度账本。Range、
+  building Atom、会话、旧 playbook 和实验产物均未进入暂存区。
+- 暂存前检查发现新增 Dockerfile 的 EOF 空白和 3 个 compose 文件的行尾空格；
+  清理这些纯格式问题后，同步更新对应 3 个 source bundle hash 声明，实时
+  Atom 清单仍为 `planned=0`、`building=193`、`completed=46`。
+- 验证：`git diff --cached --check` 通过；41 个暂存 `atom.yaml` 可解析，42
+  个目录全部仍通过 completed gates；Atom/Range loader focused tests 31 passed。
+  暂存区与未暂存区无路径重叠。commit 仍等待用户的第二次明确批准。
