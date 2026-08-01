@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-08-01T10:52:04.350108+00:00",
+  "run_id": "b1549cd3582a28cca911d9a9",
+  "fingerprint": "79648d3d109e51cfe9a08c7652439cc1c9e49c8055af09f6cfbaecb2900a25e8",
+  "options": {
+    "environment_only": false,
+    "generate_only": false,
+    "parallel": 1,
+    "agent_timeout": 3600,
+    "max_turns": 120,
+    "agent_context": "guided",
+    "noise_level": "low"
+  },
+  "selected_case_ids": [
+    "2t3x6-CVE-2018-16509-CVE-2019-9193"
+  ],
+  "cases": {
+    "2t3x6-CVE-2018-16509-CVE-2019-9193": {
+      "case": {
+        "id": "2t3x6-CVE-2018-16509-CVE-2019-9193",
+        "cves": [
+          "CVE-2018-16509",
+          "CVE-2019-9193"
+        ],
+        "purpose": "matrix-generated combination",
+        "asset_variants": {}
+      },
+      "lab_name": "e3-b1549cd3-2b747f24c2ec1dfb",
+      "status": "completed",
+      "attempts": 1,
+      "scenario_dir": "/home/htxxp/sys-factory/CVELab/data/ablation/2tier_16509_9193_guided_low/scenarios/e3-b1549cd3-2b747f24c2ec1dfb",
+      "result_path": "/home/htxxp/sys-factory/CVELab/data/ablation/2tier_16509_9193_guided_low/.batch/results/2t3x6-CVE-2018-16509-CVE-2019-9193.json",
+      "runtime_preparation": {
+        "ok": true,
+        "builds": [],
+        "runtime_images": [
+          {
+            "cve_id": "CVE-2018-16509",
+            "image": "cvelab-runtime-2018-16509-9596de73edd4",
+            "expected_runtime_image_digest": "sha256:e3a4ccb6792270258f7c80e20b860f4dc67665c0de54e0858ed8ba9929f65ee8",
+            "actual_runtime_image_id": "sha256:e3a4ccb6792270258f7c80e20b860f4dc67665c0de54e0858ed8ba9929f65ee8",
+            "actual_repo_digests": [],
+            "ok": true,
+            "error": "",
+            "action": "verified_local_image"
+          },
+          {
+            "cve_id": "CVE-2019-9193",
+            "image": "cvelab-runtime-2019-9193-ba6eb56f5408",
+            "expected_runtime_image_digest": "sha256:3d52444886f1c5511c894104c7fede7181194689cf9cfda4889a8f0f9c5361ad",
+            "actual_runtime_image_id": "sha256:3d52444886f1c5511c894104c7fede7181194689cf9cfda4889a8f0f9c5361ad",
+            "actual_repo_digests": [],
+            "ok": true,
+            "error": "",
+            "action": "verified_local_image"
+          }
+        ]
+      },
+      "control_network_lease": null,
+      "attempt_records": [
+        {
+          "attempt": 1,
+          "started_at": "2026-08-01T10:52:06.504364+00:00",
+          "log_path": "/home/htxxp/sys-factory/CVELab/data/ablation/2tier_16509_9193_guided_low/.batch/logs/2t3x6-CVE-2018-16509-CVE-2019-9193-a1.log",
+          "finished_at": "2026-08-01T10:55:13.826532+00:00",
+          "failure_stage": "",
+          "success": true,
+          "cleanup_failed": false,
+          "cleanup": {
+            "ok": true,
+            "stdout": "",
+            "stderr": "18:55:13 INFO Parsing & checking topology file=clab.yaml\n18:55:13 INFO no containerlab containers found\n"
+          }
+        }
+      ],
+      "last_failure_stage": ""
+    }
+  },
+  "updated_at": "2026-08-01T10:55:13.844140+00:00"
+}

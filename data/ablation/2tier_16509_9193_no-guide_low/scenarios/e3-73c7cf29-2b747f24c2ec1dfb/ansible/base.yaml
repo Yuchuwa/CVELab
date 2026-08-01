@@ -1,0 +1,343 @@
+- name: Configure data plane network
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: 'Configure edge-router: ip link show dev br-dmz-19155 >/dev/null 2>&1 ||
+      ip link add'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''ip link show dev br-dmz-19155 >/dev/null 2>&1 || ip link add name br-dmz-19155
+      type bridge''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router) -n sh -c ''ip link show dev br-dmz-19155
+      >/dev/null 2>&1 || ip link add name br-dmz-19155 type bridge''; fi{% endraw
+      %}'
+    changed_when: false
+  - name: 'Configure edge-router: ip addr flush dev eth3 && ip link set eth3 master
+      br-dmz-191'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''ip addr flush dev eth3 && ip link set eth3 master br-dmz-19155 && ip
+      link set eth3 up''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router) -n sh -c ''ip addr flush dev
+      eth3 && ip link set eth3 master br-dmz-19155 && ip link set eth3 up''; fi{%
+      endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: ip addr flush dev eth4 && ip link set eth4 master
+      br-dmz-191'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''ip addr flush dev eth4 && ip link set eth4 master br-dmz-19155 && ip
+      link set eth4 up''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router) -n sh -c ''ip addr flush dev
+      eth4 && ip link set eth4 master br-dmz-19155 && ip link set eth4 up''; fi{%
+      endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: ip addr flush dev eth5 && ip link set eth5 master
+      br-dmz-191'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''ip addr flush dev eth5 && ip link set eth5 master br-dmz-19155 && ip
+      link set eth5 up''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router) -n sh -c ''ip addr flush dev
+      eth5 && ip link set eth5 master br-dmz-19155 && ip link set eth5 up''; fi{%
+      endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: ip addr flush dev eth6 && ip link set eth6 master
+      br-dmz-191'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''ip addr flush dev eth6 && ip link set eth6 master br-dmz-19155 && ip
+      link set eth6 up''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router) -n sh -c ''ip addr flush dev
+      eth6 && ip link set eth6 master br-dmz-19155 && ip link set eth6 up''; fi{%
+      endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: ip addr replace 192.168.100.1/24 dev br-dmz-19155
+      && ip link'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''ip addr replace 192.168.100.1/24 dev br-dmz-19155 && ip link set br-dmz-19155
+      up''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''ip addr replace 192.168.100.1/24 dev br-dmz-19155 && ip link set
+      br-dmz-19155 up''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: ip addr replace 10.255.255.2/30 dev eth1 && ip link
+      set eth1'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''ip addr replace 10.255.255.2/30 dev eth1 && ip link set eth1 up''; else
+      sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''ip addr replace 10.255.255.2/30 dev eth1 && ip link set eth1 up'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: ip addr replace 10.255.255.5/30 dev eth2 && ip link
+      set eth2'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''ip addr replace 10.255.255.5/30 dev eth2 && ip link set eth2 up''; else
+      sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''ip addr replace 10.255.255.5/30 dev eth2 && ip link set eth2 up'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: sysctl -w net.ipv4.ip_forward=1'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v sysctl >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''sysctl -w net.ipv4.ip_forward=1''; else sudo -n nsenter -t $(docker
+      inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''sysctl -w net.ipv4.ip_forward=1''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: iptables -F FORWARD'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''iptables -F FORWARD''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router) -n sh -c ''iptables -F FORWARD'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: iptables -P FORWARD DROP'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''iptables -P FORWARD DROP''; else sudo -n nsenter -t $(docker inspect
+      -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router) -n sh -c
+      ''iptables -P FORWARD DROP''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELAT'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT'';
+      else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j
+      ACCEPT''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: iptables -A FORWARD -s 10.255.255.1/32 -d 192.168.100.0/24
+      -'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''iptables -A FORWARD -s 10.255.255.1/32 -d 192.168.100.0/24 -j ACCEPT'';
+      else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''iptables -A FORWARD -s 10.255.255.1/32 -d 192.168.100.0/24 -j ACCEPT'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: iptables -A FORWARD -s 10.255.255.1/32 -d 10.10.2.0/24
+      -j DR'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''iptables -A FORWARD -s 10.255.255.1/32 -d 10.10.2.0/24 -j DROP''; else
+      sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''iptables -A FORWARD -s 10.255.255.1/32 -d 10.10.2.0/24 -j DROP'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: iptables -A FORWARD -s 192.168.100.0/24 -d 10.10.2.0/24
+      -j A'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''iptables -A FORWARD -s 192.168.100.0/24 -d 10.10.2.0/24 -j ACCEPT'';
+      else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''iptables -A FORWARD -s 192.168.100.0/24 -d 10.10.2.0/24 -j ACCEPT'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure edge-router: iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE''; else sudo -n
+      nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE''; fi{% endraw
+      %}'
+    changed_when: false
+  - name: 'Configure edge-router: ip route replace 10.10.2.0/24 via 10.255.255.6'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router
+      sh -c ''ip route replace 10.10.2.0/24 via 10.255.255.6''; else sudo -n nsenter
+      -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-edge-router)
+      -n sh -c ''ip route replace 10.10.2.0/24 via 10.255.255.6''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: ip link show dev br-data-951fe >/dev/null 2>&1 ||
+      ip link ad'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''ip link show dev br-data-951fe >/dev/null 2>&1 || ip link add name br-data-951fe
+      type bridge''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router) -n sh -c ''ip link show dev br-data-951fe
+      >/dev/null 2>&1 || ip link add name br-data-951fe type bridge''; fi{% endraw
+      %}'
+    changed_when: false
+  - name: 'Configure data-router: ip addr flush dev eth2 && ip link set eth2 master
+      br-data-95'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''ip addr flush dev eth2 && ip link set eth2 master br-data-951fe && ip
+      link set eth2 up''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router) -n sh -c ''ip addr flush dev
+      eth2 && ip link set eth2 master br-data-951fe && ip link set eth2 up''; fi{%
+      endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: ip addr flush dev eth3 && ip link set eth3 master
+      br-data-95'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''ip addr flush dev eth3 && ip link set eth3 master br-data-951fe && ip
+      link set eth3 up''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router) -n sh -c ''ip addr flush dev
+      eth3 && ip link set eth3 master br-data-951fe && ip link set eth3 up''; fi{%
+      endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: ip addr flush dev eth4 && ip link set eth4 master
+      br-data-95'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''ip addr flush dev eth4 && ip link set eth4 master br-data-951fe && ip
+      link set eth4 up''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router) -n sh -c ''ip addr flush dev
+      eth4 && ip link set eth4 master br-data-951fe && ip link set eth4 up''; fi{%
+      endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: ip addr replace 10.10.2.1/24 dev br-data-951fe &&
+      ip link se'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''ip addr replace 10.10.2.1/24 dev br-data-951fe && ip link set br-data-951fe
+      up''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router)
+      -n sh -c ''ip addr replace 10.10.2.1/24 dev br-data-951fe && ip link set br-data-951fe
+      up''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: ip addr replace 10.255.255.6/30 dev eth1 && ip link
+      set eth1'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''ip addr replace 10.255.255.6/30 dev eth1 && ip link set eth1 up''; else
+      sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router)
+      -n sh -c ''ip addr replace 10.255.255.6/30 dev eth1 && ip link set eth1 up'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: sysctl -w net.ipv4.ip_forward=1'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v sysctl >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''sysctl -w net.ipv4.ip_forward=1''; else sudo -n nsenter -t $(docker
+      inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router)
+      -n sh -c ''sysctl -w net.ipv4.ip_forward=1''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: iptables -F FORWARD'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''iptables -F FORWARD''; else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}''
+      clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router) -n sh -c ''iptables -F FORWARD'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: iptables -P FORWARD DROP'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''iptables -P FORWARD DROP''; else sudo -n nsenter -t $(docker inspect
+      -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router) -n sh -c
+      ''iptables -P FORWARD DROP''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELAT'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT'';
+      else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router)
+      -n sh -c ''iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j
+      ACCEPT''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: iptables -A FORWARD -s 10.255.255.1/32 -d 192.168.100.0/24
+      -'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''iptables -A FORWARD -s 10.255.255.1/32 -d 192.168.100.0/24 -j ACCEPT'';
+      else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router)
+      -n sh -c ''iptables -A FORWARD -s 10.255.255.1/32 -d 192.168.100.0/24 -j ACCEPT'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: iptables -A FORWARD -s 10.255.255.1/32 -d 10.10.2.0/24
+      -j DR'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''iptables -A FORWARD -s 10.255.255.1/32 -d 10.10.2.0/24 -j DROP''; else
+      sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router)
+      -n sh -c ''iptables -A FORWARD -s 10.255.255.1/32 -d 10.10.2.0/24 -j DROP'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: iptables -A FORWARD -s 192.168.100.0/24 -d 10.10.2.0/24
+      -j A'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v iptables >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''iptables -A FORWARD -s 192.168.100.0/24 -d 10.10.2.0/24 -j ACCEPT'';
+      else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router)
+      -n sh -c ''iptables -A FORWARD -s 192.168.100.0/24 -d 10.10.2.0/24 -j ACCEPT'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure data-router: ip route replace 192.168.100.0/24 via 10.255.255.5'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router
+      sh -c ''ip route replace 192.168.100.0/24 via 10.255.255.5''; else sudo -n nsenter
+      -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-data-router)
+      -n sh -c ''ip route replace 192.168.100.0/24 via 10.255.255.5''; fi{% endraw
+      %}'
+    changed_when: false
+  - name: 'Configure target-1: ip addr replace 192.168.100.2/24 dev eth1 && ip link
+      set eth'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-1
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-1
+      sh -c ''ip addr replace 192.168.100.2/24 dev eth1 && ip link set eth1 up'';
+      else sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-target-1)
+      -n sh -c ''ip addr replace 192.168.100.2/24 dev eth1 && ip link set eth1 up'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure target-1: ip route replace default via 192.168.100.1'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-1
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-1
+      sh -c ''ip route replace default via 192.168.100.1''; else sudo -n nsenter -t
+      $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-target-1)
+      -n sh -c ''ip route replace default via 192.168.100.1''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure target-1: ip addr flush dev eth0'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-1
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-1
+      sh -c ''ip addr flush dev eth0''; else sudo -n nsenter -t $(docker inspect -f
+      ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-target-1) -n sh -c ''ip
+      addr flush dev eth0''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure target-2: ip addr replace 10.10.2.2/24 dev eth1 && ip link set
+      eth1 up'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-2
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-2
+      sh -c ''ip addr replace 10.10.2.2/24 dev eth1 && ip link set eth1 up''; else
+      sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-target-2)
+      -n sh -c ''ip addr replace 10.10.2.2/24 dev eth1 && ip link set eth1 up''; fi{%
+      endraw %}'
+    changed_when: false
+  - name: 'Configure target-2: ip route replace default via 10.10.2.1'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-2
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-2
+      sh -c ''ip route replace default via 10.10.2.1''; else sudo -n nsenter -t $(docker
+      inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-target-2) -n
+      sh -c ''ip route replace default via 10.10.2.1''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure target-2: ip addr flush dev eth0'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-2
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-target-2
+      sh -c ''ip addr flush dev eth0''; else sudo -n nsenter -t $(docker inspect -f
+      ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-target-2) -n sh -c ''ip
+      addr flush dev eth0''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure attacker: ip addr replace 10.255.255.1/30 dev eth1 && ip link
+      set eth1'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-attacker
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-attacker
+      sh -c ''ip addr replace 10.255.255.1/30 dev eth1 && ip link set eth1 up''; else
+      sudo -n nsenter -t $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-attacker)
+      -n sh -c ''ip addr replace 10.255.255.1/30 dev eth1 && ip link set eth1 up'';
+      fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure attacker: ip route replace default via 10.255.255.2'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-attacker
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-attacker
+      sh -c ''ip route replace default via 10.255.255.2''; else sudo -n nsenter -t
+      $(docker inspect -f ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-attacker)
+      -n sh -c ''ip route replace default via 10.255.255.2''; fi{% endraw %}'
+    changed_when: false
+  - name: 'Configure attacker: ip addr flush dev eth0'
+    ansible.builtin.shell: '{% raw %}if docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-attacker
+      sh -c ''command -v ip >/dev/null 2>&1''; then docker exec -u 0 clab-e3-73c7cf29-2b747f24c2ec1dfb-attacker
+      sh -c ''ip addr flush dev eth0''; else sudo -n nsenter -t $(docker inspect -f
+      ''{{.State.Pid}}'' clab-e3-73c7cf29-2b747f24c2ec1dfb-attacker) -n sh -c ''ip
+      addr flush dev eth0''; fi{% endraw %}'
+    changed_when: false

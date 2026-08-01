@@ -1,0 +1,350 @@
+name: e3-fca76d88-6c1a4c244b4836be
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+      binds:
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2012-1823/source_bundle/www/index.php:/vulhub/CVE-2012-1823__index.php:ro
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2012-1823/source_bundle/www/info.php:/vulhub/CVE-2012-1823__info.php:ro
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2018-16509/source_bundle/index.php:/vulhub/CVE-2018-16509__index.php:ro
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2018-16509/source_bundle/poc.png:/vulhub/CVE-2018-16509__poc.png:ro
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+    app-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data-router:
+      kind: linux
+      image: frrouting/frr:latest
+    target-1:
+      kind: linux
+      image: vulhub/php:5.4.1-cgi
+      env:
+        FLAG: flag{d03959021e74d072e6bc718016efa40f}
+      binds:
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2012-1823/init/www:/var/www/html
+      - flag-target-1.txt:/flag
+    target-2:
+      kind: linux
+      image: cvelab-runtime-2018-16509-9596de73edd4
+      env:
+        FLAG: flag{a884d478faadf9448051ad8e4b40b610}
+      cmd: php -t /var/www/html -S 0.0.0.0:8080
+      binds:
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2018-16509/init/index.php:/var/www/html/index.php
+      - flag-target-2.txt:/flag
+    target-3:
+      kind: linux
+      image: cvelab-runtime-2019-9193-ba6eb56f5408
+      env:
+        POSTGRES_PASSWORD: postgres
+        FLAG: flag{e35a04dd44347078057f00696694756c}
+      binds:
+      - flag-target-3.txt:/flag
+    decoy-dmz-01:
+      kind: linux
+      image: nginx:alpine
+    decoy-dmz-02:
+      kind: linux
+      image: redis:7.4-alpine
+    decoy-dmz-03:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 3306 -e /bin/true
+    decoy-dmz-04:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 22 -e /bin/true
+    decoy-dmz-05:
+      kind: linux
+      image: busybox:latest
+      cmd: httpd -f -p 8080
+    decoy-dmz-06:
+      kind: linux
+      image: nginx:alpine
+    decoy-dmz-07:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 5432 -e /bin/true
+    decoy-dmz-08:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 9000 -e /bin/true
+    decoy-dmz-09:
+      kind: linux
+      image: redis:7.4-alpine
+    decoy-dmz-10:
+      kind: linux
+      image: busybox:latest
+      cmd: httpd -f -p 8888
+    decoy-dmz-11:
+      kind: linux
+      image: nginx:alpine
+    decoy-dmz-12:
+      kind: linux
+      image: redis:7.4-alpine
+    decoy-dmz-13:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 3306 -e /bin/true
+    decoy-dmz-14:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 22 -e /bin/true
+    decoy-dmz-15:
+      kind: linux
+      image: busybox:latest
+      cmd: httpd -f -p 8080
+    decoy-dmz-16:
+      kind: linux
+      image: nginx:alpine
+    decoy-dmz-17:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 5432 -e /bin/true
+    decoy-dmz-18:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 9000 -e /bin/true
+    decoy-app-19:
+      kind: linux
+      image: redis:7.4-alpine
+    decoy-app-20:
+      kind: linux
+      image: busybox:latest
+      cmd: httpd -f -p 8888
+    decoy-app-21:
+      kind: linux
+      image: nginx:alpine
+    decoy-app-22:
+      kind: linux
+      image: redis:7.4-alpine
+    decoy-app-23:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 3306 -e /bin/true
+    decoy-app-24:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 22 -e /bin/true
+    decoy-app-25:
+      kind: linux
+      image: busybox:latest
+      cmd: httpd -f -p 8080
+    decoy-app-26:
+      kind: linux
+      image: nginx:alpine
+    decoy-app-27:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 5432 -e /bin/true
+    decoy-app-28:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 9000 -e /bin/true
+    decoy-app-29:
+      kind: linux
+      image: redis:7.4-alpine
+    decoy-app-30:
+      kind: linux
+      image: busybox:latest
+      cmd: httpd -f -p 8888
+    decoy-app-31:
+      kind: linux
+      image: nginx:alpine
+    decoy-data-32:
+      kind: linux
+      image: redis:7.4-alpine
+    decoy-data-33:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 3306 -e /bin/true
+    decoy-data-34:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 22 -e /bin/true
+    decoy-data-35:
+      kind: linux
+      image: busybox:latest
+      cmd: httpd -f -p 8080
+    decoy-data-36:
+      kind: linux
+      image: nginx:alpine
+    decoy-data-37:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 5432 -e /bin/true
+    decoy-data-38:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 9000 -e /bin/true
+    decoy-data-39:
+      kind: linux
+      image: redis:7.4-alpine
+    decoy-data-40:
+      kind: linux
+      image: busybox:latest
+      cmd: httpd -f -p 8888
+    decoy-data-41:
+      kind: linux
+      image: nginx:alpine
+    decoy-data-42:
+      kind: linux
+      image: redis:7.4-alpine
+    decoy-data-43:
+      kind: linux
+      image: alpine:latest
+      cmd: nc -lk -p 3306 -e /bin/true
+  links:
+  - endpoints:
+    - attacker:eth1
+    - edge-router:eth1
+  - endpoints:
+    - edge-router:eth2
+    - app-router:eth1
+  - endpoints:
+    - app-router:eth2
+    - data-router:eth1
+  - endpoints:
+    - target-1:eth1
+    - edge-router:eth3
+  - endpoints:
+    - target-2:eth1
+    - app-router:eth3
+  - endpoints:
+    - target-3:eth1
+    - data-router:eth2
+  - endpoints:
+    - decoy-dmz-01:eth1
+    - edge-router:eth4
+  - endpoints:
+    - decoy-dmz-02:eth1
+    - edge-router:eth5
+  - endpoints:
+    - decoy-dmz-03:eth1
+    - edge-router:eth6
+  - endpoints:
+    - decoy-dmz-04:eth1
+    - edge-router:eth7
+  - endpoints:
+    - decoy-dmz-05:eth1
+    - edge-router:eth8
+  - endpoints:
+    - decoy-dmz-06:eth1
+    - edge-router:eth9
+  - endpoints:
+    - decoy-dmz-07:eth1
+    - edge-router:eth10
+  - endpoints:
+    - decoy-dmz-08:eth1
+    - edge-router:eth11
+  - endpoints:
+    - decoy-dmz-09:eth1
+    - edge-router:eth12
+  - endpoints:
+    - decoy-dmz-10:eth1
+    - edge-router:eth13
+  - endpoints:
+    - decoy-dmz-11:eth1
+    - edge-router:eth14
+  - endpoints:
+    - decoy-dmz-12:eth1
+    - edge-router:eth15
+  - endpoints:
+    - decoy-dmz-13:eth1
+    - edge-router:eth16
+  - endpoints:
+    - decoy-dmz-14:eth1
+    - edge-router:eth17
+  - endpoints:
+    - decoy-dmz-15:eth1
+    - edge-router:eth18
+  - endpoints:
+    - decoy-dmz-16:eth1
+    - edge-router:eth19
+  - endpoints:
+    - decoy-dmz-17:eth1
+    - edge-router:eth20
+  - endpoints:
+    - decoy-dmz-18:eth1
+    - edge-router:eth21
+  - endpoints:
+    - decoy-app-19:eth1
+    - app-router:eth4
+  - endpoints:
+    - decoy-app-20:eth1
+    - app-router:eth5
+  - endpoints:
+    - decoy-app-21:eth1
+    - app-router:eth6
+  - endpoints:
+    - decoy-app-22:eth1
+    - app-router:eth7
+  - endpoints:
+    - decoy-app-23:eth1
+    - app-router:eth8
+  - endpoints:
+    - decoy-app-24:eth1
+    - app-router:eth9
+  - endpoints:
+    - decoy-app-25:eth1
+    - app-router:eth10
+  - endpoints:
+    - decoy-app-26:eth1
+    - app-router:eth11
+  - endpoints:
+    - decoy-app-27:eth1
+    - app-router:eth12
+  - endpoints:
+    - decoy-app-28:eth1
+    - app-router:eth13
+  - endpoints:
+    - decoy-app-29:eth1
+    - app-router:eth14
+  - endpoints:
+    - decoy-app-30:eth1
+    - app-router:eth15
+  - endpoints:
+    - decoy-app-31:eth1
+    - app-router:eth16
+  - endpoints:
+    - decoy-data-32:eth1
+    - data-router:eth3
+  - endpoints:
+    - decoy-data-33:eth1
+    - data-router:eth4
+  - endpoints:
+    - decoy-data-34:eth1
+    - data-router:eth5
+  - endpoints:
+    - decoy-data-35:eth1
+    - data-router:eth6
+  - endpoints:
+    - decoy-data-36:eth1
+    - data-router:eth7
+  - endpoints:
+    - decoy-data-37:eth1
+    - data-router:eth8
+  - endpoints:
+    - decoy-data-38:eth1
+    - data-router:eth9
+  - endpoints:
+    - decoy-data-39:eth1
+    - data-router:eth10
+  - endpoints:
+    - decoy-data-40:eth1
+    - data-router:eth11
+  - endpoints:
+    - decoy-data-41:eth1
+    - data-router:eth12
+  - endpoints:
+    - decoy-data-42:eth1
+    - data-router:eth13
+  - endpoints:
+    - decoy-data-43:eth1
+    - data-router:eth14
+mgmt:
+  network: cvelab-range-mgmt-v2
+  ipv4-subnet: 172.30.240.0/23

@@ -1,0 +1,26 @@
+- name: verify_command app-db-credential
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: verify_command app-db-credential
+    ansible.builtin.shell: docker exec clab-e3-ab1a62f3-6c1a4c244b4836be-target-2
+      sh -c 'test -s /run/secrets/db-password && test "$(cat /run/secrets/db-password)"
+      = postgres'
+    changed_when: false
+    register: asset_verify_command_app_db_credential
+    until: asset_verify_command_app_db_credential.rc == 0
+    retries: 18
+    delay: 10
+- name: verify_command customer-records
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: verify_command customer-records
+    ansible.builtin.shell: docker exec clab-e3-ab1a62f3-6c1a4c244b4836be-target-3
+      sh -c 'PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d postgres -tAc "SELECT
+      marker FROM customers WHERE marker='"'"'CVELAB-CANARY'"'"'"'
+    changed_when: false
+    register: asset_verify_command_customer_records
+    until: asset_verify_command_customer_records.rc == 0
+    retries: 18
+    delay: 10

@@ -1,0 +1,67 @@
+name: e3-ab1a62f3-6c1a4c244b4836be
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+      binds:
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2012-1823/source_bundle/www/index.php:/vulhub/CVE-2012-1823__index.php:ro
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2012-1823/source_bundle/www/info.php:/vulhub/CVE-2012-1823__info.php:ro
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2018-16509/source_bundle/index.php:/vulhub/CVE-2018-16509__index.php:ro
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2018-16509/source_bundle/poc.png:/vulhub/CVE-2018-16509__poc.png:ro
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+    app-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data-router:
+      kind: linux
+      image: frrouting/frr:latest
+    target-1:
+      kind: linux
+      image: vulhub/php:5.4.1-cgi
+      env:
+        FLAG: flag{8c8061b8c4dcc97629f5120479d2e321}
+      binds:
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2012-1823/init/www:/var/www/html
+      - flag-target-1.txt:/flag
+    target-2:
+      kind: linux
+      image: cvelab-runtime-2018-16509-9596de73edd4
+      env:
+        FLAG: flag{f60fa7d4448372e3430139a024f49919}
+      cmd: php -t /var/www/html -S 0.0.0.0:8080
+      binds:
+      - /home/htxxp/sys-factory/CVELab/data/atoms/CVE-2018-16509/init/index.php:/var/www/html/index.php
+      - flag-target-2.txt:/flag
+    target-3:
+      kind: linux
+      image: cvelab-runtime-2019-9193-ba6eb56f5408
+      env:
+        POSTGRES_PASSWORD: postgres
+        FLAG: flag{50f1bd4e4c9e7ad7203f004cc2b52937}
+      binds:
+      - flag-target-3.txt:/flag
+  links:
+  - endpoints:
+    - attacker:eth1
+    - edge-router:eth1
+  - endpoints:
+    - edge-router:eth2
+    - app-router:eth1
+  - endpoints:
+    - app-router:eth2
+    - data-router:eth1
+  - endpoints:
+    - target-1:eth1
+    - edge-router:eth3
+  - endpoints:
+    - target-2:eth1
+    - app-router:eth3
+  - endpoints:
+    - target-3:eth1
+    - data-router:eth2
+mgmt:
+  network: cvelab-range-mgmt-v2
+  ipv4-subnet: 172.30.240.0/23
