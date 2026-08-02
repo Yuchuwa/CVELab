@@ -191,7 +191,10 @@ class AtomizerPipeline:
             # success 与 atom.yaml.verified 同源，避免重复计算导致 manifest / atom 不一致
             success = verified
             print(f"\n=== Done: {cve_id} (success={success}, flag_matched={flag_matched}) ===")
-            succeeded = True
+            # Only a fully verified rebuild is committed over an existing Atom.
+            # A completed Agent run whose exploit/flag validation failed must
+            # still restore the previous authoritative Atom in finally.
+            succeeded = bool(success)
             return {
                 "success": success,
                 "cve_id": cve_id,
@@ -494,6 +497,8 @@ class AtomizerPipeline:
                 svc["volumes"] = abs_volumes
             self._materialize_missing_env_files(name, svc, vulhub_path)
 
+        self._relax_compose_healthchecks(compose_data)
+
         # 写到临时 compose 文件
         compose_tmp = vulhub_path / ".compose-no-ports.yml"
         compose_tmp.write_text(yaml.dump(compose_data, default_flow_style=False))
@@ -641,6 +646,24 @@ class AtomizerPipeline:
             created_time=time.strftime("%Y-%m-%d %H:%M:%S"),
         )
         return info, cve_network
+
+    @staticmethod
+    def _relax_compose_healthchecks(compose_data: dict[str, Any]) -> None:
+        """Give cold-start dependency healthchecks enough time to settle."""
+        services = compose_data.get("services") or {}
+        for svc in services.values():
+            if not isinstance(svc, dict):
+                continue
+            healthcheck = svc.get("healthcheck")
+            if not isinstance(healthcheck, dict) or healthcheck.get("disable"):
+                continue
+            try:
+                retries = int(healthcheck.get("retries", 0))
+            except (TypeError, ValueError):
+                retries = 0
+            if retries < 30:
+                healthcheck["retries"] = 30
+            healthcheck.setdefault("start_period", "120s")
 
     def _readme_env_defaults(self) -> str:
         """Extract KEY=value examples from the README for missing compose env_file entries."""
@@ -2136,12 +2159,21 @@ class AtomizerPipeline:
             rs = exploit_access.required_service or {}
             has_proto = bool(rs.get("protocol"))
             has_port = rs.get("port") is not None
-            if (not has_proto or not has_port) and resolved is not None:
+            # Prefer source-derived metadata, then the native parser's
+            # observed container port. An Agent response containing an empty
+            # required_service must not suppress a reliable main_ports value.
+            fallback = resolved
+            if fallback is None and main_ports:
+                fallback = (
+                    AtomizerPipeline._infer_protocol(main_ports[0]),
+                    main_ports[0],
+                )
+            if (not has_proto or not has_port) and fallback is not None:
                 rs = dict(rs)
                 if not has_proto:
-                    rs["protocol"] = resolved[0]
+                    rs["protocol"] = fallback[0]
                 if not has_port:
-                    rs["port"] = resolved[1]
+                    rs["port"] = fallback[1]
                 exploit_access = _ExploitAccess(
                     attack_vector=exploit_access.attack_vector,
                     privileges_required=exploit_access.privileges_required,

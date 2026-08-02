@@ -200,6 +200,56 @@ def test_start_environment_cleans_project_when_compose_up_fails(tmp_path):
 
 
 @pytest.mark.unit
+def test_start_environment_relaxes_short_dependency_healthchecks(tmp_path):
+    """Cold-starting DB dependencies should not be declared unhealthy too early."""
+    cve_dir = tmp_path / "vulhub" / "test" / "CVE-2024-0011"
+    cve_dir.mkdir(parents=True)
+    (cve_dir / "docker-compose.yml").write_text(
+        yaml.dump({
+            "services": {
+                "web": {
+                    "image": "vulhub/test:latest",
+                    "ports": ["8080:80"],
+                    "depends_on": {"db": {"condition": "service_healthy"}},
+                },
+                "db": {
+                    "image": "mysql:8.4",
+                    "healthcheck": {
+                        "test": ["CMD", "mysqladmin", "ping", "-h", "localhost"],
+                        "interval": "10s",
+                        "timeout": "5s",
+                        "retries": 5,
+                    },
+                },
+            }
+        })
+    )
+    (cve_dir / "README.md").write_text("# CVE-2024-0011\n")
+    pipeline = AtomizerPipeline(vulhub_dir=str(cve_dir), output_dir=str(tmp_path / "atoms"))
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:3] == ["docker", "image", "inspect"]:
+            return MagicMock(returncode=0, stdout="", stderr="")
+        if cmd[:5] == ["docker", "compose", "-p", "cve-2024-0011", "-f"]:
+            return MagicMock(returncode=1, stdout="", stderr="dependency db unhealthy")
+        return MagicMock(returncode=0, stdout="", stderr="")
+
+    with patch.object(pipeline, "_pull_image_with_retry"), \
+         patch.object(pipeline, "_cleanup_compose_project"), \
+         patch("clab_builder.atomizer.pipeline.subprocess.run", side_effect=fake_run):
+        with pytest.raises(RuntimeError, match="docker compose up failed"):
+            pipeline._start_cve_environment()
+
+    generated = yaml.safe_load((cve_dir / ".compose-no-ports.yml").read_text())
+    healthcheck = generated["services"]["db"]["healthcheck"]
+    assert healthcheck["retries"] == 30
+    assert healthcheck["start_period"] == "120s"
+    assert generated["services"]["web"]["depends_on"] == {
+        "db": {"condition": "service_healthy"}
+    }
+
+
+@pytest.mark.unit
 def test_inspect_compose_services_retries_timeout(tmp_path, monkeypatch):
     """A transient Docker inspect timeout should be retried."""
     import subprocess as real_subprocess
@@ -392,6 +442,19 @@ def test_build_capability_contract_falls_back_to_port_inference():
     ea, _ = AtomizerPipeline._build_capability_contract({}, verified=False, main_ports=[5432])
     assert ea.required_service["protocol"] == "postgres"
     assert ea.required_service["port"] == 5432
+
+
+@pytest.mark.unit
+def test_build_capability_contract_falls_back_when_agent_service_is_empty():
+    """空 required_service 不能屏蔽 native parser 已发现的端口。"""
+    from clab_builder.atomizer.pipeline import AtomizerPipeline
+
+    ea, _ = AtomizerPipeline._build_capability_contract(
+        {"exploit_access": {"attack_vector": "network", "required_service": {}}},
+        verified=True,
+        main_ports=[445],
+    )
+    assert ea.required_service == {"protocol": "smb", "port": 445}
 
 
 @pytest.mark.unit

@@ -1,5 +1,6 @@
-"""Tests for atom_loader — loading v2 AtomConfig from data/atoms/"""
+"""Tests for atom_loader — loading AtomConfig from Range admission index."""
 
+import json
 import pytest
 import yaml
 from pathlib import Path
@@ -56,6 +57,46 @@ class TestAtomLoaderAllVerified:
         all_atoms = loader.load_all_verified(single_service_only=False)
         single_atoms = loader.load_all_verified(single_service_only=True)
         assert len(all_atoms) >= len(single_atoms)
+
+    def test_range_index_is_authoritative_when_present(self, tmp_path):
+        atoms_dir = tmp_path / "atoms"
+        for cve in ("CVE-2024-5001", "CVE-2024-5002"):
+            atom_dir = atoms_dir / cve
+            atom_dir.mkdir(parents=True)
+            (atom_dir / "atom.yaml").write_text(yaml.safe_dump({
+                "version": 2,
+                "cve_id": cve,
+                "category": "test",
+                "docker_image": "test:latest",
+                "ports": [80],
+                "services": [{"name": "web", "image": "test:latest"}],
+                "vuln_category": "RCE",
+                "primary_mitre_phase": "initial_access",
+                "service_role": "web_application",
+                "exploit_complexity": "simple",
+                "attack_method": "single_request",
+                "verified": True,
+            }))
+        dataset = tmp_path / "atom_scale" / "dataset.jsonl"
+        dataset.parent.mkdir()
+        dataset.write_text("\n".join(json.dumps(row) for row in [
+            {
+                "cve_id": "CVE-2024-5001",
+                "atom_path": str(atoms_dir / "CVE-2024-5001"),
+                "admission_schema_version": 1,
+                "range_admitted": True,
+            },
+            {
+                "cve_id": "CVE-2024-5002",
+                "atom_path": str(atoms_dir / "CVE-2024-5002"),
+                "admission_schema_version": 1,
+                "range_admitted": False,
+            },
+        ]) + "\n")
+
+        atoms = AtomLoader(atoms_dir=str(atoms_dir)).load_all_verified()
+
+        assert [atom.cve_id for atom in atoms] == ["CVE-2024-5001"]
 
 
 class TestAtomLoaderList:

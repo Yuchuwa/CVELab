@@ -5,12 +5,15 @@ import yaml
 
 from clab_builder.atomizer.output.vulhub_converter import VulhubParser
 from clab_builder.atomizer.scaling import (
+    AtomScaleRecord,
     AtomScaleRunner,
     dedupe_candidates,
+    discover_cve_factory_candidates,
     discover_raw_record_candidates,
     discover_vulhub_candidates,
     load_raw_records,
 )
+from clab_builder.shared.models.atom import AtomConfig
 
 
 def write_compose(path: Path, image: str = "vulhub/test:latest"):
@@ -92,6 +95,69 @@ def test_dedupe_prefers_vulhub_over_raw_records(tmp_path):
 
     assert len(records) == 1
     assert records[0].source_type == "vulhub"
+
+
+def test_discover_cve_factory_prepares_regular_atomizer_source(tmp_path):
+    root = tmp_path / "cve_tasks"
+    task = root / "trainset" / "cve-2024-4321"
+    task.mkdir(parents=True)
+    (task / "Dockerfile").write_text("FROM nginx\nEXPOSE 8080\n")
+    (task / "docker-compose.yaml").write_text(
+        "services:\n  client:\n    image: ${T_BENCH_TASK_DOCKER_CLIENT_IMAGE_NAME}\n"
+    )
+    (task / "task.yaml").write_text("category: bug-fix\ndifficulty: medium\n")
+
+    records = discover_cve_factory_candidates(root, tmp_path / "generated")
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.cve_id == "CVE-2024-4321"
+    assert record.source_type == "cve_factory"
+    prepared = Path(record.source_path)
+    compose = yaml.safe_load((prepared / "docker-compose.yml").read_text())
+    assert compose["services"]["client"]["image"] == "cve-cve-2024-4321:vuln"
+    assert compose["services"]["client"]["expose"] == ["8080"]
+
+
+def test_dataset_materializes_range_admission_from_atom_base(tmp_path):
+    atom_dir = tmp_path / "atoms" / "CVE-2024-4322"
+    atom_dir.mkdir(parents=True)
+    (atom_dir / "docker-compose.yml").write_text("services:\n  web:\n    image: test\n")
+    atom = AtomConfig.model_validate({
+        "version": 3,
+        "cve_id": "CVE-2024-4322",
+        "category": "test",
+        "docker_image": "test:latest",
+        "ports": [80],
+        "services": [{"name": "web", "image": "test:latest", "is_target": True}],
+        "runtime_spec": {"ports": [80], "services": [{"name": "web", "image": "test:latest", "is_target": True}]},
+        "source_bundle": {"compose_file": "docker-compose.yml"},
+        "vuln_category": "RCE",
+        "primary_mitre_phase": "initial_access",
+        "service_role": "web_application",
+        "exploit_complexity": "simple",
+        "attack_method": "single_request",
+        "exploit_access": {"attack_vector": "network", "privileges_required": "none", "required_service": {"protocol": "http", "port": 80}},
+        "capability_grants": [{"type": "execute_command", "principal": "root", "evidence_level": "verified", "evidence_ref": "native"}],
+        "verification": {"native_verification": {"success": True}, "environment_ready": True},
+        "verified": True,
+    })
+    (atom_dir / "atom.yaml").write_text(yaml.safe_dump(atom.model_dump(mode="json"), sort_keys=False))
+    runner = AtomScaleRunner(
+        vulhub_dir="", output_dir=str(tmp_path / "atoms"), state_dir=str(tmp_path / "state")
+    )
+    runner.write_outputs([AtomScaleRecord(
+        cve_id=atom.cve_id, source_type="cve_factory", source_path="trainset/cve-2024-4322",
+        status="succeeded", atom_path=str(atom_dir),
+    )], export_parquet=False)
+
+    row = json.loads(runner.dataset_jsonl_path.read_text().strip())
+    assert row["admission_schema_version"] == 1
+    assert row["range_admitted"] is True
+    assert row["qualification_status"] == "template_anchor"
+    assert row["range_index"]["service_role"] == "web_application"
+    assert row["range_index"]["capability_types"] == ["execute_command"]
+    assert row["range_index"]["source_kind"] == "cve_factory"
 
 
 def test_runner_discover_writes_unique_dataset(tmp_path):

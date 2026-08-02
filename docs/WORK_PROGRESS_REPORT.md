@@ -3705,3 +3705,255 @@ AGENT_CONTEXT=l1 \
 AGENT_RUNNER=openai \
 bash scripts/run_decoy_ablation.sh 2>&1 | tee data/guide_ablation/decoy_l1_kimi_v3.log
 ```
+
+## 2026-07-27 — 切换 dev 分支后的状态核对
+
+### 分支状态
+
+- 已从 `build` 切换到 `dev`，并从 `origin/dev` 快进到 `2388b04`。
+- `build` 工作区的改动已保存到本地 stash：
+  `preserve build work before switching to dev`；未删除，后续如需恢复再单独处理。
+- 工作区仍有未跟踪的 `data/CVE-Factory/`，未删除；它不属于本次 dev 状态判断。
+
+### dev 当前已完成工作
+
+- Range 侧已完成 L0/L1/L2 输入分级、decoy 噪音档位、批量实验编排、API 错误分级与
+  quota/rate-limit 容错，以及 ContainerLab 生命周期锁的 root/sudo 健壮性修复。
+- L2 decoy ablation（deepseek-v4-pro，8 cases，none/low/medium/high）已完成；
+  结果不支持在 L2 下观察到稳定的 decoy 负效应，因为 L2 直接提供 CVE→IP 映射。
+- SFT Phase 0/1/2 已完成：666 条训练样本、三档长度 smoke、Qwen2.5-7B LoRA
+  训练 501 steps，loss 1.111→0.313，token accuracy 92.8%。
+- SFT Phase 3 的 vLLM + tool-call 服务链路已修复并通过 API smoke，但 base-vs-LoRA
+  Range 对照评测尚未形成有效结果；当前 dev checkout 的 `data/sft/` 仅有训练
+  JSONL 和长度报告，`data/sft/adapter_v1/` 未出现，需要先确认 adapter 产物位置
+  或重新导出。
+
+### 当前后续工作
+
+1. 按最新网关配置重跑 `L1 × kimi-k3 × none/low/medium/high` decoy 实验，区分
+   deploy、Agent、objective、API 错误，不把 quota/限流停止计入 exploit 失败。
+2. 完成 SFT base-vs-LoRA 域内对照，先确认环境与攻击图全通过，再比较 3-flag 全通率、
+   至少一跳成功率、平均完成度和终止原因。
+3. 实现并验证 `enterprise_2tier`；当前只有设计文档，模板文件尚不存在，不能把两层
+   拓扑实验视为已完成。
+
+### 本次验证
+
+- 关键 dev 回归：`113 passed, 10 skipped, 1 failed`。
+- 唯一失败为本机 Python 环境缺少 `openai` 包，测试在导入 `APIConnectionError`
+  时失败；API triage 其余测试、verifier、noise-node 和 stratified-selector 测试通过。
+- 未启动真实 LLM/Docker 批次；L1 实验仍以报告中的 `decoy_l1_kimi_v3.log` 命令为下一执行入口。
+
+## 2026-07-29 — 从最新 dev 重建 build 分支
+
+- 已获取远端 `dev`；本地 `dev` 与 `origin/dev` 的最新提交均为 `2388b04`，没有新增提交。
+- 已将本地 `build` 分支重新指向 `2388b04` 并切换到 `build`；`build`、`dev`、
+  `origin/dev` 当前完全一致。
+- 原有 stash `preserve build work before switching to dev`、未跟踪的
+  `data/CVE-Factory/` 以及工作区报告修改均保留，未删除或恢复。
+- 本次未运行 Atom/Range 实验，也未改变共享构建或验证契约。
+
+## 2026-07-29 — 项目规划与下一步核对
+
+### 已确认状态
+
+- `L2 × deepseek-v4-pro × decoy none/low/medium/high` 已完成，但没有观察到稳定的
+  decoy 负效应；最新计划要求转到不提供 CVE→IP 映射的 L1 继续实验。
+- L1 decoy runner 与 API/ContainerLab 容错代码已经存在；当前工作区没有可供分析的
+  `data/guide_ablation/` 批次结果目录，因此 L1 四档实验仍未闭环。
+- SFT Phase 0/1/2 已有训练数据和既往训练记录；当前工作区只有
+  `data/sft/cve_attack_sft_v1.jsonl` 与 `length_report.json`，没有
+  `adapter_v1`、adapter 权重或 base-vs-LoRA 评测产物。现有 stash 也不包含 adapter。
+- `sft/eval_sft.py` 已存在，但 Phase 3 域内对照评测尚不能在恢复或重新导出 adapter
+  之前执行。
+- `templates/enterprise_2tier/template.yaml` 不存在；两层拓扑目前只有
+  `docs/2TIER_IMPLEMENTATION.md` 的实现与验收说明。
+
+### 后续顺序
+
+1. 运行并分析 `L1 × kimi-k3 × decoy none/low/medium/high`，分别记录环境、Agent、
+   objective、API 错误和 decoy interaction 结果。
+2. 定位或重新导出 LoRA adapter，随后完成同一批 Range 上的 base-vs-LoRA Phase 3
+   对照评测。
+3. 实现 `enterprise_2tier`，依次通过生成、节点数/noise-level、environment-only
+   和两跳 Agent smoke 验收。
+
+## 2026-07-29 — 统一 Atom-to-Range 准入索引
+
+### 已完成
+
+- `data/atom_scale/dataset.jsonl` 已升级为 Atom 资格的物化索引。每条成功 Atom
+  记录现在包含统一资格结果、`range_admitted`、服务角色、MITRE phase、攻击入口、
+  已验证 capability、运行时契约、source bundle、Guide 状态与原生/编排验证摘要；
+  完整可复现材料仍以 `data/atoms/<CVE>/` 为权威来源。
+- `AtomLoader` 在存在新版索引时只加载 `range_admitted=true` 的记录，再经
+  `atom_path` 读取完整 `atom.yaml`；旧索引尚未回填时保留目录扫描兼容路径。
+- `atom scale` 新增 `--cve-factory-dir` 与可重复的 `--cve-factory-task`。任务先被
+  适配为普通 Atomizer 输入，再走标准 LLM 原生验证、source bundle、Guide、编排环境
+  与共享资格判定。CVE-Factory 的测试/标记结果不再直接构成 Range 准入。
+
+### 当前基线
+
+- 已从现有 `data/atoms` 回填新版 `data/atom_scale/dataset.jsonl`：115 条成功 Atom
+  记录中，25 条为 `template_candidate` 或 `template_anchor`；其中 18 条为 anchor、
+  7 条为 candidate。
+- 默认单服务 Range 加载器当前消费 22 条准入 Atom；按服务角色为 web_application 18、
+  middleware 2、database 1、system_service 1。该数值是当前 checkout 的派生索引结果，
+  不替代历史实验报告的 Atom/Range 计数。
+
+### 验证与限制
+
+- 新增 CVE-Factory 源适配、索引物化和索引权威加载的单元测试；本地 Python 语法和
+  admission-index smoke 通过。
+- 当前环境缺少可执行的 `pytest`，因此未完成完整 pytest 回归；后续应在具备 dev
+  dependencies 的环境运行 `tests/atomizer/test_scaling.py`、
+  `tests/orchestrator/test_atom_loader.py` 与资格判定测试。
+
+### 结果更正
+
+- 已同步项目 dev 依赖并完成聚焦回归：49 passed、1 deselected。覆盖 AtomScale、
+  CVE-Factory 适配、准入索引、Range Loader 与资格判定。
+- 未选中的既有测试是 `test_load_known_atom`：它要求当前 checkout 中的
+  `CVE-2014-6271` 为 `verified=true`，但该 Atom 当前实际为未验证状态；本次没有
+  修改该 Atom，也没有放宽统一资格门禁。
+- 修复了准入索引新增嵌套字段写入 Parquet 时的 Arrow struct 空字段问题，JSONL 与
+  Parquet 现在保持一致。
+
+### 数量口径核对补充
+
+- 直接扫描当前 `data/atoms/CVE-*/atom.yaml` 得到 238 个标准 Atom 目录：
+  `template_anchor=18`、`template_candidate=7`，统一 Range 准入合计 **25**；
+  与 `data/atom_authoritative_audit.json` 的 18+7 结果一致。
+- 历史 authoritative audit 为 239 条，额外条目是 `PIL-CVE-2017-8291`，其目录名
+  不符合当前 `CVE-*` 目录模式；它不属于当前 25 条准入集合，因此只造成总池数量
+  的 239→238 差异。
+- 工作记录中的 115 是当时成功 Atom 的批处理池，114 是历史 v3 structure audit，
+  109 是更早的 managed pool 快照；2026-07-20 记录中的 45 是特定历史 matrix
+  扩充口径（入口 41 + data-store 4），不能与当前统一 `qualify_atom_dir` 的 25 条
+  直接相加或替换。
+
+### 当前准入池偏小的原因
+
+- 直接审计 238 个 Atom 后，213 个未达到 `template_candidate`。主要共享缺口为：
+  209 个 network Atom 缺少 `required_service`，193 个没有 verified capability，
+  189 个 `verified=false`/native 未成功，185 个仍为 v2，134 个没有 source_bundle。
+- 因此当前 25 个准入不是索引漏写，也不能通过放宽 Range 门禁得到可靠扩充；优先工作应是
+  对高价值旧 Atom 做批量 v3 重建、LLM/native 验证、Guide 和 runtime/source bundle
+  回填，再将通过统一门禁的结果自动回写索引。随后再从 CVE-Factory trainset 补充新的
+  服务角色和攻击阶段。
+
+### 旧 Atom 批量重建执行方案
+
+- 当前 238 个 Atom 中有 28 个已经是 v3 但尚未准入，适合作为第一波近候选；其余主要是
+  185 个 v2 旧 Atom，需要完整重建而不是单字段修补。
+- 第一波按 capability、服务角色/阶段多样性、利用自动化稳定性和环境可靠性排序，批次
+  控制在 8-12 个、并发 2；默认开启 LLM Agent，禁止用 `--skip-agent` 产生准入结果。
+- 每波使用 `--force --cve ...` 只重建选中的 CVE。Atomizer 的失败回滚和后续统一资格
+  判定保留失败证据；批次完成后由 `atom scale` 自动刷新 `dataset.jsonl`。
+- 不先对 209 个空 `required_service` Atom 做盲目回填，因为其中大部分同时缺少 native
+  验证和 verified capability；端口回填不能替代漏洞可利用性证明。
+
+### 第一波 v3 近候选实际执行结果
+
+- 已按 28 个 v3 近候选启动 Docker + LLM Agent 重建，使用并发 2、最大 80 turns；
+  用户已明确授权使用项目 `.env` 中的 LLM endpoint。
+- 批次因工具 30 分钟运行上限中止，未完整跑完 28 条：23 条实际完成，2 条 Agent 失败
+  （CVE-2015-5254、CVE-2017-12636），3 条历史 CVE-Factory Atom 未实际重建
+  （CVE-2021-23592、CVE-2021-27341、CVE-2023-2160）。
+- 直接重新审计 Atom 目录后，准入从 25 增至 **26**，template_anchor 从 18 增至 **19**；
+  新增准入为 CVE-2014-0160。失败 Atom 已从事务备份或当前分支原始版本恢复，未将失败
+  重建结果作为权威 Atom。
+- 发现并修复两个共享问题：AtomScale 的 `force` 未传递到内部 Atomizer；Atomizer
+  在 Agent 验证失败时错误地提交了新目录。新增逻辑要求只有验证成功才提交覆盖，失败时
+  恢复旧 Atom。AtomScale 相关回归为 28 passed。
+- 后续不应继续用 28 条全量长批次；应把协议型/多阶段 CVE 分离为小批次，并先补跑 3 条
+  未实际重建的 CVE-Factory 任务，再处理失败任务。
+
+## 2026-07-29 — 第一波准入数量原因核对与服务契约修复
+
+- 本批次实际是 28 个 v3 近候选 Atom 的 Docker + LLM 重建，不是 28 个
+  Range 实验；因 30 分钟运行上限实际完成 23 个，另有 2 个 Agent 失败、3 个
+  CVE-Factory 任务未启动。
+- 对本批次产物直接核对发现，24 个已有 native_verification.success=true，且这些
+  记录均已有 Exploit Guide；但其中 21 个的 exploit_access.required_service 为空。
+  这使它们被统一资格门禁判为不可进入服务槽位，主要是 Atom 构建契约转换问题，
+  不是 21 个漏洞都利用失败。
+- 根因是 Agent 输出 exploit_access: {} 时，旧逻辑把空字段当作已提供契约，跳过了
+  main_ports 的回退。已在共享 _build_capability_contract 中修复：优先使用源码解析
+  的服务契约，解析不到时使用 native parser 观察到的主端口；本地回归
+  tests/atomizer/test_pipeline_integration.py 与 tests/shared/test_service_resolver.py
+  结果为 34 passed、1 skipped。
+- 修复后的 26 条准入和 19 条 template-anchor 是修复前索引的存量结果，不能宣称
+  这 21 个已被修复；下一步应对其中原生验证成功的候选做小批量重建并重新写入索引，
+  再统计实际新增数量。
+
+## 2026-07-29 — 服务契约修复后的 21 Atom 重建批次
+
+- 按并发 4、最大 80 turns、Docker + LLM Agent 重跑了 21 个“原生验证成功但服务
+  契约为空”的近候选。批次达到 30 分钟运行上限，未完整收尾，但 AtomScale 账本记录
+  18 个成功、3 个 Agent 失败。
+- 失败任务为 CVE-2015-5254、CVE-2017-12636、CVE-2021-32682；它们没有作为新
+  权威 Atom 提交。超时留下的临时目录和 Docker/Agent 容器已清理，6 个未完成目录
+  从备份恢复，CVE-2020-10199 从当前分支恢复。
+- 重新执行 discover-only 后，data/atom_scale/dataset.jsonl 的 Range 准入从 26
+  增至 **33**，新增 7 条；当前索引为 26 条 template_anchor、7 条
+  template_candidate、13 条 review_required、66 条 excluded。
+- 本批次说明服务契约回退修复确实提升了准入数量，但仍有部分成功重建 Atom 的源码
+  没有可确定的服务端口信号，继续保留为 review_required，不通过手工填写端口放行。
+
+## 2026-07-29 — 重建批次成功数与权威准入数口径更正
+
+- “18 个成功”是 AtomScale manifest 的进程结果，不等于 18 个新 Atom 都已经
+  提交为当前权威目录；批次超时后，部分临时目录被恢复，CVE-2020-10199 也从当前
+  分支恢复。因此最终统计以当前 Atom 目录和 dataset.jsonl 为准。
+- 从先前已确认的 26 条准入到当前 33 条准入，新增 **7 条确定**，对应本批次中的：
+  CVE-2017-7494、CVE-2018-19475、CVE-2019-17558、CVE-2021-42013、
+  CVE-2022-0543、CVE-2022-22965、CVE-2022-24816。
+- 11 条账本标记成功但当前未准入的记录，资格判定均为
+  network atom has empty required_service。它们不能直接进入 Range 服务槽位；
+  后续需在可完整提交的短批次中重建并核对 atom.yaml，而不是按 Agent 成功数放行。
+
+## 2026-07-29 — SFT 训练语料位置核对
+
+- 只读核对确认，从干净 Range 攻击轨迹提取的第一版 SFT 成品位于
+  `data/sft/cve_attack_sft_v1.jsonl`，当前共 666 条、约 29 MB。
+- 配套长度与筛选统计位于 `data/sft/length_report.json`；转换入口为
+  `sft/convert_trajectories_to_sft.py`。
+- 转换器默认从 `data/guide_ablation/*/scenarios/*/verify_result.json`
+  定位验证结果，并读取相应 Claude-format `session.json`，按成功 flag 边界生成
+  hop 前缀与完整报告样本。此次仅确认已有产物和路径，未重新生成或修改训练语料。
+
+## 2026-07-29 — empty required_service 口径复核
+
+- 复核 `network atom has empty required_service` 的含义：这是 Range 准入门禁对
+  network Atom 的服务契约检查，要求 `exploit_access.required_service` 至少包含
+  protocol 和 port；缺失时不能进入二阶段服务槽位匹配。
+- 当前共享构建逻辑 `_build_capability_contract` 已能在 Agent 输出空
+  `required_service` 时回退到 source/main_ports；对 11 条当前未准入记录逐一调用
+  当前逻辑，均可推导出服务契约。因此剩余问题不是 resolver 当前不可用，而是这些
+  `data/atoms/<CVE>/atom.yaml` 仍保留旧的空字段或未完整提交状态。
+- 未对 11 条 Atom 手工回填端口；后续应通过短批次完整重建，让 native/orchestrated
+  验证和 atom.yaml 写入一起完成，再刷新 `dataset.jsonl` 作为权威准入口径。
+
+## 2026-07-29 — 11 条 empty required_service 近候选完整重建
+
+- 按短批次重新运行 11 条 `required_service` 为空的近候选，使用完整 Docker + LLM
+  native 验证，不手工回填端口；每批后刷新 `data/atom_scale/dataset.jsonl`。
+- 成功落盘并写入非空 `exploit_access.required_service` 的 10 条：
+  CVE-2020-10199、CVE-2022-41678、CVE-2023-4450、CVE-2023-51467、
+  CVE-2024-27348、CVE-2024-38856、CVE-2024-45195、CVE-2024-9264、
+  CVE-2025-55182、CVE-2025-68613。
+- 最终 Range 准入从 33 增至 **43**；其中当前索引为 34 条
+  `template_anchor`、9 条 `template_candidate`、3 条 `review_required`、66 条
+  `excluded`。本轮新增为 **10 条确定准入**。
+- `CVE-2026-25887` 未准入。第一次失败原因是 MySQL 依赖健康检查过早 unhealthy；
+  已在共享 Atomizer 临时 compose 生成逻辑中延长已有 healthcheck 的启动宽限
+  （保留 `depends_on: service_healthy` 语义）。修复后环境可启动 4 个 compose
+  服务，但 Agent 未完成验证，最终 `success=false`，因此旧空服务契约不作为准入提交。
+- 注意到当前资格函数没有把 guide 缺失作为硬门槛：CVE-2022-41678、
+  CVE-2024-45195、CVE-2025-68613 的索引 guide 字段为空但仍可进入
+  candidate/anchor。此次未改变该门禁口径；后续如要严格执行 high-confidence Guide
+  gate，需要单独修改 qualification 规则并重算准入。
+- 本轮公共回归测试：
+  `tests/atomizer/test_pipeline_integration.py` 和
+  `tests/shared/test_service_resolver.py`，结果 35 passed、1 skipped。

@@ -336,6 +336,9 @@ def atom_sysfield(cve_id, output):
 @atom.command("scale")
 @click.option("--vulhub-dir", default="data/vulhub", help="Vulhub data directory")
 @click.option("--raw-records", multiple=True, help="raw_records_*.json file; can be repeated")
+@click.option("--cve-factory-dir", default="", help="CVE-Factory cve_tasks directory")
+@click.option("--cve-factory-task", "cve_factory_tasks", multiple=True,
+              help="Relative CVE-Factory task path; repeatable (default: scan all tasks)")
 @click.option("--output", "-o", default="data/atoms", help="Atoms directory")
 @click.option("--state-dir", default="data/atom_scale", help="Manifest/dataset output directory")
 @click.option("--generated-sources-dir", default="data/generated",
@@ -356,15 +359,17 @@ def atom_sysfield(cve_id, output):
 @click.option("--no-parquet", is_flag=True, help="Do not export HuggingFace parquet dataset")
 @click.option("--min-disk-gb", type=float, default=5.0,
               help="Pause spawning new builds when free disk (GB) on /var drops below this")
-def atom_scale(vulhub_dir, raw_records, output, state_dir, generated_sources_dir,
+def atom_scale(vulhub_dir, raw_records, cve_factory_dir, cve_factory_tasks, output, state_dir, generated_sources_dir,
                api_key, base_url, model, skip_agent, force, retry_failed, limit,
                cve_filter, max_turns, workers, min_disk_gb, discover_only, no_parquet):
-    """Scale first-stage atom generation from Vulhub and raw CVE records."""
+    """Scale Atom generation from Vulhub, CVE-Factory, and raw CVE records."""
     from clab_builder.atomizer.scaling import AtomScaleRunner
 
     runner = AtomScaleRunner(
         vulhub_dir=vulhub_dir,
         raw_records=tuple(raw_records),
+        cve_factory_dir=cve_factory_dir,
+        cve_factory_tasks=tuple(cve_factory_tasks),
         output_dir=output,
         state_dir=state_dir,
         generated_sources_dir=generated_sources_dir,

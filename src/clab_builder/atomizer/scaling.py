@@ -21,6 +21,8 @@ from typing import Any, Iterable
 import yaml
 
 from clab_builder.atomizer.pipeline import AtomizerPipeline
+from clab_builder.shared.atom_qualification import qualify_atom
+from clab_builder.shared.models.atom import AtomConfig
 
 
 CVE_RE = re.compile(r"\bCVE-\d{4}-\d{4,}\b", re.IGNORECASE)
@@ -52,6 +54,14 @@ class AtomScaleRecord:
     finished_at: str = ""
     duration_seconds: float = 0.0
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Materialized from atom.yaml after every successful build.  The manifest
+    # remains the job ledger; these fields make dataset.jsonl the Range pool
+    # index without duplicating the full atom source bundle.
+    admission_schema_version: int = 0
+    range_admitted: bool = False
+    qualification_status: str = "unqualified"
+    qualification: dict[str, Any] = field(default_factory=dict)
+    range_index: dict[str, Any] = field(default_factory=dict)
 
     @property
     def key(self) -> str:
@@ -154,6 +164,142 @@ def discover_raw_record_candidates(
     return records
 
 
+def discover_cve_factory_candidates(
+    task_root: str | Path,
+    generated_sources_dir: str | Path,
+    task_paths: Iterable[str] = (),
+) -> list[AtomScaleRecord]:
+    """Prepare CVE-Factory tasks as regular Atomizer source directories.
+
+    CVE-Factory's task format is only an input source.  It deliberately does
+    not bypass the normal Atomizer/LLM native-verification pipeline: a task
+    whose test is merely a marker or non-exploitable proof remains unverified
+    and cannot enter the Range dataset.
+    """
+    root = Path(task_root)
+    generated_root = Path(generated_sources_dir) / "cve_factory"
+    if not root.is_dir():
+        return []
+
+    requested = [root / path for path in task_paths]
+    task_dirs = requested if requested else sorted({path.parent for name in (
+        "docker-compose.yaml", "docker-compose.yml"
+    ) for path in root.rglob(name)})
+
+    records: list[AtomScaleRecord] = []
+    for task_dir in task_dirs:
+        if not task_dir.is_dir() or not task_dir.is_relative_to(root):
+            continue
+        cve_id = normalize_cve_id(task_dir.name)
+        if not cve_id:
+            continue
+        prepared = prepare_cve_factory_source(task_dir, generated_root / cve_id, cve_id)
+        task_yaml = task_dir / "task.yaml"
+        task_meta: dict[str, Any] = {}
+        if task_yaml.is_file():
+            try:
+                task_meta = yaml.safe_load(task_yaml.read_text(encoding="utf-8")) or {}
+            except (OSError, yaml.YAMLError):
+                task_meta = {}
+        records.append(AtomScaleRecord(
+            cve_id=cve_id,
+            source_type="cve_factory",
+            source_path=str(prepared),
+            metadata={
+                "cve_factory_task_path": str(task_dir),
+                "cve_factory_relative_path": str(task_dir.relative_to(root)),
+                "cve_factory_category": task_meta.get("category", ""),
+                "cve_factory_difficulty": task_meta.get("difficulty", ""),
+            },
+        ))
+    return records
+
+
+def _resolve_cve_factory_vars(value: Any, cve_id: str) -> Any:
+    if isinstance(value, str):
+        mapping = {
+            "T_BENCH_TASK_DOCKER_CLIENT_IMAGE_NAME": f"cve-{cve_id.lower()}:vuln",
+            "T_BENCH_TASK_DOCKER_CLIENT_CONTAINER_NAME": f"cve-{cve_id.lower()}-client",
+            "T_BENCH_TEST_DIR": "/tests",
+            "T_BENCH_TASK_LOGS_PATH": "/tmp/logs",
+            "T_BENCH_CONTAINER_LOGS_PATH": "/tmp/container-logs",
+            "T_BENCH_TASK_AGENT_LOGS_PATH": "/tmp/agent-logs",
+            "T_BENCH_CONTAINER_AGENT_LOGS_PATH": "/tmp/container-agent-logs",
+        }
+        return re.sub(r"\$\{(\w+)\}", lambda m: mapping.get(m.group(1), m.group(0)), value)
+    if isinstance(value, list):
+        return [_resolve_cve_factory_vars(item, cve_id) for item in value]
+    if isinstance(value, dict):
+        return {key: _resolve_cve_factory_vars(item, cve_id) for key, item in value.items()}
+    return value
+
+
+def _cve_factory_exposed_port(task_dir: Path) -> int | None:
+    dockerfile = task_dir / "Dockerfile"
+    if dockerfile.is_file():
+        for line in dockerfile.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.strip().upper().startswith("EXPOSE"):
+                match = re.search(r"\b(\d+)(?:/\w+)?\b", line)
+                if match:
+                    return int(match.group(1))
+    for test_name in ("test_vuln.py", "test_func.py"):
+        test = task_dir / "tests" / test_name
+        if not test.is_file():
+            continue
+        text = test.read_text(encoding="utf-8", errors="replace")[:4000]
+        match = re.search(r"(?:APP_URL|localhost)[^'\"}]*:(\d+)", text)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def prepare_cve_factory_source(task_dir: Path, destination: Path, cve_id: str) -> Path:
+    """Adapt one Terminal-Bench task without changing its runtime semantics."""
+    if destination.exists():
+        shutil.rmtree(destination)
+    shutil.copytree(task_dir, destination)
+    compose_yaml = destination / "docker-compose.yaml"
+    compose_yml = destination / "docker-compose.yml"
+    if compose_yaml.exists() and not compose_yml.exists():
+        compose_yaml.rename(compose_yml)
+    if compose_yml.exists():
+        compose = yaml.safe_load(compose_yml.read_text(encoding="utf-8")) or {}
+        compose = _resolve_cve_factory_vars(compose, cve_id)
+        services = compose.get("services") or {}
+        for service in services.values():
+            if not isinstance(service, dict):
+                continue
+            service["image"] = f"cve-{cve_id.lower()}:vuln"
+            build = service.get("build")
+            if not isinstance(build, dict):
+                build = {"dockerfile": "Dockerfile", "context": "."}
+            build.setdefault("network", "host")
+            service["build"] = build
+            service.pop("container_name", None)
+            service.pop("healthcheck", None)
+            if not service.get("ports") and not service.get("expose"):
+                port = _cve_factory_exposed_port(destination)
+                if port:
+                    service["expose"] = [str(port)]
+        compose_yml.write_text(
+            yaml.safe_dump(compose, sort_keys=False, allow_unicode=True), encoding="utf-8"
+        )
+    readme = destination / "README.md"
+    if not readme.exists():
+        task_meta = {}
+        task_yaml = destination / "task.yaml"
+        if task_yaml.is_file():
+            task_meta = yaml.safe_load(task_yaml.read_text(encoding="utf-8")) or {}
+        readme.write_text(
+            "\n".join((
+                f"# {cve_id}", "", "Generated from CVE-Factory task.", "",
+                "## Description", str(task_meta.get("instruction", "")), "",
+            )),
+            encoding="utf-8",
+        )
+    return destination
+
+
 def materialize_raw_record_source(
     row: dict[str, Any],
     generated_root: Path,
@@ -201,7 +347,7 @@ def materialize_raw_record_source(
 
 def dedupe_candidates(candidates: Iterable[AtomScaleRecord]) -> list[AtomScaleRecord]:
     """Deduplicate by CVE id, preferring Vulhub over generated raw records."""
-    priority = {"vulhub": 0, "raw_records": 1}
+    priority = {"vulhub": 0, "cve_factory": 1, "raw_records": 2}
     selected: dict[str, AtomScaleRecord] = {}
     for candidate in sorted(candidates, key=lambda c: (priority.get(c.source_type, 99), c.cve_id)):
         key = candidate.key
@@ -238,6 +384,71 @@ def _succeeded_records(records: Iterable[AtomScaleRecord]) -> list[AtomScaleReco
     return [record for record in records if record.status == "succeeded"]
 
 
+def populate_range_admission(record: AtomScaleRecord, atom_dir: Path) -> None:
+    """Materialize an Atom's Range-relevant contract into its dataset row."""
+    atom_yaml = atom_dir / "atom.yaml"
+    if not atom_yaml.is_file():
+        record.admission_schema_version = 1
+        record.range_admitted = False
+        record.qualification_status = "excluded"
+        record.qualification = {"reasons": ["atom.yaml missing"]}
+        record.range_index = {}
+        return
+    try:
+        atom = AtomConfig.model_validate(yaml.safe_load(atom_yaml.read_text(encoding="utf-8")) or {})
+    except Exception as exc:
+        record.admission_schema_version = 1
+        record.range_admitted = False
+        record.qualification_status = "excluded"
+        record.qualification = {"reasons": [f"atom parse failed: {exc}"]}
+        record.range_index = {}
+        return
+
+    qualification = qualify_atom(atom, atom_dir)
+    atom_data = atom.model_dump(mode="json", exclude={"flag_value"})
+    verified_grants = [
+        grant for grant in atom_data["capability_grants"]
+        if grant.get("evidence_level") == "verified"
+    ]
+    guide = atom_data.get("exploit_guide") or {}
+    verification = atom_data.get("verification") or {}
+    record.admission_schema_version = 1
+    record.range_admitted = qualification.template_candidate
+    record.qualification_status = qualification.status
+    record.qualification = qualification.to_dict()
+    record.range_index = {
+        "atom_version": atom.version,
+        "source_kind": record.source_type,
+        "vuln_category": atom.vuln_category.value,
+        "primary_mitre_phase": atom.primary_mitre_phase.value,
+        "service_role": atom.service_role.value,
+        "attack_method": atom.attack_method.value,
+        "exploit_complexity": atom.exploit_complexity.value,
+        "exploit_access": atom_data["exploit_access"],
+        "capability_grants": verified_grants,
+        "capability_types": sorted({grant["type"] for grant in verified_grants}),
+        "capability_principals": sorted({grant["principal"] for grant in verified_grants}),
+        "services": atom_data["services"],
+        "runtime_spec": atom_data["runtime_spec"],
+        "network_requirements": atom_data["network_requirements"],
+        "post_exploit": atom_data["post_exploit"],
+        "source_bundle": atom_data["source_bundle"],
+        "guide": {
+            "present": bool(guide),
+            "ready": guide.get("status") == "ready",
+            "path": guide.get("path", ""),
+            "provenance": guide.get("provenance", ""),
+        },
+        "verification": {
+            "native_verified": bool((verification.get("native_verification") or {}).get("success")),
+            "environment_ready": verification.get("environment_ready"),
+            "orchestrated_verified": bool(
+                (verification.get("orchestrated_verification") or {}).get("success")
+            ),
+        },
+    }
+
+
 def export_hf_dataset(path: str | Path, records: Iterable[AtomScaleRecord]) -> str:
     """Export records as a HuggingFace-friendly parquet file."""
     import pandas as pd
@@ -248,6 +459,12 @@ def export_hf_dataset(path: str | Path, records: Iterable[AtomScaleRecord]) -> s
     for row in rows:
         row["ports"] = json.dumps(row.get("ports", []), ensure_ascii=False)
         row["metadata"] = json.dumps(row.get("metadata", {}), ensure_ascii=False, sort_keys=True)
+        row["qualification"] = json.dumps(
+            row.get("qualification", {}), ensure_ascii=False, sort_keys=True
+        )
+        row["range_index"] = json.dumps(
+            row.get("range_index", {}), ensure_ascii=False, sort_keys=True
+        )
     pd.DataFrame(rows).to_parquet(out, index=False)
     return str(out)
 
@@ -267,12 +484,16 @@ class AtomScaleRunner:
         self,
         vulhub_dir: str = "data/vulhub",
         raw_records: tuple[str, ...] = (),
+        cve_factory_dir: str = "",
+        cve_factory_tasks: tuple[str, ...] = (),
         output_dir: str = "data/atoms",
         state_dir: str = "data/atom_scale",
         generated_sources_dir: str = "data/generated",
     ):
         self.vulhub_dir = vulhub_dir
         self.raw_records = raw_records
+        self.cve_factory_dir = cve_factory_dir
+        self.cve_factory_tasks = cve_factory_tasks
         self.output_dir = Path(output_dir)
         self.state_dir = Path(state_dir)
         self.generated_sources_dir = Path(generated_sources_dir)
@@ -288,6 +509,12 @@ class AtomScaleRunner:
             candidates.extend(
                 discover_raw_record_candidates(self.raw_records, self.generated_sources_dir)
             )
+        if self.cve_factory_dir:
+            candidates.extend(discover_cve_factory_candidates(
+                self.cve_factory_dir,
+                self.generated_sources_dir,
+                self.cve_factory_tasks,
+            ))
         records = dedupe_candidates(candidates)
         records.sort(key=lambda item: item.cve_id)
         # Preserve historical statuses: if a manifest already exists, do not
@@ -321,6 +548,7 @@ class AtomScaleRunner:
         for key, prior in existing.items():
             if key not in seen:
                 merged.append(prior)
+        merged = self._merge_existing_atom_base(merged)
         # Reconcile against on-disk atom artefacts so that any successful runs
         # whose manifest update was lost get re-promoted to skipped_existing.
         merged = [self._reconcile_record(record) for record in merged]
@@ -470,6 +698,7 @@ class AtomScaleRunner:
                 model=model,
                 skip_agent=skip_agent,
                 llm_checker=llm_checker,
+                force=force,
             )
             record.atom_path = str(atom_dir)
             record.session_path = str(atom_dir / "session.json")
@@ -568,6 +797,42 @@ class AtomScaleRunner:
         self._backfill_record_time_from_session(record)
         return record
 
+    def _merge_existing_atom_base(self, records: list[AtomScaleRecord]) -> list[AtomScaleRecord]:
+        """Register existing verified atoms so a fresh index can be backfilled.
+
+        This is what makes ``data/atoms/<CVE>/`` the authoritative base while
+        keeping ``dataset.jsonl`` a reproducible, derived Range admission index.
+        """
+        by_key = {record.key: record for record in records}
+        if not self.output_dir.is_dir():
+            return records
+        for atom_yaml in self.output_dir.glob("*/atom.yaml"):
+            atom_dir = atom_yaml.parent
+            try:
+                atom = AtomConfig.model_validate(
+                    yaml.safe_load(atom_yaml.read_text(encoding="utf-8")) or {}
+                )
+            except Exception:
+                continue
+            key = atom.cve_id.upper()
+            record = by_key.get(key)
+            if record is None:
+                source_lower = atom.source.lower()
+                source_type = "cve_factory" if "cve_factory" in source_lower or "cve_factory" in atom.category else "vulhub"
+                record = AtomScaleRecord(
+                    cve_id=atom.cve_id,
+                    source_type=source_type,
+                    source_path=atom.source,
+                    status="succeeded" if atom.verified else "skipped_existing",
+                    atom_path=str(atom_dir),
+                )
+                by_key[key] = record
+            elif atom.verified and record.status in {"queued", "running", "failed", "skipped_existing"}:
+                record.status = "succeeded"
+                record.error = ""
+                record.atom_path = str(atom_dir)
+        return list(by_key.values())
+
     @staticmethod
     def _parse_session_timestamp(value: Any) -> datetime | None:
         if not value:
@@ -631,6 +896,9 @@ class AtomScaleRunner:
         sorted_records = sorted(records, key=lambda item: item.cve_id)
         for record in sorted_records:
             self._backfill_record_time_from_session(record)
+            if record.status == "succeeded":
+                atom_dir = Path(record.atom_path) if record.atom_path else self.output_dir / record.cve_id
+                populate_range_admission(record, atom_dir)
         # manifest retains ALL historical states (queued/running/succeeded/failed/...)
         write_jsonl(self.manifest_path, sorted_records)
         # dataset exports only verified (succeeded) atoms as clean training data
