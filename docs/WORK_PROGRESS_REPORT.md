@@ -1,5 +1,16 @@
 # RangeFactory 工作进展
 
+## 2026-08-04 更新：SysArmor signal 评估口径收紧
+
+正式 SysArmor × CVELab Stratified-50 报告已改为严格攻击窗口口径：
+
+- `new signal` 不再用 `signals_after_total > signals_before_total` 粗略判断，而是按 target 对 signal frame 做 `after - before` 差集。
+- `expected signal` 不再基于 after-signals 全集；expected ruleId 必须出现在攻击期间新增 signal frame 中，baseline / before 已存在的 ruleId 不计入命中。
+- 导出器会额外产出 `signals_new_total`、`new_rule_ids`、`new_rule_ids_by_target`，以及每个 case/target 的 `target-*-new.jsonl`。
+- 按新口径重导出 case1-50 后：new signal 为 31/50，strict expected signal 为 15/50。
+
+注意：下方 2026-07-30 的 first5 记录保留了当时的历史判断，其中 `after > before` 和 after-signals 全集命中已经不是当前正式口径。
+
 ## 2026-07-31 更新：SysArmor rc.5 + CVELab Stratified-50 case6-50 安装资格调试
 
 本轮目标是先把 case6-50 的 SysArmor rc.5 安装/patch/injection 链路调通，不跑正式攻击、不做 detection policy 评估。运行口径是 `--sysarmor`、`--environment-only`，暂不使用 `--sysarmor-detection`，避免把缺少 verified execution adapter 的 SysField 导出问题混入安装资格判断。
@@ -89,15 +100,15 @@ case31/33/35 定点 rerun：
 
 ### rerun B first5 统计表
 
-这张表按 50 cases 扩展设计：每个 case 一行，三段 flag 分列，signal 保留两个判定口径。`new signal` 表示攻击后 signal 数量有新增（`after > before`）；`expected signal` 表示该 case 期望的通用 ruleIds 是否在 after-signals 中出现。
+这张表按 50 cases 扩展设计：每个 case 一行，三段 flag 分列，signal 保留两个判定口径。注意这是 2026-07-30 的历史口径：当时 `new signal` 表示攻击后 signal 数量有新增（`after > before`），`expected signal` 表示该 case 期望的通用 ruleIds 是否在 after-signals 中出现；当前正式报告已改为攻击窗口新增 frame 口径。
 
 | case | L | t1 flag | t2 flag | t3 flag | attack | signal count | new signal | expected signal | missing signal |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | `matrix-2018-16509-2012-1823-2015-1427` | L2 | ❌ | ❌ | ❌ | FAIL | 12 → 139 | ✅ | ❌ | `execution_tool_opens_network_connection` |
 | `matrix-2024-9264-2021-42013-2019-9193` | L2 | ❌ | ❌ | ❌ | FAIL | 10 → 12 | ✅ | ✅ | - |
 | `matrix-2016-3088-2018-16509-2019-9193` | L2 | ❌ | ❌ | ❌ | FAIL | 18 → 18 | ❌ | ✅ | - |
-| `matrix-2018-16509-2021-42013-2019-9193` | L2 | ✅ | ❌ | ❌ | FAIL | 12 → 206 | ✅ | ✅ | - |
-| `matrix-2021-42013-2012-1823-2015-1427` | L2 | ✅ | ✅ | ✅ | PASS | 12 → 34 | ✅ | ✅ | - |
+| `matrix-2018-16509-2021-42013-2019-9193` | L2 | ✅ | ❌ | ❌ | FAIL | 12 → 212 | ✅ | ✅ | - |
+| `matrix-2021-42013-2012-1823-2015-1427` | L2 | ✅ | ✅ | ✅ | PASS | 12 → 40 | ✅ | ✅ | - |
 
 Captured flags:
 

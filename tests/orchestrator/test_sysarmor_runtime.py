@@ -221,3 +221,22 @@ def test_evaluate_signal_stream_uses_attack_window_for_detection():
     assert result["signal_count_grace"] == 1
     assert result["signal_detected"] is True
     assert result["attack_success"] is False
+
+
+def test_evaluate_signal_stream_can_be_marked_not_detected_when_not_evaluable():
+    result = sysarmor_runtime.evaluate_signal_stream(
+        pre_attack={},
+        attack_window={"target-1": [{"signalFrame": {"signal": {"id": "new"}}}]},
+        grace_window={},
+        attack_executed=True,
+        attack_success=True,
+    )
+
+    result["signal_detected"] = False
+    result["event_stream_visible"] = False
+    result["sysarmor_healthy"] = False
+    result["not_evaluable_reason"] = "watcher_not_ready"
+
+    assert result["signal_count_after"] == 1
+    assert result["signal_detected"] is False
+    assert result["not_evaluable_reason"] == "watcher_not_ready"

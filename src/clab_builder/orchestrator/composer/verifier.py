@@ -221,6 +221,7 @@ class ScenarioVerifier:
         if not ready.get("ok"):
             detection["sysarmor_healthy"] = False
             detection["event_stream_visible"] = False
+            detection["signal_detected"] = False
             detection["not_evaluable_reason"] = "watcher_not_ready"
         elif not attack_info.get("executed"):
             detection["not_evaluable_reason"] = "attack_not_executed"

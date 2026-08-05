@@ -322,3 +322,46 @@ def test_expected_signal_hit_requires_new_attack_signal(tmp_path):
     verdict = case["expected_signal_detection"]
     assert verdict["observed_rule_ids"] == ["account_database_read"]
     assert verdict["missing_rule_ids"] == ["workload_executes_shell_or_interpreter"]
+
+
+def test_expected_signal_hit_is_not_evaluated_when_watcher_not_ready(tmp_path):
+    exporter = load_exporter()
+    batch = tmp_path / "batch"
+    batch.mkdir()
+    expected = tmp_path / "expected.json"
+    expected.write_text(json.dumps({
+        "cases": {
+            "case-a": {
+                "expected_rule_ids": ["workload_executes_shell_or_interpreter"]
+            }
+        }
+    }), encoding="utf-8")
+    (batch / "summary.json").write_text(json.dumps({
+        "results": [
+            {
+                "case_id": "case-a",
+                "sysarmor": {
+                    "detection": {
+                        "signal_detected": True,
+                        "not_evaluable_reason": "watcher_not_ready",
+                    },
+                    "signals_pre_attack": {},
+                    "signals_attack_window": {
+                        "target-1": [
+                            {"signalFrame": {"signal": {"ruleId": "workload_executes_shell_or_interpreter"}}}
+                        ]
+                    },
+                    "signals_grace_window": {},
+                },
+            }
+        ],
+    }), encoding="utf-8")
+
+    summary = exporter.export_signals(batch, tmp_path / "signals", expected)
+
+    case = summary["cases"][0]
+    assert case["signal_detected"] is False
+    assert case["expected_signal_hit"] is False
+    verdict = case["expected_signal_detection"]
+    assert verdict["evaluated"] is False
+    assert verdict["missing_rule_ids"] == []
