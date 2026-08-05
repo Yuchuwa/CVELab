@@ -47,9 +47,42 @@ def _signal_rule_id(frame: dict[str, Any]) -> str:
     return str(signal.get("ruleId") or "")
 
 
-def _rule_ids_by_target(after: dict[str, list[dict[str, Any]]]) -> dict[str, list[str]]:
+def _signal_key(target: str, frame: dict[str, Any]) -> str:
+    signal_frame = frame.get("signalFrame")
+    if not isinstance(signal_frame, dict):
+        return json.dumps(frame, ensure_ascii=False, sort_keys=True)
+    signal = signal_frame.get("signal")
+    signal_id = ""
+    if isinstance(signal, dict):
+        signal_id = str(signal.get("id") or "")
+    agent_id = str(signal_frame.get("agentId") or "")
+    sequence = str(signal_frame.get("sequence") or "")
+    if signal_id or sequence:
+        return f"{target}\0{agent_id}\0{sequence}\0{signal_id}"
+    return f"{target}\0" + json.dumps(frame, ensure_ascii=False, sort_keys=True)
+
+
+def _new_signals_by_target(
+    before: dict[str, list[dict[str, Any]]],
+    after: dict[str, list[dict[str, Any]]],
+) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    for target in sorted(set(before) | set(after)):
+        seen = {_signal_key(target, frame) for frame in before.get(target, [])}
+        new_frames: list[dict[str, Any]] = []
+        for frame in after.get(target, []):
+            key = _signal_key(target, frame)
+            if key in seen:
+                continue
+            seen.add(key)
+            new_frames.append(frame)
+        out[target] = new_frames
+    return out
+
+
+def _rule_ids_by_target(signals: dict[str, list[dict[str, Any]]]) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
-    for target, frames in after.items():
+    for target, frames in signals.items():
         ids = sorted({
             rule_id
             for rule_id in (_signal_rule_id(frame) for frame in frames)
@@ -61,7 +94,7 @@ def _rule_ids_by_target(after: dict[str, list[dict[str, Any]]]) -> dict[str, lis
 
 def evaluate_expected_signals(
     case_id: str,
-    after: dict[str, list[dict[str, Any]]],
+    observed_signals: dict[str, list[dict[str, Any]]],
     expected_signals: dict[str, Any],
 ) -> dict[str, Any]:
     cases = expected_signals.get("cases") if isinstance(expected_signals, dict) else {}
@@ -75,10 +108,10 @@ def evaluate_expected_signals(
             "missing_rule_ids": [],
             "observed_rule_ids": sorted({
                 rule_id
-                for ids in _rule_ids_by_target(after).values()
+                for ids in _rule_ids_by_target(observed_signals).values()
                 for rule_id in ids
             }),
-            "rule_ids_by_target": _rule_ids_by_target(after),
+            "rule_ids_by_target": _rule_ids_by_target(observed_signals),
         }
 
     expected_rule_ids = [
@@ -88,7 +121,7 @@ def evaluate_expected_signals(
     ]
     observed = sorted({
         rule_id
-        for ids in _rule_ids_by_target(after).values()
+        for ids in _rule_ids_by_target(observed_signals).values()
         for rule_id in ids
     })
     matched = sorted(set(expected_rule_ids) & set(observed))
@@ -100,7 +133,7 @@ def evaluate_expected_signals(
         "matched_rule_ids": matched,
         "missing_rule_ids": missing,
         "observed_rule_ids": observed,
-        "rule_ids_by_target": _rule_ids_by_target(after),
+        "rule_ids_by_target": _rule_ids_by_target(observed_signals),
     }
 
 
@@ -139,35 +172,49 @@ def export_signals(
         result = _load_full_result(result)
         case_id = str(result.get("case_id") or "unknown-case")
         sysarmor = result.get("sysarmor") if isinstance(result.get("sysarmor"), dict) else {}
-        before = _signals_by_target(sysarmor.get("signals_before"))
-        after = _signals_by_target(sysarmor.get("signals_after"))
-        targets = sorted(set(before) | set(after))
+        pre_attack = _signals_by_target(sysarmor.get("signals_pre_attack"))
+        attack_window = _signals_by_target(sysarmor.get("signals_attack_window"))
+        grace_window = _signals_by_target(sysarmor.get("signals_grace_window"))
+        new = _new_signals_by_target(pre_attack, attack_window)
+        targets = sorted(set(pre_attack) | set(attack_window) | set(grace_window))
         case_dir = out_path / case_id
         for target in targets:
-            _write_jsonl(case_dir / f"{target}-before.jsonl", before.get(target, []))
-            _write_jsonl(case_dir / f"{target}-after.jsonl", after.get(target, []))
+            _write_jsonl(case_dir / f"{target}-pre-attack.jsonl", pre_attack.get(target, []))
+            _write_jsonl(case_dir / f"{target}-attack-window.jsonl", attack_window.get(target, []))
+            _write_jsonl(case_dir / f"{target}-grace-window.jsonl", grace_window.get(target, []))
+            _write_jsonl(case_dir / f"{target}-new-attack.jsonl", new.get(target, []))
 
         detection = sysarmor.get("detection") if isinstance(sysarmor.get("detection"), dict) else {}
+        pre_attack_count = sum(len(items) for items in pre_attack.values())
+        attack_window_count = sum(len(items) for items in attack_window.values())
+        grace_window_count = sum(len(items) for items in grace_window.values())
+        new_attack_signal_count = sum(len(items) for items in new.values())
         flag_verification = (
             result.get("flag_verification")
             if isinstance(result.get("flag_verification"), dict)
             else {}
         )
+        expected_signal_detection = evaluate_expected_signals(case_id, new, expected_signals)
         cases.append({
             "case_id": case_id,
             "agent_success": bool(result.get("agent_success", False)),
             "flags_all_captured": bool(flag_verification.get("all_captured", False)),
             "flags_per_target": flag_verification.get("per_target", {}),
             "signal_detected": bool(detection.get("signal_detected", False)),
-            "signals_before_total": sum(len(items) for items in before.values()),
-            "signals_after_total": sum(len(items) for items in after.values()),
+            "pre_attack_count": pre_attack_count,
+            "attack_window_count": attack_window_count,
+            "grace_window_count": grace_window_count,
+            "new_attack_signal_count": new_attack_signal_count,
+            "expected_signal_hit": bool(expected_signal_detection.get("detected", False)),
+            "new_rule_ids": sorted({
+                rule_id
+                for ids in _rule_ids_by_target(new).values()
+                for rule_id in ids
+            }),
+            "new_rule_ids_by_target": _rule_ids_by_target(new),
             "targets": targets,
             "case_dir": str(case_dir),
-            "expected_signal_detection": evaluate_expected_signals(
-                case_id,
-                after,
-                expected_signals,
-            ),
+            "expected_signal_detection": expected_signal_detection,
         })
 
     summary = {

@@ -174,12 +174,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--templates-dir", default="templates")
     parser.add_argument("--atoms-dir", default="data/atoms")
-    parser.add_argument("--max-turns", type=int, default=80)
+    parser.add_argument("--max-turns", type=int, default=300)
     parser.add_argument(
         "--agent-timeout",
         type=int,
-        default=1800,
-        help="Maximum seconds for one Agent subprocess (default: 1800).",
+        default=3600,
+        help="Maximum seconds for one Agent subprocess (default: 3600).",
     )
     parser.add_argument(
         "--strict-guide-compatibility",

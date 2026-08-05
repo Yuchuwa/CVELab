@@ -14,10 +14,13 @@ def load_exporter():
     return module
 
 
-def test_export_writes_per_case_target_jsonl_and_summary(tmp_path):
+def test_export_writes_windowed_jsonl_and_summary(tmp_path):
     exporter = load_exporter()
     batch = tmp_path / "batch"
     batch.mkdir()
+    pre = {"signalFrame": {"signal": {"id": "pre-1"}}}
+    attack = {"signalFrame": {"signal": {"id": "attack-1", "ruleId": "rule-a"}}}
+    grace = {"signalFrame": {"signal": {"id": "grace-1"}}}
     (batch / "summary.json").write_text(json.dumps({
         "results": [
             {
@@ -31,21 +34,10 @@ def test_export_writes_per_case_target_jsonl_and_summary(tmp_path):
                     },
                 },
                 "sysarmor": {
-                    "detection": {
-                        "signal_count_before": 1,
-                        "signal_count_after": 2,
-                        "signal_detected": True,
-                    },
-                    "signals_before": {
-                        "target-1": [{"signalFrame": {"signal": {"id": "old"}}}],
-                    },
-                    "signals_after": {
-                        "target-1": [
-                            {"signalFrame": {"signal": {"id": "old"}}},
-                            {"signalFrame": {"signal": {"id": "new"}}},
-                        ],
-                        "target-2": [],
-                    },
+                    "detection": {"signal_detected": True},
+                    "signals_pre_attack": {"target-1": [pre]},
+                    "signals_attack_window": {"target-1": [attack], "target-2": []},
+                    "signals_grace_window": {"target-1": [grace]},
                 },
             }
         ],
@@ -54,14 +46,100 @@ def test_export_writes_per_case_target_jsonl_and_summary(tmp_path):
     out = tmp_path / "signals"
     summary = exporter.export_signals(batch, out)
 
-    assert summary["cases"][0]["case_id"] == "case-a"
-    assert summary["cases"][0]["signal_detected"] is True
-    assert summary["cases"][0]["signals_after_total"] == 2
-    assert (out / "case-a" / "target-1-before.jsonl").read_text().count("\n") == 1
-    assert (out / "case-a" / "target-1-after.jsonl").read_text().count("\n") == 2
-    assert (out / "case-a" / "target-2-after.jsonl").read_text() == ""
+    case = summary["cases"][0]
+    assert case["case_id"] == "case-a"
+    assert case["signal_detected"] is True
+    assert case["pre_attack_count"] == 1
+    assert case["attack_window_count"] == 1
+    assert case["grace_window_count"] == 1
+    assert case["new_attack_signal_count"] == 1
+    assert case["expected_signal_hit"] is False
+    assert case["new_rule_ids"] == ["rule-a"]
+    assert (out / "case-a" / "target-1-pre-attack.jsonl").read_text().count("\n") == 1
+    assert (out / "case-a" / "target-1-attack-window.jsonl").read_text().count("\n") == 1
+    assert (out / "case-a" / "target-1-grace-window.jsonl").read_text().count("\n") == 1
     written = json.loads((out / "summary.json").read_text())
     assert written == summary
+
+
+def test_new_attack_signal_count_subtracts_pre_attack_baseline(tmp_path):
+    exporter = load_exporter()
+    batch = tmp_path / "batch"
+    batch.mkdir()
+    existing = {
+        "signalFrame": {
+            "agentId": "agent-a",
+            "sequence": "1",
+            "signal": {"id": "sig-1", "ruleId": "rule-a"},
+        }
+    }
+    new = {
+        "signalFrame": {
+            "agentId": "agent-a",
+            "sequence": "2",
+            "signal": {"id": "sig-2", "ruleId": "rule-b"},
+        }
+    }
+    (batch / "summary.json").write_text(json.dumps({
+        "results": [
+            {
+                "case_id": "case-a",
+                "sysarmor": {
+                    "signals_pre_attack": {"target-1": [existing]},
+                    "signals_attack_window": {"target-1": [existing, new]},
+                    "signals_grace_window": {},
+                },
+            }
+        ],
+    }), encoding="utf-8")
+
+    summary = exporter.export_signals(batch, tmp_path / "signals")
+    case = summary["cases"][0]
+    assert case["pre_attack_count"] == 1
+    assert case["attack_window_count"] == 2
+    assert case["new_attack_signal_count"] == 1
+    assert case["new_rule_ids"] == ["rule-b"]
+
+
+def test_agent_restart_does_not_hide_new_attack_signal_with_reused_sequence():
+    exporter = load_exporter()
+    pre = {
+        "target-1": [{
+            "signalFrame": {
+                "agentId": "agent-before",
+                "sequence": "1",
+                "signal": {"id": "sig-1"},
+            }
+        }]
+    }
+    attack = {
+        "target-1": [{
+            "signalFrame": {
+                "agentId": "agent-after",
+                "sequence": "1",
+                "signal": {"id": "sig-1"},
+            }
+        }]
+    }
+
+    new = exporter._new_signals_by_target(pre, attack)
+
+    assert new == attack
+
+
+def test_new_attack_signal_count_deduplicates_repeated_after_frames():
+    exporter = load_exporter()
+    frame = {
+        "signalFrame": {
+            "agentId": "agent-a",
+            "sequence": "1",
+            "signal": {"id": "sig-1"},
+        }
+    }
+
+    new = exporter._new_signals_by_target({}, {"target-1": [frame, frame]})
+
+    assert new == {"target-1": [frame]}
 
 
 def test_export_prefers_full_scenario_flag_verification(tmp_path):
@@ -88,8 +166,9 @@ def test_export_prefers_full_scenario_flag_verification(tmp_path):
                 "scenario_dir": str(scenario),
                 "sysarmor": {
                     "detection": {"signal_detected": False},
-                    "signals_before": {},
-                    "signals_after": {},
+                    "signals_pre_attack": {},
+                    "signals_attack_window": {},
+                    "signals_grace_window": {},
                 },
             }
         ],
@@ -102,7 +181,7 @@ def test_export_prefers_full_scenario_flag_verification(tmp_path):
     assert case["flags_per_target"]["target-3"]["captured"] == "flag{three}"
 
 
-def test_expected_signal_detection_is_case_level(tmp_path):
+def test_expected_signal_hit_is_case_level(tmp_path):
     exporter = load_exporter()
     batch = tmp_path / "batch"
     batch.mkdir()
@@ -123,27 +202,16 @@ def test_expected_signal_detection_is_case_level(tmp_path):
                 "case_id": "case-a",
                 "sysarmor": {
                     "detection": {"signal_detected": True},
-                    "signals_before": {},
-                    "signals_after": {
+                    "signals_pre_attack": {},
+                    "signals_attack_window": {
                         "target-1": [
-                            {
-                                "signalFrame": {
-                                    "signal": {
-                                        "ruleId": "workload_executes_shell_or_interpreter"
-                                    }
-                                }
-                            }
+                            {"signalFrame": {"signal": {"ruleId": "workload_executes_shell_or_interpreter"}}}
                         ],
                         "target-2": [
-                            {
-                                "signalFrame": {
-                                    "signal": {
-                                        "ruleId": "network_client_used_in_workload"
-                                    }
-                                }
-                            }
+                            {"signalFrame": {"signal": {"ruleId": "network_client_used_in_workload"}}}
                         ],
                     },
+                    "signals_grace_window": {},
                 },
             }
         ],
@@ -151,21 +219,15 @@ def test_expected_signal_detection_is_case_level(tmp_path):
 
     summary = exporter.export_signals(batch, tmp_path / "signals", expected)
 
-    verdict = summary["cases"][0]["expected_signal_detection"]
+    case = summary["cases"][0]
+    verdict = case["expected_signal_detection"]
+    assert case["expected_signal_hit"] is True
     assert verdict["evaluated"] is True
     assert verdict["detected"] is True
-    assert verdict["expected_rule_ids"] == [
-        "workload_executes_shell_or_interpreter",
-        "network_client_used_in_workload",
-    ]
     assert verdict["missing_rule_ids"] == []
-    assert verdict["matched_rule_ids"] == [
-        "network_client_used_in_workload",
-        "workload_executes_shell_or_interpreter",
-    ]
 
 
-def test_expected_signal_detection_reports_missing_rules(tmp_path):
+def test_expected_signal_hit_reports_missing_rules(tmp_path):
     exporter = load_exporter()
     batch = tmp_path / "batch"
     batch.mkdir()
@@ -186,18 +248,13 @@ def test_expected_signal_detection_reports_missing_rules(tmp_path):
                 "case_id": "case-a",
                 "sysarmor": {
                     "detection": {"signal_detected": True},
-                    "signals_before": {},
-                    "signals_after": {
+                    "signals_pre_attack": {},
+                    "signals_attack_window": {
                         "target-1": [
-                            {
-                                "signalFrame": {
-                                    "signal": {
-                                        "ruleId": "workload_executes_shell_or_interpreter"
-                                    }
-                                }
-                            }
-                        ],
+                            {"signalFrame": {"signal": {"ruleId": "workload_executes_shell_or_interpreter"}}}
+                        ]
                     },
+                    "signals_grace_window": {},
                 },
             }
         ],
@@ -205,8 +262,63 @@ def test_expected_signal_detection_reports_missing_rules(tmp_path):
 
     summary = exporter.export_signals(batch, tmp_path / "signals", expected)
 
-    verdict = summary["cases"][0]["expected_signal_detection"]
+    case = summary["cases"][0]
+    verdict = case["expected_signal_detection"]
+    assert case["expected_signal_hit"] is False
     assert verdict["detected"] is False
-    assert verdict["missing_rule_ids"] == [
-        "execution_tool_opens_network_connection"
-    ]
+    assert verdict["missing_rule_ids"] == ["execution_tool_opens_network_connection"]
+
+
+def test_expected_signal_hit_requires_new_attack_signal(tmp_path):
+    exporter = load_exporter()
+    batch = tmp_path / "batch"
+    batch.mkdir()
+    expected = tmp_path / "expected.json"
+    expected.write_text(json.dumps({
+        "cases": {
+            "case-a": {
+                "expected_rule_ids": ["workload_executes_shell_or_interpreter"]
+            }
+        }
+    }), encoding="utf-8")
+    existing_shell_signal = {
+        "signalFrame": {
+            "sequence": "10",
+            "signal": {
+                "id": "sig-10",
+                "ruleId": "workload_executes_shell_or_interpreter",
+            },
+        }
+    }
+    new_unrelated_signal = {
+        "signalFrame": {
+            "sequence": "11",
+            "signal": {
+                "id": "sig-11",
+                "ruleId": "account_database_read",
+            },
+        }
+    }
+    (batch / "summary.json").write_text(json.dumps({
+        "results": [
+            {
+                "case_id": "case-a",
+                "sysarmor": {
+                    "detection": {"signal_detected": True},
+                    "signals_pre_attack": {"target-1": [existing_shell_signal]},
+                    "signals_attack_window": {"target-1": [existing_shell_signal, new_unrelated_signal]},
+                    "signals_grace_window": {},
+                },
+            }
+        ],
+    }), encoding="utf-8")
+
+    summary = exporter.export_signals(batch, tmp_path / "signals", expected)
+
+    case = summary["cases"][0]
+    assert case["new_attack_signal_count"] == 1
+    assert case["new_rule_ids"] == ["account_database_read"]
+    assert case["expected_signal_hit"] is False
+    verdict = case["expected_signal_detection"]
+    assert verdict["observed_rule_ids"] == ["account_database_read"]
+    assert verdict["missing_rule_ids"] == ["workload_executes_shell_or_interpreter"]

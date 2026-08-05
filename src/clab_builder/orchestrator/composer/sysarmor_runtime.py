@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -142,6 +144,238 @@ def collect_recent_signals(
                     continue
         out[target] = signals
     return out
+
+
+def _watch_root(scenario_dir: str | Path) -> Path:
+    return Path(scenario_dir) / "_sysarmor_watch"
+
+
+def start_signal_watchers(
+    scenario_dir: str | Path,
+    targets: list[str],
+    *,
+    output_dir: str | Path | None = None,
+) -> dict[str, dict[str, Any]]:
+    lab_name = _lab_name(scenario_dir)
+    watch_dir = Path(output_dir) if output_dir is not None else _watch_root(scenario_dir)
+    watch_dir.mkdir(parents=True, exist_ok=True)
+    out: dict[str, dict[str, Any]] = {}
+    for target in targets:
+        container = f"clab-{lab_name}-{target}"
+        stdout_path = watch_dir / f"{target}.jsonl"
+        stderr_path = watch_dir / f"{target}.stderr.log"
+        stdout_handle = stdout_path.open("w", encoding="utf-8")
+        stderr_handle = stderr_path.open("w", encoding="utf-8")
+        command = [
+            "docker", "exec", container,
+            "/usr/local/bin/sysarmorctl",
+            "--socket", "/run/sysarmor/agent/control.sock",
+            "--json", "signal", "watch",
+            "--include-events",
+        ]
+        try:
+            process = subprocess.Popen(command, stdout=stdout_handle, stderr=stderr_handle, text=True)
+        except Exception:
+            stdout_handle.close()
+            stderr_handle.close()
+            raise
+        out[target] = {
+            "target": target,
+            "container": container,
+            "command": command,
+            "process": process,
+            "stdout_path": str(stdout_path),
+            "stderr_path": str(stderr_path),
+            "stdout_handle": stdout_handle,
+            "stderr_handle": stderr_handle,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
+    return out
+
+
+def wait_signal_watchers_ready(
+    watchers: dict[str, dict[str, Any]],
+    *,
+    timeout: float = 10.0,
+    poll_interval: float = 0.1,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + max(timeout, 0.0)
+    ready_targets = set()
+    failed_targets: dict[str, dict[str, Any]] = {}
+    while time.monotonic() <= deadline:
+        for target, watcher in watchers.items():
+            if target in ready_targets or target in failed_targets:
+                continue
+            process = watcher.get("process")
+            returncode = process.poll() if process is not None else None
+            if returncode is None:
+                ready_targets.add(target)
+                continue
+            failed_targets[target] = {
+                "returncode": returncode,
+                "stderr_path": watcher.get("stderr_path", ""),
+            }
+        if len(ready_targets) + len(failed_targets) == len(watchers):
+            break
+        time.sleep(max(poll_interval, 0.01))
+    pending_targets = sorted(set(watchers) - ready_targets - set(failed_targets))
+    return {
+        "ok": len(ready_targets) == len(watchers),
+        "ready_targets": sorted(ready_targets),
+        "failed_targets": failed_targets,
+        "pending_targets": pending_targets,
+    }
+
+
+def stop_signal_watchers(
+    watchers: dict[str, dict[str, Any]],
+    *,
+    timeout: float = 5.0,
+) -> dict[str, dict[str, Any]]:
+    results: dict[str, dict[str, Any]] = {}
+    for target, watcher in watchers.items():
+        process = watcher.get("process")
+        stdout_handle = watcher.get("stdout_handle")
+        stderr_handle = watcher.get("stderr_handle")
+        returncode = None
+        timed_out = False
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                returncode = process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                process.kill()
+                returncode = process.wait(timeout=1)
+        elif process is not None:
+            returncode = process.poll()
+        if stdout_handle is not None:
+            stdout_handle.close()
+        if stderr_handle is not None:
+            stderr_handle.close()
+        results[target] = {
+            "returncode": returncode,
+            "timed_out": timed_out,
+            "stdout_path": watcher.get("stdout_path", ""),
+            "stderr_path": watcher.get("stderr_path", ""),
+        }
+    return results
+
+
+def load_signal_watcher_frames(
+    watchers: dict[str, dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    for target, watcher in watchers.items():
+        path = Path(str(watcher.get("stdout_path", "")))
+        frames: list[dict[str, Any]] = []
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(item, dict):
+                    frames.append(item)
+        out[target] = frames
+    return out
+
+
+def _parse_iso8601(value: str) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _frame_observed_at(frame: dict[str, Any]) -> datetime | None:
+    if not isinstance(frame, dict):
+        return None
+    direct = _parse_iso8601(str(frame.get("observedAt") or frame.get("observed_at") or ""))
+    if direct is not None:
+        return direct
+    signal_frame = frame.get("signalFrame")
+    if isinstance(signal_frame, dict):
+        return _parse_iso8601(str(signal_frame.get("observedAt") or signal_frame.get("observed_at") or ""))
+    return None
+
+
+def classify_signal_frames_by_window(
+    frames_by_target: dict[str, list[dict[str, Any]]],
+    *,
+    attack_started_at: str,
+    attack_finished_at: str,
+    grace_finished_at: str,
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    start = _parse_iso8601(attack_started_at)
+    finish = _parse_iso8601(attack_finished_at)
+    grace = _parse_iso8601(grace_finished_at)
+    buckets = {
+        "pre_attack": {},
+        "attack_window": {},
+        "grace_window": {},
+        "post_grace": {},
+        "unclassified": {},
+    }
+    for target, frames in frames_by_target.items():
+        for bucket in buckets.values():
+            bucket[target] = []
+        for frame in frames:
+            observed = _frame_observed_at(frame)
+            if observed is None or start is None or finish is None or grace is None:
+                buckets["unclassified"][target].append(frame)
+            elif observed < start:
+                buckets["pre_attack"][target].append(frame)
+            elif observed < finish:
+                buckets["attack_window"][target].append(frame)
+            elif observed < grace:
+                buckets["grace_window"][target].append(frame)
+            else:
+                buckets["post_grace"][target].append(frame)
+    return buckets
+
+
+def _count_signals(signals: dict[str, list[dict[str, Any]]]) -> int:
+    return sum(len(items) for items in signals.values())
+
+
+def evaluate_signal_stream(
+    *,
+    pre_attack: dict[str, list[dict[str, Any]]],
+    attack_window: dict[str, list[dict[str, Any]]],
+    grace_window: dict[str, list[dict[str, Any]]],
+    attack_executed: bool,
+    attack_success: bool,
+) -> dict[str, Any]:
+    before_count = _count_signals(pre_attack)
+    attack_count = _count_signals(attack_window)
+    grace_count = _count_signals(grace_window)
+    detected = bool(attack_executed and attack_count > 0)
+    result = {
+        "environment_valid": True,
+        "sysarmor_healthy": True,
+        "event_stream_visible": True,
+        "attack_executed": bool(attack_executed),
+        "attack_success": bool(attack_success),
+        "signal_count_before": before_count,
+        "signal_count_after": attack_count,
+        "signal_count_grace": grace_count,
+        "signal_detected": detected,
+        "per_target_before": {target: len(items) for target, items in pre_attack.items()},
+        "per_target_after": {target: len(items) for target, items in attack_window.items()},
+        "per_target_grace": {target: len(items) for target, items in grace_window.items()},
+    }
+    if not attack_executed:
+        result["not_evaluable_reason"] = "attack_not_executed"
+    return result
 
 
 def evaluate_signal_delta(

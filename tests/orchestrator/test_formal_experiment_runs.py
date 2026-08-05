@@ -222,3 +222,27 @@ def test_execution_env_maps_deepseek_official_settings(monkeypatch):
     assert env["LLM_API_KEY"] == "deepseek-secret"
     assert env["LLM_BASE_URL"] == "https://api.deepseek.com/anthropic"
     assert env["LLM_MODEL"] == "deepseek-v4-pro"
+
+
+def test_formal_run_config_defaults_match_rerun_budget(tmp_path: Path):
+    manifest_path = tmp_path / "stratified_50_ranges.json"
+    _write_case_manifest(manifest_path)
+
+    run = create_formal_run(
+        FormalRunConfig(
+            repo_root=tmp_path,
+            experiment_root=tmp_path / "data/experiments/stratified-50",
+            case_manifest_path=manifest_path,
+            run_kind="qualification",
+            run_id="qual-defaults-run",
+            max_cases=2,
+        )
+    )
+
+    manifest = json.loads((run.run_dir / "run_manifest.json").read_text())
+    assert manifest["agent"]["max_turns"] == 300
+    assert manifest["agent"]["agent_timeout"] == 3600
+    assert "--max-turns" in manifest["batch_command"]
+    assert "300" in manifest["batch_command"]
+    assert "--agent-timeout" in manifest["batch_command"]
+    assert "3600" in manifest["batch_command"]

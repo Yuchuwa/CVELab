@@ -1,5 +1,6 @@
 import json
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -119,3 +120,104 @@ def test_inject_sysarmor_runtime_timeout_output_is_json_serializable(tmp_path):
     assert result["stdout"] == "partial stdout"
     assert result["stderr"] == "partial stderr"
     json.dumps(result)
+
+
+class _FakeProcess:
+    def __init__(self, *, returncode: int | None = None):
+        self.returncode = returncode
+        self.terminated = False
+        self.killed = False
+
+    def poll(self):
+        return self.returncode
+
+    def terminate(self):
+        self.terminated = True
+        if self.returncode is None:
+            self.returncode = -15
+
+    def kill(self):
+        self.killed = True
+        self.returncode = -9
+
+    def wait(self, timeout=None):
+        if self.returncode is None:
+            self.returncode = 0
+        return self.returncode
+
+
+def test_start_signal_watchers_launches_one_process_per_target(tmp_path):
+    scenario = tmp_path / "scenario"
+    scenario.mkdir()
+    (scenario / "clab.yaml").write_text("name: lab-a\n", encoding="utf-8")
+
+    created: list[_FakeProcess] = []
+
+    def fake_popen(command, stdout=None, stderr=None, text=None):
+        created.append(_FakeProcess())
+        return created[-1]
+
+    with patch.object(sysarmor_runtime.subprocess, "Popen", side_effect=fake_popen):
+        watchers = sysarmor_runtime.start_signal_watchers(scenario, ["target-1", "target-2"])
+
+    assert sorted(watchers) == ["target-1", "target-2"]
+    first = watchers["target-1"]
+    assert first["container"] == "clab-lab-a-target-1"
+    assert first["process"] is created[0]
+    assert Path(first["stdout_path"]).name == "target-1.jsonl"
+    assert Path(first["stderr_path"]).name == "target-1.stderr.log"
+    assert first["command"][:3] == ["docker", "exec", "clab-lab-a-target-1"]
+
+
+def test_wait_signal_watchers_ready_reports_early_exit(tmp_path):
+    watchers = {
+        "target-1": {
+            "process": _FakeProcess(returncode=7),
+            "stdout_path": str(tmp_path / "target-1.jsonl"),
+            "stderr_path": str(tmp_path / "target-1.stderr.log"),
+            "command": ["docker", "exec"],
+        }
+    }
+
+    result = sysarmor_runtime.wait_signal_watchers_ready(watchers, timeout=0.1, poll_interval=0.01)
+
+    assert result["ok"] is False
+    assert result["ready_targets"] == []
+    assert result["failed_targets"]["target-1"]["returncode"] == 7
+
+
+def test_classify_signal_frames_by_window_uses_observed_at():
+    frames = {
+        "target-1": [
+            {"signalFrame": {"observedAt": "2026-08-04T10:00:00Z", "signal": {"id": "pre"}}},
+            {"signalFrame": {"observedAt": "2026-08-04T10:00:02Z", "signal": {"id": "attack"}}},
+            {"signalFrame": {"observedAt": "2026-08-04T10:00:04Z", "signal": {"id": "grace"}}},
+        ]
+    }
+
+    buckets = sysarmor_runtime.classify_signal_frames_by_window(
+        frames,
+        attack_started_at="2026-08-04T10:00:01Z",
+        attack_finished_at="2026-08-04T10:00:03Z",
+        grace_finished_at="2026-08-04T10:00:05Z",
+    )
+
+    assert [item["signalFrame"]["signal"]["id"] for item in buckets["pre_attack"]["target-1"]] == ["pre"]
+    assert [item["signalFrame"]["signal"]["id"] for item in buckets["attack_window"]["target-1"]] == ["attack"]
+    assert [item["signalFrame"]["signal"]["id"] for item in buckets["grace_window"]["target-1"]] == ["grace"]
+
+
+def test_evaluate_signal_stream_uses_attack_window_for_detection():
+    result = sysarmor_runtime.evaluate_signal_stream(
+        pre_attack={"target-1": [{"signalFrame": {"signal": {"id": "old"}}}]},
+        attack_window={"target-1": [{"signalFrame": {"signal": {"id": "new"}}}]},
+        grace_window={"target-1": [{"signalFrame": {"signal": {"id": "later"}}}]},
+        attack_executed=True,
+        attack_success=False,
+    )
+
+    assert result["signal_count_before"] == 1
+    assert result["signal_count_after"] == 1
+    assert result["signal_count_grace"] == 1
+    assert result["signal_detected"] is True
+    assert result["attack_success"] is False

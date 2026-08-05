@@ -174,6 +174,81 @@ class ScenarioVerifier:
             command, capture_output=True, text=True, timeout=timeout,
         )
 
+    def _run_sysarmor_watch_window(
+        self,
+        scenario_dir: str,
+        targets: list[str],
+        attack_runner,
+        *,
+        grace_seconds: int,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        watchers = sysarmor_runtime.start_signal_watchers(scenario_dir, targets)
+        ready = sysarmor_runtime.wait_signal_watchers_ready(watchers)
+        attack_started_at = ""
+        attack_finished_at = ""
+        grace_finished_at = ""
+        attack_info: dict[str, Any]
+        try:
+            attack_started_at = datetime.now(timezone.utc).isoformat()
+            attack_info = attack_runner()
+            attack_finished_at = datetime.now(timezone.utc).isoformat()
+            if attack_info.get("executed"):
+                time.sleep(max(0, grace_seconds))
+            grace_finished_at = datetime.now(timezone.utc).isoformat()
+        finally:
+            stop_results = sysarmor_runtime.stop_signal_watchers(watchers)
+
+        frames = sysarmor_runtime.load_signal_watcher_frames(watchers)
+        buckets = sysarmor_runtime.classify_signal_frames_by_window(
+            frames,
+            attack_started_at=attack_started_at,
+            attack_finished_at=attack_finished_at,
+            grace_finished_at=grace_finished_at or attack_finished_at,
+        )
+        detection = sysarmor_runtime.evaluate_signal_stream(
+            pre_attack=buckets["pre_attack"],
+            attack_window=buckets["attack_window"],
+            grace_window=buckets["grace_window"],
+            attack_executed=bool(attack_info.get("executed")),
+            attack_success=bool(attack_info.get("success")),
+        )
+        detection["attack_started_at"] = attack_started_at
+        detection["attack_finished_at"] = attack_finished_at
+        detection["grace_finished_at"] = grace_finished_at
+        detection["watcher_ready"] = bool(ready.get("ok"))
+        detection["watcher_ready_targets"] = ready.get("ready_targets", [])
+        detection["watcher_failed_targets"] = ready.get("failed_targets", {})
+        if not ready.get("ok"):
+            detection["sysarmor_healthy"] = False
+            detection["event_stream_visible"] = False
+            detection["not_evaluable_reason"] = "watcher_not_ready"
+        elif not attack_info.get("executed"):
+            detection["not_evaluable_reason"] = "attack_not_executed"
+
+        sysarmor_payload = {
+            "watchers": {
+                "ready": ready,
+                "stop_results": stop_results,
+                "targets": {
+                    target: {
+                        "stdout_path": watcher.get("stdout_path", ""),
+                        "stderr_path": watcher.get("stderr_path", ""),
+                        "container": watcher.get("container", ""),
+                        "command": watcher.get("command", []),
+                    }
+                    for target, watcher in watchers.items()
+                },
+            },
+            "detection": detection,
+            "signals_stream_all": frames,
+            "signals_pre_attack": buckets["pre_attack"],
+            "signals_attack_window": buckets["attack_window"],
+            "signals_grace_window": buckets["grace_window"],
+            "signals_post_grace": buckets["post_grace"],
+            "signals_unclassified": buckets["unclassified"],
+        }
+        return dict(attack_info.get("payload") or {}), sysarmor_payload
+
     def _run_netns_command(
         self, attacker: str, container_pid: int, arguments: list[str], timeout: int = 30,
     ) -> subprocess.CompletedProcess:
@@ -1259,27 +1334,21 @@ class ScenarioVerifier:
                 and attack_path_reachable
             ):
                 targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
-                before = sysarmor_runtime.collect_recent_signals(scenario_dir, targets)
-                attack_started_at = datetime.now(timezone.utc).isoformat()
-                reference = self._run_reference_path(scenario_dir)
-                reference_verified = bool(reference.get("ok"))
-                attack_finished_at = datetime.now(timezone.utc).isoformat()
-                attack_executed = bool(reference.get("command"))
-                if attack_executed:
-                    time.sleep(max(0, sysarmor_signal_window))
-                after = sysarmor_runtime.collect_recent_signals(scenario_dir, targets)
-                sysarmor_result["detection"] = sysarmor_runtime.evaluate_signal_delta(
-                    before=before,
-                    after=after,
-                    attack_executed=attack_executed,
-                    attack_success=reference_verified,
+                def _run_reference_attack() -> dict[str, Any]:
+                    payload = self._run_reference_path(scenario_dir)
+                    return {
+                        "payload": payload,
+                        "executed": bool(payload.get("command")),
+                        "success": bool(payload.get("ok")),
+                    }
+                reference, sysarmor_capture = self._run_sysarmor_watch_window(
+                    scenario_dir,
+                    targets,
+                    _run_reference_attack,
+                    grace_seconds=sysarmor_signal_window,
                 )
-                sysarmor_result["detection"]["attack_started_at"] = attack_started_at
-                sysarmor_result["detection"]["attack_finished_at"] = attack_finished_at
-                if not attack_executed:
-                    sysarmor_result["detection"]["not_evaluable_reason"] = "attack_not_available"
-                sysarmor_result["signals_before"] = before
-                sysarmor_result["signals_after"] = after
+                reference_verified = bool(reference.get("ok"))
+                sysarmor_result.update(sysarmor_capture)
             if environment_only:
                 print("[4/5] Skipping Agent: environment-only validation requested")
                 agent_transport = {
@@ -1338,39 +1407,38 @@ class ScenarioVerifier:
                     path_reachability = post_transport_path
                     if attack_path_reachable:
                         print("[4/5] Running agent verification...")
-                        sysarmor_signal_before = {}
-                        sysarmor_attack_started_at = ""
                         if sysarmor_enabled and sysarmor_detection_enabled:
                             targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
-                            sysarmor_signal_before = sysarmor_runtime.collect_recent_signals(
-                                scenario_dir, targets
+                            def _run_agent_attack() -> dict[str, Any]:
+                                payload = self._run_agent(
+                                    scenario_dir, ground_truth, ip_alloc,
+                                    api_key=api_key, base_url=base_url, model=model,
+                                    objectives=self._public_objectives(_meta),
+                                    guide_preflight=guide_preflight,
+                                    agent_context=agent_context,
+                                    agent_runner=agent_runner,
+                                )
+                                return {
+                                    "payload": payload,
+                                    "executed": True,
+                                    "success": bool(payload.get("success", False)),
+                                }
+                            agent_result, sysarmor_capture = self._run_sysarmor_watch_window(
+                                scenario_dir,
+                                targets,
+                                _run_agent_attack,
+                                grace_seconds=sysarmor_signal_window,
                             )
-                            sysarmor_attack_started_at = datetime.now(timezone.utc).isoformat()
-                        agent_result = self._run_agent(
-                            scenario_dir, ground_truth, ip_alloc,
-                            api_key=api_key, base_url=base_url, model=model,
-                            objectives=self._public_objectives(_meta),
-                            guide_preflight=guide_preflight,
-                            agent_context=agent_context,
-                            agent_runner=agent_runner,
-                        )
-                        if sysarmor_enabled and sysarmor_detection_enabled:
-                            sysarmor_attack_finished_at = datetime.now(timezone.utc).isoformat()
-                            time.sleep(max(0, sysarmor_signal_window))
-                            targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
-                            sysarmor_signal_after = sysarmor_runtime.collect_recent_signals(
-                                scenario_dir, targets
+                            sysarmor_result.update(sysarmor_capture)
+                        else:
+                            agent_result = self._run_agent(
+                                scenario_dir, ground_truth, ip_alloc,
+                                api_key=api_key, base_url=base_url, model=model,
+                                objectives=self._public_objectives(_meta),
+                                guide_preflight=guide_preflight,
+                                agent_context=agent_context,
+                                agent_runner=agent_runner,
                             )
-                            sysarmor_result["detection"] = sysarmor_runtime.evaluate_signal_delta(
-                                before=sysarmor_signal_before,
-                                after=sysarmor_signal_after,
-                                attack_executed=True,
-                                attack_success=bool(agent_result.get("success", False)),
-                            )
-                            sysarmor_result["detection"]["attack_started_at"] = sysarmor_attack_started_at
-                            sysarmor_result["detection"]["attack_finished_at"] = sysarmor_attack_finished_at
-                            sysarmor_result["signals_before"] = sysarmor_signal_before
-                            sysarmor_result["signals_after"] = sysarmor_signal_after
                         agent_evaluated = True
                         guided_reference_evaluated = self.validation_mode == "guided_agent"
                         print("[5/5] Verifying results...")
