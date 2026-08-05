@@ -29,8 +29,8 @@ class FormalRunConfig:
     max_cases: int = 50
     offset: int = 0
     parallel: int = 1
-    max_turns: int = 80
-    agent_timeout: int = 1800
+    max_turns: int = 300
+    agent_timeout: int = 3600
     case_timeout: int = 0
     noise_level: str = "none"
     sysarmor: bool = False
