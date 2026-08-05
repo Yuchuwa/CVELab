@@ -96,7 +96,23 @@ def evaluate_expected_signals(
     case_id: str,
     observed_signals: dict[str, list[dict[str, Any]]],
     expected_signals: dict[str, Any],
+    *,
+    not_evaluable_reason: str = "",
 ) -> dict[str, Any]:
+    if str(not_evaluable_reason).strip():
+        return {
+            "evaluated": False,
+            "detected": False,
+            "expected_rule_ids": [],
+            "matched_rule_ids": [],
+            "missing_rule_ids": [],
+            "observed_rule_ids": sorted({
+                rule_id
+                for ids in _rule_ids_by_target(observed_signals).values()
+                for rule_id in ids
+            }),
+            "rule_ids_by_target": _rule_ids_by_target(observed_signals),
+        }
     cases = expected_signals.get("cases") if isinstance(expected_signals, dict) else {}
     spec = cases.get(case_id) if isinstance(cases, dict) else None
     if not isinstance(spec, dict):
@@ -194,13 +210,19 @@ def export_signals(
             if isinstance(result.get("flag_verification"), dict)
             else {}
         )
-        expected_signal_detection = evaluate_expected_signals(case_id, new, expected_signals)
+        not_evaluable_reason = str(detection.get("not_evaluable_reason") or "")
+        expected_signal_detection = evaluate_expected_signals(
+            case_id,
+            new,
+            expected_signals,
+            not_evaluable_reason=not_evaluable_reason,
+        )
         cases.append({
             "case_id": case_id,
             "agent_success": bool(result.get("agent_success", False)),
             "flags_all_captured": bool(flag_verification.get("all_captured", False)),
             "flags_per_target": flag_verification.get("per_target", {}),
-            "signal_detected": bool(detection.get("signal_detected", False)),
+            "signal_detected": bool(detection.get("signal_detected", False)) and not not_evaluable_reason,
             "pre_attack_count": pre_attack_count,
             "attack_window_count": attack_window_count,
             "grace_window_count": grace_window_count,

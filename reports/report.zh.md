@@ -25,8 +25,8 @@
 本阶段已经完成 SysArmor `v0.1.0-rc.5` 在 CVELab Stratified-50 上的第一轮 defended 实验。50 个 case 均为三段企业靶场，攻击智能体使用 `openai-compatible` runner 和 `deepseek-v4-pro`，在 L2 条件下逐案运行。实验得到四项核心发现：
 
 - **多阶段攻击仍然困难：** 50 个 case 中只有 2 个三旗全通；target-1 flag 命中 14/50，而 target-2 和 target-3 仅各为 2/50，说明主要瓶颈出现在初始立足点之后的横向推进。
-- **攻击失败仍有检测价值：** SysArmor 在 31/50 个 case 中观察到攻击后 signal 数量增加；按预设通用 GT ruleId 评估，27/50 个 case 命中 expected signal。检测结果不能由最终 flag 成功率替代。
-- **评测难点在系统而非单个模型：** 实验必须同时处理靶场资格验证、agent 终止协议、verifier 与日志不一致、SysArmor/Tetragon 观测链路并发冲突、signal GT 设计和 before/after 快照口径。
+- **攻击失败仍有检测价值：** SysArmor 在 31/50 个 case 中观察到攻击期间新增 signal；严格要求预设 GT ruleId 必须在攻击期间新增后，15/50 个 case 命中 expected signal。检测结果不能由最终 flag 成功率替代。
+- **评测难点在系统而非单个模型：** 实验必须同时处理靶场资格验证、agent 终止协议、verifier 与日志不一致、SysArmor/Tetragon 观测链路并发冲突、signal GT 设计，以及累计计数与滚动快照的双口径。
 - **下一步需要裸 harness 对照：** 当前 defended 实验已经证明运行时防御可以产出可关联信号；后续应以相同 case、模型、预算和 runner 补跑 bare harness，对比 SysArmor 注入对攻击成功率、运行稳定性、成本和观测证据的影响。
 
 ## 1. 网络安全智能能力的发展与评测现状
@@ -312,8 +312,7 @@
 
 | 范围 | attack PASS | target-1 flag | target-2 flag | target-3 flag |
 |---|---:|---:|---:|---:|
-| case1-5 | 1/5 | 2/5 | 1/5 | 1/5 |
-| case6-10 | 1/5 | 1/5 | 1/5 | 1/5 |
+| case1-10 | 2/10 | 3/10 | 2/10 | 2/10 |
 | case11-20 | 0/10 | 7/10 | 0/10 | 0/10 |
 | case21-30 | 0/10 | 0/10 | 0/10 | 0/10 |
 | case31-40 | 0/10 | 1/10 | 0/10 | 0/10 |
@@ -324,19 +323,18 @@
 
 ### 4.2 防御观测：攻击失败不等于没有检测证据
 
-**结论：** SysArmor 在多数攻击失败场景中仍能产生运行时证据。case1-50 中，31/50 个 case 攻击后 signal 快照数量增加，27/50 个 case 命中预设 expected signal。
+**结论：** SysArmor 在多数攻击失败场景中仍能产生运行时证据。case1-50 中，31/50 个 case 出现攻击期间新增 signal；严格要求 expected ruleId 必须攻击期间新增后，15/50 个 case 命中预设 expected signal。
 
 | 范围 | new signal | expected signal |
 |---|---:|---:|
-| case1-5 | 4/5 | 4/5 |
-| case6-10 | 4/5 | 5/5 |
-| case11-20 | 8/10 | 7/10 |
-| case21-30 | 5/10 | 1/10 |
-| case31-40 | 4/10 | 5/10 |
-| case41-50 | 6/10 | 5/10 |
-| **合计** | **31/50** | **27/50** |
+| case1-10 | 8/10 | 5/10 |
+| case11-20 | 8/10 | 6/10 |
+| case21-30 | 5/10 | 0/10 |
+| case31-40 | 4/10 | 1/10 |
+| case41-50 | 6/10 | 3/10 |
+| **合计** | **31/50** | **15/50** |
 
-因此，完整攻击链成功率和防御检测率必须分开报告。拿到三个 flag 是攻击成功 oracle；expected signal 命中是检测 oracle。前者回答“agent 是否完成目标”，后者回答“防御侧是否观察到预期攻击行为”。在本阶段数据中，三旗全通仅 2/50，但 expected signal 命中达到 27/50，说明运行时信号可以作为攻击过程证据，而不是只在最终攻陷时才有意义。
+因此，完整攻击链成功率和防御检测率必须分开报告。拿到三个 flag 是攻击成功 oracle；expected signal 命中是检测 oracle。前者回答“agent 是否完成目标”，后者回答“防御侧是否观察到预期攻击行为”。在本阶段数据中，三旗全通仅 2/50；严格攻击窗口口径下 expected signal 命中为 15/50，说明运行时信号可以作为攻击过程证据，而不是只在最终攻陷时才有意义。
 
 ### 4.3 GT 设计：检测标签必须行为化，不能依赖靶场私有路径
 
@@ -366,7 +364,7 @@ data/experiments/stratified-50/sysarmor-case0/expected-signals-case1-50.json
 - **flag 口径：** 日志可见 flag 不能直接计入正式成功，必须以 verifier / structured `flags_per_target[*].match` 为准。
 - **agent 协议：** 智能体可能发现 flag 但没有按协议提交，也可能在 target-1 之后丢失状态；这会影响攻击成功率，但不等同于靶场失败。
 - **并发冲突：** SysArmor defended range 并发运行时可能触发 Tetragon/BPF pinned map 和 health check 竞态，因此正式实验固定 `--parallel 1`。
-- **signal 快照：** `signal count` 使用 before/after 两个近期快照，不是累计事件流；因此 after 小于 before 不必然表示检测链路回退。
+- **signal 计数：** `signal count` 使用攻击窗口累计去重口径，after 是 baseline 与攻击期间新增 frame 的去重并集；原始 before/after 滚动窗口长度另存为 `signals_before_snapshot_total` / `signals_after_snapshot_total` 供审计。
 - **规则泛化：** GT 需要贴近每个 case 的攻击行为，同时不能耦合到具体产品、CVE、flag 或 magic path。
 
 这些难点构成了【sysfield】与普通漏洞靶场流水实验的差别：它把“能不能打下来”和“防御能不能看见”拆成两个可复核问题，并保存完整轨迹以解释二者的关系。
@@ -398,7 +396,7 @@ data/experiments/stratified-50/sysarmor-case0/expected-signals-case1-50.json
 
 第二，当前 `deepseek-v4-pro` agent 在 L2 三段 CVE 靶场上仍难以稳定完成全链路攻击。case1-50 中只有 2/50 三旗全通，但 target-1 flag 命中 14/50，说明能力不是完全缺失，而是主要卡在初始访问之后的连续推进。
 
-第三，SysArmor defended 实验显示，攻击失败并不等于没有检测价值。case1-50 中 expected signal 命中 27/50，new signal 为 31/50，说明运行时防御可以为未完成攻击提供可关联证据。
+第三，SysArmor defended 实验显示，攻击失败并不等于没有检测价值。case1-50 中 new signal 为 31/50；严格要求 expected ruleId 必须在攻击期间新增后，expected signal 命中 15/50，说明运行时防御可以为未完成攻击提供可关联证据。
 
 第四，裸 harness 与 SysArmor defended harness 的差别需要严格配对实验，而不能从单独 defended run 中直接推出。下一阶段应固定模型、runner、prompt、预算和 case，分别比较攻击成功率、终止原因、成本和 signal 覆盖。
 
@@ -541,9 +539,9 @@ data/experiments/stratified-50/sysarmor-case0/expected-signals-case1-50.json
 | 仓库版本、部署配置与运行命令 | 逐批 run id 见第 4 章与 `reports/experiments/sysarmor-cvelab-stratified50-rc5.zh.md`；SysArmor 版本 `v0.1.0-rc.5` |
 | 输出结构与复现步骤 | `data/experiments/stratified-50/runs/<run-id>/signals/summary.json` 与 `signals/<case-id>/target-*-before.jsonl`、`target-*-after.jsonl` |
 | SysArmor 健康状态 | case1-50 defended 第一轮完成；正式运行使用 `--parallel 1` 避免 BPF/Tetragon 并发归因冲突 |
-| 智能体动作、运行时事件与检测信号关联 | case1-50 expected signal 命中 27/50；missing signal 逐 case 见实验大表 |
+| 智能体动作、运行时事件与检测信号关联 | case1-50 expected signal 严格攻击窗口口径命中 15/50；missing signal 逐 case 见实验大表 |
 | CPU、内存和运行时间开销 | 当前阶段未聚合；下一阶段 bare harness 配对实验应补充 |
-| 传感器边界与观测盲区 | 当前主要缺失集中在 `execution_tool_opens_network_connection` 与 `network_client_used_in_workload`；`signal count` 为 before/after 快照，不是累计流 |
+| 传感器边界与观测盲区 | 当前主要缺失集中在 `execution_tool_opens_network_connection` 与 `network_client_used_in_workload`；正式 `signal count` 使用攻击窗口累计去重口径，原始滚动窗口计数单独保留 |
 
 防御遥测只用于仅观测条件的结果。
 

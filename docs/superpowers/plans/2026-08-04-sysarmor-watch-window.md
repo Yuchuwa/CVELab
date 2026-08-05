@@ -4,7 +4,7 @@
 
 **Goal:** Replace snapshot-based SysArmor signal collection with continuous watcher collection across the attack window.
 
-**Architecture:** Add watcher-session helpers in `sysarmor_runtime.py`, switch verifier detection branches to lifecycle-based collection, and preserve backward-compatible result keys while introducing explicit attack-window fields.
+**Architecture:** Add watcher-session helpers in `sysarmor_runtime.py`, switch verifier detection branches to lifecycle-based collection, and expose explicit attack-window fields to downstream exporters.
 
 **Tech Stack:** Python 3.12, pytest, subprocess-based orchestration
 
@@ -12,7 +12,7 @@
 
 - Keep defended execution serial on a single host.
 - Do not expand scope to exporter/report rewrites in this task.
-- Preserve `signals_before` / `signals_after` compatibility keys.
+- Do not preserve deprecated `signals_before` / `signals_after` keys.
 
 ---
 
@@ -38,8 +38,8 @@
 
 **Interfaces:**
 - Consumes: watcher lifecycle helpers from `sysarmor_runtime.py`
-- Produces: `signals_pre_attack`, `signals_attack_window`, `signals_grace_window`, compatibility `signals_before`, `signals_after`
+- Produces: `signals_pre_attack`, `signals_attack_window`, `signals_grace_window`
 
 - [ ] Replace both SysArmor detection branches with watcher lifecycle collection.
-- [ ] Preserve backward-compatible `signals_before` / `signals_after` keys while adding explicit windowed fields.
+- [ ] Remove deprecated `signals_before` / `signals_after` keys and rely on explicit windowed fields.
 - [ ] Run focused pytest targets for runtime/verifier/exporter regression.

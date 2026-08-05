@@ -30,14 +30,9 @@
 - `attack_window`
 - `grace_window`
 
-### 3. 兼容输出
+### 3. 输出字段
 
-为了不立刻打断现有导出脚本，先保留旧字段：
-
-- `signals_before` = `pre_attack`
-- `signals_after` = `attack_window`
-
-并新增显式字段：
+结果显式保存为：
 
 - `signals_stream_all`
 - `signals_pre_attack`
@@ -60,4 +55,4 @@ grace window 单独记录，不默认计入正式命中。
 - `verifier.py`
 - 对应测试
 
-`export_sysarmor_signals.py` 先依赖兼容字段继续工作，后续再切到新显式字段。
+`export_sysarmor_signals.py` 直接切到新显式字段，不再保留旧 `signals_before` / `signals_after`。
