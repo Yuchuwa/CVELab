@@ -15,8 +15,8 @@
 - Use direct, concrete language in the style of CyberGym and CyberGym-E2E; avoid invented method names and inflated claims.
 - Treat attack completion, defensive visibility, and robustness under interference as separate outcomes.
 - State that SysArmor is observe-only; signal hits do not prove prevention, and signal misses do not prove blindness.
-- Report Kimi-K3 L2 as 50/50 complete and DeepSeek-V4-Pro L2 as 40/50 partial.
-- Use the shared 40-case subset for the controlled model comparison: Kimi `18/40`, `16/40`, `15/40` for t1/t2/t3 and DeepSeek `19/40`, `10/40`, `6/40`.
+- Report both Kimi-K3 L2 and DeepSeek-V4-Pro L2 as 50/50 complete.
+- Use the full 50-case controlled model comparison: Kimi `22/50`, `18/50`, `16/50` for t1/t2/t3 and DeepSeek `19/50`, `10/50`, `6/50`.
 - Describe the DeepSeek L1 none/high comparison as the operational effect of the current high configuration, not pure decoy causality.
 - State that the harness-uplift experiment has not yet been run; do not report an uplift value.
 - Preserve identical structures, quantities, source links, limitations, and claim strength across Chinese and English.
@@ -61,17 +61,14 @@ Use these experiment-level values:
 ```text
 Kimi L2 full: 50 cases; PASS 16; t1/t2/t3 22/18/16; objective 17;
   any new signal 42; expected hit 28; timeout 22; attack-window frames 23,252.
-DeepSeek L2 partial: 40 cases; PASS 6; t1/t2/t3 19/10/6;
-  any new signal 30; expected hit 14; attack-window frames 9,628.
-Shared 40 cases: Kimi t1/t2/t3 18/16/15, PASS 15, any signal 34,
-  expected hit 26; DeepSeek t1/t2/t3 19/10/6, PASS 6, any signal 30,
-  expected hit 14.
-Kimi shared-40 quadrants: pass/hit 12, pass/miss 3, fail/hit 14, fail/miss 11.
-DeepSeek quadrants: pass/hit 3, pass/miss 3, fail/hit 11, fail/miss 23.
+DeepSeek L2 complete: 50 cases; PASS 6; t1/t2/t3 19/10/6;
+  any new signal 30; expected hit 14; timeout 0; attack-window frames 9,628.
+Kimi full quadrants: pass/hit 12, pass/miss 4, fail/hit 16, fail/miss 18.
+DeepSeek full quadrants: pass/hit 3, pass/miss 3, fail/hit 11, fail/miss 33.
 DeepSeek L1 none/high: PASS 2/0; t1 2/2; t2 2/0; t3 2/0;
   objective 1/0; timeout 6/19; mean elapsed 1417.6/2428.5 seconds;
   high interaction 50, direct contact 38, decoy hits 27,230.
-Shared-40 missing rules, Kimi/DeepSeek: execution-tool network 12/23,
+Comparable-40 missing rules, Kimi/DeepSeek: execution-tool network 12/23,
   workload network client 9/18, workload shell/interpreter 6/16.
 ```
 
@@ -80,8 +77,8 @@ Shared-40 missing rules, Kimi/DeepSeek: execution-tool network 12/23,
 Use the following interpretations:
 
 ```text
-The Kimi/DeepSeek comparison is a model comparison under the recorded matched L2 protocol,
-but DeepSeek remains partial and does not establish a final model ranking.
+The Kimi/DeepSeek comparison is a model comparison under the recorded matched L2 protocol.
+Both arms are complete, but single runs do not establish a general model ranking.
 The none/high comparison measures the current high configuration, which combines decoys
 with a topology-hint difference and uses different worker parallelism.
 The L1 decoy reports do not export comparable SysArmor signal accounting.
@@ -98,15 +95,15 @@ or an expectation that is too strong for the realized trajectory.
 - Consumes: The design spec and Task 1 evidence contract.
 - Produces: The canonical argument, tables, and conclusions used by the English report.
 
-- [ ] **Step 1: Rewrite the abstract and introduction**
+- [x] **Step 1: Rewrite the abstract and introduction**
 
 The abstract must state the problem, gap, four challenges, four techniques, principal evidence, implication, and limits in that order. The introduction must end with four research questions and three contributions; do not present time-ordered engineering work.
 
-- [ ] **Step 2: Rewrite related work as an evaluation evolution**
+- [x] **Step 2: Rewrite related work as an evaluation evolution**
 
 Cover six routes: knowledge and interactive tasks; vulnerability discovery and reproduction; lifecycle and exploit formation; remote and multi-stage action; long-horizon vulnerability research; autonomous defense and defensive artifacts. Compare representative methods by task endpoint and evidence type, then identify defended-environment visibility as the remaining gap.
 
-- [ ] **Step 3: Rewrite challenges and method as one-to-one pairs**
+- [x] **Step 3: Rewrite challenges and method as one-to-one pairs**
 
 Map each challenge to one concrete technique:
 
@@ -117,15 +114,15 @@ completion versus visibility -> external outcome verification plus runtime obser
 ambiguous signal misses -> expected-behavior coverage analysis
 ```
 
-- [ ] **Step 4: Rewrite evaluation and results around RQ1-RQ4**
+- [x] **Step 4: Rewrite evaluation and results around RQ1-RQ4**
 
 RQ1 reports multi-layer completion and the controlled model comparison. RQ2 separates the unrun harness experiment from the completed none/high interference comparison. RQ3 reports runtime visibility and the attack/visibility quadrants. RQ4 reports missing-rule distributions without calling every miss a blind spot.
 
-- [ ] **Step 5: Rewrite discussion, limitations, conclusion, and references**
+- [x] **Step 5: Rewrite discussion, limitations, conclusion, and references**
 
-Discussion must address defenders, evaluators, and platform operators. Limitations must include partial DeepSeek results, observe-only SysArmor, behavioral-GT coverage, L1/L2 incomparability, and high-decoy confounds. The conclusion must return to the joint risk picture without repeating implementation details.
+Discussion must address defenders, evaluators, and platform operators. Limitations must include the lack of repeated model trials, observe-only SysArmor, behavioral-GT coverage, missing per-rule detail for ten DeepSeek cases, L1/L2 incomparability, and high-decoy confounds. The conclusion must return to the joint risk picture without repeating implementation details.
 
-- [ ] **Step 6: Check the Chinese report**
+- [x] **Step 6: Check the Chinese report**
 
 Run:
 
@@ -144,11 +141,11 @@ Expected: no obsolete `39/50` or `14/39`; no rejected terminology; any use of â€
 - Consumes: The completed Chinese report and Task 1 evidence contract.
 - Produces: A structurally and numerically aligned English research report.
 
-- [ ] **Step 1: Mirror the Chinese structure and argument**
+- [x] **Step 1: Mirror the Chinese structure and argument**
 
 Use the same heading hierarchy, RQs, tables, experiment arms, and limitations. Translate concepts into idiomatic research English; do not preserve Chinese sentence order when it reads unnaturally.
 
-- [ ] **Step 2: Normalize terminology**
+- [x] **Step 2: Normalize terminology**
 
 Use these terms consistently:
 
@@ -162,7 +159,7 @@ external outcome verification and runtime observation
 expected-behavior coverage analysis
 ```
 
-- [ ] **Step 3: Check the English report**
+- [x] **Step 3: Check the English report**
 
 Run:
 
@@ -182,7 +179,7 @@ Expected: no obsolete values, rejected terminology, or unqualified prevention/bl
 - Consumes: Both rewritten reports.
 - Produces: A final pair with matched structure, numbers, evidence links, and conclusion strength.
 
-- [ ] **Step 1: Compare heading structures**
+- [x] **Step 1: Compare heading structures**
 
 Run:
 
@@ -193,7 +190,7 @@ rg '^#{1,4} ' reports/report.en.md
 
 Expected: the same number and order of headings.
 
-- [ ] **Step 2: Compare all quantitative tokens**
+- [x] **Step 2: Compare all quantitative tokens**
 
 Run:
 
@@ -204,7 +201,7 @@ rg -o '[0-9][0-9,]*(\.[0-9]+)?%?|[0-9]+/[0-9]+' reports/report.en.md | sort | un
 
 Expected: experiment quantities and their occurrence counts match; reference years may differ only where language-specific citation text requires it.
 
-- [ ] **Step 3: Check Markdown and source links**
+- [x] **Step 3: Check Markdown and source links**
 
 Run:
 
@@ -215,7 +212,7 @@ rg -n 'reports/experiments|experiments/' reports/report.zh.md reports/report.en.
 
 Expected: no whitespace errors; both reports link to the same three source experiment reports and the consolidated summary.
 
-- [ ] **Step 4: Review the final diff**
+- [x] **Step 4: Review the final diff**
 
 Run:
 

@@ -16,7 +16,7 @@
 4. **关键洞察：** 智能体风险不能由单一攻击成功率刻画。防御者需要攻击完成度、防御可见性和抗干扰能力的联合画像。
 5. **解决方法：** sysfield 通过 CVE 原子化与多层场景编排构造真实网络任务；通过同场景控制变量对照比较 model、harness 和 decoy/noise；将攻击结果验证与运行时行为观测结合起来，分别测量攻击完成度和防御可见性；再通过预期行为覆盖分析解释 missing signal 的分布。
 6. **实验证据：** 实验首先测量智能体能否完成三层攻击以及模型差异，再考察 harness 与 decoy 如何改变能力，随后评估各实验臂是否触发防御 signal，最后分析最容易未被观测的预期攻击行为。
-7. **研究边界：** 结论仍受 partial run、observe-only 检测、模型与难度差异、行为规则覆盖范围，以及当前 high-decoy 实验中的 topology-hint 混杂因素限制。
+7. **研究边界：** 结论仍受单次运行、observe-only 检测、模型与难度差异、行为规则覆盖范围、部分 missing-rule 明细缺失，以及当前 high-decoy 实验中的 topology-hint 混杂因素限制。
 
 全文反复强调的核心判断是：
 
@@ -151,7 +151,7 @@ Fugu-Cyber、前沿模型 system card 以及同一模型在不同 harness 下的
 
 ### RQ1：智能体能否完成多层攻击任务，不同模型之间有何差异？
 
-使用三层 flag 获取率作为最直观的能力测量，并同时报告三旗全通、objective、timeout 与失败阶段。在相同参数、相同 harness 和相同 range 下，只改变 Kimi-K3 与 DeepSeek-V4-Pro，以测量模型能力差异。DeepSeek 当前只完成 40/50，因此现阶段比较必须标注为 partial，不能形成最终模型排名。
+使用三层 flag 获取率作为最直观的能力测量，并同时报告三旗全通、objective、timeout 与失败阶段。在相同参数、相同 harness 和相同 50-case range 下，只改变 Kimi-K3 与 DeepSeek-V4-Pro，以测量模型能力差异。两个模型臂均已完成 50/50，可以直接比较本轮结果；单次运行仍不能形成普遍模型排名。
 
 ### RQ2：智能体能力会被系统条件改变多少？
 
@@ -177,6 +177,8 @@ SysArmor 是全部实验共有的观测层。原则上应在所有 `model × har
 
 对 `missing_signal` 进行分布分析，并在数据允许时按 model、harness、攻击完成阶段和 timeout 状态分层，回答哪些 expected rule 最常缺失，以及缺失模式是否随智能体系统和实际轨迹变化。
 
+DeepSeek 后补的 10 个 case 记录了 expected miss，但没有逐规则 missing 明细；当前 RQ4 的跨模型分布比较只能使用两边字段完整的 40 个 case，并必须明确这一分母。
+
 这一问题应表述为“最容易未被观测的预期攻击行为”，而不是直接宣称“防御盲区”。missing signal 可能来自智能体没有执行对应行为、行为超出 telemetry 边界、规则没有覆盖，或 case-level expectation 对实际轨迹过强。
 
 四个问题形成如下递进关系：
@@ -195,8 +197,8 @@ SysArmor 是全部实验共有的观测层。原则上应在所有 `model × har
 - SysArmor 实验是 detection/observe 实验，而不是 blocking 实验；结果不能证明攻击已被阻止。
 - strict expected-signal miss 不能直接证明防御失明。可能是智能体没有执行预期行为、当前 telemetry 未覆盖该行为，或 case-level expectation 对实际轨迹而言过强。
 - signal hit 不能证明攻击成功、攻击严重或防御实现了阻断。
-- DeepSeek L2 实验只完成 40/50，仅支持阶段性的跨模型观察。
-- Kimi-K3 L2 与 DeepSeek L2 的参数保持一致，仅模型不同；当前仍需使用共同完成 case 或明确分母进行比较，不能把 50/50 与 40/50 当成完整排名。
+- Kimi-K3 L2 与 DeepSeek L2 均完成 50/50，参数保持一致且仅模型不同；结果支持本轮直接比较，但没有重复试验，不能建立普遍模型排名。
+- DeepSeek 后补的 10 个 case 缺少逐规则 missing 明细，不能被纳入 RQ4 的 rule-level 分布统计。
 - harness 收益实验尚未完成，当前报告只能定义其问题、指标和所需对照，不能声称已有实验收益。
 - DeepSeek L1 decoy 实验引入了 SysArmor，但当前汇总没有 signal accounting；缺少导出指标不能被写成没有 signal，也不能参与 detection hit 的定量横比。
 - Kimi-K3/DeepSeek L2 与 DeepSeek L1 decoy 实验的 context 和实验设计不同；它们回答不同问题，不能直接排名。
@@ -208,7 +210,7 @@ SysArmor 是全部实验共有的观测层。原则上应在所有 `model × har
 
 中英文报告必须具有相同的章节结构、主张、表格、实验数量、限制条件和结论强度。英文版应使用自然的科研英语，而不是逐句直译；但任何一版都不得引入另一版没有的证据。
 
-重写应保留当前草稿中有效的技术内容，删除过期的 `39/50` 数字，纳入截至 2026 年 8 月 7 日的实验汇总，并在实验章节中保留各源实验报告的可追溯入口。
+重写应保留当前草稿中有效的技术内容，删除所有过期的阶段性分母，纳入截至 2026 年 8 月 7 日的 50/50 最终实验汇总，并在实验章节中保留各源实验报告的可追溯入口。
 
 ## 验收标准
 

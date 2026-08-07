@@ -16,9 +16,9 @@
 
 为此，我们提出 sysfield。它使用四项直接的技术：通过 **CVE 原子化与多层场景编排**构造可复现网络任务；通过**同场景控制变量对照**分离 model、harness 和环境的影响；将**外部攻击结果验证与运行时行为观测相结合**，分别衡量攻击完成度和防御可见性；通过**预期行为覆盖分析**解释 missing signal。CVELab 提供由真实 CVE 组成的三层 range，外部 verifier 判定分层 flag 和 objective，SysArmor 以 observe-only 方式记录攻击窗口内的运行时 signal。
 
-我们在 Stratified-50 上得到三组阶段性证据。Kimi-K3 L2 完成 50/50 个 case，三层 flag 获取率依次为 22/50、18/50 和 16/50，42/50 个 case 产生新增 signal，28/50 命中全部 expected signal。DeepSeek-V4-Pro L2 当前完成 40/50；在两种模型共同完成的 40 个 case 上，Kimi-K3 的三层结果为 18/40、16/40 和 15/40，DeepSeek 为 19/40、10/40 和 6/40，差异主要出现在入口之后的持续推进。DeepSeek L1 的 none/high 对照中，当前 high 配置使 timeout 从 6/50 增至 19/50，平均运行时间从 1,417.6 秒增至 2,428.5 秒；但该配置同时包含 topology hint 差异，因此只能说明整体运行干扰，不能归因于纯 decoy 效应。
+我们在 Stratified-50 上得到三组阶段性证据。Kimi-K3 和 DeepSeek-V4-Pro 的 L2 实验均已完成 50/50。Kimi-K3 的三层 flag 获取率依次为 22/50、18/50 和 16/50，DeepSeek 为 19/50、10/50 和 6/50；差异主要出现在入口之后的持续推进。两种模型分别有 42/50 和 30/50 个 case 产生新增 signal，strict expected-signal hit 分别为 28/50 和 14/50。DeepSeek L1 的 none/high 对照中，当前 high 配置使 timeout 从 6/50 增至 19/50，平均运行时间从 1,417.6 秒增至 2,428.5 秒；但该配置同时包含 topology hint 差异，因此只能说明整体运行干扰，不能归因于纯 decoy 效应。
 
-这些结果表明，前沿智能体已经能完成一部分真实多层任务，但能力仍依赖模型和系统条件；基础运行时防御在大量成功与失败轨迹中仍能产生结构化证据；最常缺失的是执行工具联网、workload 网络客户端和 shell/interpreter 行为。当前结论限于有限模型、单次实验、partial run、observe-only 防御和行为规则覆盖范围。sysfield 的意义不是帮助智能体更有效地攻击，而是为防御者、评测者和平台方提供一套更完整的风险证据。
+这些结果表明，前沿智能体已经能完成一部分真实多层任务，但能力仍依赖模型和系统条件；基础运行时防御在大量成功与失败轨迹中仍能产生结构化证据；最常缺失的是执行工具联网、workload 网络客户端和 shell/interpreter 行为。当前结论限于有限模型、单次实验、observe-only 防御、行为规则覆盖范围和部分 missing-rule 明细缺失。sysfield 的意义不是帮助智能体更有效地攻击，而是为防御者、评测者和平台方提供一套更完整的风险证据。
 
 ## 1. 引言
 
@@ -59,7 +59,7 @@
 
 1. **一个由真实 CVE 组成的多层评测基座。** CVELab 将异构漏洞封装为可独立部署和验证的 atom，再编排为具有阶段性目标的网络场景。
 2. **一套同时保留攻击结果与防御证据的评测方法。** 外部 verifier 判定 flag 和 objective，SysArmor 独立记录运行时 signal，同一 case 上的两类结果分别统计。
-3. **一组关于模型差异、防御可见性和环境干扰的阶段性证据。** 实验显示，模型差异主要出现在多层持续推进，运行时信号同时存在于成功和失败轨迹，当前 high-decoy 配置能够显著增加智能体的运行成本。
+3. **一组关于模型差异、防御可见性和环境干扰的阶段性证据。** 实验显示，模型差异主要出现在多层持续推进，运行时信号同时存在于成功和失败轨迹，当前 high-decoy 配置能够明显增加智能体的运行成本。
 
 ## 2. 相关工作
 
@@ -188,12 +188,12 @@ Stratified-50 包含 50 个 `enterprise_3tier` case，共使用 24 个唯一 CVE
 | 实验臂 | 主要变量 | 完成度 | 回答的问题 |
 |---|---|---:|---|
 | Kimi-K3 L2 + SysArmor | model=`kimi-k3` | 50/50 | 完整多层能力与防御可见性 |
-| DeepSeek-V4-Pro L2 + SysArmor | model=`deepseek-v4-pro` | 40/50 | 与 Kimi 相同协议下的阶段性模型比较 |
+| DeepSeek-V4-Pro L2 + SysArmor | model=`deepseek-v4-pro` | 50/50 | 与 Kimi 相同协议下的模型比较 |
 | DeepSeek-V4-Pro L1 none | interference=`none` | 50/50 | 当前 L1 基线 |
 | DeepSeek-V4-Pro L1 high | interference=`high` | 50/50 | 当前 high 配置的运行干扰 |
 | Harness 对照 | harness | 未运行 | harness 对能力的增益 |
 
-L2 两个模型臂使用 `openai-compatible` SDK、`openai` runner、L2 context、300 turns、3,600 秒 agent timeout、串行执行和相同 SysArmor detection 设置。DeepSeek 当前缺少 case29-31 和 case44-50，因此跨模型结论以共同完成的 40 个 case 为主。
+L2 两个模型臂使用 `openai-compatible` SDK、`openai` runner、L2 context、300 turns、3,600 秒 agent timeout、串行执行和相同 SysArmor detection 设置。两个实验均完成 50/50，因此可以在同一 case 集合上直接比较；单次运行仍不足以建立普遍模型排名。
 
 L1 none/high 两臂使用同一 manifest、DeepSeek-V4-Pro、L1 context、300 turns、3,600 秒 timeout、seed 1 和 temperature 0。none 使用 parallel=8，high 使用 parallel=4；两个 arm 固定按 none 后 high 的顺序运行。high 包含 43 个 decoy，同时存在 data-router topology hint 缺失。这个设计只能测量当前 high 实现的整体效果。
 
@@ -205,7 +205,7 @@ signal frame 数量反映运行时观测量，不等同于独立攻击行为数�
 
 ### 5.4 数据来源
 
-本报告使用截至 2026 年 8 月 7 日已落盘的数据。总体汇总见 [Stratified-50 实验汇总](experiments/stratified50-experiment-summary.zh.md)，逐 case 证据见 [Kimi-K3 watch-window 报告](experiments/sysarmor-cvelab-stratified50-kimi-k3-watch.zh.md)、[DeepSeek L2 partial 报告](experiments/sysarmor-cvelab-stratified50-rerun300-case50.zh.md) 和 [DeepSeek L1 none/high 报告](experiments/2026-08-07-deepseek-l1-none-high.md)。
+本报告使用截至 2026 年 8 月 7 日已落盘的数据。总体汇总见 [Stratified-50 实验汇总](experiments/stratified50-experiment-summary.zh.md)，逐 case 证据见 [Kimi-K3 watch-window 报告](experiments/sysarmor-cvelab-stratified50-kimi-k3-watch.zh.md)、[DeepSeek L2 报告](experiments/sysarmor-cvelab-stratified50-rerun300-case50.zh.md) 和 [DeepSeek L1 none/high 报告](experiments/2026-08-07-deepseek-l1-none-high.md)。
 
 ## 6. 实验结果
 
@@ -213,16 +213,14 @@ signal frame 数量反映运行时观测量，不等同于独立攻击行为数�
 
 Kimi-K3 完成全部 50 个 L2 case，其中 16/50 三旗全通，三层 flag 获取率依次为 22/50、18/50 和 16/50，objective 为 17/50。22/50 个 case 以 timeout 结束。这说明前沿智能体已经能够完成一部分真实多层任务，但连续推进仍不稳定。
 
-DeepSeek-V4-Pro 当前完成 40/50 个 L2 case，其中 6/40 三旗全通，三层 flag 为 19/40、10/40 和 6/40。由于它是 partial run，不能与 Kimi 的 50-case 完整结果直接形成最终排名。
-
-在两种模型共同完成的 40 个 case 上，控制变量比较更清楚：
+DeepSeek-V4-Pro 完成 50/50 个 L2 case，其中 6/50 三旗全通，三层 flag 为 19/50、10/50 和 6/50。两个模型臂采用相同 case 和协议，可以直接比较本轮结果：
 
 | 模型 | t1 | t2 | t3 / 三旗全通 |
 |---|---:|---:|---:|
-| Kimi-K3 L2 | 18/40 | 16/40 | 15/40 |
-| DeepSeek-V4-Pro L2 | 19/40 | 10/40 | 6/40 |
+| Kimi-K3 L2 | 22/50 | 18/50 | 16/50 |
+| DeepSeek-V4-Pro L2 | 19/50 | 10/50 | 6/50 |
 
-两种模型在入口层非常接近，DeepSeek 甚至多完成一个 t1；差异在后续层级扩大。Kimi 从 t1 到 t3 减少 3 个 case，DeepSeek 减少 13 个。这组结果支持一个有限结论：**在当前协议和共同 case 上，模型差异主要体现为入口后的持续推进，而不是初始访问。** 单次运行、模型随机性和 DeepSeek 未完成部分仍然限制了结论强度。
+两种模型在入口层相差 3 个 case，差异在后续层级扩大。Kimi 从 t1 到 t3 减少 6 个 case，DeepSeek 减少 13 个。这组结果支持一个有限结论：**在当前协议下，观察到的模型差异主要体现为入口后的持续推进，而不是初始访问。** Kimi 有 22/50 个 timeout，DeepSeek 记录为 0/50；终止方式不同，但没有重复试验时不能据此建立普遍可靠性排名。
 
 ### 6.2 RQ2：系统条件会在多大程度上改变能力？
 
@@ -242,20 +240,18 @@ harness 收益实验尚未完成，因此本文不对其效果作定量结论。
 
 两个 arm 的环境、攻击图、攻击路径和清理均为 50/50，说明差异不是 range 部署失败。high 配置使平均运行时间增加约 71%，timeout 从 6 增至 19；none 中成功的两个 case 在 high 中都失败，没有出现 high-only success。
 
-但这不是纯 decoy 因果效应。high 同时包含 43 个 decoy、不同 worker 并行度和一处 topology hint 序列化差异。可靠结论是：**当前 high 配置显著增加了 L1 智能体的探索和规划成本。** 要单独估计 decoy 效应，还需要修复 topology hint、统一 parallel 并随机化实验顺序。
+但这不是纯 decoy 因果效应。high 同时包含 43 个 decoy、不同 worker 并行度和一处 topology hint 序列化差异。可靠结论是：**当前 high 配置明显增加了 L1 智能体的探索和规划成本。** 要单独估计 decoy 效应，还需要修复 topology hint、统一 parallel 并随机化实验顺序。
 
 ### 6.3 RQ3：智能体行动是否会触发防御信号？
 
 答案是肯定的，但 signal 覆盖与攻击完成度并不相同。
 
-Kimi 完整 50-case 结果中，42/50 至少产生一个新增 attack-window signal，28/50 命中全部 expected signal，共记录 23,252 个 attack-window signal frame。DeepSeek 当前 40 个 case 中，30/40 产生新增 signal，14/40 命中全部 expected signal，共记录 9,628 个 frame。
-
-在共同 40 个 case 上：
+Kimi 的 50-case 结果中，42/50 至少产生一个新增 attack-window signal，28/50 命中全部 expected signal，共记录 23,252 个 attack-window signal frame。DeepSeek 的 50-case 结果中，30/50 产生新增 signal，14/50 命中全部 expected signal，共记录 9,628 个 frame。
 
 | 模型 | 三旗全通 | 至少一个新增 signal | strict expected hit |
 |---|---:|---:|---:|
-| Kimi-K3 L2 | 15/40 | 34/40 | 26/40 |
-| DeepSeek-V4-Pro L2 | 6/40 | 30/40 | 14/40 |
+| Kimi-K3 L2 | 16/50 | 42/50 | 28/50 |
+| DeepSeek-V4-Pro L2 | 6/50 | 30/50 | 14/50 |
 
 即使 DeepSeek 只完成 6 个多层任务，30 个 case 仍产生运行时信号。攻击失败不能被解释为没有安全相关活动。
 
@@ -263,16 +259,16 @@ Kimi 完整 50-case 结果中，42/50 至少产生一个新增 attack-window sig
 
 | 模型 | 攻击成功 / signal hit | 攻击成功 / signal miss | 攻击失败 / signal hit | 攻击失败 / signal miss |
 |---|---:|---:|---:|---:|
-| Kimi-K3，共同 40 case | 12 | 3 | 14 | 11 |
-| DeepSeek-V4-Pro，已完成 40 case | 3 | 3 | 11 | 23 |
+| Kimi-K3，50 case | 12 | 4 | 16 | 18 |
+| DeepSeek-V4-Pro，50 case | 3 | 3 | 11 | 33 |
 
-Kimi 有 14 个攻击失败但 expected signal 命中的 case，DeepSeek 有 11 个。另一方面，两种模型都有攻击成功但 signal miss 的 case。前者说明失败轨迹仍会暴露，后者说明攻击成功并不保证当前规则覆盖了预期行为。
+Kimi 有 16 个攻击失败但 expected signal 命中的 case，DeepSeek 有 11 个。另一方面，两种模型都有攻击成功但 signal miss 的 case。前者说明失败轨迹仍会暴露，后者说明攻击成功并不保证当前规则覆盖了预期行为。
 
 这些结果只证明 SysArmor 产生了观察证据。它们不证明攻击被阻止，也不能仅凭 signal hit 数量判断哪种攻击更严重。
 
 ### 6.4 RQ4：哪些预期行为最容易未被观察到？
 
-共同 40 个 case 的 missing-rule 分布如下：
+DeepSeek 新补齐的 10 个 case 记录了 expected miss，但没有逐规则 `missing_signal` 明细。因此，下表只比较两种模型都有完整 missing-rule 字段的 40 个 case：
 
 | missing rule | Kimi-K3 | DeepSeek-V4-Pro |
 |---|---:|---:|
@@ -302,11 +298,11 @@ Kimi 有 14 个攻击失败但 expected signal 命中的 case，DeepSeek 有 11 
 
 分层 flag 比单一 PASS 更有解释力，因为它显示智能体停在哪一层。运行时 signal 又补充了“行动是否暴露”。两类信息应该在 case 级对齐，但保持独立字段。将它们压成单一总分会掩盖成功但暴露、失败但危险等关键状态。
 
-benchmark 还应把 model、harness、工具、预算和环境作为正式实验配置。当前共同 40-case 结果表明，模型差异会随任务阶段变化；只报告最终成功率无法看出差异发生在入口还是持续推进。
+benchmark 还应把 model、harness、工具、预算和环境作为正式实验配置。当前 50-case 结果表明，模型差异会随任务阶段变化；只报告最终成功率无法看出差异发生在入口还是持续推进。
 
 ### 7.3 对平台方：harness 和环境都是风险控制面
 
-智能体能力不仅来自模型。harness 决定状态管理、工具调用和恢复能力，环境决定它能看到什么、被什么吸引以及如何消耗预算。当前 high 配置显著增加 timeout，说明环境设计可以改变智能体的运行成本。
+智能体能力不仅来自模型。harness 决定状态管理、工具调用和恢复能力，环境决定它能看到什么、被什么吸引以及如何消耗预算。当前 high 配置明显增加 timeout，说明环境设计可以改变智能体的运行成本。
 
 这不意味着 decoy 已经被证明具有普遍防护效果。它说明平台方应把工具权限、网络视图、环境反馈、预算和运行时观测纳入部署评估，而不是只按模型版本设定风险等级。
 
@@ -316,9 +312,9 @@ sysfield 在授权、隔离的 range 内使用已知漏洞，报告聚合结果�
 
 ## 8. 局限性
 
-1. **DeepSeek L2 仍是 partial run。** 当前只有 40/50，跨模型观察不是完整排名，也没有重复试验估计随机性。
+1. **模型实验没有重复试验。** 两个 L2 模型臂均完成 50/50，但单次轨迹不能估计随机性，也不足以建立普遍模型排名。
 2. **SysArmor 只做 observe-only 观测。** 本文不能证明 signal 会阻断攻击或改善响应结果。
-3. **expected signal 不是逐动作 ground truth。** miss 可能来自行为未发生、telemetry 边界、规则覆盖或 expectation 过强。
+3. **expected signal 不是逐动作 ground truth。** miss 可能来自行为未发生、telemetry 边界、规则覆盖或 expectation 过强；DeepSeek 后补的 10 个 case 还缺少逐规则 missing 明细。
 4. **L1 与 L2 回答不同问题。** L2 用于模型与可见性分析，L1 none/high 用于当前干扰配置分析，二者不能直接排名。
 5. **high 对照存在混杂因素。** 两臂 parallel 不同，顺序固定，high 还包含 topology hint 差异；当前结果不是纯 decoy 因果效应。
 6. **decoy interaction 来自 transcript 诊断。** 它不是 packet-level provenance，也不能证明每一次文本命中都对应真实网络访问。
@@ -328,7 +324,7 @@ sysfield 在授权、隔离的 range 内使用已知漏洞，报告聚合结果�
 
 ## 9. 结论
 
-前沿网络安全智能体已经能够完成部分真实多层任务，但入口成功并不保证持续推进，模型和环境条件都会改变最终能力。与此同时，基础运行时防御仍能在大量成功与失败轨迹中产生结构化证据，当前 high 配置也能显著增加智能体的运行成本。
+前沿网络安全智能体已经能够完成部分真实多层任务，但入口成功并不保证持续推进，模型和环境条件都会改变最终能力。与此同时，基础运行时防御仍能在大量成功与失败轨迹中产生结构化证据，当前 high 配置也能明显增加智能体的运行成本。
 
 这些结果支持一个直接结论：下一代网络安全智能体 benchmark 不能只问“攻击是否成功”。它还必须回答防御何时看见了什么、环境如何改变行动，以及缺失信号究竟意味着什么。
 
