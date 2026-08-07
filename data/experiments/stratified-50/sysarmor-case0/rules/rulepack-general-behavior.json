@@ -1,0 +1,132 @@
+{
+  "api_version": "sysarmor.content/v1",
+  "kind": "rulepack",
+  "metadata": {
+    "id": "rulepack:cvelab-general-behavior",
+    "version": "v1"
+  },
+  "spec": {
+    "rulesets": [
+      {
+        "id": "ruleset:cvelab-general-behavior",
+        "version": "v1",
+        "rules": [
+          {
+            "rule_id": "workload_executes_shell_or_interpreter",
+            "version": 1,
+            "severity": "medium",
+            "runtime": {
+              "type": "expr",
+              "expr": {
+                "conditions": [
+                  {"field": "behavior", "op": "in", "values": ["process.exec"]},
+                  {"field": "process.binary_name", "op": "in", "ref": "ctx:cvelab-execution-tools"}
+                ]
+              }
+            },
+            "requires": {
+              "events": [
+                {
+                  "behavior": "process.exec",
+                  "fields": ["process.binary", "process.binary_name", "process.argv", "lineage_id"]
+                }
+              ],
+              "context": {
+                "required": ["ctx:cvelab-execution-tools"]
+              }
+            },
+            "suppress": {
+              "within": "5m",
+              "by": ["lineage_id", "process.binary"]
+            },
+            "output": {
+              "terminal": false
+            }
+          },
+          {
+            "rule_id": "execution_tool_opens_network_connection",
+            "version": 1,
+            "severity": "high",
+            "runtime": {
+              "type": "sequence",
+              "sequence": {
+                "within": "2m",
+                "by": ["lineage_id"],
+                "steps": [
+                  {
+                    "id": "exec",
+                    "event": "process.exec",
+                    "conditions": [
+                      {"field": "process.binary_name", "op": "in", "ref": "ctx:cvelab-execution-tools"}
+                    ]
+                  },
+                  {
+                    "id": "connect",
+                    "event": "network.connect",
+                    "condition_group": {
+                      "any": [
+                        {"condition": {"field": "process.stable_id", "op": "same_as", "step": "exec", "step_field": "process.stable_id"}},
+                        {"condition": {"field": "parent.stable_id", "op": "same_as", "step": "exec", "step_field": "process.stable_id"}},
+                        {"condition": {"field": "process.pid", "op": "same_as", "step": "exec", "step_field": "process.pid"}}
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            "requires": {
+              "events": [
+                {
+                  "behavior": "process.exec",
+                  "fields": ["process.binary", "process.binary_name", "process.stable_id", "process.pid", "lineage_id"]
+                },
+                {
+                  "behavior": "network.connect",
+                  "fields": ["process.stable_id", "process.pid", "parent.stable_id", "lineage_id"]
+                }
+              ],
+              "context": {
+                "required": ["ctx:cvelab-execution-tools"]
+              }
+            },
+            "output": {
+              "terminal": false
+            }
+          },
+          {
+            "rule_id": "network_client_used_in_workload",
+            "version": 1,
+            "severity": "medium",
+            "runtime": {
+              "type": "expr",
+              "expr": {
+                "conditions": [
+                  {"field": "behavior", "op": "in", "values": ["network.connect"]},
+                  {"field": "process.binary_name", "op": "in", "ref": "ctx:cvelab-network-clients"}
+                ]
+              }
+            },
+            "requires": {
+              "events": [
+                {
+                  "behavior": "network.connect",
+                  "fields": ["process.binary", "process.binary_name", "lineage_id"]
+                }
+              ],
+              "context": {
+                "required": ["ctx:cvelab-network-clients"]
+              }
+            },
+            "suppress": {
+              "within": "5m",
+              "by": ["lineage_id", "process.binary"]
+            },
+            "output": {
+              "terminal": false
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

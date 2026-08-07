@@ -135,6 +135,44 @@ def test_export_prefers_atom_sysfield_steps_over_local_flag_probe(tmp_path):
     assert "echo $FLAG" not in command
 
 
+def test_export_does_not_require_non_executed_source_bundle_materials(tmp_path):
+    atoms_dir = tmp_path / "atoms"
+    scenario_dir = tmp_path / "scenario"
+    _write_atom(atoms_dir, "CVE-SOURCE-0001")
+    atom_dir = atoms_dir / "CVE-SOURCE-0001"
+    atom_data = yaml.safe_load((atom_dir / "atom.yaml").read_text())
+    atom_data["source_bundle"] = {
+        "compose_file": "source_bundle/docker-compose.yml",
+        "readme_file": "source_bundle/README.md",
+        "dockerfiles": [],
+        "init_files": [],
+        "poc_materials": [
+            "source_bundle/www/index.php",
+            "source_bundle/www/info.php",
+        ],
+        "hashes": {},
+    }
+    (atom_dir / "atom.yaml").write_text(yaml.safe_dump(atom_data, sort_keys=False))
+    (atom_dir / "source_bundle" / "www").mkdir(parents=True)
+    (atom_dir / "source_bundle" / "www" / "index.php").write_text("<?php echo 'index';")
+    (atom_dir / "source_bundle" / "www" / "info.php").write_text("<?php phpinfo();")
+    _write_scenario(scenario_dir, "CVE-SOURCE-0001")
+    (scenario_dir / "clab.yaml").write_text(yaml.safe_dump({
+        "topology": {
+            "nodes": {
+                "attacker": {
+                    "image": "cvelab-attacker",
+                    "binds": [],
+                }
+            }
+        }
+    }))
+
+    out = SysFieldExporter(atoms_dir=str(atoms_dir)).export(str(scenario_dir))
+
+    assert Path(out).is_file()
+
+
 def test_export_runs_later_steps_from_previous_target_node(tmp_path):
     atoms_dir = tmp_path / "atoms"
     scenario_dir = tmp_path / "scenario"

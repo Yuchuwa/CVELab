@@ -16,6 +16,7 @@ import os
 import re
 import secrets
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -35,11 +36,8 @@ from clab_builder.orchestrator.composer.scenario_runner import (
     DEFAULT_MAX_TURNS as DEFAULT_AGENT_TURNS,
     extract_observed_progress,
 )
+from clab_builder.orchestrator.composer import sysarmor_runtime
 from clab_builder.orchestrator.composer.sysfield_runner import SysFieldRunner
-from clab_builder.shared.models.artifact_contracts import (
-    load_scenario_manifest,
-    normalize_verification_result,
-)
 
 SCENARIO_RUNNER_SRC = Path(__file__).parent / "scenario_runner.py"
 
@@ -131,28 +129,10 @@ class ScenarioVerifier:
 
     @staticmethod
     def _lifecycle_lock():
-        """Serialize the small ContainerLab management-network lifecycle only.
-
-        The lock file is world-writable (0666) so both the sudo-root batch
-        process and the invoking researcher can coordinate. Permission-denied
-        on a stale file is treated as a stale lock: delete and recreate.
-        """
-        path = Path("/tmp/cvelab-clab-lifecycle.lock")
-
+        """Serialize the small ContainerLab management-network lifecycle only."""
         class _Lock:
             def __enter__(self_inner):
-                # Ensure the lock file exists and is writable by whoever runs
-                # the batch (root via sudo or the ordinary user). A stale lock
-                # left by a different uid can block deploys, so recreate it.
-                try:
-                    self_inner.handle = open(path, "a+")
-                except PermissionError:
-                    try:
-                        path.unlink(missing_ok=True)
-                    except OSError:
-                        pass
-                    path.touch(mode=0o666)
-                    self_inner.handle = open(path, "a+")
+                self_inner.handle = open("/tmp/cvelab-clab-lifecycle.lock", "a+")
                 if fcntl is not None:
                     fcntl.flock(self_inner.handle.fileno(), fcntl.LOCK_EX)
                 return self_inner
@@ -193,6 +173,82 @@ class ScenarioVerifier:
         return subprocess.run(
             command, capture_output=True, text=True, timeout=timeout,
         )
+
+    def _run_sysarmor_watch_window(
+        self,
+        scenario_dir: str,
+        targets: list[str],
+        attack_runner,
+        *,
+        grace_seconds: int,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        watchers = sysarmor_runtime.start_signal_watchers(scenario_dir, targets)
+        ready = sysarmor_runtime.wait_signal_watchers_ready(watchers)
+        attack_started_at = ""
+        attack_finished_at = ""
+        grace_finished_at = ""
+        attack_info: dict[str, Any]
+        try:
+            attack_started_at = datetime.now(timezone.utc).isoformat()
+            attack_info = attack_runner()
+            attack_finished_at = datetime.now(timezone.utc).isoformat()
+            if attack_info.get("executed"):
+                time.sleep(max(0, grace_seconds))
+            grace_finished_at = datetime.now(timezone.utc).isoformat()
+        finally:
+            stop_results = sysarmor_runtime.stop_signal_watchers(watchers)
+
+        frames = sysarmor_runtime.load_signal_watcher_frames(watchers)
+        buckets = sysarmor_runtime.classify_signal_frames_by_window(
+            frames,
+            attack_started_at=attack_started_at,
+            attack_finished_at=attack_finished_at,
+            grace_finished_at=grace_finished_at or attack_finished_at,
+        )
+        detection = sysarmor_runtime.evaluate_signal_stream(
+            pre_attack=buckets["pre_attack"],
+            attack_window=buckets["attack_window"],
+            grace_window=buckets["grace_window"],
+            attack_executed=bool(attack_info.get("executed")),
+            attack_success=bool(attack_info.get("success")),
+        )
+        detection["attack_started_at"] = attack_started_at
+        detection["attack_finished_at"] = attack_finished_at
+        detection["grace_finished_at"] = grace_finished_at
+        detection["watcher_ready"] = bool(ready.get("ok"))
+        detection["watcher_ready_targets"] = ready.get("ready_targets", [])
+        detection["watcher_failed_targets"] = ready.get("failed_targets", {})
+        if not ready.get("ok"):
+            detection["sysarmor_healthy"] = False
+            detection["event_stream_visible"] = False
+            detection["signal_detected"] = False
+            detection["not_evaluable_reason"] = "watcher_not_ready"
+        elif not attack_info.get("executed"):
+            detection["not_evaluable_reason"] = "attack_not_executed"
+
+        sysarmor_payload = {
+            "watchers": {
+                "ready": ready,
+                "stop_results": stop_results,
+                "targets": {
+                    target: {
+                        "stdout_path": watcher.get("stdout_path", ""),
+                        "stderr_path": watcher.get("stderr_path", ""),
+                        "container": watcher.get("container", ""),
+                        "command": watcher.get("command", []),
+                    }
+                    for target, watcher in watchers.items()
+                },
+            },
+            "detection": detection,
+            "signals_stream_all": frames,
+            "signals_pre_attack": buckets["pre_attack"],
+            "signals_attack_window": buckets["attack_window"],
+            "signals_grace_window": buckets["grace_window"],
+            "signals_post_grace": buckets["post_grace"],
+            "signals_unclassified": buckets["unclassified"],
+        }
+        return dict(attack_info.get("payload") or {}), sysarmor_payload
 
     def _run_netns_command(
         self, attacker: str, container_pid: int, arguments: list[str], timeout: int = 30,
@@ -423,6 +479,20 @@ class ScenarioVerifier:
                         route.stderr.strip() or f"route install failed for {address}"
                     )
 
+            if not re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", host):
+                hosts_line = f"{addresses[0]} {host}"
+                hosts_script = (
+                    f"grep -Eq {shlex.quote(r'^[0-9.]+[[:space:]]+' + re.escape(host) + r'([[:space:]]|$)')} "
+                    f"/etc/hosts || printf '\\n%s\\n' {shlex.quote(hosts_line)} >> /etc/hosts"
+                )
+                hosts_update = self._run_command([
+                    "docker", "exec", "-u", "0", attacker, "sh", "-c", hosts_script,
+                ])
+                if hosts_update.returncode != 0:
+                    raise RuntimeError(
+                        hosts_update.stderr.strip() or f"cannot pin {host} in attacker /etc/hosts"
+                    )
+
             probe_code = (
                 "import socket,sys; "
                 "s=socket.create_connection((sys.argv[1],int(sys.argv[2])),5); "
@@ -507,10 +577,7 @@ class ScenarioVerifier:
         scenario_meta = scenario_path / "scenario.yaml"
         if scenario_meta.exists():
             import yaml
-            raw_meta = yaml.safe_load(scenario_meta.read_text()) or {}
-            meta = load_scenario_manifest(raw_meta).model_dump(
-                mode="json", exclude_none=True
-            )
+            meta = yaml.safe_load(scenario_meta.read_text()) or {}
         return ground_truth, meta.get("ip_allocations", {}), meta
 
     @staticmethod
@@ -755,19 +822,35 @@ class ScenarioVerifier:
                 target_ip, str(port),
             ], timeout=10)
         else:
-            inspected = self._run_command([
-                "docker", "inspect", "-f", "{{.State.Pid}}", container,
-            ])
-            if inspected.returncode != 0 or not inspected.stdout.strip().isdigit():
-                return {
-                    "port": port,
-                    "reachable": False,
-                    "detail": inspected.stderr.strip() or "source container PID unavailable",
-                }
-            probe = self._run_command([
-                "nsenter", "-t", inspected.stdout.strip(), "-n",
-                sys.executable, "-c", probe_code, target_ip, str(port),
+            # No Python inside the container.  Try bash /dev/tcp (built-in
+            # on bash with --enable-net-redirections) first, then busybox nc
+            # as a portable fallback.  We intentionally avoid nsenter because
+            # it requires CAP_SYS_ADMIN.
+            bash_probe = self._run_command([
+                "docker", "exec", "-u", "0", container,
+                "bash", "-c",
+                f"timeout 3 bash -c 'echo > /dev/tcp/{target_ip}/{port}' 2>&1",
             ], timeout=10)
+            if bash_probe.returncode == 0:
+                probe = bash_probe
+            else:
+                probe = self._run_command([
+                    "docker", "exec", "-u", "0", container,
+                    "sh", "-c",
+                    " ".join([
+                        "timeout", "3",
+                        "sh", "-c",
+                        f"\"exec 3<>/dev/tcp/{target_ip}/{port} && echo connected || echo failed\"",
+                    ]),
+                ], timeout=10)
+                if probe.returncode != 0:
+                    # Last resort: use busybox nc via a one-shot container
+                    # sharing the target's network namespace.
+                    probe = self._run_command([
+                        "docker", "run", "--rm",
+                        "--network", f"container:{container}",
+                        "busybox:latest", "nc", "-w", "3", "-z", target_ip, str(port),
+                    ], timeout=15)
         return {
             "port": port,
             "reachable": probe.returncode == 0,
@@ -923,7 +1006,7 @@ class ScenarioVerifier:
                 scenario_dir, "asset-verify.yaml", required=assets_required,
                 timeout=600,
             )
-            cve = self._run_ansible(scenario_dir, "cve-setup.yaml", timeout=600)
+            cve = self._run_ansible(scenario_dir, "cve-setup.yaml")
             environment = self._verify_environment(ground_truth, scenario_dir)
             result["environment_verified"] = bool(environment.get("all_targets_verified"))
             result["environment_verification"] = environment
@@ -991,6 +1074,7 @@ class ScenarioVerifier:
         execution_context: dict[str, Any] | None = None,
         agent_context: str = "guided",
         agent_runner: str = "claude",
+        sysarmor: dict[str, Any] | None = None,
     ) -> dict:
         """Run deployment validation, optionally followed by Agent evaluation.
 
@@ -1005,6 +1089,10 @@ class ScenarioVerifier:
             raise ValueError(f"agent_context must be one of {AGENT_CONTEXTS}")
         scenario_path = Path(scenario_dir)
         self.execution_context = dict(execution_context or {})
+        sysarmor_config = dict(sysarmor or {})
+        sysarmor_enabled = bool(sysarmor_config.get("enabled"))
+        sysarmor_detection_enabled = bool(sysarmor_config.get("detection"))
+        sysarmor_signal_window = int(sysarmor_config.get("signal_window", 30) or 30)
 
         ground_truth, ip_alloc, _meta = self._load_scenario_context(scenario_dir)
         scenario_mode = _meta.get("validation_mode")
@@ -1026,6 +1114,11 @@ class ScenarioVerifier:
                 "overall_status": "not_requested",
                 "agent_context": agent_context,
             })
+        sysarmor_result: dict[str, Any] = {
+            "enabled": sysarmor_enabled,
+            "detection_requested": sysarmor_detection_enabled,
+            "signal_window": sysarmor_signal_window,
+        }
 
         try:
             # 1. Materialize Atom-declared runtime images, then deploy.
@@ -1058,7 +1151,40 @@ class ScenarioVerifier:
                     "guide_advisories": guide_preflight,
                     "guide_compatibility": guide_preflight,
                     "agent_transport": agent_transport,
+                    "sysarmor": sysarmor_result,
                 })
+
+            if sysarmor_enabled:
+                patch = sysarmor_runtime.patch_scenario_clab(scenario_dir, ground_truth)
+                sysarmor_result["patch"] = patch
+                if not patch.get("ok"):
+                    return self._save_result(scenario_path, {
+                        "success": False,
+                        "agent_context": agent_context,
+                        "error": "SysArmor target patching failed",
+                        "runtime_materialization": runtime_materialization,
+                        "environment_verified": False,
+                        "environment_success": False,
+                        "range_build_verified": False,
+                        "failure_stage": "sysarmor:patch",
+                        "reference_path_verified": False if self.validation_mode == "sysfield" else None,
+                        "attack_graph_valid": False,
+                        "attack_path_reachable": False,
+                        "guided_trial_evaluated": False,
+                        "guided_trial_success": False,
+                        "objective_achieved": False,
+                        "guided_reference_evaluated": False,
+                        "guided_reference_success": False,
+                        "agent_evaluated": False,
+                        "agent_success": False,
+                        "guide_integrity": {
+                            "evaluated": False, "valid": True, "entries": []
+                        },
+                        "guide_advisories": guide_preflight,
+                        "guide_compatibility": guide_preflight,
+                        "agent_transport": agent_transport,
+                        "sysarmor": sysarmor_result,
+                    })
 
             # 2. Deploy
             print("[1/5] Deploying...")
@@ -1089,6 +1215,7 @@ class ScenarioVerifier:
                     "guide_advisories": guide_preflight,
                     "guide_compatibility": guide_preflight,
                     "agent_transport": agent_transport,
+                    "sysarmor": sysarmor_result,
                 })
 
             # 3. Ansible base (IP config + routing)
@@ -1111,7 +1238,40 @@ class ScenarioVerifier:
                 scenario_dir, "asset-verify.yaml", required=assets_required,
                 timeout=600,
             )
-            cve = self._run_ansible(scenario_dir, "cve-setup.yaml", timeout=600)
+            cve = self._run_ansible(scenario_dir, "cve-setup.yaml")
+            if sysarmor_enabled and all(item.get("ok", True) for item in (base, asset, asset_verify, cve)):
+                targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
+                injection = sysarmor_runtime.inject_sysarmor_runtime(scenario_dir, targets)
+                sysarmor_result["injection"] = injection
+                if not injection.get("ok"):
+                    return self._save_result(scenario_path, {
+                        "success": False,
+                        "agent_context": agent_context,
+                        "error": "SysArmor injection failed",
+                        "runtime_materialization": runtime_materialization,
+                        "deploy": deploy,
+                        "environment_verified": False,
+                        "environment_success": False,
+                        "range_build_verified": False,
+                        "failure_stage": "sysarmor:inject",
+                        "reference_path_verified": False if self.validation_mode == "sysfield" else None,
+                        "attack_graph_valid": False,
+                        "attack_path_reachable": False,
+                        "guided_trial_evaluated": False,
+                        "guided_trial_success": False,
+                        "objective_achieved": False,
+                        "guided_reference_evaluated": False,
+                        "guided_reference_success": False,
+                        "agent_evaluated": False,
+                        "agent_success": False,
+                        "guide_integrity": {
+                            "evaluated": False, "valid": True, "entries": []
+                        },
+                        "guide_advisories": guide_preflight,
+                        "guide_compatibility": guide_preflight,
+                        "agent_transport": agent_transport,
+                        "sysarmor": sysarmor_result,
+                    })
 
             environment = self._verify_environment(ground_truth, scenario_dir)
             environment_success = bool(environment.get("all_targets_verified")) and all(
@@ -1145,7 +1305,6 @@ class ScenarioVerifier:
                 environment_success
                 and attack_graph_valid
                 and attack_path_reachable
-                and not environment_only
                 and self.validation_mode == "sysfield"
             ):
                 reference = self._run_reference_path(scenario_dir)
@@ -1167,6 +1326,30 @@ class ScenarioVerifier:
             range_build_verified = bool(
                 environment_success and attack_graph_valid and attack_path_reachable
             )
+            if (
+                sysarmor_enabled
+                and sysarmor_detection_enabled
+                and environment_only
+                and environment_success
+                and attack_graph_valid
+                and attack_path_reachable
+            ):
+                targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
+                def _run_reference_attack() -> dict[str, Any]:
+                    payload = self._run_reference_path(scenario_dir)
+                    return {
+                        "payload": payload,
+                        "executed": bool(payload.get("command")),
+                        "success": bool(payload.get("ok")),
+                    }
+                reference, sysarmor_capture = self._run_sysarmor_watch_window(
+                    scenario_dir,
+                    targets,
+                    _run_reference_attack,
+                    grace_seconds=sysarmor_signal_window,
+                )
+                reference_verified = bool(reference.get("ok"))
+                sysarmor_result.update(sysarmor_capture)
             if environment_only:
                 print("[4/5] Skipping Agent: environment-only validation requested")
                 agent_transport = {
@@ -1225,14 +1408,38 @@ class ScenarioVerifier:
                     path_reachability = post_transport_path
                     if attack_path_reachable:
                         print("[4/5] Running agent verification...")
-                        agent_result = self._run_agent(
-                            scenario_dir, ground_truth, ip_alloc,
-                            api_key=api_key, base_url=base_url, model=model,
-                            objectives=self._public_objectives(_meta),
-                            guide_preflight=guide_preflight,
-                            agent_context=agent_context,
-                            agent_runner=agent_runner,
-                        )
+                        if sysarmor_enabled and sysarmor_detection_enabled:
+                            targets = list((sysarmor_result.get("patch") or {}).get("targets") or [])
+                            def _run_agent_attack() -> dict[str, Any]:
+                                payload = self._run_agent(
+                                    scenario_dir, ground_truth, ip_alloc,
+                                    api_key=api_key, base_url=base_url, model=model,
+                                    objectives=self._public_objectives(_meta),
+                                    guide_preflight=guide_preflight,
+                                    agent_context=agent_context,
+                                    agent_runner=agent_runner,
+                                )
+                                return {
+                                    "payload": payload,
+                                    "executed": True,
+                                    "success": bool(payload.get("success", False)),
+                                }
+                            agent_result, sysarmor_capture = self._run_sysarmor_watch_window(
+                                scenario_dir,
+                                targets,
+                                _run_agent_attack,
+                                grace_seconds=sysarmor_signal_window,
+                            )
+                            sysarmor_result.update(sysarmor_capture)
+                        else:
+                            agent_result = self._run_agent(
+                                scenario_dir, ground_truth, ip_alloc,
+                                api_key=api_key, base_url=base_url, model=model,
+                                objectives=self._public_objectives(_meta),
+                                guide_preflight=guide_preflight,
+                                agent_context=agent_context,
+                                agent_runner=agent_runner,
+                            )
                         agent_evaluated = True
                         guided_reference_evaluated = self.validation_mode == "guided_agent"
                         print("[5/5] Verifying results...")
@@ -1309,6 +1516,7 @@ class ScenarioVerifier:
                 # used to decide whether the Agent starts.
                 "guide_compatibility": guide_preflight,
                 "agent_transport": agent_transport,
+                "sysarmor": sysarmor_result,
                 "reference_path_verification": reference,
                 "reference_path_verified": reference_verified if self.validation_mode == "sysfield" else None,
                 "attack_graph_valid": attack_graph_valid,
@@ -1371,10 +1579,7 @@ class ScenarioVerifier:
                     persisted["execution_complete"] = bool(
                         destroy.get("ok", False) and transport_cleanup.get("ok", False)
                     )
-                    persisted["cleanup_failed"] = not persisted["execution_complete"]
-                    self._atomic_write_json(
-                        result_file, normalize_verification_result(persisted)
-                    )
+                    self._atomic_write_json(result_file, persisted)
                 except (OSError, json.JSONDecodeError):
                     pass
 
@@ -1426,12 +1631,8 @@ class ScenarioVerifier:
             return "agent_timeout"
         if validation_mode == "guided_agent" and agent_termination_reason == "max_turns_reached":
             return "agent_turn_limit"
-        if validation_mode == "guided_agent" and agent_termination_reason in (
-            "agent_api_quota", "quota_exhausted"
-        ):
-            return "agent_quota_exhausted"
-        if validation_mode == "guided_agent" and agent_termination_reason == "rate_limit_persistent":
-            return "agent_rate_limit"
+        if validation_mode == "guided_agent" and agent_termination_reason == "agent_api_quota":
+            return "agent_api_quota"
         if validation_mode == "guided_agent" and agent_termination_reason == "agent_api_protocol":
             return "agent_api_protocol"
         if validation_mode == "guided_agent" and agent_evaluated and not guided_trial_success:
@@ -2183,35 +2384,24 @@ class ScenarioVerifier:
             nets = sy.get("network_subnets") or []
             if isinstance(nets, list):
                 topology["subnets"] = [str(n) for n in nets]
-        # Chain hosts (target-* nodes) with their data-plane IPs. The node
-        # names carry a 'target-' prefix; replace with 'node-N' so the Agent
-        # cannot pick targets by name alone — all hosts (chain + decoy) look
-        # the same in the prompt (paper §A.3). The L2 CVE→IP block still
-        # identifies the real targets by IP, so the difficulty delta is
-        # purely about scanning/resolving the host list under L1.
-        _host_counter = 0
+        # Chain hosts (target-* nodes) with their data-plane IPs.
         for step in ground_truth.get("attack_path", []):
             node = step.get("target_node", "")
             if not node:
                 continue
             ip = ip_alloc.get(node, {}).get("eth1", "").split("/")[0] or step.get("target_ip", "")
             zone = step.get("zone", "")
-            _host_counter += 1
-            topology["hosts"].append(f"node-{_host_counter} ({ip}, zone: {zone})")
-        # Decoy hosts (noise_nodes) mixed into the same hosts list. The node
-        # names in the data carry a 'decoy-' prefix (e.g. decoy-dmz-01), which
-        # would immediately expose them as decoys to the Agent. Replace the
-        # name with a neutral 'node-N' label so the Agent cannot distinguish
-        # decoys from chain targets by name (paper §A.3: all hosts listed
-        # without labeling which are decoys). The IP and zone stay accurate.
+            topology["hosts"].append(f"{node} ({ip}, zone: {zone})")
+        # Decoy hosts (noise_nodes) mixed into the same hosts list, with no
+        # marker distinguishing them from chain nodes (paper §A.3: the prompt
+        # lists all hosts without labeling which are decoys).
         for node in ground_truth.get("noise_nodes", []) or []:
             name = node.get("name", "")
             if not name:
                 continue
             ip = node.get("ip", "") or ip_alloc.get(name, {}).get("eth1", "").split("/")[0]
             zone = node.get("zone", "")
-            _host_counter += 1
-            topology["hosts"].append(f"node-{_host_counter} ({ip}, zone: {zone})")
+            topology["hosts"].append(f"{name} ({ip}, zone: {zone})")
         # Multi-homed pivot hosts: router nodes with multiple interfaces.
         for node_name, alloc in ip_alloc.items():
             if "router" not in node_name:
@@ -2265,6 +2455,7 @@ class ScenarioVerifier:
         # explicit l0/l1/l2 contexts get the level-trimmed contract.
         targets = []
         credential_material_paths: list[str] = []
+        agent_materials: list[tuple[str, Path, str]] = []
         for step in ground_truth.get("attack_path", []):
             node_name = step["target_node"]
             cve_id = step["cve_id"]
@@ -2287,7 +2478,16 @@ class ScenarioVerifier:
             materials = {}
             if atom_config and atom_config.source_bundle:
                 for material in atom_config.source_bundle.poc_materials:
-                    materials[material] = f"/vulhub/{cve_id}__{Path(material).name}"
+                    mounted_path = f"/vulhub/{cve_id}__{Path(material).name}"
+                    materials[material] = mounted_path
+                    material_is_allowed = (
+                        agent_context in ("guided", "no_guide")
+                        or (level == "l2" and self._is_credential_material(material))
+                    )
+                    if material_is_allowed:
+                        agent_materials.append(
+                            (cve_id, self.atoms_dir / cve_id / material, mounted_path)
+                        )
             flag_hint = (
                 step.get("flag_hint", "file:/flag.txt")
                 if agent_context != "no_hint" and not is_level else ""
@@ -2469,36 +2669,47 @@ class ScenarioVerifier:
         # 准备 workspace
         workspace = scenario_path / "agent_workspace"
         workspace.mkdir(exist_ok=True)
+        vulhub_mount_dir = self._materialize_agent_materials(workspace, agent_materials)
         input_path = workspace / "input.json"
         output_path = workspace / "output.json"
         session_path = workspace / "session.json"
         stream_path = workspace / "agent_stream.log"
         input_path.write_text(json.dumps(input_data, indent=2, ensure_ascii=False))
         self._reset_agent_artifacts(workspace)
+        if agent_runner == "claude":
+            try:
+                os.chmod(workspace, 0o777)
+            except OSError:
+                pass
 
-        # 拷入 runner + input. Select the runner source by agent_runner mode:
-        # "claude" uses scenario_runner.py (claude_agent_sdk), "openai" uses
-        # openai_scenario_runner.py (openai SDK, no built-in Agent/Task tools).
+        # Prepare runner + input. Select the runner source by agent_runner mode:
+        # "claude" uses scenario_runner.py (claude_agent_sdk) in the
+        # clab-agent image while sharing the attacker network namespace;
+        # "openai" keeps running inside the attacker container because it has
+        # a no-dependency stdlib API fallback.
         OPENAI_RUNNER_SRC = Path(__file__).parent / "openai_scenario_runner.py"
         runner_src = OPENAI_RUNNER_SRC if agent_runner == "openai" else SCENARIO_RUNNER_SRC
-        # The openai runner imports pure helpers from scenario_runner, so copy
-        # both files; the entrypoint is always /opt/scenario_runner.py.
-        runner_copy = subprocess.run(
-            ["docker", "cp", str(runner_src.resolve()),
-             f"{attacker_container}:/opt/scenario_runner.py"],
-            capture_output=True, timeout=30,
-        )
+        runner_copy = subprocess.CompletedProcess(["runner-prepared"], 0, "", "")
         if agent_runner == "openai":
+            # The openai runner imports pure helpers from scenario_runner, so
+            # copy both files; the entrypoint is always /opt/scenario_runner.py.
+            runner_copy = subprocess.run(
+                ["docker", "cp", str(runner_src.resolve()),
+                 f"{attacker_container}:/opt/scenario_runner.py"],
+                capture_output=True, timeout=30,
+            )
             subprocess.run(
                 ["docker", "cp", str(SCENARIO_RUNNER_SRC.resolve()),
                  f"{attacker_container}:/opt/scenario_runner_lib.py"],
                 capture_output=True, timeout=30,
             )
-        input_copy = subprocess.run(
-            ["docker", "cp", str(input_path),
-             f"{attacker_container}:/tmp/scenario_input.json"],
-            capture_output=True, timeout=30,
-        )
+            input_copy = subprocess.run(
+                ["docker", "cp", str(input_path),
+                 f"{attacker_container}:/tmp/scenario_input.json"],
+                capture_output=True, timeout=30,
+            )
+        else:
+            input_copy = subprocess.CompletedProcess(["input-mounted"], 0, "", "")
         copy_errors = [result.stderr.decode(errors="replace") if isinstance(result.stderr, bytes)
                        else result.stderr for result in (runner_copy, input_copy)
                        if result.returncode != 0]
@@ -2512,10 +2723,13 @@ class ScenarioVerifier:
                 "failed_targets": [t["node_name"] for t in targets],
             }
 
-        cleanup = subprocess.run([
-            "docker", "exec", attacker_container, "rm", "-f",
-            "/tmp/scenario_output.json", "/tmp/scenario_session.json",
-        ], capture_output=True, text=True, timeout=30)
+        if agent_runner == "openai":
+            cleanup = subprocess.run([
+                "docker", "exec", attacker_container, "rm", "-f",
+                "/tmp/scenario_output.json", "/tmp/scenario_session.json",
+            ], capture_output=True, text=True, timeout=30)
+        else:
+            cleanup = subprocess.CompletedProcess(["workspace-reset"], 0, "", "")
         if cleanup.returncode != 0:
             return {
                 "scenario_name": ground_truth.get("scenario", ""),
@@ -2527,8 +2741,7 @@ class ScenarioVerifier:
                 "termination_reason": "workspace_cleanup_failed",
             }
 
-        # 构建 docker exec 命令
-        full_cmd = ["docker", "exec"]
+        # 构建 Agent command
         if agent_runner == "openai":
             # OpenAI runner reads OPENAI_BASE_URL / OPENAI_API_KEY (with
             # LLM_* / ANTHROPIC_* fallbacks inside the runner). No Agent/Task
@@ -2538,17 +2751,26 @@ class ScenarioVerifier:
                 env_flags.append(f"OPENAI_BASE_URL={base_url}")
             if model:
                 env_flags.append(f"MODEL={model}")
-            # Reasoning models (kimi-k3, GLM) require temperature=1; pass
-            # LLM_TEMPERATURE through so the runner picks it up. Defaults to 0
-            # inside the runner when unset.
-            if os.environ.get("LLM_TEMPERATURE"):
-                env_flags.append(f"LLM_TEMPERATURE={os.environ['LLM_TEMPERATURE']}")
+            full_cmd = ["docker", "exec"]
+            for ef in env_flags:
+                full_cmd.extend(["-e", ef])
+            full_cmd.extend([
+                attacker_container,
+                "python3", "/opt/scenario_runner.py",
+                "--input", "/tmp/scenario_input.json",
+                "--output", "/tmp/scenario_output.json",
+                "--max-turns", str(self.max_turns),
+            ])
         else:
-            env_flags = [f"ANTHROPIC_API_KEY={api_key}"]
+            env_flags = [
+                f"ANTHROPIC_API_KEY={api_key}",
+                f"ANTHROPIC_AUTH_TOKEN={api_key}",
+            ]
             if base_url:
                 env_flags.append(f"ANTHROPIC_BASE_URL={base_url}")
             if model:
                 env_flags.append(f"MODEL={model}")
+                env_flags.append(f"ANTHROPIC_MODEL={model}")
                 # Claude Code SDK's Agent/Task tools spawn sub-agents that
                 # default to a lighter model (claude-haiku-4-5). When the LLM
                 # API gateway has no channel for that default (503 No
@@ -2558,15 +2780,34 @@ class ScenarioVerifier:
                 # gateway-backed model. See WORK_PROGRESS_REPORT 2026-07-23
                 # 'haiku sub-agent 503' analysis.
                 env_flags.append(f"CLAUDE_CODE_SUBAGENT_MODEL={model}")
-        for ef in env_flags:
-            full_cmd.extend(["-e", ef])
-        full_cmd.extend([
-            attacker_container,
-            "python3", "/opt/scenario_runner.py",
-            "--input", "/tmp/scenario_input.json",
-            "--output", "/tmp/scenario_output.json",
-            "--max-turns", str(self.max_turns),
-        ])
+            claude_cache_dir = workspace / ".claude_cache"
+            claude_cache_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                os.chmod(claude_cache_dir, 0o777)
+            except OSError:
+                pass
+            full_cmd = [
+                "docker", "run", "--rm",
+                f"--network=container:{attacker_container}",
+                "--cap-add", "NET_RAW",
+                "--cap-add", "NET_ADMIN",
+                "-v", f"{workspace.resolve()}:/workspace",
+                "-v", f"{runner_src.resolve()}:/opt/scenario_runner.py:ro",
+                "-v", f"{claude_cache_dir.resolve()}:/home/agent/.claude",
+                "-e", "CLAUDE_CONFIG_DIR=/home/agent/.claude",
+                "-e", "HOME=/home/agent",
+            ]
+            if vulhub_mount_dir is not None:
+                full_cmd.extend(["-v", f"{vulhub_mount_dir.resolve()}:/vulhub:ro"])
+            for ef in env_flags:
+                full_cmd.extend(["-e", ef])
+            full_cmd.extend([
+                self.agent_image,
+                "python3", "/opt/scenario_runner.py",
+                "--input", "/workspace/input.json",
+                "--output", "/workspace/output.json",
+                "--max-turns", str(self.max_turns),
+            ])
 
         # 执行
         stderr_chunks = []
@@ -2611,19 +2852,28 @@ class ScenarioVerifier:
             with stream_path.open("a") as stream:
                 stream.write(timeout_message)
 
-        # 拷出 output + session
-        output_copy = subprocess.run(
-            ["docker", "cp",
-             f"{attacker_container}:/tmp/scenario_output.json",
-             str(output_path)],
-            capture_output=True, timeout=30,
-        )
-        session_copy = subprocess.run(
-            ["docker", "cp",
-             f"{attacker_container}:/tmp/scenario_session.json",
-             str(session_path)],
-            capture_output=True, timeout=30,
-        )
+        # 拷出 output + session. Claude runner writes directly to the mounted
+        # workspace; OpenAI runner writes inside attacker and needs docker cp.
+        if agent_runner == "openai":
+            output_copy = subprocess.run(
+                ["docker", "cp",
+                 f"{attacker_container}:/tmp/scenario_output.json",
+                 str(output_path)],
+                capture_output=True, timeout=30,
+            )
+            session_copy = subprocess.run(
+                ["docker", "cp",
+                 f"{attacker_container}:/tmp/scenario_session.json",
+                 str(session_path)],
+                capture_output=True, timeout=30,
+            )
+        else:
+            output_copy = subprocess.CompletedProcess(
+                ["mounted-output"], 0 if output_path.exists() else 1, "", ""
+            )
+            session_copy = subprocess.CompletedProcess(
+                ["mounted-session"], 0 if session_path.exists() else 1, "", ""
+            )
         if session_copy.returncode == 0 and session_path.exists():
             print(f"  Session saved: {session_path}")
 
@@ -2931,7 +3181,6 @@ class ScenarioVerifier:
                 "validated_at": datetime.now(timezone.utc).isoformat(),
             }
         result_file = scenario_path / "verify_result.json"
-        result = normalize_verification_result(result)
         self._atomic_write_json(result_file, result)
         print(f"  Result saved: {result_file}")
 
@@ -3014,6 +3263,54 @@ class ScenarioVerifier:
         import yaml
         data = yaml.safe_load(atom_yaml.read_text())
         return data.get("flag_verify_command", "")
+
+    def _materialize_agent_materials(
+        self,
+        workspace: Path,
+        materials: list[tuple[str, Path, str]],
+    ) -> Path | None:
+        """Create a /vulhub-compatible material view for external agent images.
+
+        The attacker container receives source_bundle files through ContainerLab
+        binds, but the Claude SDK runner now executes in a separate clab-agent
+        container that only shares the attacker's network namespace.  Copy the
+        same allowed files into the agent workspace and bind-mount them at
+        /vulhub so guided/no_guide and L2 credential hints remain truthful.
+        """
+
+        vulhub_dir = workspace / "vulhub"
+        if vulhub_dir.exists():
+            shutil.rmtree(vulhub_dir)
+        safe_materials: list[tuple[Path, Path]] = []
+        for cve_id, source, container_path in materials:
+            if not str(container_path).startswith("/vulhub/"):
+                continue
+            target_name = Path(container_path).name
+            if not target_name or target_name in {".", ".."}:
+                continue
+            try:
+                bundle_root = (self.atoms_dir / cve_id / "source_bundle").resolve(strict=True)
+                resolved_source = source.resolve(strict=True)
+                resolved_source.relative_to(bundle_root)
+            except (FileNotFoundError, RuntimeError, ValueError):
+                continue
+            if not resolved_source.is_file() or source.is_symlink():
+                continue
+            safe_materials.append((resolved_source, vulhub_dir / target_name))
+        if not safe_materials:
+            return None
+        vulhub_dir.mkdir(parents=True, exist_ok=True)
+        for source, target in safe_materials:
+            shutil.copy2(source, target)
+            try:
+                os.chmod(target, 0o644)
+            except OSError:
+                pass
+        try:
+            os.chmod(vulhub_dir, 0o755)
+        except OSError:
+            pass
+        return vulhub_dir
 
     def _load_atom_config(self, cve_id: str):
         atom_yaml = self.atoms_dir / cve_id / "atom.yaml"

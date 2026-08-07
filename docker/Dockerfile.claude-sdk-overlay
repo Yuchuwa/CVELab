@@ -1,0 +1,9 @@
+FROM clab-agent:latest
+
+USER root
+RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED && \
+    pip3 install --no-cache-dir \
+      'claude-agent-sdk>=0.2.87' \
+      'openai>=1.40.0'
+
+USER agent

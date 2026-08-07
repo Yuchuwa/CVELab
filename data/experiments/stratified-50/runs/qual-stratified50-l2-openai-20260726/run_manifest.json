@@ -1,0 +1,1283 @@
+{
+  "schema_version": 1,
+  "run_id": "qual-stratified50-l2-openai-20260726",
+  "run_kind": "qualification",
+  "created_at": "2026-07-26T12:18:14.469385+00:00",
+  "repository": {
+    "commit": "98d971a054dc422ba2cd830a64b3a68a9304878f",
+    "dirty": true,
+    "status_short": [
+      "M data/atoms/CVE-2012-1823/atom.yaml",
+      " M data/atoms/CVE-2012-1823/runtime/install-tools.sh",
+      " M data/atoms/CVE-2012-1823/runtime/manifest.yaml",
+      " M data/atoms/CVE-2014-3120/atom.yaml",
+      " M data/atoms/CVE-2015-1427/atom.yaml",
+      " M data/atoms/CVE-2021-42013/atom.yaml",
+      " M data/atoms/CVE-2021-42013/runtime/install-tools.sh",
+      " M data/atoms/CVE-2021-42013/runtime/manifest.yaml",
+      " M data/atoms/CVE-2024-27348/atom.yaml",
+      "?? data/atoms/CVE-2014-3120/runtime/",
+      "?? data/atoms/CVE-2015-1427/runtime/",
+      "?? data/atoms/CVE-2024-27348/runtime/",
+      "?? scripts/run_stratified_50.py",
+      "?? scripts/run_stratified_50_experiment.py",
+      "?? src/clab_builder/orchestrator/experiments/",
+      "?? tests/orchestrator/test_formal_experiment_runs.py"
+    ]
+  },
+  "source_manifest": {
+    "path": "/home/jiandong/workspace/oslab/sysarmor/CVELab/data/stratified_50_ranges.json",
+    "sha256": "4bd6cdcb2b206c9ddb4b2334fb2c682f91d09fbb3621b638cc86acd6c701f8ac",
+    "offset": 0,
+    "max_cases": 50
+  },
+  "selected_case_ids": [
+    "matrix-2018-16509-2012-1823-2015-1427",
+    "matrix-2024-9264-2021-42013-2019-9193",
+    "matrix-2016-3088-2018-16509-2019-9193",
+    "matrix-2018-16509-2021-42013-2019-9193",
+    "matrix-2021-42013-2012-1823-2015-1427",
+    "matrix-2012-1823-2019-0193-2014-3120",
+    "matrix-2012-1823-2021-42013-2014-3120",
+    "matrix-2024-27348-2019-17558-2014-3120",
+    "matrix-2018-19475-2024-27348-2019-9193",
+    "matrix-2012-1823-2024-27348-2014-3120",
+    "matrix-2019-17558-2024-38856-2015-1427",
+    "matrix-2012-1823-2025-55182-2019-9193",
+    "matrix-2024-27348-2025-68613-2015-1427",
+    "matrix-2018-16509-2018-19475-2015-1427",
+    "matrix-2012-1823-2022-24816-2015-1427",
+    "matrix-2016-3088-2018-19475-2019-9193",
+    "matrix-2021-42013-2025-55182-2014-3120",
+    "matrix-2021-42013-2022-24816-2015-1427",
+    "matrix-2017-11610-2019-0193-2019-9193",
+    "matrix-2022-22965-2012-1823-2015-1427",
+    "matrix-2017-11610-2021-42013-2019-9193",
+    "matrix-2024-38856-2023-51467-2014-3120",
+    "matrix-2023-51467-2019-17558-2014-3120",
+    "matrix-2017-11610-2019-0193-2014-3120",
+    "matrix-2024-38856-2024-27348-2014-3120",
+    "matrix-2021-32682-2012-1823-2015-1427",
+    "matrix-2021-32682-2025-68613-2014-3120",
+    "matrix-2025-68613-2017-17562-2019-9193",
+    "matrix-2025-68613-2017-17562-2015-1427",
+    "matrix-2024-38856-2025-55182-2019-9193",
+    "matrix-2017-11610-2022-24816-2014-3120",
+    "matrix-2024-38856-2025-55182-2014-3120",
+    "matrix-2025-55182-2016-3088-2019-9193",
+    "matrix-2022-24816-2019-0193-2019-9193",
+    "matrix-2017-12615-2019-0193-2014-3120",
+    "matrix-2017-17562-2024-27348-2019-9193",
+    "matrix-2017-12615-2018-16509-2019-9193",
+    "matrix-2022-41678-2024-27348-2015-1427",
+    "matrix-2017-17562-2017-12615-2015-1427",
+    "matrix-2019-0193-2019-17558-2019-9193",
+    "matrix-2022-24816-2021-42013-2019-9193",
+    "matrix-2017-17562-2017-15715-2014-3120",
+    "matrix-2022-41678-2021-32682-2014-3120",
+    "matrix-2017-12615-2025-68613-2014-3120",
+    "matrix-2022-41678-2022-24816-2019-9193",
+    "matrix-2019-0193-2022-22965-2014-3120",
+    "matrix-2022-41678-2022-22965-2019-9193",
+    "matrix-2025-55182-2022-24816-2014-3120",
+    "matrix-2017-17562-2022-22965-2015-1427",
+    "matrix-2017-12615-2024-38856-2019-9193"
+  ],
+  "cases": [
+    {
+      "id": "matrix-2018-16509-2012-1823-2015-1427",
+      "cves": [
+        "CVE-2018-16509",
+        "CVE-2012-1823",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2018-16509",
+        "app-service": "CVE-2012-1823",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2024-9264-2021-42013-2019-9193",
+      "cves": [
+        "CVE-2024-9264",
+        "CVE-2021-42013",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2024-9264",
+        "app-service": "CVE-2021-42013",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2016-3088-2018-16509-2019-9193",
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2018-16509",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2016-3088",
+        "app-service": "CVE-2018-16509",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2018-16509-2021-42013-2019-9193",
+      "cves": [
+        "CVE-2018-16509",
+        "CVE-2021-42013",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2018-16509",
+        "app-service": "CVE-2021-42013",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2021-42013-2012-1823-2015-1427",
+      "cves": [
+        "CVE-2021-42013",
+        "CVE-2012-1823",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2021-42013",
+        "app-service": "CVE-2012-1823",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2012-1823-2019-0193-2014-3120",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2019-0193",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2012-1823",
+        "app-service": "CVE-2019-0193",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2012-1823-2021-42013-2014-3120",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2021-42013",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2012-1823",
+        "app-service": "CVE-2021-42013",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2024-27348-2019-17558-2014-3120",
+      "cves": [
+        "CVE-2024-27348",
+        "CVE-2019-17558",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2024-27348",
+        "app-service": "CVE-2019-17558",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2018-19475-2024-27348-2019-9193",
+      "cves": [
+        "CVE-2018-19475",
+        "CVE-2024-27348",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2018-19475",
+        "app-service": "CVE-2024-27348",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2012-1823-2024-27348-2014-3120",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2024-27348",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2012-1823",
+        "app-service": "CVE-2024-27348",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2019-17558-2024-38856-2015-1427",
+      "cves": [
+        "CVE-2019-17558",
+        "CVE-2024-38856",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2019-17558",
+        "app-service": "CVE-2024-38856",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2012-1823-2025-55182-2019-9193",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2025-55182",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2012-1823",
+        "app-service": "CVE-2025-55182",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2024-27348-2025-68613-2015-1427",
+      "cves": [
+        "CVE-2024-27348",
+        "CVE-2025-68613",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2024-27348",
+        "app-service": "CVE-2025-68613",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2018-16509-2018-19475-2015-1427",
+      "cves": [
+        "CVE-2018-16509",
+        "CVE-2018-19475",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2018-16509",
+        "app-service": "CVE-2018-19475",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2012-1823-2022-24816-2015-1427",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-24816",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2012-1823",
+        "app-service": "CVE-2022-24816",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2016-3088-2018-19475-2019-9193",
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2018-19475",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2016-3088",
+        "app-service": "CVE-2018-19475",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2021-42013-2025-55182-2014-3120",
+      "cves": [
+        "CVE-2021-42013",
+        "CVE-2025-55182",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2021-42013",
+        "app-service": "CVE-2025-55182",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2021-42013-2022-24816-2015-1427",
+      "cves": [
+        "CVE-2021-42013",
+        "CVE-2022-24816",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2021-42013",
+        "app-service": "CVE-2022-24816",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2017-11610-2019-0193-2019-9193",
+      "cves": [
+        "CVE-2017-11610",
+        "CVE-2019-0193",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-11610",
+        "app-service": "CVE-2019-0193",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2022-22965-2012-1823-2015-1427",
+      "cves": [
+        "CVE-2022-22965",
+        "CVE-2012-1823",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2022-22965",
+        "app-service": "CVE-2012-1823",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2017-11610-2021-42013-2019-9193",
+      "cves": [
+        "CVE-2017-11610",
+        "CVE-2021-42013",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-11610",
+        "app-service": "CVE-2021-42013",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2024-38856-2023-51467-2014-3120",
+      "cves": [
+        "CVE-2024-38856",
+        "CVE-2023-51467",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2024-38856",
+        "app-service": "CVE-2023-51467",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2023-51467-2019-17558-2014-3120",
+      "cves": [
+        "CVE-2023-51467",
+        "CVE-2019-17558",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2023-51467",
+        "app-service": "CVE-2019-17558",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2017-11610-2019-0193-2014-3120",
+      "cves": [
+        "CVE-2017-11610",
+        "CVE-2019-0193",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-11610",
+        "app-service": "CVE-2019-0193",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2024-38856-2024-27348-2014-3120",
+      "cves": [
+        "CVE-2024-38856",
+        "CVE-2024-27348",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2024-38856",
+        "app-service": "CVE-2024-27348",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2021-32682-2012-1823-2015-1427",
+      "cves": [
+        "CVE-2021-32682",
+        "CVE-2012-1823",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2021-32682",
+        "app-service": "CVE-2012-1823",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2021-32682-2025-68613-2014-3120",
+      "cves": [
+        "CVE-2021-32682",
+        "CVE-2025-68613",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2021-32682",
+        "app-service": "CVE-2025-68613",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2025-68613-2017-17562-2019-9193",
+      "cves": [
+        "CVE-2025-68613",
+        "CVE-2017-17562",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2025-68613",
+        "app-service": "CVE-2017-17562",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2025-68613-2017-17562-2015-1427",
+      "cves": [
+        "CVE-2025-68613",
+        "CVE-2017-17562",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2025-68613",
+        "app-service": "CVE-2017-17562",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2024-38856-2025-55182-2019-9193",
+      "cves": [
+        "CVE-2024-38856",
+        "CVE-2025-55182",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2024-38856",
+        "app-service": "CVE-2025-55182",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2017-11610-2022-24816-2014-3120",
+      "cves": [
+        "CVE-2017-11610",
+        "CVE-2022-24816",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-11610",
+        "app-service": "CVE-2022-24816",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2024-38856-2025-55182-2014-3120",
+      "cves": [
+        "CVE-2024-38856",
+        "CVE-2025-55182",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2024-38856",
+        "app-service": "CVE-2025-55182",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2025-55182-2016-3088-2019-9193",
+      "cves": [
+        "CVE-2025-55182",
+        "CVE-2016-3088",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2025-55182",
+        "app-service": "CVE-2016-3088",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2022-24816-2019-0193-2019-9193",
+      "cves": [
+        "CVE-2022-24816",
+        "CVE-2019-0193",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2022-24816",
+        "app-service": "CVE-2019-0193",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2017-12615-2019-0193-2014-3120",
+      "cves": [
+        "CVE-2017-12615",
+        "CVE-2019-0193",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-12615",
+        "app-service": "CVE-2019-0193",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2017-17562-2024-27348-2019-9193",
+      "cves": [
+        "CVE-2017-17562",
+        "CVE-2024-27348",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-17562",
+        "app-service": "CVE-2024-27348",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2017-12615-2018-16509-2019-9193",
+      "cves": [
+        "CVE-2017-12615",
+        "CVE-2018-16509",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-12615",
+        "app-service": "CVE-2018-16509",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2022-41678-2024-27348-2015-1427",
+      "cves": [
+        "CVE-2022-41678",
+        "CVE-2024-27348",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2022-41678",
+        "app-service": "CVE-2024-27348",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2017-17562-2017-12615-2015-1427",
+      "cves": [
+        "CVE-2017-17562",
+        "CVE-2017-12615",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-17562",
+        "app-service": "CVE-2017-12615",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2019-0193-2019-17558-2019-9193",
+      "cves": [
+        "CVE-2019-0193",
+        "CVE-2019-17558",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2019-0193",
+        "app-service": "CVE-2019-17558",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2022-24816-2021-42013-2019-9193",
+      "cves": [
+        "CVE-2022-24816",
+        "CVE-2021-42013",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2022-24816",
+        "app-service": "CVE-2021-42013",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2017-17562-2017-15715-2014-3120",
+      "cves": [
+        "CVE-2017-17562",
+        "CVE-2017-15715",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-17562",
+        "app-service": "CVE-2017-15715",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2022-41678-2021-32682-2014-3120",
+      "cves": [
+        "CVE-2022-41678",
+        "CVE-2021-32682",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2022-41678",
+        "app-service": "CVE-2021-32682",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2017-12615-2025-68613-2014-3120",
+      "cves": [
+        "CVE-2017-12615",
+        "CVE-2025-68613",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-12615",
+        "app-service": "CVE-2025-68613",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2022-41678-2022-24816-2019-9193",
+      "cves": [
+        "CVE-2022-41678",
+        "CVE-2022-24816",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2022-41678",
+        "app-service": "CVE-2022-24816",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2019-0193-2022-22965-2014-3120",
+      "cves": [
+        "CVE-2019-0193",
+        "CVE-2022-22965",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2019-0193",
+        "app-service": "CVE-2022-22965",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2022-41678-2022-22965-2019-9193",
+      "cves": [
+        "CVE-2022-41678",
+        "CVE-2022-22965",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2022-41678",
+        "app-service": "CVE-2022-22965",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    },
+    {
+      "id": "matrix-2025-55182-2022-24816-2014-3120",
+      "cves": [
+        "CVE-2025-55182",
+        "CVE-2022-24816",
+        "CVE-2014-3120"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2025-55182",
+        "app-service": "CVE-2022-24816",
+        "data-store": "CVE-2014-3120"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2017-17562-2022-22965-2015-1427",
+      "cves": [
+        "CVE-2017-17562",
+        "CVE-2022-22965",
+        "CVE-2015-1427"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-17562",
+        "app-service": "CVE-2022-22965",
+        "data-store": "CVE-2015-1427"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "elasticsearch"
+      }
+    },
+    {
+      "id": "matrix-2017-12615-2024-38856-2019-9193",
+      "cves": [
+        "CVE-2017-12615",
+        "CVE-2024-38856",
+        "CVE-2019-9193"
+      ],
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "slot_atoms": {
+        "dmz-web": "CVE-2017-12615",
+        "app-service": "CVE-2024-38856",
+        "data-store": "CVE-2019-9193"
+      },
+      "service_families": {
+        "dmz-web": "unknown",
+        "app-service": "unknown",
+        "data-store": "postgresql"
+      }
+    }
+  ],
+  "agent": {
+    "context": "l2",
+    "runner": "openai",
+    "model_id": "",
+    "base_url_label": "configured-env",
+    "max_turns": 80,
+    "agent_timeout": 1800
+  },
+  "execution": {
+    "environment_only": true,
+    "parallel": 1,
+    "case_timeout": 0,
+    "noise_level": "none"
+  },
+  "parent_qualification_run": "",
+  "paths": {
+    "run_dir": "/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/qual-stratified50-l2-openai-20260726",
+    "batch_output_dir": "/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/qual-stratified50-l2-openai-20260726/batch",
+    "case_index": "/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/qual-stratified50-l2-openai-20260726/case_index.json"
+  },
+  "batch_command": [
+    "/home/jiandong/workspace/oslab/sysarmor/CVELab/.venv/bin/python3",
+    "/home/jiandong/workspace/oslab/sysarmor/CVELab/scripts/verify_enterprise3_guided_batch.py",
+    "--case-manifest",
+    "/home/jiandong/workspace/oslab/sysarmor/CVELab/data/stratified_50_ranges.json",
+    "--max-cases",
+    "50",
+    "--offset",
+    "0",
+    "--output",
+    "data/experiments/stratified-50/runs/qual-stratified50-l2-openai-20260726/batch",
+    "--agent-context",
+    "l2",
+    "--agent-runner",
+    "openai",
+    "--parallel",
+    "1",
+    "--max-turns",
+    "80",
+    "--agent-timeout",
+    "1800",
+    "--noise-level",
+    "none",
+    "--environment-only"
+  ]
+}
