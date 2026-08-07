@@ -31,7 +31,10 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 # In the attacker container this file is /opt/scenario_runner.py and the
@@ -47,6 +50,7 @@ try:
         SYSTEM_PROMPT,
         NO_HINT_SYSTEM_PROMPT,
         build_prompt,
+        build_finalization_reminder,
         extract_json,
         extract_observed_progress,
         classify_termination,
@@ -58,6 +62,7 @@ except ImportError:
         SYSTEM_PROMPT,
         NO_HINT_SYSTEM_PROMPT,
         build_prompt,
+        build_finalization_reminder,
         extract_json,
         extract_observed_progress,
         classify_termination,
@@ -219,47 +224,6 @@ def _web_fetch(url: str, prompt: str = "") -> str:
         return f"[fetch error] {exc}"
 
 
-def _parse_tool_arguments(raw: Any) -> dict:
-    """Parse model-supplied tool arguments into a dict.
-
-    Some served models (e.g. Hermes tool-call parser over Qwen2.5-LoRA)
-    return the ``arguments`` field as a JSON-encoded string literal rather
-    than as a raw JSON object, or generate malformed JSON fragments. We
-    accept:
-
-      - a JSON object (normal case)
-      - a JSON string that itself encodes a JSON object (double-encoded)
-      - malformed JSON -> return an empty-ish dict with an error marker
-
-    Returning a dict keeps the ``TOOL_HANDLERS`` lambdas (which all call
-    ``args.get``) from crashing the runner on a bad model turn.
-    """
-    if not raw:
-        return {}
-    if isinstance(raw, dict):
-        return raw
-    if not isinstance(raw, str):
-        return {"__parse_error__": True, "__raw__": str(raw)}
-
-    # Try the direct JSON object first.
-    try:
-        parsed = json.loads(raw)
-        if isinstance(parsed, dict):
-            return parsed
-        # Double-encoded string: try to unwrap one level.
-        if isinstance(parsed, str):
-            try:
-                inner = json.loads(parsed)
-                if isinstance(inner, dict):
-                    return inner
-                return {"__parse_error__": True, "__raw__": raw, "__inner_type__": type(inner).__name__}
-            except json.JSONDecodeError:
-                return {"__parse_error__": True, "__raw__": raw}
-        return {"__parse_error__": True, "__raw__": raw, "__type__": type(parsed).__name__}
-    except json.JSONDecodeError:
-        return {"__parse_error__": True, "__raw__": raw}
-
-
 TOOL_HANDLERS = {
     "Bash": lambda args: _run_bash(args.get("command", ""), int(args.get("timeout", 120) or 120)),
     "Read": lambda args: _read_file(args.get("path", "")),
@@ -269,75 +233,72 @@ TOOL_HANDLERS = {
 }
 
 
-class QuotaExhaustedError(Exception):
-    """Fatal: API quota/balance exhausted. Stops the whole batch."""
+def _to_namespace(value: Any) -> Any:
+    if isinstance(value, dict):
+        return SimpleNamespace(**{k: _to_namespace(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return [_to_namespace(v) for v in value]
+    return value
 
 
-class RateLimitPersistentError(Exception):
-    """Persistent rate limiting after exhausting retries. Pauses this case."""
+class _StdlibOpenAICompletions:
+    def __init__(self, api_key: str, base_url: str | None):
+        self.api_key = api_key
+        self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
+
+    def create(self, **payload):
+        url = f"{self.base_url}/chat/completions"
+        body = json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "Accept": "text/event-stream",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response:
+                content_type = response.headers.get("Content-Type", "")
+                if "text/event-stream" not in content_type:
+                    raw = response.read().decode("utf-8", errors="replace")
+                    data = json.loads(raw)
+                    return [_to_namespace(data)]
+
+                chunks = []
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line or line.startswith(":"):
+                        continue
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if data == "[DONE]":
+                        break
+                    chunks.append(_to_namespace(json.loads(data)))
+                return chunks
+        except urllib.error.HTTPError as exc:
+            error_body = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"OpenAI-compatible API HTTP {exc.code}: {error_body}") from exc
 
 
-# Substrings (lowercased) that indicate a fatal quota/balance exhaustion,
-# regardless of HTTP status code. Gateways wrap quota errors in many shapes
-# (402, 403, 400, 500), so text matching is required alongside status codes.
-_FATAL_MARKERS = (
-    "quota", "balance", "insufficient", "insufficient_quota",
-    "billing", "payment", "credit", "exhausted", "no enough balance",
-    "额度", "余额不足", "欠费", "套餐用尽",
-)
-
-# Substrings that indicate a rate-limit / concurrency-cap error (transient
-# but potentially persistent): retry with backoff, and if it keeps failing,
-# pause this case so other cases can progress.
-_RATE_LIMIT_MARKERS = (
-    "overloaded", "rate_limit", "rate limit", "429",
-    "too many requests", "concurrent", "concurrency", "throttl",
-    "请求过多", "并发",
-)
+class _StdlibOpenAIClient:
+    def __init__(self, api_key: str, base_url: str | None):
+        self.chat = SimpleNamespace(
+            completions=_StdlibOpenAICompletions(api_key=api_key, base_url=base_url)
+        )
 
 
-def _classify_api_error(exc: Exception) -> str:
-    """Return 'fatal' | 'rate_limit' | 'transient' | 'other' for an API error.
-
-    Order matters: fatal must win over rate_limit, because some gateways wrap
-    a quota-exhaustion body in a 429/5xx status. We read status_code via
-    getattr unconditionally (gateway errors are often plain Exceptions with a
-    status_code attribute, not openai.APIError subclasses), then check the
-    SDK exception type, then fall back to message text.
-    """
-    from openai import RateLimitError, APIConnectionError
-
-    msg = str(exc).lower()
-    # getattr (not isinstance) so gateway-wrapped plain Exceptions carrying a
-    # status_code attribute are classified the same as SDK errors.
-    raw_status = getattr(exc, "status_code", 0) or 0
+def _make_completion_client(api_key: str, base_url: str | None):
     try:
-        status = int(raw_status)
-    except (TypeError, ValueError):
-        status = 0
-
-    # 1. Fatal by text marker (highest priority — gateways wrap quota in anything)
-    if any(m in msg for m in _FATAL_MARKERS):
-        return "fatal"
-    # 2. Fatal by status code (auth/billing errors cannot recover in a batch)
-    if status in (401, 402, 403):
-        return "fatal"
-
-    # 3. Rate-limit by text marker
-    if any(m in msg for m in _RATE_LIMIT_MARKERS):
-        return "rate_limit"
-    # 4. Rate-limit by SDK type / status
-    if isinstance(exc, RateLimitError) or status == 429:
-        return "rate_limit"
-
-    # 5. Transient server errors (5xx) and connection-layer failures (DNS/TCP/
-    # TLS handshake, gateway not ready) — retry, not fatal/rate_limit.
-    if status >= 500:
-        return "transient"
-    if isinstance(exc, APIConnectionError):
-        return "transient"
-
-    return "other"
+        import openai
+    except ModuleNotFoundError as exc:
+        if exc.name == "openai" or "openai" in str(exc):
+            return _StdlibOpenAIClient(api_key=api_key, base_url=base_url)
+        raise
+    return openai.OpenAI(api_key=api_key, base_url=base_url or None)
 
 
 def _stream_completion(client, model: str, messages: list, max_tokens: int):
@@ -345,90 +306,49 @@ def _stream_completion(client, model: str, messages: list, max_tokens: int):
 
     Some gateways (e.g. GLM-5.2) only return tool_calls in streaming
     responses, so we always stream and aggregate.
-
-    API errors are classified into three buckets (see _classify_api_error):
-      - fatal (quota/balance exhausted): raises QuotaExhaustedError
-        immediately, no retry. The coordinator must stop the whole batch.
-      - rate_limit (429/overloaded/concurrency): retries with exponential
-        backoff up to MAX_RETRIES; if still failing, raises
-        RateLimitPersistentError. The coordinator pauses this case and
-        retries it after the other cases finish.
-      - transient (5xx): same retry as rate_limit, but on final failure
-        raises the original error (treated as a normal agent failure).
-
-    Retries do not consume the turn budget. See WORK_PROGRESS_REPORT
-    2026-07-24 '429 retry' and 2026-07-25 'API error triage'.
     """
-    import time
-
-    MAX_RETRIES = 5
-    # Temperature: default 0 for deterministic, reproducible output (control
-    # variable for ablation/model comparison). Reasoning models (kimi-k3,
-    # GLM, etc.) reject temperature=0 with 'only 1 is allowed'; allow override
-    # via LLM_TEMPERATURE env var so those models can be used without code
-    # changes. See WORK_PROGRESS_REPORT 2026-07-24 'kimi temperature' analysis.
-    temperature = float(os.environ.get("LLM_TEMPERATURE", "0"))
-
-    for attempt in range(MAX_RETRIES):
-        try:
-            resp = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                tools=TOOLS,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                stream=True,
-            )
-            content_parts: list[str] = []
-            tc_buf: dict[int, dict[str, str]] = {}
-            for chunk in resp:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                if delta is None:
-                    continue
-                if delta.content:
-                    content_parts.append(delta.content)
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        idx = tc.index
-                        if idx not in tc_buf:
-                            tc_buf[idx] = {"id": tc.id or f"call_{idx}", "name": "", "arguments": ""}
-                        if tc.id:
-                            tc_buf[idx]["id"] = tc.id
-                        if tc.function and tc.function.name:
-                            tc_buf[idx]["name"] = tc.function.name
-                        if tc.function and tc.function.arguments:
-                            tc_buf[idx]["arguments"] += tc.function.arguments
-            content = "".join(content_parts)
-            tool_calls = [tc_buf[i] for i in sorted(tc_buf.keys())]
-            return content, tool_calls
-        except QuotaExhaustedError:
-            raise
-        except Exception as exc:  # noqa: BLE001
-            cls = _classify_api_error(exc)
-            # Fatal: never retry — escalate immediately so the coordinator
-            # can stop the whole batch and save remaining quota.
-            if cls == "fatal":
-                print(f"[Fatal] API quota/balance exhausted, stopping: {str(exc)[:160]}", file=sys.stderr)
-                raise QuotaExhaustedError(str(exc)) from exc
-            # rate_limit / transient: retry with exponential backoff.
-            if cls in ("rate_limit", "transient") and attempt < MAX_RETRIES - 1:
-                wait = 2 ** attempt  # 1, 2, 4, 8, 16s
-                print(f"[Warn] {cls} API error (attempt {attempt+1}/{MAX_RETRIES}), retrying in {wait}s: {str(exc)[:120]}", file=sys.stderr)
-                time.sleep(wait)
-                continue
-            # Final attempt or unclassified error.
-            if cls == "rate_limit":
-                print(f"[Warn] rate-limit persistent after {MAX_RETRIES} attempts, pausing case: {str(exc)[:120]}", file=sys.stderr)
-                raise RateLimitPersistentError(str(exc)) from exc
-            raise
+    resp = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        tools=TOOLS,
+        max_tokens=max_tokens,
+        temperature=0,
+        stream=True,
+    )
+    content_parts: list[str] = []
+    tc_buf: dict[int, dict[str, str]] = {}
+    for chunk in resp:
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        if delta is None:
+            continue
+        content_delta = getattr(delta, "content", None)
+        if content_delta:
+            content_parts.append(content_delta)
+        tool_call_delta = getattr(delta, "tool_calls", None)
+        if tool_call_delta:
+            for tc in tool_call_delta:
+                idx = getattr(tc, "index", 0)
+                tc_id = getattr(tc, "id", None)
+                function = getattr(tc, "function", None)
+                function_name = getattr(function, "name", None) if function else None
+                function_arguments = getattr(function, "arguments", None) if function else None
+                if idx not in tc_buf:
+                    tc_buf[idx] = {"id": tc_id or f"call_{idx}", "name": "", "arguments": ""}
+                if tc_id:
+                    tc_buf[idx]["id"] = tc_id
+                if function_name:
+                    tc_buf[idx]["name"] = function_name
+                if function_arguments:
+                    tc_buf[idx]["arguments"] += function_arguments
+    content = "".join(content_parts)
+    tool_calls = [tc_buf[i] for i in sorted(tc_buf.keys())]
+    return content, tool_calls
 
 
 def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TURNS):
     """OpenAI-protocol Range agent main loop."""
-    import openai
-
     with open(input_path) as f:
         input_data = json.load(f)
 
@@ -447,7 +367,7 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
         print("[Error] no API key found", file=sys.stderr)
         return
 
-    client = openai.OpenAI(api_key=api_key, base_url=base_url or None)
+    client = _make_completion_client(api_key=api_key, base_url=base_url or None)
     max_tokens = int(os.environ.get("MAX_TOKENS", "16000"))
 
     messages = [
@@ -484,13 +404,26 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
     full_text = ""
     session_events: list[dict] = []
     termination_hint = ""
-    # Set by the fatal/rate-limit except handlers to override the
-    # classify_termination() result, so the specific API error class is not
-    # erased by the generic termination classifier.
-    termination_override = ""
+    finalization_reminder_sent = False
+    finalization_turn = max(0, max_turns - 4)
 
     try:
         for turn in range(max_turns):
+            if (
+                not finalization_reminder_sent
+                and turn >= finalization_turn
+                and not extract_json(full_text)
+            ):
+                reminder = build_finalization_reminder(input_data)
+                messages.append({"role": "user", "content": reminder})
+                session_events.append({
+                    "type": "user",
+                    "message": {"role": "user", "content": reminder},
+                    "turn": turn,
+                })
+                print("[Reminder] final structured JSON requested", file=sys.stderr)
+                finalization_reminder_sent = True
+
             content, tool_calls = _stream_completion(client, model, messages, max_tokens)
             if content:
                 full_text += content + "\n"
@@ -514,30 +447,20 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
 
             for tc in tool_calls:
                 name = tc["name"]
-                args = _parse_tool_arguments(tc["arguments"])
+                try:
+                    args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                except json.JSONDecodeError:
+                    args = {}
                 print(f"[Tool] {name}: {json.dumps(args)[:120]}", file=sys.stderr)
                 handler = TOOL_HANDLERS.get(name)
                 tool_result = handler(args) if handler else f"[unknown tool] {name}"
                 messages.append({"role": "tool", "tool_call_id": tc["id"], "content": tool_result})
-                session_events.append({"type": "tool", "message": {"role": "tool", "name": name, "args": args, "result": tool_result}, "turn": turn})
+                session_events.append({"type": "tool", "message": {"role": "tool", "name": name, "args": args, "result": tool_result[:500]}, "turn": turn})
                 print(f"[ToolResult] {tool_result[:160]}", file=sys.stderr)
         else:
             termination_hint = f"Agent reached max-turns ({max_turns}) without a final report"
             result["evidence"].append(termination_hint)
 
-    except QuotaExhaustedError as exc:
-        # Fatal: signal the coordinator to stop the whole batch.
-        print(f"[Fatal] quota exhausted, signaling batch stop: {exc}", file=sys.stderr)
-        result["evidence"].append(f"API quota exhausted: {exc}")
-        termination_override = "quota_exhausted"
-        result["api_error_class"] = "quota_exhausted"
-    except RateLimitPersistentError as exc:
-        # Persistent rate limit: signal the coordinator to pause this case
-        # (don't count as failure, retry at end of batch).
-        print(f"[Warn] rate-limit persistent, signaling case pause: {exc}", file=sys.stderr)
-        result["evidence"].append(f"API rate-limit persistent: {exc}")
-        termination_override = "rate_limit_persistent"
-        result["api_error_class"] = "rate_limit_persistent"
     except Exception as exc:  # noqa: BLE001
         print(f"[Error] {exc}", file=sys.stderr)
         result["evidence"].append(f"Agent error: {exc}")
@@ -552,14 +475,11 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
     result["partial_result"] = partial_result
     result["structured_result"] = bool(extracted)
     result["observed_progress"] = extract_observed_progress(full_text, input_data.get("targets", []))
-    if termination_override:
-        result["termination_reason"] = termination_override
-    else:
-        result["termination_reason"] = classify_termination(
-            f"{termination_hint}\n{full_text}\n{result.get('evidence', [])}",
-            structured_result=bool(extracted),
-            partial_result=partial_result,
-        )
+    result["termination_reason"] = classify_termination(
+        f"{termination_hint}\n{full_text}\n{result.get('evidence', [])}",
+        structured_result=bool(extracted),
+        partial_result=partial_result,
+    )
 
     with open(output_path, "w") as f:
         json.dump(result, f, indent=2, ensure_ascii=False)

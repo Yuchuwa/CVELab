@@ -1,0 +1,1611 @@
+{
+  "description": "Expected generic SysArmor GT signals for Stratified-50 case1-50 L2 runs. Labels are behavior-based and avoid product, CVE-specific rule IDs, fixed paths, flag paths, lab-private directories, IPs, and ports.",
+  "label_policy": {
+    "case1_10": "Inherited unchanged from expected-signals-case1-10.json.",
+    "case11_50": "Tailored by each case CVE atom/exploit-guide behavior; case-level expected_rule_ids is the union of target-level labels.",
+    "evaluation": "Current exporter evaluates case-level expected_rule_ids; expected_rule_ids_by_target is for later per-target GT analysis.",
+    "download_by_lolbin": "Only used when already validated or clearly required by target-side LOLBin download behavior; not broadly inferred for case11-50."
+  },
+  "rationale_codebook": {
+    "cmd_exec_or_script_eval": "RCE/webshell/sandbox/script-evaluation atom should produce command or interpreter execution in target workload.",
+    "target_side_network_client": "Three-tier post-exploitation/lateral access should produce target workload network-client behavior.",
+    "exec_tool_network_sequence": "Atom guide or command-channel style can reasonably lead a shell/interpreter/webshell/raw payload to open downstream network connections."
+  },
+  "cve_profiles": {
+    "CVE-2012-1823": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2014-3120": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2015-1427": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2016-3088": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2017-11610": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2017-12615": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2017-15715": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2017-17562": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2018-16509": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2018-19475": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2019-0193": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2019-17558": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    },
+    "CVE-2019-9193": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    },
+    "CVE-2021-32682": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2021-42013": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    },
+    "CVE-2022-22965": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2022-24816": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    },
+    "CVE-2022-41678": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client",
+        "exec_tool_network_sequence"
+      ]
+    },
+    "CVE-2023-51467": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    },
+    "CVE-2024-27348": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    },
+    "CVE-2024-38856": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    },
+    "CVE-2024-9264": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    },
+    "CVE-2025-55182": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    },
+    "CVE-2025-68613": {
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "rationale_codes": [
+        "cmd_exec_or_script_eval",
+        "target_side_network_client"
+      ]
+    }
+  },
+  "cases": {
+    "matrix-2018-16509-2012-1823-2015-1427": {
+      "case_no": 1,
+      "cves": [
+        "CVE-2018-16509",
+        "CVE-2012-1823",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2024-9264-2021-42013-2019-9193": {
+      "case_no": 2,
+      "cves": [
+        "CVE-2024-9264",
+        "CVE-2021-42013",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2016-3088-2018-16509-2019-9193": {
+      "case_no": 3,
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2018-16509",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2018-16509-2021-42013-2019-9193": {
+      "case_no": 4,
+      "cves": [
+        "CVE-2018-16509",
+        "CVE-2021-42013",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2021-42013-2012-1823-2015-1427": {
+      "case_no": 5,
+      "cves": [
+        "CVE-2021-42013",
+        "CVE-2012-1823",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2012-1823-2019-0193-2014-3120": {
+      "case_no": 6,
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2019-0193",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2012-1823-2021-42013-2014-3120": {
+      "case_no": 7,
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2021-42013",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2024-27348-2019-17558-2014-3120": {
+      "case_no": 8,
+      "cves": [
+        "CVE-2024-27348",
+        "CVE-2019-17558",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2018-19475-2024-27348-2019-9193": {
+      "case_no": 9,
+      "cves": [
+        "CVE-2018-19475",
+        "CVE-2024-27348",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2012-1823-2024-27348-2014-3120": {
+      "case_no": 10,
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2024-27348",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection",
+        "download_by_lolbin"
+      ],
+      "label_source": "inherited_case1_10"
+    },
+    "matrix-2019-17558-2024-38856-2015-1427": {
+      "case_no": 11,
+      "cves": [
+        "CVE-2019-17558",
+        "CVE-2024-38856",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2012-1823-2025-55182-2019-9193": {
+      "case_no": 12,
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2025-55182",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2024-27348-2025-68613-2015-1427": {
+      "case_no": 13,
+      "cves": [
+        "CVE-2024-27348",
+        "CVE-2025-68613",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2018-16509-2018-19475-2015-1427": {
+      "case_no": 14,
+      "cves": [
+        "CVE-2018-16509",
+        "CVE-2018-19475",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2012-1823-2022-24816-2015-1427": {
+      "case_no": 15,
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-24816",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2016-3088-2018-19475-2019-9193": {
+      "case_no": 16,
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2018-19475",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2021-42013-2025-55182-2014-3120": {
+      "case_no": 17,
+      "cves": [
+        "CVE-2021-42013",
+        "CVE-2025-55182",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2021-42013-2022-24816-2015-1427": {
+      "case_no": 18,
+      "cves": [
+        "CVE-2021-42013",
+        "CVE-2022-24816",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-11610-2019-0193-2019-9193": {
+      "case_no": 19,
+      "cves": [
+        "CVE-2017-11610",
+        "CVE-2019-0193",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2022-22965-2012-1823-2015-1427": {
+      "case_no": 20,
+      "cves": [
+        "CVE-2022-22965",
+        "CVE-2012-1823",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-11610-2021-42013-2019-9193": {
+      "case_no": 21,
+      "cves": [
+        "CVE-2017-11610",
+        "CVE-2021-42013",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2024-38856-2023-51467-2014-3120": {
+      "case_no": 22,
+      "cves": [
+        "CVE-2024-38856",
+        "CVE-2023-51467",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2023-51467-2019-17558-2014-3120": {
+      "case_no": 23,
+      "cves": [
+        "CVE-2023-51467",
+        "CVE-2019-17558",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-11610-2019-0193-2014-3120": {
+      "case_no": 24,
+      "cves": [
+        "CVE-2017-11610",
+        "CVE-2019-0193",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2024-38856-2024-27348-2014-3120": {
+      "case_no": 25,
+      "cves": [
+        "CVE-2024-38856",
+        "CVE-2024-27348",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2021-32682-2012-1823-2015-1427": {
+      "case_no": 26,
+      "cves": [
+        "CVE-2021-32682",
+        "CVE-2012-1823",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2021-32682-2025-68613-2014-3120": {
+      "case_no": 27,
+      "cves": [
+        "CVE-2021-32682",
+        "CVE-2025-68613",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2025-68613-2017-17562-2019-9193": {
+      "case_no": 28,
+      "cves": [
+        "CVE-2025-68613",
+        "CVE-2017-17562",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2025-68613-2017-17562-2015-1427": {
+      "case_no": 29,
+      "cves": [
+        "CVE-2025-68613",
+        "CVE-2017-17562",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2024-38856-2025-55182-2019-9193": {
+      "case_no": 30,
+      "cves": [
+        "CVE-2024-38856",
+        "CVE-2025-55182",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-11610-2022-24816-2014-3120": {
+      "case_no": 31,
+      "cves": [
+        "CVE-2017-11610",
+        "CVE-2022-24816",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2024-38856-2025-55182-2014-3120": {
+      "case_no": 32,
+      "cves": [
+        "CVE-2024-38856",
+        "CVE-2025-55182",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2025-55182-2016-3088-2019-9193": {
+      "case_no": 33,
+      "cves": [
+        "CVE-2025-55182",
+        "CVE-2016-3088",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2022-24816-2019-0193-2019-9193": {
+      "case_no": 34,
+      "cves": [
+        "CVE-2022-24816",
+        "CVE-2019-0193",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-12615-2019-0193-2014-3120": {
+      "case_no": 35,
+      "cves": [
+        "CVE-2017-12615",
+        "CVE-2019-0193",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-17562-2024-27348-2019-9193": {
+      "case_no": 36,
+      "cves": [
+        "CVE-2017-17562",
+        "CVE-2024-27348",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-12615-2018-16509-2019-9193": {
+      "case_no": 37,
+      "cves": [
+        "CVE-2017-12615",
+        "CVE-2018-16509",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2022-41678-2024-27348-2015-1427": {
+      "case_no": 38,
+      "cves": [
+        "CVE-2022-41678",
+        "CVE-2024-27348",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-17562-2017-12615-2015-1427": {
+      "case_no": 39,
+      "cves": [
+        "CVE-2017-17562",
+        "CVE-2017-12615",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2019-0193-2019-17558-2019-9193": {
+      "case_no": 40,
+      "cves": [
+        "CVE-2019-0193",
+        "CVE-2019-17558",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2022-24816-2021-42013-2019-9193": {
+      "case_no": 41,
+      "cves": [
+        "CVE-2022-24816",
+        "CVE-2021-42013",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-17562-2017-15715-2014-3120": {
+      "case_no": 42,
+      "cves": [
+        "CVE-2017-17562",
+        "CVE-2017-15715",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2022-41678-2021-32682-2014-3120": {
+      "case_no": 43,
+      "cves": [
+        "CVE-2022-41678",
+        "CVE-2021-32682",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-12615-2025-68613-2014-3120": {
+      "case_no": 44,
+      "cves": [
+        "CVE-2017-12615",
+        "CVE-2025-68613",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2022-41678-2022-24816-2019-9193": {
+      "case_no": 45,
+      "cves": [
+        "CVE-2022-41678",
+        "CVE-2022-24816",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2019-0193-2022-22965-2014-3120": {
+      "case_no": 46,
+      "cves": [
+        "CVE-2019-0193",
+        "CVE-2022-22965",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2022-41678-2022-22965-2019-9193": {
+      "case_no": 47,
+      "cves": [
+        "CVE-2022-41678",
+        "CVE-2022-22965",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2025-55182-2022-24816-2014-3120": {
+      "case_no": 48,
+      "cves": [
+        "CVE-2025-55182",
+        "CVE-2022-24816",
+        "CVE-2014-3120"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-17562-2022-22965-2015-1427": {
+      "case_no": 49,
+      "cves": [
+        "CVE-2017-17562",
+        "CVE-2022-22965",
+        "CVE-2015-1427"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    },
+    "matrix-2017-12615-2024-38856-2019-9193": {
+      "case_no": 50,
+      "cves": [
+        "CVE-2017-12615",
+        "CVE-2024-38856",
+        "CVE-2019-9193"
+      ],
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ],
+      "expected_rule_ids_by_target": {
+        "target-1": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload",
+          "execution_tool_opens_network_connection"
+        ],
+        "target-2": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ],
+        "target-3": [
+          "workload_executes_shell_or_interpreter",
+          "network_client_used_in_workload"
+        ]
+      },
+      "label_source": "tailored_cve_atom_profiles"
+    }
+  }
+}

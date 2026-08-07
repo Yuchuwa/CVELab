@@ -1,0 +1,27 @@
+{
+  "api_version": "sysarmor.content/v1",
+  "kind": "contextset",
+  "metadata": {
+    "id": "ctx:cvelab-execution-tools",
+    "version": "v1"
+  },
+  "spec": {
+    "value_type": "process_binary_name",
+    "values": [
+      "ash",
+      "bash",
+      "busybox",
+      "dash",
+      "ksh",
+      "lua",
+      "node",
+      "perl",
+      "php",
+      "python",
+      "python3",
+      "ruby",
+      "sh",
+      "zsh"
+    ]
+  }
+}

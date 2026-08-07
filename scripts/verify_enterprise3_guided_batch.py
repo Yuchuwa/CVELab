@@ -46,6 +46,7 @@ except ImportError:  # The caller may provide all settings through the environme
     load_dotenv = None
 
 from clab_builder.orchestrator.composer.scenario import ScenarioPipeline
+from clab_builder.orchestrator.composer.sysfield_exporter import SysFieldExporter
 from clab_builder.orchestrator.composer.verifier import ScenarioVerifier
 from clab_builder.shared.models.artifact_contracts import (
     load_scenario_manifest,
@@ -201,12 +202,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--templates-dir", default="templates")
     parser.add_argument("--atoms-dir", default="data/atoms")
-    parser.add_argument("--max-turns", type=int, default=80)
+    parser.add_argument("--max-turns", type=int, default=300)
     parser.add_argument(
         "--agent-timeout",
         type=int,
-        default=1800,
-        help="Maximum seconds for one Agent subprocess (default: 1800).",
+        default=3600,
+        help="Maximum seconds for one Agent subprocess (default: 3600).",
     )
     parser.add_argument(
         "--strict-guide-compatibility",
@@ -267,6 +268,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--noise-level", default="none",
         help="Noise level key from the template's noise_levels (none/baseline). "
              "Inserts benign decoy nodes into zone LANs; orthogonal to --agent-context.",
+    )
+    parser.add_argument(
+        "--sysarmor",
+        action="store_true",
+        help="Patch target nodes and install the pinned SysArmor rc.5 runtime before attack evaluation.",
+    )
+    parser.add_argument(
+        "--sysarmor-detection",
+        action="store_true",
+        help="When --sysarmor is enabled, run the deterministic reference attack and record Signal count delta.",
+    )
+    parser.add_argument(
+        "--sysarmor-signal-window",
+        type=int,
+        default=30,
+        help="Seconds to wait after the reference attack before reading recent SysArmor Signals.",
     )
     parser.add_argument("--worker-spec", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     return parser.parse_args(argv)
@@ -374,6 +391,7 @@ def summarize(case: dict[str, object], scenario_dir: Path, result: dict) -> dict
         "agent_partial_result": bool(agent_result.get("partial_result", False)),
         "observed_progress": agent_result.get("observed_progress", {}),
         "decoy_interactions": result.get("decoy_interactions", {}),
+        "sysarmor": result.get("sysarmor", {}),
         "error": result.get("error", ""),
     }
 
@@ -410,6 +428,9 @@ def _digest_inputs(selected: list[dict[str, object]], args: argparse.Namespace) 
         "noise_level": str(getattr(args, "noise_level", "none")),
         "agent_runner": args.agent_runner,
         "model": args.model,
+        "sysarmor": bool(getattr(args, "sysarmor", False)),
+        "sysarmor_detection": bool(getattr(args, "sysarmor_detection", False)),
+        "sysarmor_signal_window": int(getattr(args, "sysarmor_signal_window", 30)),
     }, sort_keys=True).encode())
     paths = [ROOT / "templates" / "enterprise_3tier" / "template.yaml", Path(__file__),
              ROOT / "src/clab_builder/orchestrator/composer/verifier.py",
@@ -515,6 +536,13 @@ def release_control_lease(lease: dict[str, Any] | None) -> None:
                        capture_output=True, text=True, stdin=subprocess.DEVNULL)
 
 
+def _runner_base_url(agent_runner: str, base_url: str) -> str:
+    value = str(base_url or "").rstrip("/")
+    if agent_runner == "openai" and value.endswith("/anthropic"):
+        return value[: -len("/anthropic")]
+    return base_url
+
+
 def scenario_reserved_subnets(scenario_dir: Path) -> list[str]:
     try:
         import yaml
@@ -575,6 +603,7 @@ def run_worker(spec_path: Path) -> int:
                 },
                 agent_context=str(spec.get("agent_context", "guided")),
                 agent_runner=str(spec.get("agent_runner", "claude")),
+                sysarmor=spec.get("sysarmor") or {},
             )
             # run_full writes final cleanup information in its ``finally``
             # block.  Reload it so the batch result records that durable
@@ -672,6 +701,7 @@ def _generate_cases(state: dict[str, Any], args: argparse.Namespace, output_dir:
         templates_dir=args.templates_dir, atoms_dir=args.atoms_dir,
         default_validation_mode="guided_agent",
     )
+    sysfield_exporter = SysFieldExporter(atoms_dir=args.atoms_dir)
     scenarios_root = output_dir / "scenarios"
     for case_id in state["selected_case_ids"]:
         item = state["cases"][case_id]
@@ -685,6 +715,8 @@ def _generate_cases(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 agent_context=str(getattr(args, "agent_context", "guided")),
                 noise_level=str(getattr(args, "noise_level", "none")),
             )
+            if bool(getattr(args, "sysarmor_detection", False)) and bool(getattr(args, "environment_only", False)):
+                sysfield_exporter.export(str(scenarios_root / item["lab_name"]))
             item["status"] = "generated"
             item["scenario_dir"] = str(scenarios_root / item["lab_name"])
         except Exception as exc:
@@ -752,6 +784,11 @@ def _worker_spec(state: dict[str, Any], case_state: dict[str, Any], args: argpar
         "noise_level": str(getattr(args, "noise_level", "none")),
         "agent_runner": str(getattr(args, "agent_runner", "claude")),
         "strict_guide_compatibility": args.strict_guide_compatibility,
+        "sysarmor": {
+            "enabled": bool(getattr(args, "sysarmor", False)),
+            "detection": bool(getattr(args, "sysarmor_detection", False)),
+            "signal_window": int(getattr(args, "sysarmor_signal_window", 30)),
+        },
         "mgmt_network": management, "control_network_lease": case_state.get("control_network_lease") or {},
         "ansible_paths": {
             "ANSIBLE_HOME": str(work_dir / "ansible-home"),
@@ -836,7 +873,7 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 if args.api_key:
                     worker_env["LLM_API_KEY"] = args.api_key
                 if args.base_url:
-                    worker_env["LLM_BASE_URL"] = args.base_url
+                    worker_env["LLM_BASE_URL"] = _runner_base_url(args.agent_runner, args.base_url)
                 if args.model:
                     worker_env["LLM_MODEL"] = args.model
                 worker_env["PYTHONUNBUFFERED"] = "1"
@@ -1020,6 +1057,9 @@ def main() -> int:
     if load_dotenv is not None:
         load_dotenv(ROOT / ".env")
         args.api_key = args.api_key or os.getenv("LLM_API_KEY", "")
+        args.base_url = args.base_url or os.getenv("LLM_BASE_URL", "")
+        args.model = args.model or os.getenv("LLM_MODEL", "")
+    args.base_url = _runner_base_url(args.agent_runner, args.base_url)
     try:
         validate_parallelism(args.parallel)
     except ValueError as exc:
@@ -1102,6 +1142,11 @@ def main() -> int:
                         "generated": True, "preflight": True, "success": True,
                         "agent_context": args.agent_context,
                         "noise_level": str(getattr(args, "noise_level", "none")),
+                        "sysarmor": {
+                            "enabled": bool(getattr(args, "sysarmor", False)),
+                            "detection": bool(getattr(args, "sysarmor_detection", False)),
+                            "signal_window": int(getattr(args, "sysarmor_signal_window", 30)),
+                        },
                         "execution_complete": True})
             _persist(output_dir, state)
             return 0

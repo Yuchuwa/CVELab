@@ -1,6 +1,8 @@
 """Tests for Scenario Verifier"""
 
 import json
+import builtins
+import importlib.util
 import subprocess
 from types import SimpleNamespace
 import pytest
@@ -542,6 +544,134 @@ class TestDifficultyLevels:
         assert "target_ip" not in obj
         assert "service_access" not in obj
         assert "agent_hint" not in obj
+
+    def test_claude_runner_uses_clab_agent_network_namespace(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: claude-runner\n")
+        verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"))
+        popen_commands = []
+
+        class FakeProcess:
+            returncode = 1
+            stderr = iter(())
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def kill(self):
+                self.returncode = -9
+
+        def fake_run(command, *args, **kwargs):
+            if command[:2] == ["docker", "cp"] and command[-1].endswith("scenario_runner.py"):
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[:2] == ["docker", "cp"] and command[-1].endswith("scenario_input.json"):
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[:3] == ["docker", "exec", "clab-claude-runner-attacker"]:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return subprocess.CompletedProcess(command, 1, "", "copy failed")
+
+        def fake_popen(command, *args, **kwargs):
+            popen_commands.append(command)
+            return FakeProcess()
+
+        with patch.object(verifier, "_load_scenario_guide", return_value=""), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=self._atom_with([])), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run", side_effect=fake_run), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.Popen", side_effect=fake_popen):
+            verifier._run_agent(
+                str(scenario_dir), self._ground_truth(), self._ip_alloc(),
+                api_key="test", agent_context="l2", agent_runner="claude",
+            )
+
+        assert popen_commands
+        command = popen_commands[0]
+        assert command[:2] == ["docker", "run"]
+        assert "--rm" in command
+        assert f"--network=container:clab-claude-runner-attacker" in command
+        assert "clab-agent:latest" in command
+        assert "-e" in command
+        assert "ANTHROPIC_API_KEY=test" in command
+        assert "ANTHROPIC_AUTH_TOKEN=test" in command
+
+    def test_guided_claude_runner_mounts_allowed_source_materials(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: claude-materials\n")
+        atoms_dir = tmp_path / "atoms"
+        for cve_id in ("CVE-A", "CVE-B", "CVE-C"):
+            bundle = atoms_dir / cve_id / "source_bundle"
+            bundle.mkdir(parents=True)
+            (bundle / "poc.png").write_text(f"{cve_id} material")
+        verifier = ScenarioVerifier(atoms_dir=str(atoms_dir))
+        popen_commands = []
+
+        class FakeProcess:
+            returncode = 1
+            stderr = iter(())
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def kill(self):
+                self.returncode = -9
+
+        def fake_popen(command, *args, **kwargs):
+            popen_commands.append(command)
+            return FakeProcess()
+
+        with patch.object(verifier, "_load_scenario_guide", return_value="requirements: {tools: [curl]}\nsteps: []\n"), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=self._atom_with(["source_bundle/poc.png"])), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run",
+                   return_value=subprocess.CompletedProcess(["noop"], 0, "", "")), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.Popen", side_effect=fake_popen):
+            verifier._run_agent(
+                str(scenario_dir), self._ground_truth(), self._ip_alloc(),
+                api_key="test", agent_context="guided", agent_runner="claude",
+            )
+
+        vulhub_dir = scenario_dir / "agent_workspace" / "vulhub"
+        assert (vulhub_dir / "CVE-A__poc.png").read_text() == "CVE-A material"
+        assert (vulhub_dir / "CVE-B__poc.png").read_text() == "CVE-B material"
+        command = popen_commands[0]
+        assert "-v" in command
+        assert f"{vulhub_dir.resolve()}:/vulhub:ro" in command
+
+    def test_claude_materials_reject_paths_outside_source_bundle(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: claude-material-safety\n")
+        atoms_dir = tmp_path / "atoms"
+        bundle = atoms_dir / "CVE-A" / "source_bundle"
+        bundle.mkdir(parents=True)
+        (atoms_dir / "CVE-A" / "secret.txt").write_text("do-not-copy")
+        (bundle / "ok.txt").write_text("ok")
+        (bundle / "escape").symlink_to(atoms_dir / "CVE-A" / "secret.txt")
+        verifier = ScenarioVerifier(atoms_dir=str(atoms_dir))
+
+        vulhub_dir = verifier._materialize_agent_materials(
+            scenario_dir,
+            [
+                ("CVE-A", atoms_dir / "CVE-A" / "source_bundle" / "ok.txt", "/vulhub/CVE-A__ok.txt"),
+                ("CVE-A", atoms_dir / "CVE-A" / "source_bundle" / "../secret.txt", "/vulhub/CVE-A__secret.txt"),
+                ("CVE-A", atoms_dir / "CVE-A" / "source_bundle" / "escape", "/vulhub/CVE-A__escape"),
+            ],
+        )
+
+        assert vulhub_dir is not None
+        assert (vulhub_dir / "CVE-A__ok.txt").read_text() == "ok"
+        assert not (vulhub_dir / "CVE-A__secret.txt").exists()
+        assert not (vulhub_dir / "CVE-A__escape").exists()
 
     def test_l1_input_has_topology_but_no_cve(self, tmp_path):
         payload = self._run_level(tmp_path, "l1", self._atom_with(["poc.py"]))
@@ -1101,6 +1231,52 @@ class TestAgentTransport:
         assert ["nsenter", "-t", "1234", "-n", "ip", "route", "replace",
                 "10.0.0.5/32", "via", "172.30.0.1", "dev", "ctl0"] in calls
 
+    def test_agent_transport_pins_hostname_resolution_inside_attacker(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: pilot\n")
+        verifier = ScenarioVerifier()
+        calls = []
+        network_name = ""
+
+        def fake_run(command, timeout=30):
+            nonlocal network_name
+            calls.append(command)
+            if command[:3] == ["docker", "network", "create"]:
+                network_name = command[-1]
+                return subprocess.CompletedProcess(command, 0, "id\n", "")
+            if command[:3] == ["docker", "network", "connect"]:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[:2] == ["docker", "inspect"]:
+                payload = [{
+                    "State": {"Pid": 1234},
+                    "NetworkSettings": {"Networks": {
+                        network_name: {"Gateway": "172.31.240.1", "IPAddress": "172.31.240.2"}
+                    }},
+                }]
+                return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
+            if command[:6] == ["docker", "exec", "-u", "0", "clab-pilot-attacker", "ip"]:
+                if "addr" in command:
+                    output = "3: ctl0@if4: <UP> inet 172.31.240.2/28 scope global ctl0\n"
+                    return subprocess.CompletedProcess(command, 0, output, "")
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        with patch.object(verifier, "_resolve_endpoint", return_value=["203.0.113.10"]), \
+             patch.object(verifier, "_run_command", side_effect=fake_run):
+            result = verifier._prepare_agent_transport(
+                str(scenario_dir), "https://api.quickrouter.ai/v1"
+            )
+
+        assert result["ok"] is True
+        assert any(
+            command[:6] == ["docker", "exec", "-u", "0", "clab-pilot-attacker", "sh"]
+            and "/etc/hosts" in command[-1]
+            and "api.quickrouter.ai" in command[-1]
+            and "203.0.113.10" in command[-1]
+            for command in calls
+        )
+
     def test_default_route_helpers_preserve_existing_route(self):
         verifier = ScenarioVerifier()
         calls = []
@@ -1541,7 +1717,7 @@ class TestAttackPathReachability:
         assert result["all_edges_verified"] is False
         assert result["edges"][0]["ok"] is False
 
-    def test_probe_falls_back_to_nsenter_without_source_python(self):
+    def test_probe_falls_back_to_docker_exec_without_source_python(self):
         verifier = ScenarioVerifier()
         calls = []
 
@@ -1551,6 +1727,12 @@ class TestAttackPathReachability:
                 return subprocess.CompletedProcess(command, 1, "", "python unavailable")
             if command[:3] == ["docker", "inspect", "-f"]:
                 return subprocess.CompletedProcess(command, 0, "100\n", "")
+            # Simulate bash /dev/tcp succeeding
+            if command[0] == "docker" and "bash" in command:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            # Simulate busybox nc succeeding
+            if command[0] == "docker" and "busybox" in command:
+                return subprocess.CompletedProcess(command, 0, "connected", "")
             return subprocess.CompletedProcess(command, 0, "", "")
 
         with patch.object(verifier, "_run_command", side_effect=fake_run):
@@ -1559,7 +1741,12 @@ class TestAttackPathReachability:
             )
 
         assert result["reachable"] is True
-        assert any(command[0] == "nsenter" for command in calls)
+        # When no Python, bash /dev/tcp or busybox nc is used instead of nsenter.
+        assert any(
+            (command[0] == "docker" and "bash" in command)
+            or (command[0] == "docker" and "busybox" in command)
+            for command in calls
+        )
 
 
 class TestGuideRuntimePreflight:
@@ -1828,6 +2015,33 @@ class TestAgentArtifactRecovery:
 class TestRunnerPrompt:
     """scenario_runner.py 的 prompt 构建"""
 
+    def test_scenario_runner_helpers_import_without_claude_sdk(self):
+        """OpenAI runner copies scenario_runner.py as a helper library into the
+        attacker container. That helper import must not require Claude SDK.
+        """
+        runner_path = (
+            Path(__file__).parents[2]
+            / "src/clab_builder/orchestrator/composer/scenario_runner.py"
+        )
+        spec = importlib.util.spec_from_file_location(
+            "_scenario_runner_without_claude_sdk", runner_path
+        )
+        assert spec and spec.loader
+
+        module = importlib.util.module_from_spec(spec)
+        original_import = builtins.__import__
+
+        def import_without_claude_sdk(name, *args, **kwargs):
+            if name == "claude_agent_sdk":
+                raise ModuleNotFoundError("No module named 'claude_agent_sdk'")
+            return original_import(name, *args, **kwargs)
+
+        with patch.object(builtins, "__import__", side_effect=import_without_claude_sdk):
+            spec.loader.exec_module(module)
+
+        assert module.SYSTEM_PROMPT
+        assert module.build_prompt({"scenario_name": "x", "targets": []})
+
     def test_build_prompt(self):
         from clab_builder.orchestrator.composer.scenario_runner import build_prompt
 
@@ -1887,6 +2101,51 @@ class TestRunnerPrompt:
         assert "Bash" in names
         assert "WebSearch" in names
 
+    def test_openai_runner_client_works_without_openai_package(self):
+        """The OpenAI-compatible runner is copied into the attacker container,
+        where the openai Python package may not be installed.
+        """
+        from clab_builder.orchestrator.composer import openai_scenario_runner
+
+        original_import = builtins.__import__
+
+        def import_without_openai(name, *args, **kwargs):
+            if name == "openai":
+                raise ModuleNotFoundError("No module named 'openai'")
+            return original_import(name, *args, **kwargs)
+
+        with patch.object(builtins, "__import__", side_effect=import_without_openai):
+            client = openai_scenario_runner._make_completion_client(
+                api_key="test-key",
+                base_url="https://api.example.test/v1",
+            )
+
+        assert hasattr(client.chat.completions, "create")
+
+    def test_openai_runner_stream_tolerates_missing_delta_fields(self):
+        from clab_builder.orchestrator.composer import openai_scenario_runner
+
+        class Client:
+            class chat:
+                class completions:
+                    @staticmethod
+                    def create(**_kwargs):
+                        return [
+                            openai_scenario_runner._to_namespace({
+                                "choices": [{"delta": {"tool_calls": []}}],
+                            }),
+                            openai_scenario_runner._to_namespace({
+                                "choices": [{"delta": {"content": "ok"}}],
+                            }),
+                        ]
+
+        content, tool_calls = openai_scenario_runner._stream_completion(
+            Client(), "model", [], 128
+        )
+
+        assert content == "ok"
+        assert tool_calls == []
+
 
 class TestRunnerExtractJson:
     """JSON 提取逻辑"""
@@ -1942,6 +2201,28 @@ class TestRunnerExtractJson:
             "target-1", "target-2"
         }
         assert progress["flag_claims"][0]["source"] == "assistant_text"
+
+    def test_finalization_reminder_requires_partial_structured_json(self):
+        from clab_builder.orchestrator.composer.scenario_runner import (
+            build_finalization_reminder,
+        )
+
+        reminder = build_finalization_reminder({
+            "targets": [
+                {"node_name": "target-1"},
+                {"node_name": "target-2"},
+                {"node_name": "target-3"},
+            ],
+            "objectives": [{"id": "read-customer-records"}],
+        })
+
+        assert "turn budget is almost exhausted" in reminder
+        assert "verified_flags" in reminder
+        assert "attack_log" in reminder
+        assert "objective_results" in reminder
+        assert "failed_targets" in reminder
+        assert "target-1" in reminder
+        assert "read-customer-records" in reminder
 
     def test_turn_limit_is_distinguished_from_completed_output(self):
         from clab_builder.orchestrator.composer.scenario_runner import (

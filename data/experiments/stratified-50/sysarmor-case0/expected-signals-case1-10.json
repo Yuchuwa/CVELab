@@ -1,0 +1,84 @@
+{
+  "description": "Case-level expected generic SysArmor signals for Stratified-50 case1-10 L2 runs. Rules are intentionally behavior-based and avoid product, CVE, fixed path, flag, or lab-private directory coupling.",
+  "cases": {
+    "matrix-2018-16509-2012-1823-2015-1427": {
+      "case_no": 1,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2024-9264-2021-42013-2019-9193": {
+      "case_no": 2,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ]
+    },
+    "matrix-2016-3088-2018-16509-2019-9193": {
+      "case_no": 3,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2018-16509-2021-42013-2019-9193": {
+      "case_no": 4,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2021-42013-2012-1823-2015-1427": {
+      "case_no": 5,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2012-1823-2019-0193-2014-3120": {
+      "case_no": 6,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2012-1823-2021-42013-2014-3120": {
+      "case_no": 7,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2024-27348-2019-17558-2014-3120": {
+      "case_no": 8,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload"
+      ]
+    },
+    "matrix-2018-19475-2024-27348-2019-9193": {
+      "case_no": 9,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection"
+      ]
+    },
+    "matrix-2012-1823-2024-27348-2014-3120": {
+      "case_no": 10,
+      "expected_rule_ids": [
+        "workload_executes_shell_or_interpreter",
+        "network_client_used_in_workload",
+        "execution_tool_opens_network_connection",
+        "download_by_lolbin"
+      ]
+    }
+  }
+}
