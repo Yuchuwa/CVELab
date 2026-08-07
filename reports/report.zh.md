@@ -1,325 +1,373 @@
-# sysfield：面向真实多层网络靶场的攻防联合智能体评测
+# sysfield：真实防御环境中的网络安全智能体评测
 
 **技术报告草稿**
-**状态：** 基于 SysArmor × CVELab Stratified-50 防御增强评测协议当前进度的阶段稿
+
+**状态：** 基于 CVELab × SysArmor 当前实验结果的阶段稿
+
 **日期：** 2026 年 8 月 7 日
 
 ## 摘要
 
-安全智能体评测正在从“模型知道什么”走向“模型进入系统以后能完成什么”。CyberSecEval、Cybench 和 InterCode-CTF 把安全知识、CTF 与工具交互纳入评测；CyberGym、SEC-Bench Pro、BountyBench 和 CyberGym-E2E 将任务推进到真实开源项目中的漏洞复现、发现和修复；ExploitBench 与 ExploitGym 继续追问从漏洞触发到可执行利用的距离；CVE-Bench、长程 Cyber Range 和 VulnLMP 则把问题推向远程目标、长期探索和多阶段行动。这个谱系共同说明：现代安全评测的对象已经不是孤立模型，而是模型、harness、工具权限、环境、预算和外部验证器组成的行动系统。
+网络安全智能体评测正在从静态知识和孤立任务转向真实系统中的连续行动。CyberGym、CyberGym-E2E、ExploitGym 等工作已经能够测量真实代码库中的漏洞复现、完整漏洞生命周期和真实利用效果。然而，这些 benchmark 的主要结果仍是 PoC、patch、flag 或最终 objective。它们能说明智能体完成了什么，却很少说明真实防御在过程中看见了什么，以及环境干扰能否改变智能体的行动。
 
-sysfield 关注这条谱系中仍然薄弱的一环：当安全智能体在真实多层网络靶场中行动时，我们不仅需要知道它有没有完成最终目标，还需要知道攻击过程是否能被防御系统观察、解释和复核。真实攻防不是只有终局失陷才有意义。一次失败的攻击也可能包含 shell 执行、解释器启动、网络探测、工具下载、横向连接和凭据访问等关键行为；如果评测只记录最终 flag，这些安全证据会被压缩成一个 `FAIL`。
+这给防御者留下了一个关键问题：网络安全智能体在真实防御环境中仍然有效吗？回答这个问题不能只看攻击成功率。攻击成功不等于防御失明，攻击失败也不等于风险不存在。一次失败轨迹仍可能留下高价值运行时信号；一次成功轨迹也可能从一开始就被观察到。
 
-本报告提出并实现一套攻防联合评测口径。CVELab 将真实 CVE atom 组合为可复现的多层网络行动场景，并通过拓扑物化、runtime 准备、资格验证和外部 verifier 保证每个 case 可执行、可判定、可追溯；SysArmor 在 workload 运行时采集行为事件并生成 signal；评估侧把最终目标完成情况与攻击窗口内新增的 expected signal 分开统计。本阶段使用的 CVELab Stratified-50 将多层网络行动具体实例化为三层企业场景，用入口层、应用/中间层和数据层考察智能体的连续推进能力。
+这类评测面临四个困难。真实 CVE 环境异构，难以组成稳定、可判定的多阶段任务；model、harness 和环境会同时影响结果；最终攻击结果与防御可见性相关但不能互相替代；expected signal 未出现时，也不能直接判断防御存在盲区。
 
-截至本文写作时，SysArmor `v0.1.0-rc.5` 防御增强评测协议已完成 39/50 个 case：case1-27 和 case32-43 已完成，case28 正在运行，case29-31 已完成 runtime preparation 并等待串行执行，case44-50 待跑。在已完成的 39 个 case 中，三旗全通为 6/39，strict expected signal hit 为 14/39。阶段性结果显示：多阶段攻击仍然困难，但运行时防御可以在一部分攻击未达成最终目标的场景中留下结构化证据。
+为此，我们提出 sysfield。它使用四项直接的技术：通过 **CVE 原子化与多层场景编排**构造可复现网络任务；通过**同场景控制变量对照**分离 model、harness 和环境的影响；将**外部攻击结果验证与运行时行为观测相结合**，分别衡量攻击完成度和防御可见性；通过**预期行为覆盖分析**解释 missing signal。CVELab 提供由真实 CVE 组成的三层 range，外部 verifier 判定分层 flag 和 objective，SysArmor 以 observe-only 方式记录攻击窗口内的运行时 signal。
 
-本文的核心观点是：下一代安全智能体评测不应只有一条成功率曲线。flag/verifier 衡量攻击链是否完成；attack-window signal 衡量防御系统是否观察到预期攻击行为；当防御没有产生预期 signal 时，missing signal 进一步解释这种“沉默”可能来自 agent 未推进、行为发生在观测边界之外、规则覆盖不足或 GT 过强。只有把这三类证据放在一起，才能解释智能体攻击的真实能力、失败过程和防御可见性。
+我们在 Stratified-50 上得到三组阶段性证据。Kimi-K3 L2 完成 50/50 个 case，三层 flag 获取率依次为 22/50、18/50 和 16/50，42/50 个 case 产生新增 signal，28/50 命中全部 expected signal。DeepSeek-V4-Pro L2 当前完成 40/50；在两种模型共同完成的 40 个 case 上，Kimi-K3 的三层结果为 18/40、16/40 和 15/40，DeepSeek 为 19/40、10/40 和 6/40，差异主要出现在入口之后的持续推进。DeepSeek L1 的 none/high 对照中，当前 high 配置使 timeout 从 6/50 增至 19/50，平均运行时间从 1,417.6 秒增至 2,428.5 秒；但该配置同时包含 topology hint 差异，因此只能说明整体运行干扰，不能归因于纯 decoy 效应。
+
+这些结果表明，前沿智能体已经能完成一部分真实多层任务，但能力仍依赖模型和系统条件；基础运行时防御在大量成功与失败轨迹中仍能产生结构化证据；最常缺失的是执行工具联网、workload 网络客户端和 shell/interpreter 行为。当前结论限于有限模型、单次实验、partial run、observe-only 防御和行为规则覆盖范围。sysfield 的意义不是帮助智能体更有效地攻击，而是为防御者、评测者和平台方提供一套更完整的风险证据。
 
 ## 1. 引言
 
-网络安全是前沿智能体能力的高密度观察场。一个安全任务通常有明确目标、真实工具反馈、可验证结果和清楚的失败边界；它要求模型在多轮环境反馈中读代码、跑命令、搜索线索、修正假设，并在预算耗尽前交付外部可验证的结果。相比静态问答，这更接近真实世界中的长期行动。
+### 1.1 领域变化：评测对象正在从模型回答转向系统行动
 
-现有安全智能体评测已经证明，模型可以在真实代码库、漏洞环境和远程目标中完成越来越长的行动链。但这类评测大多仍以最终产物作为核心 oracle，例如 PoC 是否触发、patch 是否通过、flag 是否取得或最终目标是否完成。这个设计对衡量攻击能力是必要的，却不足以回答防御问题。真实世界里，防御系统并不等到攻击者拿完所有 flag 才开始工作；它要在过程中识别行为、产生证据、解释阶段，并尽量在最终失陷前暴露风险。
+网络安全任务天然适合检验智能体能力。任务有明确目标，工具会返回真实反馈，结果可以由环境状态验证；同时，它要求模型连续完成理解、规划、工具使用、状态维护和错误恢复。随着模型能力提高，安全评测也从知识问答和 CTF，逐步走向真实代码库、远程目标和长程网络行动。
 
-sysfield 因此把问题推进一步：在多层网络行动中，攻击结果和防御观测应该同时成为评测对象。攻击是否成功是一条线；防御是否看见了攻击行为是另一条线；防御为什么沉默是第三条线。三条线共同决定这个实验对安全研究是否有解释力。
+这次变化改变了评测对象。现在被测量的不是孤立模型，而是 `model × harness × tools × environment × budget` 组成的完整智能体系统。同一个模型使用不同工具、上下文管理和执行框架，可能得到不同结果。一个只写模型名称和最终成功率的 benchmark，已经无法完整解释能力来自哪里。
 
-本报告围绕四个研究问题组织。
+### 1.2 现有缺口：任务完成度不能回答防御看见了什么
 
-1. **安全智能体能否稳定完成多阶段攻击？**
-   我们考察 agent 是否能从入口目标持续推进到后续层级，并由外部 verifier 确认各阶段 flag。这里的重点不是单个漏洞是否存在，而是模型能否把发现、利用、验证和横向推进串成稳定行动链。
+现有工作已经显著提高了真实度。CyberGym 在真实代码库中验证 PoC；CyberGym-E2E 串联 discovery、PoC、patch 和回归测试；ExploitGym 区分漏洞触发和真实攻击效果；Cyber Range 则把多个步骤连接成网络行动。这些工作回答了一个重要问题：智能体能够完成多真实的安全任务？
 
-2. **运行时防御系统能否产生可解释 signal？**
-   我们不只问“有没有日志”，而是要求 SysArmor 将 workload 内的关键进程、网络和执行行为归纳为有语义的 signal，并能够导出到逐 case 证据文件。
+防御者还需要另一个答案：这些行动在真实防御环境中是否可见，又能否被环境中的诱骗和噪声扰动？最终 flag 无法独立回答这个问题。智能体没有拿到最终目标，可能已经执行了危险行为；智能体完成了目标，也不代表防御没有留下证据。把整条轨迹压缩成 PASS 或 FAIL，会同时丢失攻击过程和防御暴露面。
 
-3. **攻击未完成最终目标时，是否仍然有足够检测证据？**
-   这一区分非常重要。攻击失败不等于安全无事发生。agent 没拿齐 flag 时，仍可能已经执行过 shell、解释器、网络客户端或可疑连接。我们因此把 attack PASS 与 expected signal hit 分开统计。
+因此，本文研究的核心问题是：
 
-4. **当防御系统沉默时，这种沉默意味着什么？**
-   检测评估不能止于 hit/miss。对每个 miss，我们记录缺失的 expected ruleId，用于分析沉默究竟来自 agent 未推进、规则覆盖不足、采集链路盲区，还是 GT 对失败轨迹要求过强。
+> **网络安全智能体，在真实防御环境中仍然有效吗？**
 
-围绕这些问题，本文的阶段性贡献如下。
+这里的“有效”有三个维度：能否完成攻击任务，行动是否对运行时防御可见，以及面对诱骗或环境干扰时能否维持推进。三者需要分别测量，再放在同一 case 上解释。
 
-**第一，构建以 CVELab 为核心的多层网络行动评测基座。** CVELab 将真实 CVE atom 组合成可复现的多层企业靶场，并用拓扑物化、runtime 准备、资格验证、flag 和外部 verifier 保证每个 case 可执行、可判定、可追溯。CVELab Stratified-50 从可组合场景空间中抽取 50 个代表性 case，使 sysfield 能够在有限预算下评估从入口利用到横向推进再到最终目标的连续行动。
+### 1.3 研究问题
 
-**第二，提出攻防联合的双 oracle 评测范式。** sysfield 将攻击智能体、多层 CVE 靶场、外部 verifier 与运行时防御观测放入同一个实验闭环，并显式区分 attack oracle 与 defense oracle。前者回答攻击链是否完成，后者回答攻击过程是否被防御系统观察到。这个设计避免把防御可见性简化为攻击成功率的副产品，使“攻击能力”和“防御证据”能够被并列评估。
+本文围绕四个递进问题展开：
 
-**第三，设计面向迁移性的行为化检测 GT。** 本报告将 expected signal 定义为通用运行时行为，而不是绑定具体产品、CVE、IP、端口、flag 路径或实验私有目录。规则关注 shell/interpreter 执行、workload 内网络客户端使用、执行工具发起网络连接等跨场景行为。这样得到的指标更保守，但更能衡量防御系统是否捕捉到可迁移的攻击语义，而不是记住某个靶场的表面特征。
+- **RQ1：** 智能体能否完成多层网络任务，不同模型的推进能力有何差异？
+- **RQ2：** harness 和环境干扰会在多大程度上改变这种能力？
+- **RQ3：** 智能体行动是否会触发基础运行时防御信号？
+- **RQ4：** 哪些预期攻击行为最容易未被观察到？
 
-**第四，引入攻击窗口归因的 signal 评估口径。** 为避免静态 before/after 快照把 baseline 噪声误计为攻击命中，sysfield 将观测过程划分为 watcher ready、attack window 与 grace window，并要求 expected ruleId 必须作为攻击窗口内的新增 signal 出现。这个设计把检测结论绑定到真实攻击时段，使 signal 命中能够被解释为“攻击期间发生的防御证据”，而不是运行前后状态差异。
+前两个问题测量攻击完成能力及其系统依赖，后两个问题测量防御可见性及其边界。它们共同形成面向防御者的风险画像，而不是一张攻击能力排行榜。
 
-**第五，把“防御沉默”转化为可解释的研究对象。** 在传统成功率口径中，一个未命中的 case 往往只留下一个 ❌：攻击没有被检测到。但在真实防御中，沉默并不是一种单一状态。它可能意味着 agent 根本没有推进到危险行为，也可能意味着攻击行为发生在观测边界之外，可能是规则没有覆盖，也可能是 expected GT 对这条失败轨迹要求过强。sysfield 因此不只记录 hit/miss，而是保存每个 case 缺失的 expected ruleId，把“没有 signal”进一步拆解为可追问、可定位、可改进的检测盲区。这样，失败 case 不再只是分母里的损失，而成为理解防御边界的入口。
+### 1.4 核心洞察与贡献
 
-## 2. 背景与相关工作
+本文的核心洞察是：**智能体风险不能由单一攻击成功率刻画；防御者需要攻击完成度、防御可见性和抗干扰能力的联合画像。**
 
-现有 benchmark 已经沿着几条路线推进。
+基于这一判断，本文作出三项贡献：
 
-| 路线 | 代表工作 | 主要问题 |
+1. **一个由真实 CVE 组成的多层评测基座。** CVELab 将异构漏洞封装为可独立部署和验证的 atom，再编排为具有阶段性目标的网络场景。
+2. **一套同时保留攻击结果与防御证据的评测方法。** 外部 verifier 判定 flag 和 objective，SysArmor 独立记录运行时 signal，同一 case 上的两类结果分别统计。
+3. **一组关于模型差异、防御可见性和环境干扰的阶段性证据。** 实验显示，模型差异主要出现在多层持续推进，运行时信号同时存在于成功和失败轨迹，当前 high-decoy 配置能够显著增加智能体的运行成本。
+
+## 2. 相关工作
+
+### 2.1 网络安全智能体评测的六条路线
+
+网络安全 benchmark 不是沿一条统一难度轴发展。不同工作选择了不同任务起点、终点和判定语义。
+
+| 评测路线 | 代表工作 | 主要技术推进 | 主要终点 |
+|---|---|---|---|
+| 安全知识与交互式挑战 | CyberSecEval、Cybench、InterCode-CTF [1-3] | 分类型任务集、容器化交互、执行反馈和子任务分解 | 正确答案、子任务或 flag |
+| 真实漏洞发现与复现 | CyberGym、SEC-Bench Pro、BountyBench、OSS-Fuzz 类评测 [4-6] | 真实代码库重建、隐藏漏洞制品、补丁前后或跨版本可执行验证 | 漏洞发现、PoC 或 patch |
+| 漏洞生命周期与利用形成 | CyberGym-E2E、ExploitBench、ExploitGym [7-9] | 端到端任务串联、能力阶梯、two-stage validation 和 mitigation ablation | 回归验证后的 patch、利用原语或未授权执行 |
+| 远程目标与多阶段行动 | AutoPen-Bench、CVE-Bench、WebExploitBench、OpenAI Cyber Range、UK AISI 长程评测 [10-14] | 隔离远程目标、黑盒交互、外部状态验证和阶段进度记录 | 远程目标状态、最深步骤或最终 objective |
+| 长时程漏洞研究 | VulnLMP [14] | 多方向并行探索和可复现证据验证 | 多日研究产物或受控利用原语 |
+| 自主防御与防御产物 | AIxCC、CTI-REALM [15-16] | 可执行漏洞验证、patch 功能测试、CTI 到检测规则的验证流水线 | 修复后的软件或检测规则 |
+
+这些路线不能用原始成功率直接比较。CTF flag、可差分验证的 PoC、未授权执行、长程 objective 和检测规则是不同研究对象。运行时间更长也不等于覆盖更多网络攻击阶段。
+
+### 2.2 代表性技术如何推进评测边界
+
+CyberGym 解决的是规模化真实漏洞复现。它自动重建历史项目，并用补丁前后 differential testing 判断 PoC 是否真正对应目标漏洞 [4]。SEC-Bench Pro 进一步隐藏原始 PoC、补丁和详细报告，再通过跨版本执行验证开放式漏洞发现 [5]。这些技术提高了真实性和去污染能力，但任务通常终止于发现或复现。
+
+CyberGym-E2E 把 discovery、PoC、patch 和回归测试串成完整生命周期，并用可复现环境和功能测试约束 patch [7]。ExploitBench 用阶段性 checkpoint 区分触发、利用原语和代码执行 [8]。ExploitGym 则通过 execution-based evaluation、two-stage validation 和 mitigation ablation，判断智能体是否把指定漏洞转化为真实攻击效果 [9]。这些工作说明，漏洞触发、完整利用和修复是不同能力层级。
+
+AutoPen-Bench、CVE-Bench、WebExploitBench 和 Cyber Range 将评测推进到远程目标或连续网络行动 [10-14]。它们使用隔离目标、外部状态或阶段进度，减少模型自报带来的不确定性。VulnLMP 从另一方向延长研究时间，但长时程漏洞研究并不自动构成多主机行动链 [14]。
+
+AIxCC 和 CTI-REALM 更接近防御任务：前者考察自主漏洞发现和修复，后者考察从威胁情报生成检测规则 [15-16]。但“智能体能生成防御产物”与“已有防御能否观察攻击智能体”仍是两个问题。
+
+公开的模型 system card 和 Fugu-Cyber 等系统结果还揭示了一个横向事实：网络安全成绩依赖 harness、工具和预算，而不是裸模型常数 [14,16]。METR Time Horizon 可以描述任务时间尺度，但不能替代安全阶段覆盖 [17]。
+
+### 2.3 sysfield 的位置
+
+sysfield 不替代上述 benchmark，也不主张自己的攻击任务更强。它补充一个现有工作较少系统测量的维度：**在同一真实网络 case 中，同时保留攻击完成度、运行时防御可见性和环境干扰证据。**
+
+这个位置决定了本文的立场。受控攻击轨迹只是测量工具，目的是帮助防御者、评测者和平台方理解风险边界。missing signal 用于发现 telemetry、规则或 GT 的不足，不用于总结规避检测的方法。
+
+## 3. 研究挑战
+
+### 3.1 异构 CVE 很难组成稳定的多层任务
+
+真实 CVE 依赖不同 runtime、端口、资产和利用前提。单个漏洞可以复现，不代表多个漏洞能够在同一拓扑中稳定连接。多层 benchmark 还必须保证每一层可达、每个目标可判定，并把环境失败与智能体失败分开。
+
+### 3.2 模型和系统条件的影响容易混在一起
+
+一次运行的结果同时受 model、harness、提示信息、工具、预算、噪声和环境状态影响。如果一个对照同时改变多个条件，结果差异就无法清楚归因。跨 benchmark 的排行榜尤其容易把系统差异误写成模型差异。
+
+### 3.3 攻击完成度和防御可见性需要同时测量
+
+最终 flag 说明攻击走到了哪里，却不说明防御记录了什么。signal 命中说明观察到预期行为，也不说明攻击成功、严重或已经被阻断。两类结果必须在同一运行中对齐，但不能合并成一个分数。
+
+### 3.4 missing signal 不是单一含义
+
+expected signal 没有出现，至少有四种可能：智能体没有执行该行为；行为发生在当前 telemetry 边界之外；规则没有覆盖实际变体；case-level expectation 对实际失败轨迹过强。因此，miss 不能直接写成防御盲区。
+
+## 4. sysfield
+
+### 4.1 方法概览
+
+sysfield 用四项技术分别回答上述挑战。
+
+| 挑战 | 技术 | sysfield 中的实现 |
 |---|---|---|
-| 安全知识与交互式挑战 | CyberSecEval、Cybench、InterCode-CTF | 模型是否具备安全知识，能否在工具环境中解决 CTF/安全任务 |
-| 漏洞复现与发现 | CyberGym、SEC-Bench Pro、BountyBench | 模型能否在真实代码库中定位漏洞并生成可验证 PoC |
-| 端到端漏洞生命周期 | CyberGym-E2E | 模型能否完成发现、PoC、补丁和回归测试的连续流程 |
-| 利用形成 | ExploitBench、ExploitGym | 模型能否从漏洞触发走向利用原语、代码执行或 flag 获取 |
-| 远程目标与长程行动 | CVE-Bench、Cyber Range、VulnLMP | 模型能否在远程或长期环境中完成探索、利用和多阶段推进 |
+| 异构漏洞难以形成稳定任务 | CVE 原子化与多层场景编排 | 将漏洞封装为可部署、可验证、可复用的 atom，再按拓扑和能力依赖组合成 range |
+| 多种系统因素同时变化 | 同场景控制变量对照 | 固定 case、预算和运行协议，每次只改变 model、harness 或 interference 条件 |
+| 最终结果不能表示防御可见性 | 外部攻击结果验证与运行时行为观测相结合 | verifier 判定 flag/objective，SysArmor 记录 signal，两类结果按 case 对齐并分别统计 |
+| signal miss 难以解释 | 预期行为覆盖分析 | 为 case 定义通用 expected behavior，记录 hit 和 missing rule，再结合实际轨迹解释 |
 
-这些工作各自解决了关键问题。CyberGym 强调真实项目和规模化漏洞复现；CyberGym-E2E 把漏洞生命周期串起来；ExploitBench 细分利用能力标志；ExploitGym 把“能触发 bug”推进到“能完成攻击”；Cyber Range 和 CVE-Bench 则让智能体面对更像真实部署的远程环境。它们共同把安全评测从纸面知识推向可执行行动。
+### 4.2 CVE 原子化与多层场景编排
 
-与这些工作相比，sysfield 不试图替代漏洞生命周期或 exploit 评测，而是补上防御观测这一维度。它关注 agent 在多层网络行动中的过程证据：攻击链是否完成、攻击期间是否出现语义化运行时信号、以及防御没有产生预期信号时这种沉默如何解释。
+CVE atom 是 sysfield 的最小漏洞单元。每个 atom 保存可重建的 runtime、服务入口、验证语义和场景编排需要的能力信息。atom 必须能够独立部署和验证，才能进入多层场景。
 
-## 3. CVELab 基准构造
+CVELab 根据 slot 需求和能力依赖组合 atom。本文使用的 `enterprise_3tier` 场景包含三个层级：
 
-CyberGym-E2E 的核心结构是先说明 benchmark 如何从真实漏洞数据构造出来，再说明 agent 如何被评估。sysfield 采用相同思路：CVELab 不是一个临时实验目录，而是将真实 CVE atom 转化为多层网络行动 case 的基准构造层；SysArmor defended run 是在这个基准之上的防御观测扩展。
-
-### 3.1 术语与设计目标
-
-本文使用四个固定术语。
-
-| 术语 | 含义 |
-|---|---|
-| CVE atom | 一个可部署、可验证的漏洞服务单元，包含 runtime、服务入口、exploit guide、验证语义和必要资产 |
-| range case | 由多个 CVE atom 组合出的多层网络行动场景，包含拓扑、目标、flag 和 verifier |
-| CVELab Stratified-50 | 从 CVELab 可组合场景空间中抽样得到的 50 个正式 case，用于报告级实验 |
-| 防御增强评测协议 | 当前报告级 defended protocol：L2、`--max-turns 300`、`--agent-timeout 3600`、SysArmor detection 与攻击窗口 signal 口径 |
-
-CVELab 的设计目标是：真实、可复现、可判定、可分层。真实意味着 case 来自真实 CVE atom，而不是纯合成题；可复现意味着 runtime、拓扑和资产可以重新物化；可判定意味着结果由外部 verifier 和 flag 判断，而不是模型自报；可分层意味着同一场景包含入口、中间和数据目标，可以观察 agent 是否能从初始访问推进到后续目标。
-
-### 3.2 从 CVE atom 到 Stratified-50
-
-CVELab 的场景构造从 CVE atom 开始。每个 atom 需要至少满足三类条件：服务能够在受控 runtime 中启动，漏洞入口能够被网络访问或业务流程触达，验证器能够判定目标是否完成。通过这些 atom，CVELab 进一步生成 enterprise-style 多层组合。
-
-本阶段的 Stratified-50 具体采用三层实例：
-
-| 层级 | CVELab slot | 评测作用 |
+| 层级 | 场景角色 | 评测语义 |
 |---|---|---|
-| 入口层 | `dmz-web` | 考察初始识别、入口利用和第一阶段 flag |
-| 应用/中间层 | `app-service` | 考察继续利用、凭据使用、横向推进或业务链路 |
-| 数据层 | `data-store` | 考察最终目标访问、数据读取和第三阶段 flag |
+| target 1 | DMZ 入口服务 | 识别入口、完成初始访问并取得第一层 flag |
+| target 2 | 应用或中间服务 | 使用已有访问继续推进并取得第二层 flag |
+| target 3 | 数据服务 | 到达最终目标并取得第三层 flag |
 
-`CVELab/data/stratified_50_ranges.json` 记录了 50 个 case。每个 case 包含 `id`、三个 CVE、`slot_atoms`、`service_families` 和 `asset_variants`。当前 50 个 case 覆盖 24 个唯一 CVE，并统一使用 `dmz-web`、`app-service`、`data-store` 三个 slot。Stratified-50 的目的不是穷尽所有组合，而是在有限实验预算下覆盖不同入口漏洞、中间阶段和数据层后端，避免只评估少数易利用路径。
+每个 case 在正式运行前完成环境验证、攻击图验证和路径可达性验证。模型无法通过自报决定结果；外部 verifier 检查每层 flag 和业务 objective。这样，环境资格、攻击完成度和业务目标可以分别记录。
 
-### 3.3 Qualification 与正式运行
+### 4.3 同场景控制变量对照
 
-CVELab 将环境资格验证和 agent trial 分开。qualification run 只验证 runtime 物化、服务就绪、网络连通和 verifier 条件；agent trial 必须引用冻结的 parent qualification run。这个设计把 infrastructure failure 与 agent failure 分离，避免把镜像缺失、服务未启动或拓扑错误误计为模型攻击失败。
+sysfield 将实验变量分为 model、harness 和 interference 三类。可靠对照需要固定 case manifest、难度、预算、工具权限和验证协议，再改变一个目标变量。
 
-每次正式运行写入不可变 `run_manifest.json`，记录 case manifest hash、selected case IDs、git commit、dirty marker、agent context、runner、model label 和精确 batch command；`case_index.json` 则作为可刷新索引，记录 qualification outcome 与 agent outcome。这个 manifest 层是防御增强评测协议能够被追溯和复核的基础。
+本文已有两种对照。Kimi-K3 与 DeepSeek-V4-Pro 的 L2 实验使用相同协议，仅模型不同，用于观察模型能力差异。DeepSeek L1 的 none/high 实验使用同一份 50-case manifest、模型、runner、seed 和预算，用于观察当前 high 配置带来的运行干扰。
 
-## 4. 任务格式与攻防联合评测协议
+harness 收益是预先定义的研究问题，但对应实验尚未完成。本文不报告 harness uplift，也不从跨批次结果推断该数值。
 
-在 CVELab 构造的 range case 之上，sysfield 定义攻防联合评测协议。该协议的目标不是把防御观测混入攻击成功率，而是并行保留 attack oracle、defense oracle 和 defensive silence evidence。
+### 4.4 外部结果验证与运行时行为观测
 
-### 4.1 攻防联合实验闭环
+sysfield 为同一次运行保留两类独立结果：
 
-一次 defended run 包含五个角色：
+- **攻击结果：** t1/t2/t3 flag、三旗全通、objective、timeout 和失败阶段；
+- **防御结果：** 攻击窗口 signal、是否产生新增 signal、expected-signal hit 和 missing signal。
 
-| 角色 | 职责 |
-|---|---|
-| CVELab range | 生成多层网络拓扑、目标服务、漏洞组合和 flag |
-| 攻击智能体 | 在授权靶场内使用工具探索、利用、验证和推进 |
-| Verifier | 独立判定 target-1/2/3 flag 或业务目标是否真实命中 |
-| SysArmor | 在目标 workload 内以 observe 模式采集运行时事件并生成 signal |
-| Exporter | 导出攻击窗口 signal，并按 expected ruleId 评估命中和缺失 |
+SysArmor 在所有实验环境中作为运行时观测层。本文只对已经完成 signal accounting 的 L2 实验报告防御指标。L1 none/high 实验虽然引入了 SysArmor，但当前汇总没有导出可比的攻击窗口 signal 字段，因此不参与 detection 数字比较。
 
-攻击侧和检测侧共享同一次运行，但互不泄漏答案。模型看不到 flag、verifier 输出或 SysArmor signal；检测评估也不依赖模型声称自己做了什么。
+SysArmor 当前是 observe-only。它记录行为，但不阻断攻击。因此，本报告只讨论可见性，不报告阻断率或防护成功率。
 
-### 4.2 攻击窗口归因
+### 4.5 预期行为覆盖分析
 
-当前协议显式定义 signal 生命周期：
+expected signal 描述通用运行时行为，而不是产品名、CVE 编号、固定 IP、端口或实验私有路径。当前 Stratified-50 主要使用以下规则：
 
-```text
-watcher ready
-    -> attack start
-    -> agent attack
-    -> attack finish
-    -> grace window
-    -> watcher stop
-```
-
-对应统计字段为：
-
-| 字段 | 含义 |
-|---|---|
-| `pre_attack_count` | attack start 之前采到的 signal frame |
-| `attack_window_count` | attack start 到 attack finish 之间采到的 signal frame |
-| `grace_window_count` | attack finish 后 grace window 内采到的 signal frame |
-| `new_attack_signal_count` | 相对 pre-attack 新增的攻击窗口 signal frame |
-| `expected_signal_hit` | expected ruleId 是否全部出现在新增攻击窗口 signal 中 |
-| `missing_signal` | 未在新增攻击窗口 signal 中出现的 expected ruleId |
-
-这个设计把检测 oracle 绑定到实际攻击期间，避免 baseline 噪声污染结论。当前已完成的 39 个 case 中，`pre_attack_count` 均为 0，说明 watcher ready 后进入攻击窗口的流程符合预期。
-
-### 4.3 行为化检测 oracle
-
-expected signal 是 case-level GT。每个 case 的 expected ruleId 来自其漏洞组合与预期攻击路径的行为 union，但标签只使用通用行为语义。目前主要包含：
-
-| ruleId | 语义 |
+| ruleId | 行为语义 |
 |---|---|
 | `workload_executes_shell_or_interpreter` | workload 内执行 shell 或解释器 |
-| `network_client_used_in_workload` | workload 内使用 curl、wget、nc、python 等网络客户端 |
+| `network_client_used_in_workload` | workload 内使用网络客户端 |
 | `execution_tool_opens_network_connection` | 执行类工具发起网络连接 |
+| `download_by_lolbin` | 使用常见系统工具执行下载 |
 
-我们刻意不加入 product-specific、CVE-specific 或 magic-path 规则。规则如果写成“访问 Elasticsearch”“读取 `/flag`”或“命中 `/opt/cvelab/**`”，短期命中率可能更好，但它证明的是靶场记忆，不是防御系统观察到了可迁移攻击行为。
+watcher 在攻击开始前就绪，并将 signal 分为 pre-attack、attack-window 和 grace-window。strict expected-signal hit 只计算攻击窗口内新增的 expected rule。这样可以降低 baseline 噪声被误算为攻击证据的风险。
 
-## 5. 实验评估
+对 miss，sysfield 保留具体 missing rule，而不是只写一个二元失败。这个分析提供的是“预期行为覆盖”，不是对真实行为是否发生的独立证明。
 
-### 5.1 实验设置
+## 5. 评测方法
 
-本阶段使用防御增强评测协议，固定条件如下：
+### 5.1 Stratified-50
 
-| 项目 | 设置 |
-|---|---|
-| 靶场 | CVELab Stratified-50 |
-| 场景形态 | 多层网络靶场；本阶段实例为三层企业场景 |
-| 防御组件 | SysArmor `v0.1.0-rc.5` |
-| 传感器 | Tetragon backend，container scope |
-| Runner / SDK | `openai-compatible` |
-| 模型 | `deepseek-v4-pro` |
-| 难度 | L2 |
-| 最大轮数 | `--max-turns 300` |
-| Agent 超时 | `--agent-timeout 3600` |
-| 并行度 | `--parallel 1` |
-| 防御模式 | `--sysarmor --sysarmor-detection` |
+Stratified-50 包含 50 个 `enterprise_3tier` case，共使用 24 个唯一 CVE。抽样按入口层和中间层的历史难度分层，覆盖 easy/easy、easy/hard、mid/easy、mid/hard、hard/easy 和 hard/hard 六个组合。历史结果只用于分层抽样，不作为本报告的模型成绩。
 
-固定串行运行是本轮的重要实验约束。此前调试显示，同一宿主机并发多个 defended case 时，多个 Tetragon 实例可能共享 `/sys/fs/bpf/tetragon/*`，触发 BPF pinned map、health check 或 signal 归因竞态。为了让每个 signal 都能明确归属到对应 case，本轮牺牲吞吐量，优先保证证据干净。
+每个 case 包含三个 CVE slot 和三个阶段性 flag。数据层目前只包含 3 个 CVE 变体，因此集合并不代表所有企业软件和攻击路径。50 个 case 共享 CVE，也不是 50 个统计独立的漏洞样本。
 
-完整逐 case 表见 `reports/experiments/sysarmor-cvelab-stratified50-rerun300-case50.zh.md`。
+### 5.2 实验臂
 
-### 5.2 当前结果
+| 实验臂 | 主要变量 | 完成度 | 回答的问题 |
+|---|---|---:|---|
+| Kimi-K3 L2 + SysArmor | model=`kimi-k3` | 50/50 | 完整多层能力与防御可见性 |
+| DeepSeek-V4-Pro L2 + SysArmor | model=`deepseek-v4-pro` | 40/50 | 与 Kimi 相同协议下的阶段性模型比较 |
+| DeepSeek-V4-Pro L1 none | interference=`none` | 50/50 | 当前 L1 基线 |
+| DeepSeek-V4-Pro L1 high | interference=`high` | 50/50 | 当前 high 配置的运行干扰 |
+| Harness 对照 | harness | 未运行 | harness 对能力的增益 |
 
-截至 2026 年 8 月 7 日 10:07 CST，防御增强评测协议进度如下：
+L2 两个模型臂使用 `openai-compatible` SDK、`openai` runner、L2 context、300 turns、3,600 秒 agent timeout、串行执行和相同 SysArmor detection 设置。DeepSeek 当前缺少 case29-31 和 case44-50，因此跨模型结论以共同完成的 40 个 case 为主。
 
-| 范围 | 状态 |
-|---|---|
-| case1-27 | completed |
-| case28 | running |
-| case29-31 | runtime prepared |
-| case32-43 | completed |
-| case44-50 | pending |
+L1 none/high 两臂使用同一 manifest、DeepSeek-V4-Pro、L1 context、300 turns、3,600 秒 timeout、seed 1 和 temperature 0。none 使用 parallel=8，high 使用 parallel=4；两个 arm 固定按 none 后 high 的顺序运行。high 包含 43 个 decoy，同时存在 data-router topology hint 缺失。这个设计只能测量当前 high 实现的整体效果。
 
-已完成 39 个 case 的汇总结果：
+### 5.3 指标
 
-| 指标 | 结果 |
-|---|---:|
-| 已完成 case | 39/50 |
-| 三旗全通 | 6/39 |
-| 攻击 FAIL | 33/39 |
-| expected signal hit | 14/39 |
-| pre-attack signal 非零 case | 0/39 |
+攻击完成度通过 t1/t2/t3 flag、三旗全通、objective、timeout 和失败阶段测量。防御可见性通过至少一个新增 signal、attack-window signal frame 总量、strict expected-signal hit 和 attack/visibility 四象限测量。干扰效果通过 flag、objective、timeout、运行时间和 decoy interaction 测量。
 
-三旗全通的 case 为：case4、case5、case6、case7、case35、case40。
+signal frame 数量反映运行时观测量，不等同于独立攻击行为数量，也不直接表示风险严重度。不同模型产生的 frame 总量不用于建立检测能力排行榜。
 
-### 5.3 RQ1：多阶段攻击仍然不稳定
+### 5.4 数据来源
 
-当前结果显示，agent 能够在部分场景中建立入口能力，但稳定推进到后续层级仍然困难。6/39 的三旗全通率不表示失败 case 没有攻击行为；它说明从入口利用到中间层、数据层的连续行动仍然是主要瓶颈。
+本报告使用截至 2026 年 8 月 7 日已落盘的数据。总体汇总见 [Stratified-50 实验汇总](experiments/stratified50-experiment-summary.zh.md)，逐 case 证据见 [Kimi-K3 watch-window 报告](experiments/sysarmor-cvelab-stratified50-kimi-k3-watch.zh.md)、[DeepSeek L2 partial 报告](experiments/sysarmor-cvelab-stratified50-rerun300-case50.zh.md) 和 [DeepSeek L1 none/high 报告](experiments/2026-08-07-deepseek-l1-none-high.md)。
 
-日志中常见失败模式包括：入口服务识别后无法收敛到有效 PoC，拿到局部访问但未能结构化提交 flag，横向网络不可达，工具缺失，WebSearch/WebFetch 返回空，以及长时间探索后超时。这与 CyberGym-E2E、ExploitBench 和 ExploitGym 的共同趋势一致：任务越接近端到端，瓶颈越从单点漏洞知识转移到发现、串联、验证和预算管理。
+## 6. 实验结果
 
-### 5.4 RQ2/RQ3：攻击失败仍可能被防御观察
+### 6.1 RQ1：多层任务能否完成，不同模型有何差异？
 
-检测结果必须与攻击结果分开读。在 39 个已完成 case 中，14 个 case 的 expected ruleId 在攻击窗口新增 signal 中被覆盖。也就是说，即使多数 case 没有完成全部 flag，SysArmor 仍能在一部分失败攻击中观察到预期行为。
+Kimi-K3 完成全部 50 个 L2 case，其中 16/50 三旗全通，三层 flag 获取率依次为 22/50、18/50 和 16/50，objective 为 17/50。22/50 个 case 以 timeout 结束。这说明前沿智能体已经能够完成一部分真实多层任务，但连续推进仍不稳定。
 
-这个结果的价值不在于声称“检测率已经高”，而在于建立了一个可复核的检测 oracle。每个命中都可以追溯到具体 signal frame、ruleId、target 和攻击窗口。它让我们可以区分四类结果：
+DeepSeek-V4-Pro 当前完成 40/50 个 L2 case，其中 6/40 三旗全通，三层 flag 为 19/40、10/40 和 6/40。由于它是 partial run，不能与 Kimi 的 50-case 完整结果直接形成最终排名。
 
-| 情况 | 解释 |
-|---|---|
-| 攻击成功且 signal 命中 | 攻击链完成，防御侧观察到预期行为 |
-| 攻击成功但 signal 未命中 | 攻击达成目标，但当前规则或采集链路漏掉了预期行为 |
-| 攻击失败但 signal 命中 | 最终目标未完成，但攻击过程已经产生可解释证据 |
-| 攻击失败且 signal 未命中 | 可能未触发预期行为，也可能检测覆盖不足 |
+在两种模型共同完成的 40 个 case 上，控制变量比较更清楚：
 
-第三种情况尤其重要。它说明安全智能体评测不能把失败攻击简单丢弃；这些失败轨迹恰恰可能包含防御系统需要学习和解释的中间行为。
+| 模型 | t1 | t2 | t3 / 三旗全通 |
+|---|---:|---:|---:|
+| Kimi-K3 L2 | 18/40 | 16/40 | 15/40 |
+| DeepSeek-V4-Pro L2 | 19/40 | 10/40 | 6/40 |
 
-### 5.5 RQ4：解释防御为什么沉默
+两种模型在入口层非常接近，DeepSeek 甚至多完成一个 t1；差异在后续层级扩大。Kimi 从 t1 到 t3 减少 3 个 case，DeepSeek 减少 13 个。这组结果支持一个有限结论：**在当前协议和共同 case 上，模型差异主要体现为入口后的持续推进，而不是初始访问。** 单次运行、模型随机性和 DeepSeek 未完成部分仍然限制了结论强度。
 
-对于未命中的 case，我们记录 `missing_signal`，而不是只给一个 ❌。当前未命中的 ruleId 主要集中在：
+### 6.2 RQ2：系统条件会在多大程度上改变能力？
 
-| missing ruleId | 可能解释 |
-|---|---|
-| `execution_tool_opens_network_connection` | agent 没有在 workload 内触发执行工具联网，或该行为没有被当前规则捕捉 |
-| `network_client_used_in_workload` | 网络客户端行为可能发生在 attacker 容器、外部环境或未覆盖进程中 |
-| `workload_executes_shell_or_interpreter` | 攻击路径可能没有进入 workload 执行，或 shell/interpreter 规则覆盖不足 |
+harness 收益实验尚未完成，因此本文不对其效果作定量结论。已有证据来自 DeepSeek L1 的 none/high 对照。
 
-这些 missing signal 是下一轮规则设计和传感器验证的入口。更重要的是，它们让“没有告警”变得可以解释：未命中究竟是 agent 没做到、规则没有覆盖、采集链路没有看到，还是 expected GT 对该 case 的失败路径要求过强。这样，防御沉默不再是一个黑盒结果，而是一组可以继续追问的假设。
+| 指标 | none | high |
+|---|---:|---:|
+| 三旗全通 | 2/50 | 0/50 |
+| t1 / t2 / t3 | 2/50 / 2/50 / 2/50 | 2/50 / 0/50 / 0/50 |
+| objective | 1/50 | 0/50 |
+| timeout | 6/50 | 19/50 |
+| 平均 agent 时间 | 1,417.6 s | 2,428.5 s |
+| 中位 agent 时间 | 1,091.7 s | 2,536.5 s |
+| decoy interaction | 不适用 | 50/50 |
+| 直接接触 decoy | 不适用 | 38/50 |
+| decoy hits | 不适用 | 27,230 |
 
-### 5.6 评测系统本身是研究对象
+两个 arm 的环境、攻击图、攻击路径和清理均为 50/50，说明差异不是 range 部署失败。high 配置使平均运行时间增加约 71%，timeout 从 6 增至 19；none 中成功的两个 case 在 high 中都失败，没有出现 high-only success。
 
-本轮实验暴露的工程问题不是背景噪声，而是真实安全智能体评测的一部分。我们需要处理 SysArmor 版本一致性、Tetragon container ID 匹配、非 root 镜像注入、runtime 资产缺失、agent finalization、Web 工具返回空、日志与 verifier 不一致，以及 watcher 采集窗口定义。这些问题共同说明：真实评测的可信度来自协议冻结、证据保存和失败归因，而不是只运行一个 benchmark 脚本。
+但这不是纯 decoy 因果效应。high 同时包含 43 个 decoy、不同 worker 并行度和一处 topology hint 序列化差异。可靠结论是：**当前 high 配置显著增加了 L1 智能体的探索和规划成本。** 要单独估计 decoy 效应，还需要修复 topology hint、统一 parallel 并随机化实验顺序。
 
-## 6. 讨论
+### 6.3 RQ3：智能体行动是否会触发防御信号？
 
-### 6.1 为什么不是只报告 flag？
+答案是肯定的，但 signal 覆盖与攻击完成度并不相同。
 
-flag 是攻击成功 oracle，但不是防御 oracle。一个 agent 没有拿齐 flag，仍然可能执行过 shell、发起网络连接、读取敏感文件或触发反连模式。如果评测只报告 `PASS/FAIL`，这些行为会消失。对防御研究而言，这些中间行为往往比最终 flag 更接近真实告警场景。
+Kimi 完整 50-case 结果中，42/50 至少产生一个新增 attack-window signal，28/50 命中全部 expected signal，共记录 23,252 个 attack-window signal frame。DeepSeek 当前 40 个 case 中，30/40 产生新增 signal，14/40 命中全部 expected signal，共记录 9,628 个 frame。
 
-sysfield 因此把攻击能力、防御可观测性和防御沉默拆成三条曲线。攻击曲线衡量 agent 能否完成目标；检测曲线衡量防御能否在过程中产生语义化证据；missing-signal 曲线解释当前规则体系和观测边界在哪里保持沉默。
+在共同 40 个 case 上：
 
-### 6.2 为什么 GT 必须行为化？
+| 模型 | 三旗全通 | 至少一个新增 signal | strict expected hit |
+|---|---:|---:|---:|
+| Kimi-K3 L2 | 15/40 | 34/40 | 26/40 |
+| DeepSeek-V4-Pro L2 | 6/40 | 30/40 | 14/40 |
 
-靶场评测很容易过拟合。如果规则绑定 `/flag`、固定路径、产品名或 CVE 编号，就会得到漂亮但不可迁移的结果。我们当前使用通用行为 ruleId，牺牲了一部分短期命中率，但保留了向其他靶场和真实 workload 迁移的可能性。
+即使 DeepSeek 只完成 6 个多层任务，30 个 case 仍产生运行时信号。攻击失败不能被解释为没有安全相关活动。
 
-一个较低但干净的 expected signal hit，比一个依赖 magic path 的高命中率更有研究价值。这是本文的 taste 选择：指标不只是要好看，更要能说明问题。
+四象限结果进一步说明两类指标不能互相替代：
 
-### 6.3 裸 harness 对照是下一步关键
+| 模型 | 攻击成功 / signal hit | 攻击成功 / signal miss | 攻击失败 / signal hit | 攻击失败 / signal miss |
+|---|---:|---:|---:|---:|
+| Kimi-K3，共同 40 case | 12 | 3 | 14 | 11 |
+| DeepSeek-V4-Pro，已完成 40 case | 3 | 3 | 11 | 23 |
 
-当前 defended 结果不能直接回答 SysArmor 是否改变了攻击成功率。SysArmor 可能引入额外开销、改变 timing、影响服务稳定性，也可能几乎不影响攻击过程。要回答这个问题，必须用相同 case、模型、runner、prompt、预算和 verifier 跑 bare harness，并与 defended harness 做配对比较。
+Kimi 有 14 个攻击失败但 expected signal 命中的 case，DeepSeek 有 11 个。另一方面，两种模型都有攻击成功但 signal miss 的 case。前者说明失败轨迹仍会暴露，后者说明攻击成功并不保证当前规则覆盖了预期行为。
 
-下一阶段建议报告两类效应：
+这些结果只证明 SysArmor 产生了观察证据。它们不证明攻击被阻止，也不能仅凭 signal hit 数量判断哪种攻击更严重。
 
-| 维度 | 指标 |
-|---|---|
-| 攻击侧效应 | 三旗全通率、t1/t2/t3 flag、终止原因、时间、工具调用 |
-| 防御侧效应 | attack-window signal、expected signal、missing signal、ruleId 分布 |
+### 6.4 RQ4：哪些预期行为最容易未被观察到？
 
-只有配对实验完成后，才能严谨讨论“裸 harness + SysArmor 之间效果差别”。
+共同 40 个 case 的 missing-rule 分布如下：
 
-## 7. 局限性
+| missing rule | Kimi-K3 | DeepSeek-V4-Pro |
+|---|---:|---:|
+| `execution_tool_opens_network_connection` | 12 | 23 |
+| `network_client_used_in_workload` | 9 | 18 |
+| `workload_executes_shell_or_interpreter` | 6 | 16 |
 
-当前报告是阶段稿，结果尚未覆盖完整 case1-50。case28 正在运行，case29-31 已完成 runtime preparation 并等待串行执行，case44-50 待跑，因此本文的定量结果以 39 个 completed case 为分母。
+两种模型最常缺失的都是执行工具联网，其次是 workload 网络客户端和 shell/interpreter 行为。这给规则和 telemetry 改进提供了优先级，但不能直接得出“DeepSeek 更隐蔽”或“SysArmor 在这些行为上失明”的结论。
 
-第二，本轮只覆盖一个模型、一个 runner、一个难度等级和一个 defended 配置。结果不能外推到其他模型、Claude Code runner、L0/L1、更多预算或裸 harness。
+原因在于 expected rule 描述 case 可能需要的行为，而不是对实际轨迹的逐动作标注。DeepSeek 更早停止推进时，部分行为可能从未发生；其他 miss 也可能来自规则覆盖或采集边界。下一步需要将 missing rule 与工具调用和 workload 事件逐项对齐，才能区分未执行与未观察。
 
-第三，expected signal GT 仍然是人工设计的行为标签。它避免了产品和路径耦合，但仍可能漏掉某些真实攻击行为，也可能要求了 agent 在具体失败路径中没有实际执行的动作。
+### 6.5 对核心问题的阶段性回答
 
-第四，SysArmor 当前以 observe 模式评估可观测性，不评估阻断、处置或对抗规避能力。
+网络安全智能体在真实防御环境中仍然具备有效攻击能力，但这种能力不是稳定常数。它随模型和系统条件变化，在多层推进中快速衰减，也会受到当前 high 配置的明显干扰。同时，基础运行时防御并未在智能体面前普遍失去可见性：大量成功和失败轨迹都产生了结构化 signal。
 
-## 8. 结论与未来工作
+因此，真实风险不能用“智能体成功率”或“检测命中率”中的任何一个单独表示。攻击完成度、防御可见性和抗干扰能力必须共同报告。
 
-我们预计安全智能体评测会沿三条线发展。
+## 7. 讨论
 
-第一，任务会从单点漏洞转向长程行动。CyberGym、CyberGym-E2E、ExploitBench 和 ExploitGym 已经展示了从复现、修复到利用的能力阶梯；CVE-Bench、Cyber Range 和多层靶场会继续把问题推进到凭据、横向移动、业务目标和长期状态管理。
+### 7.1 对防御者：在最终失陷前使用过程证据
 
-第二，评测对象会从模型转向系统。模型、harness、工具权限、知识包、预算、网络出口和验证器都会显著影响结果。未来报告如果只写模型名和成功率，会越来越难解释。
+实验中相当一部分失败攻击已经触发 expected signal。防御者不应把“没有完成最终目标”当作没有风险，也不需要等待完整攻击链出现后才评估检测价值。过程信号可以用于更早的调查、关联和响应设计。
 
-第三，防御评测会从日志存在性转向语义化 signal。更有价值的不是“有没有事件”，而是事件能否映射到攻击阶段、进程链、网络行为和可迁移的检测规则，并在最终失陷之前给出证据。
+但 observe-only 结果不等于防护效果。下一步应在相同协议上加入阻断和响应实验，测量 signal 出现后能否降低后续 flag 获取，而不是从当前数据推断阻断能力。
 
-sysfield 的定位正是在这三条线的交点：真实多层网络行动、可控智能体系统、以及运行时防御证据。
+### 7.2 对 benchmark 设计者：同时保留结果和过程
 
-## 9. 复现材料
+分层 flag 比单一 PASS 更有解释力，因为它显示智能体停在哪一层。运行时 signal 又补充了“行动是否暴露”。两类信息应该在 case 级对齐，但保持独立字段。将它们压成单一总分会掩盖成功但暴露、失败但危险等关键状态。
 
-主要实验表：
+benchmark 还应把 model、harness、工具、预算和环境作为正式实验配置。当前共同 40-case 结果表明，模型差异会随任务阶段变化；只报告最终成功率无法看出差异发生在入口还是持续推进。
 
-- `CVELab/reports/experiments/sysarmor-cvelab-stratified50-rerun300-case50.zh.md`
+### 7.3 对平台方：harness 和环境都是风险控制面
 
-当前 GT 与导出脚本：
+智能体能力不仅来自模型。harness 决定状态管理、工具调用和恢复能力，环境决定它能看到什么、被什么吸引以及如何消耗预算。当前 high 配置显著增加 timeout，说明环境设计可以改变智能体的运行成本。
 
-- `CVELab/data/experiments/stratified-50/sysarmor-case0/expected-signals-case1-50.json`
-- `CVELab/scripts/export_sysarmor_signals.py`
+这不意味着 decoy 已经被证明具有普遍防护效果。它说明平台方应把工具权限、网络视图、环境反馈、预算和运行时观测纳入部署评估，而不是只按模型版本设定风险等级。
 
-关键运行目录：
+### 7.4 负责任的评测边界
 
-- `CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case1-10-l2-20260804-a/`
-- `CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case11-20-l2-20260805-b/`
-- `CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case18-50-l2-20260806-e/`
-- `CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case32-50-l2-20260806-g/`
-- `CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case28-31-l2-20260807-h/`
+sysfield 在授权、隔离的 range 内使用已知漏洞，报告聚合结果和防御证据，不提供面向开放网络的战术优化。研究目标与 CyberGym、CyberGym-E2E 和 ExploitGym 的负责任立场一致：真实任务用于测清能力和风险，以支持安全部署、防御规划和修复。
 
-## 参考资料
+## 8. 局限性
 
-[1] CyberGym: Evaluating AI Agents' Real-World Cybersecurity Capabilities at Scale. Local archive: `.archive/paper/cybetgym.md`.
+1. **DeepSeek L2 仍是 partial run。** 当前只有 40/50，跨模型观察不是完整排名，也没有重复试验估计随机性。
+2. **SysArmor 只做 observe-only 观测。** 本文不能证明 signal 会阻断攻击或改善响应结果。
+3. **expected signal 不是逐动作 ground truth。** miss 可能来自行为未发生、telemetry 边界、规则覆盖或 expectation 过强。
+4. **L1 与 L2 回答不同问题。** L2 用于模型与可见性分析，L1 none/high 用于当前干扰配置分析，二者不能直接排名。
+5. **high 对照存在混杂因素。** 两臂 parallel 不同，顺序固定，high 还包含 topology hint 差异；当前结果不是纯 decoy 因果效应。
+6. **decoy interaction 来自 transcript 诊断。** 它不是 packet-level provenance，也不能证明每一次文本命中都对应真实网络访问。
+7. **harness 实验尚未完成。** 本文只能定义对照问题，不能给出 harness uplift。
+8. **任务覆盖有限。** Stratified-50 复用 24 个 CVE，数据层只有 3 个 CVE 变体，不能代表全部漏洞、网络拓扑和 MITRE ATT&CK 阶段。
+9. **signal frame 不是独立行为计数。** frame 总量受轨迹长度和重复行为影响，不能直接解释为攻击数量或风险严重度。
 
-[2] CyberGym-E2E: Scalable Real-World Benchmark for AI Agents' End-to-End Cybersecurity Capabilities. Local archive: `.archive/paper/cybergym-e2e-paper.md` and `.archive/paper/cybetgym-e2e.md`.
+## 9. 结论
 
-[3] ExploitGym: Can AI Agents Turn Security Vulnerabilities into Real Attacks? Local archive: `.archive/paper/exploitgym.md`.
+前沿网络安全智能体已经能够完成部分真实多层任务，但入口成功并不保证持续推进，模型和环境条件都会改变最终能力。与此同时，基础运行时防御仍能在大量成功与失败轨迹中产生结构化证据，当前 high 配置也能显著增加智能体的运行成本。
 
-[4] Related benchmarks discussed in CyberGym-E2E and prior sysfield notes: CyberSecEval, Cybench, InterCode-CTF, ExploitBench, CVE-Bench, SEC-Bench Pro, BountyBench, VulnLMP, and long-horizon Cyber Range evaluations.
+这些结果支持一个直接结论：下一代网络安全智能体 benchmark 不能只问“攻击是否成功”。它还必须回答防御何时看见了什么、环境如何改变行动，以及缺失信号究竟意味着什么。
 
-[5] SysArmor × CVELab Stratified-50 防御增强评测表. `CVELab/reports/experiments/sysarmor-cvelab-stratified50-rerun300-case50.zh.md`.
+> **攻击成功不等于防御失明，攻击失败也不等于风险不存在。**
+
+sysfield 将攻击完成度、防御可见性和抗干扰能力放入同一个可复现评测体系。它的目标不是提高攻击能力，而是让防御者、评测者和平台方更准确地理解前沿智能体的现实风险边界。
+
+## 参考文献
+
+[1] Meta. [CyberSecEval / Purple Llama Cybersecurity Benchmarks](https://github.com/meta-llama/PurpleLlama/tree/main/CybersecurityBenchmarks).
+
+[2] Zhang et al. [Cybench: A Framework for Evaluating Cybersecurity Capabilities and Risks of Language Models](https://arxiv.org/abs/2408.08926). 2024.
+
+[3] Yang et al. [InterCode: Standardizing and Benchmarking Interactive Coding with Execution Feedback](https://arxiv.org/abs/2306.14898). 2023.
+
+[4] Wang et al. [CyberGym: Evaluating AI Agents' Real-World Cybersecurity Capabilities at Scale](https://arxiv.org/abs/2506.02548). 2025.
+
+[5] OpenAI. [SEC-Bench Pro](https://deploymentsafety.openai.com/gpt-5-6/sec-bench-pro). 2026.
+
+[6] [BountyBench: Dollar Impact of AI Agent Attackers and Defenders on Real-World Cybersecurity Systems](https://arxiv.org/abs/2412.19127). 2024.
+
+[7] [CyberGym-E2E: Benchmarking End-to-End Cybersecurity Agents](https://arxiv.org/abs/2606.04460). 2026.
+
+[8] Lee and Brumley. [ExploitBench: A Capability Ladder Benchmark for LLM Cybersecurity Agents](https://arxiv.org/abs/2605.14153). 2026.
+
+[9] Wang et al. [ExploitGym: Can AI Agents Turn Security Vulnerabilities into Real Attacks?](https://arxiv.org/abs/2605.11086). 2026.
+
+[10] [AutoPenBench: Benchmarking Generative Agents for Penetration Testing](https://arxiv.org/abs/2410.03225). 2024.
+
+[11] [CVE-Bench: A Benchmark for AI Agents' Ability to Exploit Real-World Web Application Vulnerabilities](https://arxiv.org/abs/2503.17332). 2025.
+
+[12] AgentCyberRange. [WebExploitBench](https://huggingface.co/datasets/AgentCyberRange/WebExploitBench).
+
+[13] OpenAI. [GPT-5 System Card](https://cdn.openai.com/gpt-5-system-card.pdf). 2025.
+
+[14] OpenAI. [GPT-5.6 System Card](https://deploymentsafety.openai.com/gpt-5-6/). 2026.
+
+[15] DARPA. [AI Cyber Challenge](https://aicyberchallenge.com/).
+
+[16] Sakana AI. [Introducing Fugu-Cyber](https://sakana.ai/fugu-cyber-release/). 2026.
+
+[17] METR. [Time Horizon](https://metr.org/time-horizons/).
