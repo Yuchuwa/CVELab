@@ -1,163 +1,103 @@
-# sysfield Problem-Driven Report Design
+# sysfield 问题牵引式报告设计说明
 
-## Goal
+## 目标
 
-Rewrite `reports/report.zh.md` and `reports/report.en.md` as a bilingual,
-defender-centric research report. The report must explain what evidence
-defenders, benchmark designers, and platform operators need in order to
-characterize the risk boundary of frontier cyber agents in real defended
-environments.
+将 `reports/report.zh.md` 和 `reports/report.en.md` 重写为立场一致的双语科研报告。报告应面向防御者、benchmark 设计者和平台方，说明为了刻画前沿网络安全智能体在真实防御环境中的风险边界，需要怎样的 benchmark 与证据体系。
 
-The report does not optimize offensive tactics. Controlled attack trajectories
-are measurement instruments used to evaluate attack completion, defensive
-visibility, and robustness under interference.
+报告不以优化攻击战术为目的。受控攻击轨迹只是测量手段，用于评估攻击完成度、防御可见性和抗干扰能力。
 
-## First-Principles Narrative
+## 第一性原理叙事
 
-Both language versions follow the same causal sequence:
+中英文报告必须遵循同一条因果链：
 
-1. **Field change:** cyber-agent evaluation is moving from static knowledge and
-   isolated tasks toward executable, long-horizon action in realistic systems.
-2. **Gap:** existing benchmarks measure PoCs, flags, patches, and objectives
-   well, but rarely measure whether real defenses can observe or perturb the
-   attack process.
-3. **Challenges:** the benchmark must construct realistic but judgeable ranges,
-   separate attack and defense outcomes, attribute signals to the attack
-   window, define behavioral rather than benchmark-private detection ground
-   truth, and measure interference without collapsing it into attack success.
-4. **Key insight:** agent risk is not a single attack-success rate. Defenders
-   need the joint profile of attack completion, defensive visibility, and
-   robustness under interference.
-5. **Approach:** sysfield combines CVELab multi-layer ranges, external attack
-   verification, SysArmor runtime observation, attack-window attribution,
-   behavioral expected signals, and decoy arms in one evidence protocol.
-6. **Evidence:** separate experiments answer separate research questions about
-   visibility, model-dependent behavior, and decoy-induced operational impact.
-7. **Boundary:** conclusions remain limited by partial runs, observe-only
-   detection, model/difficulty differences, behavioral-rule coverage, and the
-   topology-hint confound in the current high-decoy arm.
+1. **领域变化：** 网络安全智能体评测正在从静态知识和孤立任务，转向真实系统中可执行、长程、连续的行动。
+2. **现有缺口：** 现有 benchmark 已经能有效测量 PoC、flag、patch 和 objective，却很少测量真实防御能否观察或扰动攻击过程。
+3. **真正挑战：** benchmark 既要构造真实又可判定的靶场，也要分离攻击与防御结果；既要把 signal 严格归因到攻击窗口，也要使用行为化而非靶场私有的检测 GT；还要独立测量干扰效果，而不能把它折叠进攻击成功率。
+4. **关键洞察：** 智能体风险不能由单一攻击成功率刻画。防御者需要攻击完成度、防御可见性和抗干扰能力的联合画像。
+5. **解决方法：** sysfield 将 CVELab 多层 range、外部攻击验证、SysArmor 运行时观测、攻击窗口归因、行为化 expected signal 和 decoy 实验臂组合成统一的证据协议。
+6. **实验证据：** 不同实验分别回答防御可见性、不同模型系统的行为差异，以及 decoy 带来的实际运行影响。
+7. **研究边界：** 结论仍受 partial run、observe-only 检测、模型与难度差异、行为规则覆盖范围，以及当前 high-decoy 实验中的 topology-hint 混杂因素限制。
 
-The recurring thesis is:
+全文反复强调的核心判断是：
 
-> Attack success does not imply defensive blindness, and attack failure does
-> not imply the absence of risk.
+> 攻击成功不等于防御失明，攻击失败也不等于风险不存在。
 
-## Positioning
+## 研究立场
 
-The report aligns with the responsible framing used by CyberGym,
-CyberGym-E2E, and ExploitGym:
+报告的立场应与 CyberGym、CyberGym-E2E 和 ExploitGym 的负责任表述一致：
 
-- realistic evaluation is necessary because synthetic or completion-only
-  scores cannot reveal real risk and defensive requirements;
-- offensive actions are included to support safe deployment, repair,
-  evaluation, and defensive planning;
-- dual-use capability is acknowledged, while the analytical endpoint remains
-  the defender's need to model agents as a realistic source of attack pressure.
+- 必须在真实任务中评测智能体，因为合成任务或单一完成度分数无法揭示现实风险和防御需求；
+- 引入攻击行为是为了支持安全部署、修复、评估和防御规划；
+- 明确认识网络安全能力的 dual-use 属性，但分析落点始终是防御者需要把智能体建模为一种真实攻击压力来源。
 
-The report must not describe sysfield as a way to make agents more effective,
-stealthy, or operationally capable. Detection misses are inputs to benchmark
-and defensive-system improvement, not advice for evasion.
+报告不得把 sysfield 描述成一种让智能体更有效、更隐蔽或更具攻击能力的方法。检测 miss 应用于改进 benchmark 和防御系统，而不能被转化为规避检测的建议。
 
-## Core Claims
+## 核心主张
 
 ### Core Problem
 
-Do cyber agents remain effective in real defended environments?
+网络安全智能体，在真实防御环境中仍然有效吗？
 
-Here, "effective" is multidimensional: completing attack objectives, remaining
-visible or invisible to runtime defense, and maintaining progress under
-deception or environmental interference.
+这里的“有效”是多维概念：它既包括能否完成攻击目标，也包括攻击过程对运行时防御是否可见，以及面对诱骗或环境干扰时能否维持行动。
 
 ### Defender-Centric Gap
 
-Existing cyber-agent benchmarks primarily measure task completion, such as
-PoCs, flags, patches, or final objectives, but rarely measure the visibility and
-perturbability of attack processes in real defended environments. This leaves a
-critical industry gap: whether baseline runtime defenses still observe key
-attack behaviors when frontier agents enter realistic networks, and whether
-deception and environmental noise still disrupt their trajectories.
+现有网络安全智能体 benchmark 主要衡量任务完成度，例如 PoC、flag、patch 或最终 objective，但很少衡量攻击过程在真实防御环境中的可见性与可干扰性。对于网络安全业界而言，这留下了一个关键空白：如果前沿智能体进入真实网络环境，基础运行时防御是否仍能观察到关键攻击行为，诱骗和环境噪声是否仍能有效扰动其行动轨迹。
 
 ### Key Insight
 
-For defenders, benchmark designers, and platform operators, a single attack
-success rate cannot characterize agent risk. A more useful evaluation target is
-the joint profile of attack completion, defensive visibility, and robustness
-under interference. Measuring all three is necessary to identify actual risk
-and defensive exposure in realistic environments.
+对防御者、benchmark 设计者和平台方而言，智能体风险不能由单一攻击成功率刻画；更有用的评测对象，是攻击完成度、防御可见性和抗干扰能力的联合画像。只有把这三者同时纳入评测，才能判断前沿智能体在真实防御环境中的实际风险与防御暴露面。
 
-## Evidence Architecture
+## 证据架构
 
-Experiments are organized by research dimension rather than execution order or
-a primary/secondary hierarchy.
+实验应按研究维度组织，而不是按执行时间线排列，也不应被简单划分为“主实验”和“辅助实验”。
 
-| Dimension | Evidence | Supported interpretation |
+| 研究维度 | 对应证据 | 可以支持的解释 |
 |---|---|---|
-| Attack completion and defensive visibility | Kimi-K3 L2 SysArmor watch-window, 50/50 | Attack success, objectives, timeouts, new signals, and strict expected-signal hits are distinct outcomes. |
-| Model-dependent behavior under defended observation | DeepSeek L2 SysArmor rerun, 40/50, compared cautiously with Kimi-K3 | The protocol can expose different attack and signal profiles across model-agent systems; the incomplete run does not support a final model ranking. |
-| Robustness under interference | DeepSeek L1 paired none/high-decoy arms, 50/50 each | The current high configuration changes exploration cost, interaction, timeouts, and success outcomes while the range remains valid. |
-| Evidence separation | Environment, graph/path, flags, objective, signals, timeout, and decoy interaction | Infrastructure validity, attack completion, business objective, visibility, and interference are not interchangeable labels. |
+| 攻击完成度与防御可见性 | Kimi-K3 L2 SysArmor watch-window，50/50 | 攻击成功、objective、timeout、新增 signal 和 strict expected-signal hit 是相互独立的结果。 |
+| 真实防御观测下的模型系统差异 | DeepSeek L2 SysArmor 重跑，40/50；与 Kimi-K3 谨慎比较 | 该协议能够揭示不同模型智能体系统的攻击和 signal 画像差异；未完成的实验不能支持最终模型排名。 |
+| 抗干扰能力 | DeepSeek L1 none/high-decoy 配对实验，各 50/50 | 在 range 保持有效的前提下，当前 high 配置改变了探索成本、decoy interaction、timeout 和成功结果。 |
+| 证据解耦 | 环境、graph/path、flag、objective、signal、timeout 和 decoy interaction | 基础设施有效性、攻击完成度、业务目标、防御可见性和干扰效果不能相互替代。 |
 
-The report must preserve the configuration attached to every number. It must
-not directly aggregate different models, L1/L2 contexts, detection arms, and
-decoy arms into one success rate.
+报告必须为每个数字保留对应的实验配置，不得把不同模型、L1/L2 context、detection arm 和 decoy arm 直接聚合成一个成功率。
 
-## Results Organization
+## 结果组织
 
-The evaluation section answers questions rather than recounting experiment
-batches:
+实验评估章节按研究问题展开，而不是复述各批次运行过程：
 
-1. Can agents reliably complete multi-layer attacks?
-2. Can baseline runtime defense observe meaningful behavior during those
-   trajectories?
-3. Are attack completion and defensive visibility independent?
-4. Does the protocol reveal different profiles across agent systems?
-5. Do deception and environmental noise perturb agent trajectories?
-6. What do misses and timeouts reveal about benchmark and defense boundaries?
+1. 智能体能否稳定完成多层攻击？
+2. 基础运行时防御能否在攻击轨迹中观察到有意义的行为？
+3. 攻击完成度与防御可见性是否相互独立？
+4. 该协议能否揭示不同智能体系统的行为画像差异？
+5. 诱骗和环境噪声是否会扰动智能体的行动轨迹？
+6. miss 与 timeout 揭示了哪些 benchmark 和防御边界？
 
-Each subsection states the question, identifies the applicable experiment,
-reports the evidence, and gives only the conclusion supported by that evidence.
+每个小节先提出问题，再明确适用的实验，随后给出证据，并且只得出证据能够支持的结论。
 
-## Required Boundaries
+## 必须保留的结论边界
 
-- SysArmor runs are detection/observe experiments, not blocking experiments;
-  they do not show that attacks were prevented.
-- A strict expected-signal miss does not prove defensive blindness. The agent
-  may not have executed the expected behavior, telemetry may not cover it, or
-  the case-level expectation may be too strong for the realized trajectory.
-- A signal hit does not prove attack success, severity, or prevention.
-- The DeepSeek L2 run is incomplete at 40/50 and supports only provisional
-  cross-model interpretation.
-- Kimi-K3 and DeepSeek L1 results differ in model context and experiment design;
-  they answer different questions and must not be ranked directly.
-- The current high-decoy arm includes a topology-hint difference caused by a
-  serialization bug. Its result is the operational effect of the current high
-  configuration, not an isolated causal estimate of container decoys.
-- Transcript-derived decoy interaction is diagnostic evidence, not
-  packet-level provenance.
-- Current results are based on one manifest and limited model-agent systems;
-  they do not establish universal model or defense rankings.
+- SysArmor 实验是 detection/observe 实验，而不是 blocking 实验；结果不能证明攻击已被阻止。
+- strict expected-signal miss 不能直接证明防御失明。可能是智能体没有执行预期行为、当前 telemetry 未覆盖该行为，或 case-level expectation 对实际轨迹而言过强。
+- signal hit 不能证明攻击成功、攻击严重或防御实现了阻断。
+- DeepSeek L2 实验只完成 40/50，仅支持阶段性的跨模型观察。
+- Kimi-K3 与 DeepSeek L1 结果的模型 context 和实验设计不同；两者回答不同问题，不能直接排名。
+- 当前 high-decoy arm 包含 serialization bug 导致的 topology-hint 差异。因此实验测量的是当前 high 配置的整体 operational effect，而不是 container decoy 的独立因果效应。
+- 基于 transcript 的 decoy interaction 只是诊断证据，不是 packet-level provenance。
+- 当前结果基于一份 manifest 和有限的模型智能体系统，不能建立普遍适用的模型或防御排名。
 
-## Bilingual Consistency
+## 双语一致性
 
-The Chinese and English reports must have the same section structure, claims,
-tables, experiment counts, caveats, and conclusion strength. English should be
-written as natural research prose rather than a sentence-by-sentence literal
-translation, but neither version may introduce evidence absent from the other.
+中英文报告必须具有相同的章节结构、主张、表格、实验数量、限制条件和结论强度。英文版应使用自然的科研英语，而不是逐句直译；但任何一版都不得引入另一版没有的证据。
 
-The rewrite preserves useful technical detail from the current drafts, removes
-stale `39/50` counts, incorporates the experiment summary dated August 7, 2026,
-and keeps source experiment reports discoverable from the evaluation section.
+重写应保留当前草稿中有效的技术内容，删除过期的 `39/50` 数字，纳入截至 2026 年 8 月 7 日的实验汇总，并在实验章节中保留各源实验报告的可追溯入口。
 
-## Acceptance Criteria
+## 验收标准
 
-- The abstract follows problem, gap, challenge, approach, evidence,
-  implication, and boundary in compact form.
-- The introduction foregrounds the defender-centric gap and key insight.
-- Related work positions sysfield as a complementary defensive-evidence
-  dimension, not as an offensive leaderboard.
-- Method sections explain how each component resolves a stated challenge.
-- Results are grouped by research question and retain experiment-specific
-  denominators and configurations.
-- Detection, model comparison, and decoy evidence are all represented.
-- Claims never exceed the limitations above.
-- Chinese and English versions are structurally and numerically aligned.
+- 摘要以紧凑形式覆盖问题、缺口、挑战、方法、证据、启示和边界。
+- 引言优先建立 defender-centric gap 和 key insight。
+- 相关工作把 sysfield 定位为对防御证据维度的补充，而不是 offensive leaderboard。
+- 方法章节明确说明各系统组件如何解决前文提出的挑战。
+- 实验结果按研究问题组织，并为每项结果保留对应的实验配置和分母。
+- detection、模型差异和 decoy 三个证据维度均得到呈现。
+- 任何主张都不得超出上述结论边界。
+- 中英文报告在结构、数字和结论强度上保持一致。
