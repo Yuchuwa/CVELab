@@ -6439,3 +6439,18 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   `data/sft/length_report_full_audit.json` 和 `data/sft/length_report_v2.json` 定向暂存。
 - 外部 checkout（约 5.7G）和 `tmp_venvs`（约 5.1G）未删除或暂存；本轮未执行任何批量
   restore、remove 或 add，当前暂存区只包含上述 7 个 curated 元数据文件。
+
+### 2026-08-08 — Atom session deep audit
+
+- 31 个 Atom session 均为 JSONL raw Agent/native 轨迹，当前内容全部可逐行解析；工作区状态为
+  20 个 modified、10 个 deleted、1 个 untracked。此次审计没有读取或输出具体 flag、token、
+  命令内容，也没有修改 session 文件。
+- 其中 13 个 session 对应的 Atom 当前记录为 `verified=true` 且 native/orchestrated verification
+  均成功；但其中 2 个 runtime 状态仍为 `unsupported` 或 `failed`，不能仅凭 session 视为
+  completed。CVE-2017-12635 的新增 session 对应的 Atom 当前记录为 verified/native/orchestrated
+  成功且 runtime ready。
+- 1 个 session（CVE-2017-12794）只有 native 成功、orchestrated 失败；另外 6 个 modified
+  session 和 10 个 deleted session 对应的 Atom 都是未验证或失败证据。它们应作为失败/诊断
+  证据私有保存，不应回填为 verified Atom。
+- 多份 session 含内部地址，5 份命中授权/token 形态标记；raw session 不应继续作为 canonical
+  Atom 文件提交。下一步应统一决定“私有归档”或“从 Git 追踪边界移除”，不能按单个 CVE 特判。
