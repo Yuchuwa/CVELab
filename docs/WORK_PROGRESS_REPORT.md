@@ -6397,3 +6397,14 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   已审查候选路径；post-commit `git diff HEAD^ HEAD --check` 通过。
 - `data/sft/cve_attack_sft_clean.jsonl` 未进入 commit，`data/sft/cve_attack_sft_v1.jsonl`
   也未被该 commit 修改；session、实验运行目录和模型产物仍留在工作区/未跟踪区，未被清理。
+
+### 2026-08-08 — post-merge completeness audit
+
+- `cvelab-report` 到 `CVELab` 的 Git 合并已完成：合并提交为 `cd881b1`，后续恢复提交为
+  `8450d29`，当前没有 unmerged index entry；`dev` 尚未推送，较 `origin/dev` ahead 58。
+- 交付边界复核发现 `8450d29` 删除了 `CVE-2014-0160` 和 `CVE-2017-8386` 的旧版
+  `exploit_guide.yaml`，并删除了若干旧 `playbook/sysfield.yaml`。当前 Atom source bundle
+  仍包含对应 PoC 材料，但 `CVE-2017-8386/atom.yaml` 当前记录为 `verified: false`；这些
+  删除需要按通用 Atom 重建/Guide 契约复核，不能仅按单个 CVE 临时恢复。
+- 工作区仍有 109 个未暂存或未跟踪的 session、SFT 原始数据、外部 checkout 和实验目录；它们
+  未进入提交，后续需单独决定保留、归档或清理。
