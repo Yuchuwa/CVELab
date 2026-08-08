@@ -105,5 +105,11 @@ data/sft/adapter_*/
 data/sft/*.jsonl
 data/sft/*.log
 data/sft/*.bak
+# Local external source checkouts and disposable virtual environments.
+/CVE-Factory/
+/vulhub/
+/db_vulns/
+/tmp_venvs/
+/.tmp/
 src/sysfield/
 data/experiments/stratified-50/runs/

@@ -6488,3 +6488,10 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
 - SFT Git 边界现在只追踪 4 个 aggregate length reports 和 2 个监控脚本；raw JSONL、3 个
   adapter 目录及训练/vLLM 日志不再进入 Git。现有 aggregate reports 未改动，本次没有删除
   任何 SFT 本地产物。
+
+### 2026-08-08 — external checkout and temporary environment boundary
+
+- `.gitignore` 已加入 `CVE-Factory/`、`vulhub/`、`db_vulns/`、`tmp_venvs/` 和 `.tmp/` 的
+  本地边界规则；这些目录均保留在磁盘，未删除、未提交，之后不会再出现在普通 Git 状态中。
+- 根目录 `opencode.json`、`2606.14295v2.pdf`、`1` 和 `EOF` 未自动忽略或清理，留待单独确认，
+  避免把可能有用的配置/研究资料当作临时垃圾处理。
