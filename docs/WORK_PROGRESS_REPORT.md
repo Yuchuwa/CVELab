@@ -6408,3 +6408,19 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   删除需要按通用 Atom 重建/Guide 契约复核，不能仅按单个 CVE 临时恢复。
 - 工作区仍有 109 个未暂存或未跟踪的 session、SFT 原始数据、外部 checkout 和实验目录；它们
   未进入提交，后续需单独决定保留、归档或清理。
+
+### 2026-08-08 — uncommitted worktree classification
+
+- 当前工作区共盘点出 109 个状态条目，分为：Atom 类 43 个、Range 类 40 个、SFT 类 17 个、
+  外部 checkout 3 个、临时/其他 6 个。此次仅完成盘点和分类，未对未提交内容执行 restore、
+  remove 或批量 add。
+- Atom 类包括 31 个 `data/atoms/**/session.json` raw session，以及 Atom reconstruction wave、
+  CVE-Factory candidate 扫描、候选队列和 probe 结果；这些是私有证据/候选供应，不是新的
+  canonical Atom 提交候选。
+- Range 类包括 `data/guide_ablation/`、34 个 `data/scenarios_*` 目录、Range matrix、
+  rerun 和 heterogeneity 结果；其中 `data/guide_ablation/sft_*_eval` 属于 SFT 评估输出，
+  后续需从 Range 原始实验中单独归类。
+- SFT 类包括未提交的 `cve_attack_sft_v1.jsonl`、clean/full/v2 corpus、adapter、训练日志和
+  vLLM 日志；总目录约 19G，trajectory 和模型产物按数据政策保持私有，不直接提交。
+- 外部 checkout 为 `CVE-Factory/`、`vulhub/`、`db_vulns/`；其他项包括 `tmp_venvs/`、
+  `.tmp/`、PDF、孤立临时文件和 `opencode.json`，需逐项确认后再处理。
