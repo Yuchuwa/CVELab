@@ -6454,3 +6454,12 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   证据私有保存，不应回填为 verified Atom。
 - 多份 session 含内部地址，5 份命中授权/token 形态标记；raw session 不应继续作为 canonical
   Atom 文件提交。下一步应统一决定“私有归档”或“从 Git 追踪边界移除”，不能按单个 CVE 特判。
+
+### 2026-08-08 — Atom session Git tracking boundary
+
+- `git ls-files` 显示仓库曾追踪 225 个 `data/atoms/**/session.json`。已统一使用
+  `git rm --cached` 将它们移出 index，并在 `.gitignore` 增加 `data/atoms/**/session.json`；
+  这是 raw evidence 的通用边界调整，不删除工作区文件。
+- 操作后 index 中的 session 追踪数为 0，磁盘上仍保留 216 个 session；其中 10 个在本次操作
+  前已经处于工作区缺失状态，另有 1 个新增 untracked session。未来 checkout 不再携带这些
+  raw session，但现有本地证据仍可继续用于私有分析。

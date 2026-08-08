@@ -92,5 +92,7 @@ data/scenarios/
 data/vulhub/
 data/atoms/**/.workspace/
 data/atoms/**/node_modules/
+# Native/Agent session traces are private raw evidence, not Atom contract files.
+data/atoms/**/session.json
 src/sysfield/
 data/experiments/stratified-50/runs/
