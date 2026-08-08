@@ -6495,3 +6495,12 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   本地边界规则；这些目录均保留在磁盘，未删除、未提交，之后不会再出现在普通 Git 状态中。
 - 根目录 `opencode.json`、`2606.14295v2.pdf`、`1` 和 `EOF` 未自动忽略或清理，留待单独确认，
   避免把可能有用的配置/研究资料当作临时垃圾处理。
+
+### 2026-08-08 correction — root and Atom candidate disposition
+
+- 按用户确认，根目录临时文件 `1`、`EOF` 已删除；`opencode.json` 和
+  `2606.14295v2.pdf` 保留在本地并加入 `.gitignore`，未提交。
+- `data/atom_reconstruction_wave_002_logs/`、raw wave、`data/cve_factory_*`、
+  `data/heterogeneity_vulhub_candidates.json`、`data/p0_probe_results.json` 和
+  `data/revalidate_existing_atoms_wave1.txt` 均保留本地，并加入 Atom candidate/raw 忽略边界；
+  它们不是未完成的 canonical Atom，而是私有候选供应、重建过程或 probe 证据。

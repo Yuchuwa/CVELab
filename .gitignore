@@ -111,5 +111,15 @@ data/sft/*.bak
 /db_vulns/
 /tmp_venvs/
 /.tmp/
+# Local research configuration and source PDF retained outside Git.
+/opencode.json
+/2606.14295v2.pdf
+# Atom candidate/reconstruction evidence is private planning data, not canonical Atom assets.
+data/atom_reconstruction_wave_002_logs/
+data/atom_reconstruction_wave_002_raw.json
+data/cve_factory_*
+data/heterogeneity_vulhub_candidates.json
+data/p0_probe_results.json
+data/revalidate_existing_atoms_wave1.txt
 src/sysfield/
 data/experiments/stratified-50/runs/
