@@ -6463,3 +6463,11 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
 - 操作后 index 中的 session 追踪数为 0，磁盘上仍保留 216 个 session；其中 10 个在本次操作
   前已经处于工作区缺失状态，另有 1 个新增 untracked session。未来 checkout 不再携带这些
   raw session，但现有本地证据仍可继续用于私有分析。
+
+### 2026-08-08 — data/atoms tracking verification
+
+- 当前 `HEAD` 追踪 `data/atoms/` 下 1,996 个非 session 文件，其中包括 239 个 `atom.yaml`、
+  225 个 runtime 文件和 776 个 source_bundle 文件；`git status -- data/atoms` 无未提交
+  canonical Atom 变更。
+- 因 session 已从 index 移除，结论是 canonical Atom 资产已提交，raw session 仅保留在本地
+  并由 `.gitignore` 管理；本次核对未修改 Atom 内容。
