@@ -6424,3 +6424,18 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   vLLM 日志；总目录约 19G，trajectory 和模型产物按数据政策保持私有，不直接提交。
 - 外部 checkout 为 `CVE-Factory/`、`vulhub/`、`db_vulns/`；其他项包括 `tmp_venvs/`、
   `.tmp/`、PDF、孤立临时文件和 `opencode.json`，需逐项确认后再处理。
+
+### 2026-08-08 — non-destructive worktree curation
+
+- Atom session 审计确认 31 个 session 均为 raw Agent/native 证据；多份包含内部地址、授权或
+  token 形态内容，因此全部保持未暂存。Atom reconstruction logs、CVE candidate scans 和
+  probe 结果也保持私有，未作为 canonical Atom 提交。
+- Range 审计覆盖约 1.1G 原始结果，包含 34 个 scenario 目录和 `guide_ablation` 批次；原始
+  `summary`/`verify_result` 文件普遍含 host path 或私有运行信息，未批量加入。通过 JSON/schema
+  和 marker 检查的 curated 候选为 4 个 `data/range_matrices/enterprise_3tier*.json` 文件及
+  `data/guide_ablation/manifest_reconciled.json`，已定向暂存。
+- SFT 审计确认 3 个 adapter 目录各约 6.5G；trajectory corpus 分别含内部路径，clean/full
+  还含 token 或 oracle 标记，训练/推理日志也保持私有。仅无敏感 marker 的
+  `data/sft/length_report_full_audit.json` 和 `data/sft/length_report_v2.json` 定向暂存。
+- 外部 checkout（约 5.7G）和 `tmp_venvs`（约 5.1G）未删除或暂存；本轮未执行任何批量
+  restore、remove 或 add，当前暂存区只包含上述 7 个 curated 元数据文件。

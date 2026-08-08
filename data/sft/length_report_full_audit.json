@@ -1,0 +1,32 @@
+{
+  "n_samples": 702,
+  "skipped_overlong": 0,
+  "skipped_leaks": 242,
+  "leak_flagged_samples": 0,
+  "by_context": {
+    "l2": 441,
+    "l0": 96,
+    "l1": 97,
+    "no_hint": 68
+  },
+  "by_hops_captured": {
+    "3": 156,
+    "0": 344,
+    "1": 165,
+    "2": 37
+  },
+  "by_resolved": {
+    "true": 156,
+    "false": 546
+  },
+  "by_sample_kind": {
+    "full": 702
+  },
+  "token_stats": {
+    "min": 2552,
+    "median": 52750,
+    "mean": 61631,
+    "p90": 127024,
+    "max": 250285
+  }
+}

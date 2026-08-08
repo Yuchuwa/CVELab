@@ -1,0 +1,1132 @@
+{
+  "schema_version": 1,
+  "experiment": "enterprise3-guide-ablation",
+  "selection_contract": {
+    "requires": [
+      "environment_success",
+      "attack_graph_valid",
+      "attack_path_reachable",
+      "guided_trial_evaluated",
+      "agent_success",
+      "objective_achieved"
+    ],
+    "max_cases": 100,
+    "selection": "coverage-first deterministic greedy selection"
+  },
+  "candidate_count": 72,
+  "selected_count": 71,
+  "cases": [
+    {
+      "id": "matrix-2012-1823-2016-3088-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2016-3088-2012-1823-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2012-1823",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "b01-dmz-middleware",
+      "purpose": "replace dmz-web with middleware RCE",
+      "cves": [
+        "CVE-2014-3120",
+        "CVE-2018-16509",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "b05-dual-variant",
+      "purpose": "replace both entry and app atoms",
+      "cves": [
+        "CVE-2022-22965",
+        "CVE-2022-24816",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2016-3714-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3714",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2017-11610-2017-12615-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2017-11610",
+        "CVE-2017-12615",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2017-12615-2017-11610-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2017-12615",
+        "CVE-2017-11610",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2017-15715-2017-17562-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2017-15715",
+        "CVE-2017-17562",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2018-16509-2018-19475-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2018-16509",
+        "CVE-2018-19475",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2019-17558-2019-0193-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2019-17558",
+        "CVE-2019-0193",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2021-42013-2021-32682-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2021-42013",
+        "CVE-2021-32682",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2022-24816-2022-22965-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2022-24816",
+        "CVE-2022-22965",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2025-68613-2025-55182-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2025-68613",
+        "CVE-2025-55182",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "b04-app-solr",
+      "purpose": "replace app-service with Solr RCE",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2019-17558",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2017-15715-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2017-15715",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2021-42013-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2021-42013",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2022-41678-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-41678",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2023-51467-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2023-51467",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2024-27348-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2024-27348",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2024-38856-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2024-38856",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2025-68613-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2025-68613",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2018-19475-2018-16509-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2018-19475",
+        "CVE-2018-16509",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "b00-baseline",
+      "purpose": "successful three-hop baseline",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2018-16509",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "b02-dmz-web-variant",
+      "purpose": "replace dmz-web with another reusable web RCE",
+      "cves": [
+        "CVE-2021-42013",
+        "CVE-2018-16509",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2016-3088-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2016-3088-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2016-3714-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3714",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2016-3714-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3714",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2017-11610-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2017-11610",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2017-11610-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2017-11610",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2017-11610-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2017-11610",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2017-12615-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2017-12615",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2017-12615-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2017-12615",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2017-12615-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2017-12615",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2017-15715-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2017-15715",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2017-15715-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2017-15715",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2018-16509-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2018-16509",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2018-16509-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2018-16509",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2018-16509-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2018-16509",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2018-19475-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2018-19475",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2018-19475-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2018-19475",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2018-19475-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2018-19475",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2019-0193-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2019-0193",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2019-0193-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2019-0193",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2019-0193-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2019-0193",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2019-17558-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2019-17558",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2019-17558-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2019-17558",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2021-32682-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2021-32682",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2021-32682-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2021-32682",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2021-32682-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2021-32682",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2021-42013-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2021-42013",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2021-42013-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2021-42013",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2022-22965-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-22965",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2022-22965-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-22965",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2022-24816-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-24816",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2022-24816-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-24816",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2022-24816-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-24816",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2022-41678-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-41678",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2022-41678-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2022-41678",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    },
+    {
+      "id": "matrix-2012-1823-2023-51467-2015-1427",
+      "purpose": "Guide ablation baseline",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2023-51467",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {},
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2023-51467-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2023-51467",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2024-27348-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2024-27348",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2024-27348-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2024-27348",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2025-55182-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2025-55182",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2025-68613-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2025-68613",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2012-1823-2025-68613-2019-9193",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2025-68613",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "postgresql"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2016-3088-2012-1823-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2012-1823",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2016-3088-2016-3714-2015-1427",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2016-3714",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2022-22965-2018-16509-2019-9193",
+      "purpose": "Guide ablation baseline",
+      "cves": [
+        "CVE-2022-22965",
+        "CVE-2018-16509",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2022-22965-2019-17558-2019-9193",
+      "purpose": "Guide ablation baseline",
+      "cves": [
+        "CVE-2022-22965",
+        "CVE-2019-17558",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "original_complete"
+    },
+    {
+      "id": "matrix-2022-22965-2022-24816-2014-3120",
+      "purpose": "auto-compatible enterprise_3tier combination",
+      "cves": [
+        "CVE-2022-22965",
+        "CVE-2022-24816",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {
+        "app-db-credential": "legacy",
+        "customer-records": "elasticsearch"
+      },
+      "baseline_context": "guided",
+      "source_summary": "data/guide_ablation/guided_reconciled/summary.json",
+      "reconciliation_status": "accepted_cleanup_only"
+    }
+  ]
+}
