@@ -100,5 +100,10 @@ data/range_matrices/*
 data/scenarios_*/
 data/rerun_capability*.jsonl
 # Reviewed Range exports already tracked above remain available; force-add new exports only after review.
+# SFT raw corpora, model adapters and training/runtime logs are private artifacts.
+data/sft/adapter_*/
+data/sft/*.jsonl
+data/sft/*.log
+data/sft/*.bak
 src/sysfield/
 data/experiments/stratified-50/runs/

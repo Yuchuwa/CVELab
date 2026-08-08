@@ -6480,3 +6480,11 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
 - 已提交的 `manifest_reconciled.json` 和 4 个 `enterprise_3tier` curated matrix 仍存在于
   `HEAD`；ignore 规则验证通过，`git status` 不再显示 Range raw 目录。后续新增 curated
   export 必须先审计再显式 force-add。
+
+### 2026-08-08 — SFT raw Git tracking boundary
+
+- `data/sft/cve_attack_sft_v1.jsonl` 已使用 `git rm --cached` 移出 index，工作区文件保持原样；
+  `.gitignore` 新增 corpus、adapter、训练/runtime log 和 backup 规则。
+- SFT Git 边界现在只追踪 4 个 aggregate length reports 和 2 个监控脚本；raw JSONL、3 个
+  adapter 目录及训练/vLLM 日志不再进入 Git。现有 aggregate reports 未改动，本次没有删除
+  任何 SFT 本地产物。
