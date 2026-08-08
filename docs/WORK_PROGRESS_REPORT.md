@@ -6471,3 +6471,12 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   canonical Atom 变更。
 - 因 session 已从 index 移除，结论是 canonical Atom 资产已提交，raw session 仅保留在本地
   并由 `.gitignore` 管理；本次核对未修改 Atom 内容。
+
+### 2026-08-08 — Range raw Git tracking boundary
+
+- 为 Range raw evidence 增加通用 `.gitignore` 边界：`data/guide_ablation/*`、
+  `data/heterogeneity_wave_logs/`、`data/range_matrices/*`、`data/scenarios_*/` 和
+  `data/rerun_capability*.jsonl`。这些规则只影响未追踪 raw 产物，不删除本地文件。
+- 已提交的 `manifest_reconciled.json` 和 4 个 `enterprise_3tier` curated matrix 仍存在于
+  `HEAD`；ignore 规则验证通过，`git status` 不再显示 Range raw 目录。后续新增 curated
+  export 必须先审计再显式 force-add。
