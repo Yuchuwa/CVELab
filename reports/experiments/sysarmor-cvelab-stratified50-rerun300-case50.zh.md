@@ -1,6 +1,6 @@
 # SysArmor × CVELab Stratified-50 重跑实验大表（case1-50，300 turns 口径）
 
-**状态：** case1-50 已完成
+**状态：** 原始 rerun300 已完成；402 修复重跑中：case29-31 已完成，case44-50 待重跑
 **日期：** 2026 年 8 月 6 日
 **运行目录：** [trial-sysarmor-rc5-general-case1-10-l2-20260804-a](/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case1-10-l2-20260804-a)
 **口径：**
@@ -90,6 +90,12 @@
 - `grace_window_count` 目前完成的 case 绝大多数为 0；case11 当前记录到 1 条、case20 当前记录到 2 条 grace-window signal。
 - `expected_signal_hit` 在已完成 case 中命中 14/50；新增补齐的 case29-31、case44-50 均未命中 expected signal。
 
+## 402 修复重跑说明
+
+- 2026 年 8 月 8 日复核发现，case29-31 与 case44-50 在后续批次中出现 `agent_api_quota / 402 Insufficient Balance`，因此这些结果不能直接与正常攻击失败等价。
+- 其中 case29-31 已完成一轮修复重跑：`trial-sysarmor-rc5-general-case29-31-l2-20260808-l`。这三例在修复重跑中均真实完成 agent 执行并以 `FAIL` 结束，不再是 402 假失败。
+- case44-50 的修复重跑将在后续批次继续补齐；在修复完成前，本表中 case44-50 仍保留原先落盘结果，但应视为“待纠正”。
+
 ## 数据来源
 
 - batch state： [batch_state.json](/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case1-10-l2-20260804-a/batch/batch_state.json)
@@ -101,4 +107,5 @@
 - case27 signal summary： [signals-sync/summary.json](/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case18-50-l2-20260806-e/signals-sync/summary.json)
 - case28 result： [matrix-2025-68613-2017-17562-2019-9193.json](/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case28-31-l2-20260807-h/batch/.batch/results/matrix-2025-68613-2017-17562-2019-9193.json)
 - case29-31 summary： [summary.json](/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case29-31-l2-20260807-k/batch/summary.json)
+- case29-31 rerun summary： [summary.json](/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case29-31-l2-20260808-l/batch/summary.json)
 - case44-50 summary： [summary.json](/home/jiandong/workspace/oslab/sysarmor/CVELab/data/experiments/stratified-50/runs/trial-sysarmor-rc5-general-case44-50-l2-20260807-j/batch/summary.json)
