@@ -34,10 +34,16 @@ except ImportError:  # pragma: no cover - retained for importability on Windows.
 
 from clab_builder.orchestrator.composer.scenario_runner import (
     DEFAULT_MAX_TURNS as DEFAULT_AGENT_TURNS,
+    audit_no_hint,
     extract_observed_progress,
 )
 from clab_builder.orchestrator.composer import sysarmor_runtime
 from clab_builder.orchestrator.composer.sysfield_runner import SysFieldRunner
+from clab_builder.orchestrator.composer.syspear_runner import (
+    build_syspear_description,
+    run_syspear_agent,
+    syspear_base_url,
+)
 
 SCENARIO_RUNNER_SRC = Path(__file__).parent / "scenario_runner.py"
 
@@ -45,6 +51,7 @@ SCENARIO_RUNNER_SRC = Path(__file__).parent / "scenario_runner.py"
 # scenario_runner.py for the level contract. "no_hint" is a legacy alias.
 AGENT_CONTEXTS = ("guided", "no_guide", "no_hint", "l0", "l1", "l2")
 LEVEL_CONTEXTS = ("l0", "l1", "l2")
+AGENT_RUNNERS = ("claude", "openai", "syspear")
 
 
 def _hint_profile(agent_context: str) -> str:
@@ -317,6 +324,8 @@ class ScenarioVerifier:
         import yaml
 
         scenario_path = Path(scenario_dir)
+        if not base_url and self.execution_context.get("agent_runner") == "syspear":
+            base_url = syspear_base_url()
         clab_data = yaml.safe_load((scenario_path / "clab.yaml").read_text()) or {}
         scenario_meta = {}
         meta_path = scenario_path / "scenario.yaml"
@@ -1087,8 +1096,11 @@ class ScenarioVerifier:
             raise ValueError("runtime_policy must be rebuild_missing or verify_only")
         if agent_context not in AGENT_CONTEXTS:
             raise ValueError(f"agent_context must be one of {AGENT_CONTEXTS}")
+        if agent_runner not in AGENT_RUNNERS:
+            raise ValueError(f"agent_runner must be one of {AGENT_RUNNERS}")
         scenario_path = Path(scenario_dir)
         self.execution_context = dict(execution_context or {})
+        self.execution_context["agent_runner"] = agent_runner
         sysarmor_config = dict(sysarmor or {})
         sysarmor_enabled = bool(sysarmor_config.get("enabled"))
         sysarmor_detection_enabled = bool(sysarmor_config.get("detection"))
@@ -1489,6 +1501,7 @@ class ScenarioVerifier:
             result = self._save_result(scenario_path, {
                 "validation_mode": self.validation_mode,
                 "agent_context": agent_context,
+                "agent_runner": agent_runner,
                 "environment_only": environment_only,
                 "resolved_asset_bindings": _meta.get("resolved_asset_bindings", {}),
                 "runtime_materialization": runtime_materialization,
@@ -1759,6 +1772,13 @@ class ScenarioVerifier:
             result["error"] = "docker image inspect returned invalid metadata"
         return result
 
+    @staticmethod
+    def _image_digests_equal(left: str, right: str) -> bool:
+        """Compare immutable image digests without treating registry aliases as drift."""
+        left_digest = str(left or "").rsplit("@", 1)[-1]
+        right_digest = str(right or "").rsplit("@", 1)[-1]
+        return bool(left_digest and left_digest == right_digest)
+
     def _rebuild_runtime_image(self, selection: dict[str, Any]) -> dict[str, Any]:
         """Rebuild a missing runtime image with the shared Atom builder.
 
@@ -1803,7 +1823,7 @@ class ScenarioVerifier:
             or runtime_verification.get("runtime_image_digest") != expected_runtime_digest
             or build is None
             or build.generated_hash != expected_hash
-            or build.base_image_digest != expected_base_digest
+            or not self._image_digests_equal(build.base_image_digest, expected_base_digest)
         ):
             return {"ok": False, "error": "runtime contract changed since scenario generation"}
 
@@ -1826,7 +1846,7 @@ class ScenarioVerifier:
             }
         if rebuilt.runtime_image != expected_image:
             return {"ok": False, "error": "runtime rebuild produced an unexpected image tag"}
-        if rebuilt.base_image_digest != expected_base_digest:
+        if not self._image_digests_equal(rebuilt.base_image_digest, expected_base_digest):
             return {"ok": False, "error": "runtime rebuild base image digest mismatch"}
         return {
             "ok": True,
@@ -2429,12 +2449,13 @@ class ScenarioVerifier:
         agent_context: str = "guided",
         agent_runner: str = "claude",
     ) -> dict:
-        """在 attacker 容器内运行 scenario_runner.py (claude) 或
-        openai_scenario_runner.py (openai)。"""
+        """Run the selected Agent runner against the prepared Range."""
         import threading
 
         if agent_context not in AGENT_CONTEXTS:
             raise ValueError(f"agent_context must be one of {AGENT_CONTEXTS}")
+        if agent_runner not in AGENT_RUNNERS:
+            raise ValueError(f"agent_runner must be one of {AGENT_RUNNERS}")
 
         scenario_path = Path(scenario_dir)
         import yaml
@@ -2676,6 +2697,45 @@ class ScenarioVerifier:
         stream_path = workspace / "agent_stream.log"
         input_path.write_text(json.dumps(input_data, indent=2, ensure_ascii=False))
         self._reset_agent_artifacts(workspace)
+
+        if agent_runner == "syspear":
+            description = build_syspear_description(input_data)
+            needs_hygiene = agent_context == "no_hint" or bool(level)
+            prompt_hygiene = (
+                audit_no_hint(input_data, description)
+                if needs_hygiene
+                else {"profile": "not_evaluated", "ok": True, "violations": []}
+            )
+            if not prompt_hygiene.get("ok", True):
+                result = {
+                    "scenario_name": ground_truth.get("scenario", ""),
+                    "success": False,
+                    "verified_flags": {},
+                    "attack_log": [],
+                    "evidence": ["Syspear prompt hygiene audit failed"],
+                    "failed_targets": [t["node_name"] for t in targets],
+                    "termination_reason": "prompt_hygiene",
+                    "prompt_hygiene": prompt_hygiene,
+                    "agent_runner": "syspear",
+                }
+                output_path.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+                return result
+            result = run_syspear_agent(
+                input_data=input_data,
+                description=description,
+                ground_truth=ground_truth,
+                workspace=workspace,
+                attacker_container=attacker_container,
+                lab_name=lab_name,
+                agent_timeout=self.agent_timeout,
+                execution_context=self.execution_context,
+                stream_path=stream_path,
+                material_mount_dir=vulhub_mount_dir,
+            )
+            result["prompt_hygiene"] = prompt_hygiene
+            output_path.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+            return result
+
         if agent_runner == "claude":
             try:
                 os.chmod(workspace, 0o777)
@@ -3152,6 +3212,9 @@ class ScenarioVerifier:
 
     def _save_result(self, scenario_path: Path, result: dict) -> dict:
         """保存验证结果到场景目录"""
+        ec = self.execution_context or {}
+        if ec.get("agent_runner") and "agent_runner" not in result:
+            result["agent_runner"] = ec.get("agent_runner", "")
         context = result.get("agent_context")
         if context:
             result.setdefault("hint_profile", _hint_profile(str(context)))
@@ -3169,7 +3232,6 @@ class ScenarioVerifier:
         # tag. The execution_context is populated by the batch worker (run_id,
         # case_id, lab_name, agent_context, noise_level) or stays empty for
         # single-run CLI invocations.
-        ec = self.execution_context or {}
         if ec.get("run_id") and "validation_round" not in result:
             result["validation_round"] = {
                 "run_id": ec.get("run_id", ""),
@@ -3177,6 +3239,7 @@ class ScenarioVerifier:
                 "lab_name": ec.get("lab_name", ""),
                 "worker_id": ec.get("worker_id", ""),
                 "agent_context": result.get("agent_context", ec.get("agent_context", "")),
+                "agent_runner": result.get("agent_runner", ec.get("agent_runner", "")),
                 "noise_level": ec.get("noise_level", ""),
                 "validated_at": datetime.now(timezone.utc).isoformat(),
             }

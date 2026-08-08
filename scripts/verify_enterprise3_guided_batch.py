@@ -199,11 +199,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--model", default=os.getenv("LLM_MODEL", ""))
     parser.add_argument(
         "--agent-runner",
-        choices=("claude", "openai"),
+        choices=("claude", "openai", "syspear"),
         default="claude",
         help="Agent runner harness: claude (claude_agent_sdk, default) or "
              "openai (openai SDK, no built-in Agent/Task tools, avoids "
-             "sub-agent model-not-found issues on gateways without haiku).",
+             "sub-agent model-not-found issues on gateways without haiku), or "
+             "syspear (host-side Syspear release binary).",
     )
     parser.add_argument(
         "--agent-context",
@@ -280,6 +281,15 @@ def validate_parallelism(parallel: int) -> None:
         raise ValueError("--parallel must be at least 1")
 
 
+def validate_agent_parallelism(agent_runner: str, parallel: int) -> None:
+    validate_parallelism(parallel)
+    if agent_runner == "syspear" and parallel != 1:
+        raise ValueError(
+            "Run one CVELab case per process for Syspear isolation: use --parallel 1; "
+            "this does not limit Syspear's internal solver concurrency"
+        )
+
+
 def load_manifest_cases(path_value: str) -> tuple[dict[str, object], ...]:
     path = Path(path_value)
     if not path.is_absolute():
@@ -332,6 +342,7 @@ def summarize(case: dict[str, object], scenario_dir: Path, result: dict) -> dict
         "resolved_asset_bindings": result.get("resolved_asset_bindings", {}),
         "scenario_dir": str(scenario_dir),
         "agent_context": result.get("agent_context", "guided"),
+        "agent_runner": result.get("agent_runner", ""),
         "success": bool(result.get("success", False)),
         "environment_verified": bool(result.get("environment_verified", False)),
         "environment_success": bool(result.get("environment_success", False)),
@@ -406,7 +417,8 @@ def _digest_inputs(selected: list[dict[str, object]], args: argparse.Namespace) 
     paths = [ROOT / "templates" / "enterprise_3tier" / "template.yaml", Path(__file__),
              ROOT / "src/clab_builder/orchestrator/composer/verifier.py",
              ROOT / "src/clab_builder/orchestrator/composer/scenario_runner.py",
-             ROOT / "src/clab_builder/orchestrator/composer/openai_scenario_runner.py"]
+             ROOT / "src/clab_builder/orchestrator/composer/openai_scenario_runner.py",
+             ROOT / "src/clab_builder/orchestrator/composer/syspear_runner.py"]
     for case in selected:
         for cve in case["cves"]:
             atom_dir = ROOT / args.atoms_dir / str(cve)
@@ -514,6 +526,10 @@ def _runner_base_url(agent_runner: str, base_url: str) -> str:
     return base_url
 
 
+def _runner_requires_api_key(agent_runner: str) -> bool:
+    return agent_runner != "syspear"
+
+
 def scenario_reserved_subnets(scenario_dir: Path) -> list[str]:
     try:
         import yaml
@@ -566,6 +582,7 @@ def run_worker(spec_path: Path) -> int:
                 runtime_policy="verify_only", execution_context={
                     "run_id": spec["run_id"], "case_id": spec["case"]["id"],
                     "worker_id": spec["worker_id"], "lab_name": spec["lab_name"],
+                    "agent_runner": spec.get("agent_runner", "claude"),
                     "ansible_paths": spec["ansible_paths"], "mgmt_network": spec.get("mgmt_network") or {},
                     "control_network_lease": spec.get("control_network_lease") or {},
                     "noise_level": spec.get("noise_level", "none"),
@@ -628,6 +645,7 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
         "validation_round": {
             "run_id": state["run_id"],
             "agent_context": state["options"].get("agent_context", "guided"),
+            "agent_runner": state["options"].get("agent_runner", "claude"),
             "noise_level": state["options"].get("noise_level", "none"),
             "environment_only": state["options"]["environment_only"],
             "max_turns": state["options"].get("max_turns"),
@@ -637,6 +655,7 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
         "selected_cases": state["selected_case_ids"], "results": ordered,
         "case_states": {key: value["status"] for key, value in state["cases"].items()},
         "fingerprint": state["fingerprint"],
+        "agent_runner": state["options"].get("agent_runner", "claude"),
     })
 
 
@@ -939,6 +958,14 @@ def main() -> int:
     os.chdir(ROOT)
     if hasattr(args, "worker_spec"):
         return run_worker(Path(args.worker_spec))
+    if (
+        not args.generate_only
+        and not args.environment_only
+        and (not args.sysarmor or not args.sysarmor_detection)
+    ):
+        raise SystemExit(
+            "Agent experiments require both --sysarmor and --sysarmor-detection"
+        )
     if load_dotenv is not None:
         load_dotenv(ROOT / ".env")
         args.api_key = args.api_key or os.getenv("LLM_API_KEY", "")
@@ -946,10 +973,15 @@ def main() -> int:
         args.model = args.model or os.getenv("LLM_MODEL", "")
     args.base_url = _runner_base_url(args.agent_runner, args.base_url)
     try:
-        validate_parallelism(args.parallel)
+        validate_agent_parallelism(args.agent_runner, args.parallel)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
-    if not args.generate_only and not args.environment_only and not args.api_key:
+    if (
+        not args.generate_only
+        and not args.environment_only
+        and _runner_requires_api_key(args.agent_runner)
+        and not args.api_key
+    ):
         raise SystemExit("LLM API key is required. Set LLM_API_KEY or pass --api-key. Use --generate-only for a no-Agent preflight.")
     if not args.environment_only and not args.generate_only and args.parallel > len(CONTROL_SUBNETS):
         raise SystemExit(f"--parallel exceeds the {len(CONTROL_SUBNETS)} available Agent control-network leases")
@@ -1002,6 +1034,7 @@ def main() -> int:
             "options": {"environment_only": args.environment_only, "generate_only": args.generate_only,
                         "parallel": args.parallel, "agent_timeout": args.agent_timeout, "max_turns": args.max_turns,
                         "agent_context": args.agent_context,
+                        "agent_runner": args.agent_runner,
                         "noise_level": str(getattr(args, "noise_level", "none"))},
             "selected_case_ids": [str(case["id"]) for case in selected], "cases": {},
         }
@@ -1025,6 +1058,7 @@ def main() -> int:
                         "cves": item["case"]["cves"], "scenario_dir": item["scenario_dir"],
                         "generated": True, "preflight": True, "success": True,
                         "agent_context": args.agent_context,
+                        "agent_runner": args.agent_runner,
                         "noise_level": str(getattr(args, "noise_level", "none")),
                         "sysarmor": {
                             "enabled": bool(getattr(args, "sysarmor", False)),

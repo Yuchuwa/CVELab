@@ -4,6 +4,7 @@ import json
 import builtins
 import importlib.util
 import subprocess
+import urllib.parse
 from types import SimpleNamespace
 import pytest
 import yaml
@@ -123,6 +124,172 @@ class TestVerifyFlags:
         }
         result = verifier.verify_flags(agent_result, ground_truth)
         assert result["all_captured"] is False
+
+
+class TestSyspearRunner:
+    """Syspear runner conversion tests without Docker or real Syspear."""
+
+    def test_syspear_base_url_reads_provider_without_secret(self, tmp_path, monkeypatch):
+        from clab_builder.orchestrator.composer.syspear_runner import syspear_base_url
+
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        (config_dir / "settings.json").write_text(json.dumps({
+            "providers": [{
+                "id": "pkuoslab",
+                "name": "openai",
+                "api": "openai-completions",
+                "baseUrl": "http://api.pkuoslab.com/v1",
+                "hash": "b0eb7fc7f9c508f0",
+            }],
+        }))
+        monkeypatch.setenv("SYSPEAR_CONFIG_DIR", str(config_dir))
+        monkeypatch.delenv("SYSPEAR_BASE_URL", raising=False)
+
+        assert syspear_base_url() == "http://api.pkuoslab.com/v1"
+
+    def test_syspear_submissions_are_attributed_only_by_exact_gt(self):
+        from clab_builder.orchestrator.composer.syspear_runner import (
+            verified_flags_from_submissions,
+        )
+
+        result = verified_flags_from_submissions(
+            [
+                {"flag": "flag{b}", "note": "operator wrote target-3 here"},
+                {"nested": {"flag": "flag{not-gt}"}},
+            ],
+            {
+                "attack_path": [
+                    {"target_node": "target-1", "flag": "flag{a}"},
+                    {"target_node": "target-2", "flag": "flag{b}"},
+                    {"target_node": "target-3", "flag": "flag{c}"},
+                ],
+            },
+        )
+
+        assert result["verified_flags"] == {"target-2": "flag{b}"}
+        assert result["unmatched_submissions"] == ["flag{not-gt}"]
+
+    def test_syspear_description_requires_bounded_commands_and_flag_submission(self):
+        from clab_builder.orchestrator.composer.scenario_runner import build_prompt
+        from clab_builder.orchestrator.composer.syspear_runner import build_syspear_description
+
+        input_data = {
+            "scenario_name": "bounded-results",
+            "attacker_ip": "10.255.255.1",
+            "agent_context": "l2",
+            "targets": [{
+                "node_name": "target-1", "ip": "192.0.2.10", "zone": "dmz",
+                "cve_id": "CVE-2024-1234", "service_family": "web_application",
+            }],
+            "topology": {"subnets": ["192.0.2.0/24"], "hosts": ["target-1"]},
+            "credential_material_paths": ["/vulhub/CVE-2024-1234/id_rsa"],
+            "objectives": [{
+                "id": "objective-1", "goal": "read marker", "target_node": "target-3",
+                "actor_node": "target-2", "evidence_field": "evidence",
+                "target_ip": "10.10.2.2", "service_access": {"port": 9200},
+                "agent_hint": "use Elasticsearch on port 9200",
+            }],
+        }
+        description = build_syspear_description(input_data)
+        assert description != build_prompt(input_data)
+        assert "Services and known vulnerabilities:" in description
+        assert "CVE-2024-1234" in description
+        assert "192.0.2.10" in description
+        assert "任务要求是获取各个机器的 flag。" in description
+        assert "business objective 的完成仅是攻击链证据，不代表 assessment 完成。" in description
+        assert "confirmed Board evidence" in description
+        assert "/vulhub" not in description
+        assert "/flag" not in description
+        assert "flag_hint" not in description
+
+    def test_assessment_session_recovers_board_and_event_flags(self, tmp_path):
+        """The new contract persists evidence in assessment/session artifacts."""
+        from clab_builder.orchestrator.composer.syspear_runner import (
+            flags_from_assessment_session,
+            verified_flags_from_submissions,
+        )
+
+        assessment_path = tmp_path / "assessment"
+        (assessment_path / "board" / "resources").mkdir(parents=True)
+        (assessment_path / "assessment.json").write_text(json.dumps({"id": "a"}))
+        (assessment_path / "board" / "resources" / "fact.json").write_text(json.dumps({
+            "type": "fact", "status": "confirmed",
+            "content": "proof flag{fde8479a23c4825e250663c69d3def4c}",
+        }))
+        (assessment_path / "board" / "resources" / "hypothesis.json").write_text(json.dumps({
+            "type": "hypothesis", "status": "open",
+            "content": "guess flag{a9754be52cbcca30dba56ffc6e1d0f43}",
+        }))
+        (assessment_path / "events.jsonl").write_text(json.dumps({
+            "message": "captured flag{a9754be52cbcca30dba56ffc6e1d0f43}",
+        }) + "\n")
+
+        sub_flags = flags_from_assessment_session(assessment_path)
+        assert {item["flag"] for item in sub_flags} == {
+            "flag{fde8479a23c4825e250663c69d3def4c}",
+        }
+        assert len(sub_flags) == 1
+
+        ground_truth = {"attack_path": [
+            {"target_node": "target-1", "flag": "flag{fde8479a23c4825e250663c69d3def4c}"},
+        ]}
+        attribution = verified_flags_from_submissions(sub_flags, ground_truth)
+        assert attribution["verified_flags"] == {
+            "target-1": "flag{fde8479a23c4825e250663c69d3def4c}",
+        }
+        assert attribution["unmatched_submissions"] == []
+
+    def test_event_stream_recovers_flag_abbreviated_on_board(self, tmp_path):
+        """A solver may abbreviate a captured flag on the Board (flag{abc...});
+        the full value in events.jsonl must still verify via GT match."""
+        from clab_builder.orchestrator.composer.syspear_runner import (
+            flags_from_assessment_session,
+            flags_from_events,
+            verified_flags_from_submissions,
+        )
+
+        assessment_path = tmp_path / "assessment"
+        (assessment_path / "board" / "resources").mkdir(parents=True)
+        full = "flag{221b3401c8e72e49f42c30a2cf6de40b}"
+        (assessment_path / "board" / "resources" / "fact.json").write_text(json.dumps({
+            "type": "fact", "status": "confirmed",
+            "content": "Business marker flag{221b3401c8e72e49f42c30a2cf6d...} obtained",
+        }))
+        (assessment_path / "events.jsonl").write_text(
+            json.dumps({"message": f"cat /flag -> {full}"}) + "\n"
+            + json.dumps({"message": "partial flag{221b3401..."}) + "\n"
+        )
+
+        board_only = flags_from_assessment_session(assessment_path)
+        assert {item["flag"] for item in board_only} == {"flag{221b3401c8e72e49f42c30a2cf6d...}"}
+
+        event_flags = flags_from_events(assessment_path)
+        assert full in {item["flag"] for item in event_flags}
+
+        merged = list(board_only) + [
+            e for e in event_flags if e["flag"] not in {b["flag"] for b in board_only}
+        ]
+        ground_truth = {"attack_path": [{"target_node": "target-1", "flag": full}]}
+        # Board-only (abbreviated) does not match; merged with events recovers it.
+        assert verified_flags_from_submissions(board_only, ground_truth)["verified_flags"] == {}
+        assert verified_flags_from_submissions(merged, ground_truth)["verified_flags"] == {
+            "target-1": full,
+        }
+
+    def test_assessment_session_keeps_legacy_root_resource_compatibility(self, tmp_path):
+        from clab_builder.orchestrator.composer.syspear_runner import flags_from_assessment_session
+
+        assessment_path = tmp_path / "assessment"
+        (assessment_path / "resources").mkdir(parents=True)
+        (assessment_path / "resources" / "fact.json").write_text(json.dumps({
+            "type": "fact", "status": "confirmed",
+            "content": "proof flag{fde8479a23c4825e250663c69d3def4c}",
+        }))
+        flags = flags_from_assessment_session(assessment_path)
+        assert [item["flag"] for item in flags] == [
+            "flag{fde8479a23c4825e250663c69d3def4c}"
+        ]
 
 
 class TestObjectiveVerification:
@@ -599,6 +766,117 @@ class TestDifficultyLevels:
         assert "ANTHROPIC_API_KEY=test" in command
         assert "ANTHROPIC_AUTH_TOKEN=test" in command
 
+    def test_syspear_runner_uses_attacker_namespace_and_structured_submissions(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("SYSPEAR_BIN", "bun")
+        monkeypatch.setenv("SYSPEAR_CWD", str(tmp_path / "syspear"))
+        monkeypatch.setenv("SYSPEAR_ASSESSMENTS_DIR", str(tmp_path / ".syspear" / "assessments"))
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        (config_dir / "settings.json").write_text(json.dumps({"runtime": {}, "providers": []}))
+        monkeypatch.setenv("SYSPEAR_CONFIG_DIR", str(config_dir))
+        bundle = tmp_path / "atoms" / "CVE-A" / "source_bundle"
+        bundle.mkdir(parents=True)
+        (bundle / "id_rsa").write_text("private-key")
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: syspear-runner\n")
+        verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"))
+        verifier.execution_context = {"run_id": "run123", "case_id": "case-1"}
+        popen_commands = []
+        popen_kwargs = []
+
+        class FakeProcess:
+            returncode = 0
+            stdout = iter(["Assessment completed\n"])
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def terminate(self):
+                self.returncode = 143
+
+            def kill(self):
+                self.returncode = -9
+
+        def fake_popen(command, *args, **kwargs):
+            popen_commands.append(command)
+            popen_kwargs.append(kwargs)
+            assessment_id = command[command.index("-n") + 1]
+            assessment_dir = Path(kwargs["env"]["SYSPEAR_ASSESSMENTS_DIR"]) / urllib.parse.quote(assessment_id, safe="")
+            (assessment_dir / "resources").mkdir(parents=True)
+            (assessment_dir / "assessment.json").write_text(json.dumps({"id": assessment_id}))
+            (assessment_dir / "resources" / "fact.json").write_text(json.dumps({
+                "type": "fact", "status": "confirmed", "content": "RCE evidence flag{b}",
+            }))
+            return FakeProcess()
+
+        with patch.object(verifier, "_load_scenario_guide", return_value=""), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=self._atom_with(["source_bundle/id_rsa"])), \
+             patch("clab_builder.orchestrator.composer.syspear_runner.subprocess.Popen",
+                   side_effect=fake_popen):
+            result = verifier._run_agent(
+                str(scenario_dir), self._ground_truth(), self._ip_alloc(),
+                api_key="", agent_context="guided", agent_runner="syspear",
+            )
+
+        assert popen_commands
+        command = popen_commands[0]
+        assert command[:4] == ["bun", "run", "start", "attack"]
+        assert command[command.index("-u") + 1] == "192.168.100.2"
+        assert "-f" not in command
+        assert "-p" not in command
+        assert command[command.index("--control-mode") + 1] == "auto"
+        env = popen_kwargs[0]["env"]
+        assert env["SYSPEAR_SESSION_ID"] in env["SYSPEAR_ASSESSMENTS_DIR"]
+        assert env["SYSPEAR_RUNTIME_DIR"].startswith(env["SYSPEAR_ASSESSMENTS_DIR"])
+        assert result["agent_runner"] == "syspear"
+        assert result["verified_flags"] == {"target-2": "flag{b}"}
+        assert result["failed_targets"] == ["target-1", "target-3"]
+        run_metadata = json.loads(next((scenario_dir / "agent_workspace" / "syspear").glob("*/run.json")).read_text())
+        assert run_metadata["material_mount"] is None
+        assert json.loads((config_dir / "settings.json").read_text()) == {"runtime": {}, "providers": []}
+        saved = json.loads((scenario_dir / "agent_workspace" / "output.json").read_text())
+        assert saved["verified_flags"] == {"target-2": "flag{b}"}
+        payload = json.loads((scenario_dir / "agent_workspace" / "input.json").read_text())
+        assert "credential_material_paths" not in payload
+
+    def test_syspear_projects_completed_objective_from_board_evidence(self, tmp_path):
+        from clab_builder.orchestrator.composer.syspear_runner import (
+            objective_results_from_assessment_session,
+        )
+
+        assessment = tmp_path / "assessment"
+        (assessment / "board" / "resources").mkdir(parents=True)
+        (assessment / "assessment.json").write_text(json.dumps({
+            "completion": {
+                "status": "completed",
+                "result": (
+                    "Business objective read-customer-records satisfied: "
+                    "marker CVELAB-CANARY retrieved from customer-records."
+                ),
+            },
+        }))
+        (assessment / "board" / "resources" / "fact.json").write_text(json.dumps({
+            "type": "fact", "status": "confirmed",
+            "title": "customer-records marker value",
+            "content": "The customer-records marker is CVELAB-CANARY.",
+        }))
+
+        result = objective_results_from_assessment_session(assessment, {
+            "objectives": [{
+                "id": "read-customer-records", "asset": "customer-records",
+                "actor_node": "target-2", "target_node": "target-3",
+            }],
+        })
+        assert result["read-customer-records"]["achieved"] is True
+        assert result["read-customer-records"]["actor_node"] == "target-2"
+        assert "CVELAB-CANARY" in result["read-customer-records"]["evidence"]
+
     def test_guided_claude_runner_mounts_allowed_source_materials(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
         scenario_dir.mkdir()
@@ -700,6 +978,30 @@ class TestDifficultyLevels:
         # Objective L2 includes target_ip/service_access.
         obj = payload["objectives"][0]
         assert "target_ip" in obj or obj.get("target_node") == "target-3"
+
+    def test_l2_materializes_credentials_but_not_payloads(self, tmp_path):
+        atoms_dir = tmp_path / "atoms"
+        for cve_id in ("CVE-A", "CVE-B", "CVE-C"):
+            bundle = atoms_dir / cve_id / "source_bundle"
+            bundle.mkdir(parents=True)
+            (bundle / "poc.png").write_bytes(b"payload")
+            (bundle / "id_rsa").write_text("private-key")
+
+        payload = self._run_level(
+            tmp_path,
+            "l2",
+            self._atom_with(["source_bundle/poc.png", "source_bundle/id_rsa"]),
+        )
+
+        vulhub_dir = tmp_path / "scenario" / "agent_workspace" / "vulhub"
+        assert (vulhub_dir / "CVE-A__id_rsa").read_text() == "private-key"
+        assert not (vulhub_dir / "CVE-A__poc.png").exists()
+        assert payload["credential_material_paths"] == [
+            "/vulhub/CVE-A__id_rsa",
+            "/vulhub/CVE-B__id_rsa",
+            "/vulhub/CVE-C__id_rsa",
+        ]
+        assert "/vulhub/CVE-A__poc.png" not in json.dumps(payload)
 
     def test_l0_prompt_omits_topology_and_cve(self):
         prompt = build_prompt({
@@ -851,7 +1153,6 @@ class TestLevelPoCMaterialMount:
         assert ScenarioVerifier._is_credential_material("id_rsa") is True
         assert ScenarioVerifier._is_credential_material("poc.py") is False
         assert ScenarioVerifier._is_credential_material("poc.png") is False
-
 
     def test_reference_path_is_a_hard_gate(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
@@ -1412,6 +1713,17 @@ class TestAgentTransport:
         assert result["ok"] is True
         assert result["runtime_images"][0]["action"] == "rebuilt_and_reverified"
         rebuild.assert_called_once_with(selection)
+
+    def test_base_image_digest_accepts_registry_alias(self):
+        verifier = ScenarioVerifier()
+        assert verifier._image_digests_equal(
+            "vulhub/imagemagick@sha256:base",
+            "docker.1ms.run/vulhub/imagemagick@sha256:base",
+        )
+        assert not verifier._image_digests_equal(
+            "vulhub/imagemagick@sha256:base",
+            "docker.1ms.run/vulhub/imagemagick@sha256:other",
+        )
 
     def test_verify_only_runtime_policy_never_rebuilds_a_mismatch(self, tmp_path):
         scenario_dir = tmp_path / "scenario"

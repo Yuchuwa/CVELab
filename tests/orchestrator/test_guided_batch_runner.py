@@ -11,6 +11,8 @@ SPEC.loader.exec_module(MODULE)
 _should_retry = MODULE._should_retry
 summarize = MODULE.summarize
 parse_args = MODULE.parse_args
+_runner_requires_api_key = MODULE._runner_requires_api_key
+validate_agent_parallelism = MODULE.validate_agent_parallelism
 
 
 def test_cleanup_failure_after_agent_trial_is_not_retried():
@@ -77,3 +79,21 @@ def test_no_hint_context_is_supported_and_recorded():
     assert summary["agent_context"] == "no_hint"
     assert summary["hint_profile"] == "exploit_hints_removed"
     assert summary["prompt_hygiene"]["ok"] is True
+
+
+def test_syspear_runner_is_selectable_without_llm_api_key():
+    args = parse_args(["--agent-runner", "syspear"])
+
+    assert args.agent_runner == "syspear"
+    assert _runner_requires_api_key("syspear") is False
+    assert _runner_requires_api_key("openai") is True
+
+
+def test_syspear_runner_requires_serial_batch_execution():
+    validate_agent_parallelism("syspear", 1)
+    try:
+        validate_agent_parallelism("syspear", 2)
+    except ValueError as exc:
+        assert "serially" in str(exc)
+    else:
+        raise AssertionError("Syspear parallel execution must be rejected")

@@ -30,7 +30,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--case-manifest", default="data/stratified_50_ranges.json")
     parser.add_argument("--experiment-root", default="data/experiments/stratified-50")
     parser.add_argument("--agent-context", choices=("l0", "l1", "l2", "guided"), default="l2")
-    parser.add_argument("--agent-runner", choices=("claude", "openai"), default="openai")
+    parser.add_argument("--agent-runner", choices=("claude", "openai", "syspear"), default="openai")
     parser.add_argument("--model", default="")
     parser.add_argument("--base-url-label", default="")
     parser.add_argument("--parent-qualification-run", default="")

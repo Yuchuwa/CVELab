@@ -89,6 +89,7 @@ packages/*/.eggs/
 packages/*/*.egg-info/
 data/scenarios/
 data/vulhub/
+data/experiments/stratified-50/workspaces/
 data/atoms/**/.workspace/
 data/atoms/**/node_modules/
 src/sysfield/
