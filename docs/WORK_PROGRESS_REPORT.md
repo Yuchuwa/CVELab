@@ -6390,3 +6390,10 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
 - 随后使用当前环境的稳定解释器命令 `python -m pytest -q` 完成全量回归：**737 passed,
   7 skipped**。直接执行 `pytest -q` 仅因其 shebang 暴露 `python3.12` 路径而触发了测试中
   `endswith("python")` 的脆弱断言；不是实现或提交候选内容的失败。
+
+### 2026-08-08 correction — scoped commit created
+
+- 已创建 commit `8450d29`（`feat: restore atom and range pipeline changes`），包含 358 个
+  已审查候选路径；post-commit `git diff HEAD^ HEAD --check` 通过。
+- `data/sft/cve_attack_sft_clean.jsonl` 未进入 commit，`data/sft/cve_attack_sft_v1.jsonl`
+  也未被该 commit 修改；session、实验运行目录和模型产物仍留在工作区/未跟踪区，未被清理。
