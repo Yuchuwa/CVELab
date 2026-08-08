@@ -93,5 +93,12 @@ data/atoms/**/.workspace/
 data/atoms/**/node_modules/
 # Native/Agent session traces are private raw evidence, not Atom contract files.
 data/atoms/**/session.json
+# Range raw experiment directories and batch evidence are private by default.
+data/guide_ablation/*
+data/heterogeneity_wave_logs/
+data/range_matrices/*
+data/scenarios_*/
+data/rerun_capability*.jsonl
+# Reviewed Range exports already tracked above remain available; force-add new exports only after review.
 src/sysfield/
 data/experiments/stratified-50/runs/
