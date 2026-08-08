@@ -19,15 +19,29 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
 
-def load_jsonl_dataset(path: str) -> Dataset:
+def load_jsonl_dataset(
+    path: str,
+    *,
+    include_unresolved: bool = False,
+    allow_leaks: bool = False,
+) -> Dataset:
     rows = []
+    skipped_unresolved = 0
+    skipped_leaks = 0
     with open(path) as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
             d = json.loads(line)
+            if not include_unresolved and d.get("is_resolved") is False:
+                skipped_unresolved += 1
+                continue
+            if not allow_leaks and d.get("leaks"):
+                skipped_leaks += 1
+                continue
             rows.append({"messages": d["messages"]})
+    print(f"[data] skipped unresolved={skipped_unresolved}, leak-flagged={skipped_leaks}")
     return Dataset.from_list(rows)
 
 
@@ -45,6 +59,15 @@ def main():
     ap.add_argument("--smoke", action="store_true", help="Short run: 2 steps, no save, for memory testing")
     ap.add_argument("--max-steps", type=int, default=-1)
     ap.add_argument("--num-gpus", type=int, default=4)
+    ap.add_argument("--loss-type", type=str, default="chunked_nll", choices=["nll", "chunked_nll", "dft"])
+    ap.add_argument(
+        "--include-unresolved", action="store_true",
+        help="Include samples marked is_resolved=false (default: skip)",
+    )
+    ap.add_argument(
+        "--allow-leaks", action="store_true",
+        help="Allow samples with converter leak markers (default: skip)",
+    )
     args = ap.parse_args()
 
     os.makedirs(args.output, exist_ok=True)
@@ -78,7 +101,11 @@ def main():
     model.print_trainable_parameters()
 
     # Dataset
-    ds = load_jsonl_dataset(args.data)
+    ds = load_jsonl_dataset(
+        args.data,
+        include_unresolved=args.include_unresolved,
+        allow_leaks=args.allow_leaks,
+    )
     print(f"[data] {len(ds)} samples from {args.data}")
 
     # Training config
@@ -122,6 +149,7 @@ def main():
         adam_beta1=0.9,
         adam_beta2=0.95,
         seed=1,
+        loss_type=args.loss_type,
     )
 
     # Pre-compute lengths (kept for diagnostics; group_by_length disabled in trl 1.9).

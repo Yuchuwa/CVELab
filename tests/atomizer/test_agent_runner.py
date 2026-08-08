@@ -219,6 +219,23 @@ class TestBuildPrompt:
         assert "do not pivot to unrelated" in prompt
         assert "Leave `captured_flag` empty" in prompt
 
+    def test_explorer_prompt_reuses_foothold_and_requires_probe_evidence(self):
+        """Explorer must verify post-compromise grants instead of replaying CVE."""
+        prompt = build_prompt({
+            "cve_id": "CVE-2021-TEST",
+            "target_ip": "172.18.0.2",
+            "target_ports": [80],
+            "role": "explorer",
+            "foothold_context": {
+                "principal": "service_user",
+                "capabilities": ["execute_command"],
+            },
+        })
+        assert "Capability Explorer" in prompt
+        assert "Do not re-run or invent a new CVE exploit" in prompt
+        assert "probe_evidence" in prompt
+        assert "Do not mark a capability verified from a guess" in prompt
+
     def test_system_prompt_forbids_external_research_with_shell_tools(self):
         """Bash is allowed for local target probing, not for Docker Hub/GitHub lookups."""
         assert "Do not use the Internet for research or source lookup" in SYSTEM_PROMPT

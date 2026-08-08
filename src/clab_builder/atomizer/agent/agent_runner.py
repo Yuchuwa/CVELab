@@ -300,6 +300,7 @@ def _format_json_block(value: Any) -> str:
 
 def build_prompt(input_data: dict) -> str:
     """构建给 Agent 的 prompt"""
+    role = input_data.get("role", "exploiter")
     parts = [
         f"## Bug Verification Task",
         f"- Bug ID: {input_data['cve_id']}",
@@ -307,6 +308,20 @@ def build_prompt(input_data: dict) -> str:
         f"- Exposed ports: {input_data.get('target_ports', [])}",
         f"- Description: {input_data.get('description', '')}",
     ]
+
+    if role == "explorer":
+        parts.extend([
+            "\n## Role: Capability Explorer",
+            "The Exploiter has already established the foothold described below. "
+            "Do not re-run or invent a new CVE exploit. Use only the established "
+            "local channel and perform bounded capability probes.",
+            f"\n## Established Foothold\n{_format_json_block(input_data.get('foothold_context', {}))}",
+            "\nFor every capability you actually confirm, emit a probe_evidence item "
+            "with capability, principal, scope, passed, evidence_ref, and a short "
+            "observation. Do not mark a capability verified from a guess or from "
+            "the original exploit description.",
+            "\nOutput JSON must include: success, probe_evidence, and evidence."
+        ])
 
     if input_data.get("writeup"):
         parts.append(f"\n## Bug Report\n{input_data['writeup']}")

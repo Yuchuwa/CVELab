@@ -20,10 +20,11 @@ from clab_builder.shared.models.atom import (
     ExploitAccess,
 )
 from clab_builder.orchestrator.composer.scenario_assembler import (
-    ScenarioAssembler, _zone_bridge_name,
+    ScenarioAssembler, _matched_noise_services, _surface_spec, _zone_bridge_name,
 )
 from clab_builder.orchestrator.composer.template_loader import TemplateLoader
 from clab_builder.orchestrator.composer.verifier import ScenarioVerifier
+from clab_builder.shared.models.template import NoiseService
 
 
 def _make_atom(cve_id="CVE-TEST-0001", port=8080) -> AtomConfig:
@@ -86,6 +87,13 @@ class TestNoiseLevelNoneBackwardCompat:
         )
         assert out["ground_truth"]["noise_nodes"] == []
 
+    def test_matched_high_label_is_rejected(self, assembler):
+        with pytest.raises(ValueError, match="use 'high'"):
+            assembler.assemble(
+                "enterprise_3tier", _three_atoms(),
+                scenario_name="legacy-matched-high", noise_level="matched-high",
+            )
+
 
 class TestBaselineDecoyInjection:
     def test_baseline_creates_decoy_nodes_in_clab(self, assembler):
@@ -98,7 +106,7 @@ class TestBaselineDecoyInjection:
         # low = 5 decoys (dmz 2 + app 2 + data 1).
         assert len(decoy_names) == 5
 
-    def test_high_noise_creates_8_decoys_across_zones(self, assembler):
+    def test_high_noise_creates_43_decoys_across_zones(self, assembler):
         out = assembler.assemble(
             "enterprise_3tier", _three_atoms(),
             scenario_name="high-clab", noise_level="high",
@@ -111,16 +119,70 @@ class TestBaselineDecoyInjection:
         assert sum(1 for n in decoy_names if "-app-" in n) == 13
         assert sum(1 for n in decoy_names if "-data-" in n) == 12
 
+    def test_high_reuses_target_ports_by_zone(self, assembler):
+        out = assembler.assemble(
+            "enterprise_3tier", _three_atoms(),
+            scenario_name="high-surface", noise_level="high",
+        )
+        noise = out["ground_truth"]["noise_nodes"]
+        assert len(noise) == 43
+        expected = {"dmz": 80, "app": 8080, "data": 5432}
+        for node in noise:
+            assert node["ports"] == [expected[node["zone"]]]
+
+        nodes = out["clab"]["topology"]["nodes"]
+        assert nodes["decoy-dmz-01"]["image"] == "alpine:latest"
+        assert "-p 80" in nodes["decoy-dmz-01"]["cmd"]
+        assert nodes["decoy-dmz-01"]["cmd"].startswith("sh -c ")
+
+    @pytest.mark.parametrize(("image", "port", "profile"), [
+        ("vulhub/php:5.4.1-cgi", 80, "http-web"),
+        ("vulhub/solr:8.1.1", 8983, "solr-http"),
+        ("vulhub/elasticsearch:1.1.1", 9200, "elasticsearch-http"),
+    ])
+    def test_surface_profile_comes_from_runtime_surface(self, image, port, profile):
+        spec = _surface_spec({
+            "source_image": image,
+            "ports": [port],
+            "exploit_port": port,
+            "service_protocol": "http",
+            "service_family": "unknown",
+        })
+        assert spec["profile"] == profile
+        assert str(port) in spec["command"]
+
+    def test_solr_decoy_uses_real_patched_service_contract(self):
+        services = [NoiseService(name="decoy", zone="app", image="alpine:latest", ports=[1])]
+        injections = [{
+            "zone": "app",
+            "source_image": "vulhub/solr:8.1.1",
+            "service_protocol": "http",
+            "service_family": "unknown",
+            "ports": [8983],
+            "exploit_port": 8983,
+        }]
+        decoy = _matched_noise_services(services, injections)[0]
+        assert decoy.image == "vulhub/solr:8.2.0"
+        assert decoy.entrypoint == "solr"
+        assert decoy.command == "-f -force -p 8983"
+        assert decoy.environment == {"SOLR_HEAP": "128m"}
+
     def test_decoys_get_zone_ips_after_chain_nodes(self, assembler):
         out = assembler.assemble(
             "enterprise_3tier", _three_atoms(),
             scenario_name="high-ip", noise_level="high",
         )
         alloc = out["ip_allocations"]
-        # target-1 = .2, decoys = .3, .4, .5
-        assert alloc["target-1"]["eth1"].startswith("192.168.100.2/")
-        assert alloc["decoy-dmz-01"]["eth1"].startswith("192.168.100.3/")
-        assert alloc["decoy-dmz-02"]["eth1"].startswith("192.168.100.4/")
+        # Address placement is deterministic for a chain but not a fixed
+        # target=.2 / decoys-after-targets ordering.
+        target_ip = alloc["target-1"]["eth1"].split("/")[0]
+        assert target_ip != "192.168.100.2"
+        dmz_ips = {
+            alloc[name]["eth1"].split("/")[0]
+            for name in alloc if name.startswith("decoy-dmz-")
+        }
+        assert len(dmz_ips) == 18
+        assert target_ip not in dmz_ips
         # multi-node zone activates bridge
         assert "bridges" in alloc.get("edge-router", {})
         dmz_bridge = alloc["edge-router"]["bridges"][0]
@@ -181,6 +243,8 @@ class TestBaselineDecoyInjection:
             assert t["retries"] == 3
             assert t["delay"] == 2
             assert t["until"].endswith(".rc == 0")
+            assert t["failed_when"].endswith(".rc != 0")
+        assert "Configure decoy-dmz-01: ip addr replace" in out["ansible_base"]
 
     def test_decoy_links_to_zone_router(self, assembler):
         out = assembler.assemble(
@@ -231,6 +295,9 @@ class TestVerifierTopologyHintMixesDecoys:
     def _ground_truth_with_decoys():
         return {
             "scenario": "topo-test",
+            "network_subnets": [
+                "192.168.100.0/24", "10.10.1.0/24", "10.10.2.0/24",
+            ],
             "attack_path": [
                 {"target_node": "target-1", "zone": "dmz", "target_ip": "192.168.100.2"},
                 {"target_node": "target-2", "zone": "app", "target_ip": "10.10.1.2"},
@@ -268,6 +335,16 @@ class TestVerifierTopologyHintMixesDecoys:
             scenario_dir, self._ground_truth_with_decoys(), self._ip_alloc(),
         )
         hosts = topo["hosts"]
+        assert topo == verifier._build_topology_hint(
+            scenario_dir, self._ground_truth_with_decoys(), self._ip_alloc(),
+        )
+        assert hosts != [
+            "node-1 (192.168.100.2, zone: dmz)",
+            "node-2 (10.10.1.2, zone: app)",
+            "node-3 (10.10.2.2, zone: data)",
+            "node-4 (192.168.100.3, zone: dmz)",
+            "node-5 (10.10.1.4, zone: app)",
+        ]
         # All hosts (chain + decoy) are neutralized to 'node-N (ip, zone: z)'
         # with no target-/decoy- prefix (paper §A.3). Chain nodes carry their
         # real IPs (192.168.100.2 / 10.10.1.2), decoys carry theirs.
@@ -311,14 +388,59 @@ class TestDecoyInteractionsDiagnostic:
             "[Tool] psql -h 10.10.1.4 -p 5432\n"
             "[Tool] cat /flag\n"
         )
-        gt = {"noise_nodes": [
+        gt = {
+            "network_subnets": ["192.168.100.0/24", "10.10.1.0/24"],
+            "noise_nodes": [
             {"name": "decoy-dmz-nginx", "zone": "dmz", "ip": "192.168.100.3", "ports": [80]},
             {"name": "decoy-app-postgres", "zone": "app", "ip": "10.10.1.4", "ports": [5432]},
-        ]}
+            ],
+        }
         agent_result = {"agent_stream": str(stream)}
         verifier = ScenarioVerifier(atoms_dir="data/atoms")
         out = verifier._compute_decoy_interactions(agent_result, gt)
         assert out["evaluated"] is True
         assert out["total_hits"] >= 2  # at least the nginx ip + ip:port hits
+        assert out["direct_endpoint_hits"] >= 2
+        assert "decoy-dmz-nginx" in out["unique_direct_decoys"]
+        assert out["first_direct_contact_line"] == 1
         names = {i["decoy"] for i in out["interactions"]}
         assert "decoy-dmz-nginx" in names
+
+    def test_counts_subnet_and_shell_loop_scans(self, tmp_path):
+        stream = tmp_path / "agent_stream.log"
+        stream.write_text(
+            "[Tool] nmap -p- 192.168.100.0/24\n"
+            "[Tool] for i in $(seq 2 254); do nc -z -w1 192.168.100.$i 80; done\n"
+        )
+        gt = {
+            "network_subnets": ["192.168.100.0/24"],
+            "noise_nodes": [
+                {"name": "decoy-dmz-nginx", "ip": "192.168.100.3", "ports": [80]},
+            ],
+        }
+        verifier = ScenarioVerifier(atoms_dir="data/atoms")
+        out = verifier._compute_decoy_interactions(
+            {"agent_stream": str(stream)}, gt,
+        )
+        assert out["total_hits"] >= 2
+        assert out["direct_endpoint_hits"] == 0
+        assert out["subnet_scan_hits"] >= 2
+        assert out["unique_direct_decoys"] == []
+        assert out["unique_subnet_scan_decoys"] == ["decoy-dmz-nginx"]
+        assert any(item["needle"] == "subnet-scan" for item in out["interactions"])
+
+    def test_ignores_url_path_that_looks_like_cidr(self, tmp_path):
+        stream = tmp_path / "agent_stream.log"
+        stream.write_text("[Tool] curl http://192.168.100.209/80\n")
+        gt = {
+            "network_subnets": ["192.168.100.0/24"],
+            "noise_nodes": [
+                {"name": "decoy-dmz-nginx", "ip": "192.168.100.3", "ports": [80]},
+            ],
+        }
+        verifier = ScenarioVerifier(atoms_dir="data/atoms")
+        out = verifier._compute_decoy_interactions(
+            {"agent_stream": str(stream)}, gt,
+        )
+        assert out["evaluated"] is True
+        assert out["ignored_invalid_cidr_literals"] == ["192.168.100.209/80"]

@@ -1,23 +1,23 @@
 {
-  "n_samples": 666,
-  "skipped_overlong": 169,
+  "n_samples": 694,
+  "skipped_overlong": 167,
   "leak_flagged_samples": 0,
   "by_context": {
-    "l2": 476,
-    "l0": 22,
+    "l2": 498,
+    "l0": 23,
     "l1": 15,
-    "no_hint": 153
+    "no_hint": 158
   },
   "by_hops_captured": {
-    "1": 320,
-    "3": 221,
-    "2": 125
+    "1": 329,
+    "2": 131,
+    "3": 234
   },
   "token_stats": {
     "min": 3322,
-    "median": 7871,
-    "mean": 12800,
-    "p90": 29575,
-    "max": 32746
+    "median": 8076,
+    "mean": 12887,
+    "p90": 29760,
+    "max": 32764
   }
 }

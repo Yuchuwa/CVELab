@@ -53,6 +53,12 @@ def _load_shared_helpers():
 
 DEFAULT_MAX_TURNS = 80
 
+# Adaptive overhead added to the fast JSON-length token estimate once the API
+# reports a real context-length error. The heuristic denominator of 3.2 can
+# undercount the served tokenizer for some prompts, so we learn the gap from the
+# server's exact token count and make the estimator truly conservative.
+_TOKEN_ESTIMATE_OVERHEAD = 0
+
 # Tools exposed to the model: bash (run shell commands), read_file, write_file.
 # These mirror the claude_agent_sdk built-in tools the default runner uses.
 TOOLS = [
@@ -145,6 +151,85 @@ TOOL_HANDLERS = {
 }
 
 
+def _estimate_messages_tokens(messages: list[dict]) -> int:
+    """Fast, conservative token estimate for a messages list."""
+    global _TOKEN_ESTIMATE_OVERHEAD
+    return int(len(json.dumps(messages, ensure_ascii=False)) / 3.2) + _TOKEN_ESTIMATE_OVERHEAD
+
+
+def _parse_context_length_error(text: str) -> tuple[int, int, int] | None:
+    """Parse OpenAI/vLLM context-length error text.
+
+    Returns (max_context_tokens, prompt_tokens, completion_tokens) or None.
+    Example: \"This model's maximum context length is 32768 tokens. However, you
+    requested 34029 tokens (21060 in the messages, 12969 in the completion).\"
+    """
+    m = re.search(
+        r"maximum context length is (\d+) tokens.*requested (\d+) tokens \((\d+) in the messages, (\d+) in the completion\)",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        return int(m.group(1)), int(m.group(3)), int(m.group(4))
+    return None
+
+
+def _ensure_context_budget(
+    messages: list[dict],
+    requested_max_tokens: int,
+    min_output_tokens: int = 1024,
+    context_margin: int = 256,
+    exact_prompt_tokens: int | None = None,
+    exact_max_context: int | None = None,
+) -> tuple[list[dict], int]:
+    """Trim messages and/or cap max_tokens so prompt+completion fits the model.
+
+    Prevents the OpenAI/vLLM server from rejecting requests because
+    prompt tokens + max_tokens exceed the model context length.
+    """
+    max_context = exact_max_context or int(os.environ.get("LLM_MAX_CONTEXT_LENGTH", "32768"))
+    allowed_total = max_context - context_margin
+
+    prompt_tokens = exact_prompt_tokens if exact_prompt_tokens is not None else _estimate_messages_tokens(messages)
+    if prompt_tokens + requested_max_tokens <= allowed_total:
+        return messages, requested_max_tokens
+
+    capped_max_tokens = max(min_output_tokens, allowed_total - prompt_tokens)
+    if prompt_tokens + capped_max_tokens <= allowed_total:
+        return messages, capped_max_tokens
+
+    compressed = []
+    for i, msg in enumerate(messages):
+        if (
+            msg.get("role") == "tool"
+            and i < len(messages) - 5
+            and isinstance(msg.get("content"), str)
+            and len(msg["content"]) > 1000
+        ):
+            msg = dict(msg)
+            c = msg["content"]
+            msg["content"] = (
+                f"{c[:400]}\n[...truncated {len(c) - 800} chars...]\n{c[-400:]}"
+            )
+        compressed.append(msg)
+    prompt_tokens = _estimate_messages_tokens(compressed)
+    capped_max_tokens = max(min_output_tokens, allowed_total - prompt_tokens)
+    if prompt_tokens + capped_max_tokens <= allowed_total:
+        return compressed, capped_max_tokens
+
+    trimmed = list(compressed)
+    while len(trimmed) > 2 and _estimate_messages_tokens(trimmed) + min_output_tokens > allowed_total:
+        trimmed = [trimmed[0], trimmed[1]] + trimmed[3:]
+        while len(trimmed) > 2 and trimmed[2].get("role") == "tool":
+            trimmed = trimmed[:2] + trimmed[3:]
+        if len(trimmed) <= 2:
+            break
+
+    prompt_tokens = _estimate_messages_tokens(trimmed)
+    capped_max_tokens = max(min_output_tokens, allowed_total - prompt_tokens)
+    return trimmed, capped_max_tokens
+
+
 def _stream_completion(client, model: str, messages: list, max_tokens: int):
     """Call the model with stream=True and aggregate content + tool_calls.
 
@@ -152,40 +237,71 @@ def _stream_completion(client, model: str, messages: list, max_tokens: int):
     emitted in the streamed chunks, never in the non-streaming response.
     Returns (content, tool_calls_list) where each tool_call is
     {id, name, arguments}.
+
+    Context-length errors from the API are parsed for the exact prompt token
+    count; the budget is tightened and the estimator gap is learned so the
+    same turn can be retried without user intervention.
     """
-    resp = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        tools=TOOLS,
-        max_tokens=max_tokens,
-        temperature=0,
-        stream=True,
-    )
-    content_parts: list[str] = []
-    # tool_call fragments keyed by index
-    tc_buf: dict[int, dict[str, str]] = {}
-    for chunk in resp:
-        if not chunk.choices:
-            continue
-        delta = chunk.choices[0].delta
-        if delta is None:
-            continue
-        if delta.content:
-            content_parts.append(delta.content)
-        if delta.tool_calls:
-            for tc in delta.tool_calls:
-                idx = tc.index
-                if idx not in tc_buf:
-                    tc_buf[idx] = {"id": tc.id or f"call_{idx}", "name": "", "arguments": ""}
-                if tc.id:
-                    tc_buf[idx]["id"] = tc.id
-                if tc.function and tc.function.name:
-                    tc_buf[idx]["name"] = tc.function.name
-                if tc.function and tc.function.arguments:
-                    tc_buf[idx]["arguments"] += tc.function.arguments
-    content = "".join(content_parts)
-    tool_calls = [tc_buf[i] for i in sorted(tc_buf.keys())]
-    return content, tool_calls
+    while True:
+        budgeted_messages, budgeted_max_tokens = _ensure_context_budget(messages, max_tokens)
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=budgeted_messages,
+                tools=TOOLS,
+                max_tokens=budgeted_max_tokens,
+                temperature=0,
+                stream=True,
+            )
+            content_parts: list[str] = []
+            # tool_call fragments keyed by index
+            tc_buf: dict[int, dict[str, str]] = {}
+            for chunk in resp:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if delta is None:
+                    continue
+                if delta.content:
+                    content_parts.append(delta.content)
+                if delta.tool_calls:
+                    for tc in delta.tool_calls:
+                        idx = tc.index
+                        if idx not in tc_buf:
+                            tc_buf[idx] = {"id": tc.id or f"call_{idx}", "name": "", "arguments": ""}
+                        if tc.id:
+                            tc_buf[idx]["id"] = tc.id
+                        if tc.function and tc.function.name:
+                            tc_buf[idx]["name"] = tc.function.name
+                        if tc.function and tc.function.arguments:
+                            tc_buf[idx]["arguments"] += tc.function.arguments
+            content = "".join(content_parts)
+            tool_calls = [tc_buf[i] for i in sorted(tc_buf.keys())]
+            return content, tool_calls
+        except Exception as exc:
+            err_text = str(exc)
+            if "maximum context length" in err_text.lower():
+                parsed = _parse_context_length_error(err_text)
+                if parsed:
+                    model_max, actual_prompt, _requested_completion = parsed
+                    current_estimate = _estimate_messages_tokens(messages)
+                    if actual_prompt > current_estimate:
+                        global _TOKEN_ESTIMATE_OVERHEAD
+                        _TOKEN_ESTIMATE_OVERHEAD = max(
+                            _TOKEN_ESTIMATE_OVERHEAD, actual_prompt - current_estimate
+                        )
+                        print(
+                            f"[Warn] context-length error: actual_prompt={actual_prompt} "
+                            f"estimate={current_estimate}; overhead now {_TOKEN_ESTIMATE_OVERHEAD}",
+                            file=sys.stderr,
+                        )
+                    messages, max_tokens = _ensure_context_budget(
+                        messages, max_tokens,
+                        exact_prompt_tokens=actual_prompt,
+                        exact_max_context=model_max,
+                    )
+                    continue
+            raise
 
 
 def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TURNS):

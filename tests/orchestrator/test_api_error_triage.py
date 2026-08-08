@@ -94,6 +94,16 @@ class TestClassifyApiError:
         exc = APIConnectionError(message="Connection error.", request=req)
         assert m._classify_api_error(exc) == "transient"
 
+    def test_transient_timeout_error(self):
+        from openai import APITimeoutError
+        import httpx
+
+        m = _runner_module()
+        # Request timeouts also have no HTTP status and should be retried.
+        req = httpx.Request("POST", "https://api.moonshot.cn/v1/chat/completions")
+        exc = APITimeoutError(request=req)
+        assert m._classify_api_error(exc) == "transient"
+
     def test_other_for_unclassified(self):
         m = _runner_module()
         assert m._classify_api_error(_make_api_error(400, "bad json")) == "other"

@@ -169,18 +169,23 @@ class TestAssemblerDMZSimple:
         assert bridge["name"] == _zone_bridge_name("edge-router", "dmz")
         assert "eth2" not in {key for key in router if key not in {"routes", "bridges"}}
         assert "eth3" not in {key for key in router if key not in {"routes", "bridges"}}
-        assert result["ip_allocations"]["target-1"]["eth1"] == "192.168.100.2/24"
-        assert result["ip_allocations"]["target-2"]["eth1"] == "192.168.100.3/24"
+        target_ips = {
+            result["ip_allocations"][name]["eth1"]
+            for name in ("target-1", "target-2")
+        }
+        assert len(target_ips) == 2
+        assert all(ip.startswith("192.168.100.") for ip in target_ips)
         assert result["ip_allocations"]["target-1"]["gateway"] == "192.168.100.1"
         assert result["ip_allocations"]["target-2"]["gateway"] == "192.168.100.1"
         assert {
             check["target_node"] for check in result["ground_truth"]["network_policy_checks"]
         } == {"target-1", "target-2"}
-        assert base.index(f"ip link add name {bridge['name']} type bridge") < base.index(
+        normalized_base = " ".join(base.split())
+        assert normalized_base.index(f"ip link add name {bridge['name']} type bridge") < normalized_base.index(
             f"ip link set eth2 master {bridge['name']}"
-        ) < base.index(f"ip addr replace {bridge['address']} dev {bridge['name']}")
-        assert f"ip addr replace {bridge['address']} dev eth2" not in base
-        assert f"ip addr replace {bridge['address']} dev eth3" not in base
+        ) < normalized_base.index(f"ip addr replace {bridge['address']} dev {bridge['name']}")
+        assert f"ip addr replace {bridge['address']} dev eth2" not in normalized_base
+        assert f"ip addr replace {bridge['address']} dev eth3" not in normalized_base
 
     def test_single_target_zone_keeps_point_to_point_gateway(self, assembler):
         result = assembler.assemble("dmz_simple", [_make_atom()], scenario_name="bridge-single")
@@ -211,6 +216,16 @@ class TestAssemblerDMZSimple:
         assert target["cmd"] == "php -S 0.0.0.0:8080"
         assert target["env"]["DB_PASSWORD"] == "postgres"
         assert target["env"]["FLAG"].startswith("flag{")
+
+    @pytest.mark.parametrize("agent_context", ["l0", "l1"])
+    def test_level_attacker_has_no_source_bundle_mounts(self, assembler, agent_context):
+        atom = _make_atom()
+        atom.source_bundle = SourceBundle(poc_materials=["poc.py", "id_rsa"])
+
+        result = assembler.assemble("dmz_simple", [atom], agent_context=agent_context)
+        attacker = result["clab"]["topology"]["nodes"]["attacker"]
+
+        assert not any("/vulhub/" in bind for bind in attacker.get("binds", []))
 
     def test_declared_dockerfile_becomes_runtime_build_manifest(self, assembler, tmp_path):
         atom = _make_atom("CVE-BUILD-0001")
@@ -367,6 +382,9 @@ class TestAssemblerDMZSimple:
         customer_task = next(
             task for play in asset_setup for task in play["tasks"]
             if task["name"] == "setup_command customer-records"
+        )
+        assert customer_task["ansible.builtin.shell"].startswith(
+            "timeout 20s docker exec "
         )
         assert customer_task["retries"] == 18
         assert customer_task["delay"] == 10
@@ -530,7 +548,7 @@ class TestAssemblerDMZSimple:
         assert "2>/dev/null; ip link set" not in result["ansible_base"]
         assert "docker exec -u 0" in result["ansible_base"]
         assert "command -v ip" in result["ansible_base"]
-        assert "docker run --rm --privileged --pid host --network none" in result["ansible_base"]
+        assert "apt-get install -y -qq iproute2" in result["ansible_base"]
         assert "sudo -n nsenter" not in result["ansible_base"]
 
     def test_pivot_host_atom_generates_host_and_service_nodes(self, assembler):

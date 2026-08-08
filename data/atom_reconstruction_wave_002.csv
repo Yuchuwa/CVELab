@@ -1,0 +1,240 @@
+cve_id,status,planned_path,value_score,service_role,service_family,service_access,verified_capabilities,source_image,source_image_local,reason
+CVE-2010-2861,selected,rebuild_runtime_or_bundle,6,web_application,,"{""port"": 8500, ""protocol"": ""http""}","[""read_file""]",vulhub/coldfusion:8.0.1,not_local,selected by value/diversity policy
+CVE-2013-4547,selected,rebuild_runtime_or_bundle,12,web_application,,"{""port"": 80, ""protocol"": ""http""}","[""execute_command"", ""read_file""]",vulhub/php:5.6-fpm,present,selected by value/diversity policy
+CVE-2014-0160,selected,full_reconstruction,3,web_application,,"{""port"": 443, ""protocol"": ""https""}",[],vulhub/openssl:1.0.1c-with-nginx,not_local,selected by value/diversity policy
+CVE-2017-1000028,selected,rebuild_runtime_or_bundle,7,web_application,,"{""port"": 4848, ""protocol"": ""https""}","[""read_credential"", ""read_file""]",vulhub/glassfish:4.1,not_local,selected by value/diversity policy
+CVE-2017-12794,selected,full_reconstruction,3,web_application,,{},[],vulhub/django:1.11.4,present,selected by value/diversity policy
+CVE-2017-14849,selected,rebuild_runtime_or_bundle,6,web_application,,"{""port"": 3000, ""protocol"": ""http""}","[""read_file""]",vulhub/node:8.5.0,not_local,selected by value/diversity policy
+CVE-2018-1273,selected,full_reconstruction,3,web_application,,{},[],vulhub/spring-data-commons:2.0.5,present,selected by value/diversity policy
+CVE-2018-18778,selected,rebuild_runtime_or_bundle,6,web_application,,"{""port"": 8080, ""protocol"": ""http""}","[""read_file""]",vulhub/mini_httpd:1.29,not_local,selected by value/diversity policy
+CVE-2021-32682,selected,rebuild_runtime_or_bundle,12,web_application,,{},"[""execute_command"", ""read_file""]",vulhub/elfinder:2.1.58,present,selected by value/diversity policy
+CVE-2021-40438,selected,full_reconstruction,3,middleware,,{},[],vulhub/tomcat:8.5.19,present,selected by value/diversity policy
+CVE-2021-42392,selected,full_reconstruction,3,framework,,{},[],vulhub/spring-with-h2database:2.0.204,not_local,selected by value/diversity policy
+CVE-2022-24706,selected,full_reconstruction,3,database,,{},[],vulhub/couchdb:3.2.1,present,selected by value/diversity policy
+CVE-2022-41678,selected,rebuild_runtime_or_bundle,12,web_application,,{},"[""execute_command"", ""read_file""]",vulhub/activemq:5.17.3,present,selected by value/diversity policy
+CVE-2023-26360,selected,rebuild_runtime_or_bundle,6,web_application,,"{""port"": 8500, ""protocol"": ""http""}","[""read_file""]",vulhub/coldfusion:2018.0.15,not_local,selected by value/diversity policy
+CVE-2024-1561,selected,full_reconstruction,3,web_application,,{},[],vulhub/gradio:4.12.0,present,selected by value/diversity policy
+CVE-2024-38856,selected,rebuild_runtime_or_bundle,14,web_application,,{},"[""execute_command"", ""read_file""]",vulhub/ofbiz:18.12.14,present,selected by value/diversity policy
+CVE-2024-45195,selected,rebuild_runtime_or_bundle,12,web_application,,{},"[""execute_command"", ""read_file""]",vulhub/ofbiz:18.12.15,present,selected by value/diversity policy
+CVE-2024-45507,selected,full_reconstruction,1,web_application,,{},[],vulhub/ofbiz:18.12.15,present,selected by value/diversity policy
+CVE-2024-9264,selected,rebuild_runtime_or_bundle,14,web_application,,{},"[""execute_command"", ""read_file""]",vulhub/grafana:11.0.0,present,selected by value/diversity policy
+CVE-2025-32433,selected,full_reconstruction,1,middleware,,{},[],vulhub/erlang:27.3.2-with-ssh,present,selected by value/diversity policy
+CVE-2025-55182,selected,rebuild_runtime_or_bundle,14,web_application,,{},"[""execute_command"", ""read_file""]",vulhub/nextjs:15.5.6,present,selected by value/diversity policy
+CVE-2025-68613,selected,rebuild_runtime_or_bundle,14,web_application,,{},"[""execute_command"", ""read_file""]",vulhub/n8n:1.65.0,present,selected by value/diversity policy
+CVE-2026-21858,selected,full_reconstruction,3,web_application,,{},[],vulhub/n8n:1.65.0,present,selected by value/diversity policy
+CVE-2026-24061,selected,full_reconstruction,3,system_service,,{},[],vulhub/inetutils:2.5,not_local,selected by value/diversity policy
+CVE-2026-25887,selected,rebuild_runtime_or_bundle,12,web_application,,{},"[""execute_command"", ""read_file""]",vulhub/chartbrew:4.8.0,present,selected by value/diversity policy
+CVE-2010-3863,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2012-1823,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2012-2122,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2014-3120,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2014-3704,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2014-6271,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2015-1427,excluded,,,,,,,,,already range_ready in current audit
+CVE-2015-3337,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2015-5254,excluded,,,,,,,,,low marginal capability/access value for bounded runtime rebuild
+CVE-2015-5531,excluded,,,,,,,,,already range_ready in current audit
+CVE-2015-8562,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2016-1897,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2016-3088,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2016-3714,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2016-4437,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2016-4977,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2016-5385,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2016-5734,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2016-9086,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-1000353,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-10271,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2017-11610,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2017-12149,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-12615,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2017-12629-RCE,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-12635,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-12636,excluded,,,,,,,,,low marginal capability/access value for bounded runtime rebuild
+CVE-2017-15715,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2017-16082,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-17405,excluded,,,,,,,,,deferred in B1; no new shared profile correction
+CVE-2017-17562,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2017-3066,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-4971,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-5223,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-5645,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-6920,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-7494,excluded,,,,,,,,,low marginal capability/access value for bounded runtime rebuild
+CVE-2017-7504,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-7525,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-7529,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-8046,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-8386,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-8917,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-9841,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2017-9993,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-1000006,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-1000533,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-1000861,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-10054,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-1058,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-10933,excluded,,,,,,,,,already range_ready in current audit
+CVE-2018-12613,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2018-1270,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-1297,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-14574,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-15473,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-15685,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-16509,excluded,,,,,,,,,already range_ready in current audit
+CVE-2018-18925,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-19475,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2018-19518,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-2628,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-2894,excluded,,,,,,,,,deferred in B1; no new shared profile correction
+CVE-2018-3760,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-7490,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-7600,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-7602,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2018-8715,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-0193,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2019-10758,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-11043,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2019-11581,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-14234,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-15107,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-17558,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2019-17564,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-20933,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-3396,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-5418,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-6116,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-6339,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-6341,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-7238,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-7609,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-9053,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2019-9193,excluded,,,,,,,,,already range_ready in current audit
+CVE-2020-10199,excluded,,,,,,,,,deferred in B1; no new shared profile correction
+CVE-2020-10204,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-11651,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-11652,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-11981,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-13942,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-13945,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-14882,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-15906,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-16846,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-17518,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-17519,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-17526,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-1938,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-1957,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-35476,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-7012,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-7247,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-7961,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-9402,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2020-9496,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-21311,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-21351,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-22205,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-22911,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-23592,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-25646,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-26084,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-26120,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-27341,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-28073,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-28164,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-28169,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-29441,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-29442,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-29505,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-3129,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-32568,excluded,,,,,,,,,deferred in B1; no new shared profile correction
+CVE-2021-34371,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-34429,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-35042,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-4034,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-40822,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-41277,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-41773,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-42013,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2021-42342,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-43008,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-43798,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-44228,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-45232,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2021-45788,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-0543,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2022-0778,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-22947,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-22963,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-22965,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2022-22978,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-23221,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-24816,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2022-26134,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-34265,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-4223,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-44268,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-44645,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2022-46169,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-2160,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-21839,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-22515,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-22527,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-23752,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-25157,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-25194,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-25826,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-27524,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-28432,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-29300,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-32315,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-33246,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-37582,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-37941,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-38633,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-38646,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-39361,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-41892,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-42793,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-42820,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-4450,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2023-46604,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-49070,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-49103,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-5002,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-51449,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2023-51467,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2024-23897,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-27198,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-27348,excluded,,,,,,,,,completed in B1: runtime-ready
+CVE-2024-28752,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-2961,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-32114,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-36401,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-39907,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-42323,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-43441,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-4367,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-47177,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-4956,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2024-56145,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-13780,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-1974,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-24813,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-2945,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-29927,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-30208,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-32395,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-3248,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-41242,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-49001,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-54068,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2025-67303,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2026-22777,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2026-25253,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2026-27944,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2026-31816,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2026-34197,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2026-34486,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+CVE-2026-39363,excluded,,,,,,,,,lower marginal value after value/diversity ranking
+PIL-CVE-2017-8291,excluded,,,,,,,,,lower marginal value after value/diversity ranking

@@ -1,0 +1,2330 @@
+[
+  {
+    "cve_id": "CVE-2010-3863",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2012-2122",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3306
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2014-3704",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2014-6271",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/bash:4.3.0-with-httpd",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2015-3337",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      9200,
+      9300
+    ],
+    "services": [
+      [
+        "es",
+        "vulhub/elasticsearch:1.4.4",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2015-5254",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      61616,
+      8161
+    ],
+    "services": [
+      [
+        "activemq",
+        "vulhub/activemq:5.11.1",
+        true
+      ]
+    ],
+    "verified": true
+  },
+  {
+    "cve_id": "CVE-2015-8562",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2016-1897",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2016-4437",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2016-4977",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [
+      [
+        "spring",
+        "vulhub/spring-security-oauth2:2.0.8",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2016-5385",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2016-5734",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2016-9086",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80,
+      22
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-1000353",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      50000,
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-12629-RCE",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8983,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-12635",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5984
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-12636",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5984
+    ],
+    "services": [
+      [
+        "couchdb",
+        "vulhub/couchdb:1.6.0",
+        true
+      ]
+    ],
+    "verified": true
+  },
+  {
+    "cve_id": "CVE-2017-16082",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-4971",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [
+      [
+        "spring",
+        "vulhub/spring-webflow:2.4.4",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-5223",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-5645",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      4712
+    ],
+    "services": [
+      [
+        "log4j",
+        "vulhub/log4j:2.8.1",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-6920",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-7494",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      445,
+      6699
+    ],
+    "services": [
+      [
+        "samba",
+        "vulhub/samba:4.6.3",
+        true
+      ]
+    ],
+    "verified": true
+  },
+  {
+    "cve_id": "CVE-2017-7504",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-7525",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-7529",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-8046",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [
+      [
+        "spring",
+        "vulhub/spring-rest-data:2.6.6",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-8917",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-9841",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/phpunit:5.6.2",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2017-9993",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-1000006",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-1000533",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-1000861",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      50000,
+      8080
+    ],
+    "services": [
+      [
+        "jenkins",
+        "vulhub/jenkins:2.138",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-10054",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080,
+      5005
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/spring-with-h2database:1.4.197",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-1058",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5432
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-1270",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [
+      [
+        "spring",
+        "vulhub/spring-messaging:5.0.4",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-14574",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-15473",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      22
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-15685",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-18925",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      22,
+      3000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-19518",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/php:5.6.38-apache",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-2628",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      7001
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-3760",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3000
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/rails:5.0.7",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-7490",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/uwsgi-php:2.0.16",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-7602",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2018-8715",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-11581",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-14234",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-15107",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      10000
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/webmin:1.910",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-17564",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [
+      [
+        "provider",
+        "vulhub/dubbo:2.7.3",
+        true
+      ],
+      [
+        "zookeeper",
+        "zookeeper:3.7.0",
+        false
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-20933",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8086
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-3396",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8090
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-5418",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3000
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/rails:5.2.2",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-6116",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-6339",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-6341",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-7238",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8081,
+      5005
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/nexus:3.14.0",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-7609",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2019-9053",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-10199",
+    "template_ready": true,
+    "runtime_status": "failed",
+    "runtime_image": null,
+    "ports": [
+      8081
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/nexus:3.21.1",
+        true
+      ]
+    ],
+    "verified": true
+  },
+  {
+    "cve_id": "CVE-2020-10204",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8081,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-11651",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8000,
+      4505,
+      4506,
+      22
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-11652",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8000,
+      4505,
+      4506,
+      22
+    ],
+    "services": [
+      [
+        "saltstack",
+        "vulhub/saltstack:2019.2.3",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-11981",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5555
+    ],
+    "services": [
+      [
+        "postgres",
+        "postgres:13-alpine",
+        false
+      ],
+      [
+        "redis",
+        "redis:5-alpine",
+        false
+      ],
+      [
+        "airflow-webserver",
+        "vulhub/airflow:1.10.10",
+        true
+      ],
+      [
+        "airflow-scheduler",
+        "vulhub/airflow:1.10.10",
+        true
+      ],
+      [
+        "airflow-worker",
+        "vulhub/airflow:1.10.10",
+        true
+      ],
+      [
+        "airflow-init",
+        "vulhub/airflow:1.10.10",
+        true
+      ],
+      [
+        "flower",
+        "vulhub/airflow:1.10.10",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-13942",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      9443,
+      8181
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/unomi:1.5.1",
+        true
+      ],
+      [
+        "elasticsearch",
+        "elasticsearch:7.9.3",
+        false
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-13945",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      9080,
+      9091,
+      9443
+    ],
+    "services": [
+      [
+        "apisix",
+        "vulhub/apisix:2.11.0",
+        true
+      ],
+      [
+        "etcd",
+        "gcr.io/etcd-development/etcd:v3.4.15",
+        false
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-14882",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      7001
+    ],
+    "services": [
+      [
+        "weblogic",
+        "vulhub/weblogic:12.2.1.3-2018",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-15906",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-16846",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8000,
+      4505,
+      4506,
+      22
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-17518",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8081,
+      6123
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-17519",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8081,
+      6123
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-17526",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5555
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-1938",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080,
+      8009
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-1957",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-35476",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      4242
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-7012",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-7961",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-9402",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2020-9496",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8443,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-21311",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-21351",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-22205",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80,
+      22
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-22911",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-23592",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [
+      [
+        "client",
+        "cve-cve-2021-23592:vuln",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-26120",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-27341",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [
+      [
+        "client",
+        "cve-cve-2021-27341:vuln",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-28073",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-28164",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-28169",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-29441",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8848,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-29442",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8848,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-29505",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-3129",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-34371",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      7474,
+      7687,
+      1337,
+      34444
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-34429",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-35042",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-4034",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      2222
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-40822",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-41277",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-41773",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-42342",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/goahead:5.1.4",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-43008",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/adminer:4.6.2",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-43798",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3000
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/grafana:8.2.6",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-44228",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8983,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-45232",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      9000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2021-45788",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8081,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-0778",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-22947",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-22963",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [
+      [
+        "spring",
+        "vulhub/spring-cloud-function:3.2.2",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-22978",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-23221",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080,
+      5005
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/spring-with-h2database:2.0.206",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-34265",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-4223",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5050
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/pgadmin:6.16",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-44268",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/imagemagick:7.1.0-49-php",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-44645",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      9001,
+      20303,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2022-46169",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-2160",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [
+      [
+        "client",
+        "cve-cve-2023-2160:vuln",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-21839",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      7001
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-22527",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8090
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-23752",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-25157",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-25194",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8888
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-25826",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      4242
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-27524",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8088
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-28432",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-29300",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8500,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-33246",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      10911,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-37582",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      10911
+    ],
+    "services": [
+      [
+        "namesrv",
+        "vulhub/rocketmq:5.1.0",
+        true
+      ],
+      [
+        "broker",
+        "vulhub/rocketmq:5.1.0",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-37941",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8088
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-38633",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-38646",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3000
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/metabase:0.46.6",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-39361",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-42793",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8111,
+      5005
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/teamcity:2023.05.3",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-42820",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80,
+      2222
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-4450",
+    "template_ready": true,
+    "runtime_status": "ready",
+    "runtime_image": "cvelab-runtime-2023-4450-d2c957c0ae43",
+    "ports": [
+      8085,
+      5005
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/jimureport:1.6.0",
+        true
+      ],
+      [
+        "db",
+        "mysql:5.7",
+        false
+      ]
+    ],
+    "verified": true
+  },
+  {
+    "cve_id": "CVE-2023-46604",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      61616,
+      8161,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-49070",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8443,
+      5005
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/ofbiz:18.12.09",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-49103",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-5002",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5050
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2023-51449",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      7860
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/gradio:4.10.0",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-23897",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      50000,
+      8080,
+      5005
+    ],
+    "services": [
+      [
+        "jenkins",
+        "vulhub/jenkins:2.441",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-28752",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-2961",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-32114",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      61616,
+      8161,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-36401",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080,
+      5005
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/geoserver:2.23.2",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-42323",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      1157,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-43441",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-4367",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-4956",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8081,
+      5005
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/nexus:3.68.0",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2024-56145",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-13780",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5050
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-1974",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      30080,
+      30443
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-24813",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080
+    ],
+    "services": [
+      [
+        "tomcat",
+        "vulhub/tomcat:9.0.97",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-2945",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5050
+    ],
+    "services": [
+      [
+        "pgsql",
+        "postgres:17-alpine",
+        false
+      ],
+      [
+        "web",
+        "vulhub/pgadmin:9.1",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-29927",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      3000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-30208",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5173
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/vite:6.2.2",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-32395",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5173
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/vite:6.2.5",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-3248",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      7860
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/langflow:1.2.0",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-41242",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080,
+      5005
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/spring-boot-jetty:3.2.4",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-54068",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      80
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2025-67303",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8188
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/comfyui:3.37-with-manager",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2026-22777",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8188
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2026-25253",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      18789
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/openclaw:2026.1.28",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2026-25887",
+    "template_ready": true,
+    "runtime_status": "ready",
+    "runtime_image": "cvelab-runtime-2026-25887-9ec5fb98239d",
+    "ports": [
+      4018,
+      4019
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/chartbrew:4.8.0",
+        true
+      ],
+      [
+        "db",
+        "mysql:8.4",
+        false
+      ],
+      [
+        "redis",
+        "redis:7.4-alpine",
+        false
+      ],
+      [
+        "mongodb",
+        "mongo:7.0",
+        false
+      ]
+    ],
+    "verified": true
+  },
+  {
+    "cve_id": "CVE-2026-27944",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      9000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2026-31816",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      10000
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2026-34197",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      61616,
+      8161,
+      5005
+    ],
+    "services": [
+      [
+        "activemq",
+        "vulhub/activemq:6.2.2",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2026-34486",
+    "template_ready": false,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8080,
+      4000,
+      5005
+    ],
+    "services": [],
+    "verified": false
+  },
+  {
+    "cve_id": "CVE-2026-39363",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      5173
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/vite:7.3.1",
+        true
+      ]
+    ],
+    "verified": false
+  },
+  {
+    "cve_id": "PIL-CVE-2017-8291",
+    "template_ready": true,
+    "runtime_status": null,
+    "runtime_image": null,
+    "ports": [
+      8000
+    ],
+    "services": [
+      [
+        "web",
+        "vulhub/ghostscript:9.21-with-flask",
+        true
+      ]
+    ],
+    "verified": false
+  }
+]

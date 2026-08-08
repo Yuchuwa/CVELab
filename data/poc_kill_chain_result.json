@@ -1,0 +1,61 @@
+[
+  {
+    "slot": "data-store",
+    "label": "A objective 填 RCE (v2: 不卡漏洞类型, 合法)",
+    "kill_chain_phase": "objective",
+    "depends_on": null,
+    "required_mitre": [
+      "initial_access",
+      "execution"
+    ],
+    "old_matcher": [
+      "CVE-IA-003"
+    ],
+    "new_matcher": [
+      "CVE-IA-003"
+    ],
+    "old_count": 1,
+    "new_count": 1,
+    "rejected_by_phase_policy": []
+  },
+  {
+    "slot": "data-store-dep",
+    "label": "B objective + depends_on (可达性是唯一硬约束)",
+    "required_mitre": [
+      "initial_access",
+      "execution"
+    ],
+    "kill_chain_phase": "objective",
+    "depends_on": [
+      "app-service"
+    ],
+    "old_matcher": [
+      "CVE-IA-003"
+    ],
+    "new_upstream_pivot_ok": [
+      "CVE-IA-003"
+    ],
+    "new_upstream_pivot_none": []
+  },
+  {
+    "slot": "dmz-web",
+    "label": "C entry 填 RCE (无依赖, 可达)",
+    "kill_chain_phase": "entry",
+    "depends_on": null,
+    "required_mitre": [
+      "initial_access",
+      "execution"
+    ],
+    "old_matcher": [
+      "CVE-IA-001",
+      "CVE-EXE-001"
+    ],
+    "new_matcher": [
+      "CVE-IA-001",
+      "CVE-EXE-001"
+    ],
+    "old_count": 2,
+    "new_count": 2,
+    "rejected_by_phase_policy": []
+  }
+]

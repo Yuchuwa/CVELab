@@ -11,6 +11,7 @@ from typing import Any
 
 NON_RESEARCH_FAILURES = {
     "agent_api_quota", "agent_api_protocol", "agent_transport",
+    "agent_incomplete",
     "worker_failed", "worker_timeout", "worker_launch", "cleanup_failed",
 }
 

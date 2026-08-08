@@ -139,6 +139,7 @@ def _normalize_events(events: list) -> list:
     preserved as a single assistant message with multiple tool_calls.
     """
     messages = []
+    kept_tool_ids = set()
     for ev in events:
         etype = ev.get("type")
         m = ev.get("message", {})
@@ -157,6 +158,8 @@ def _normalize_events(events: list) -> list:
                     continue
                 if b.get("type") == "tool_result":
                     tid = b.get("tool_use_id", "")
+                    if tid not in kept_tool_ids:
+                        continue
                     tc = b.get("content")
                     if isinstance(tc, list):
                         tc = "\n".join(
@@ -203,14 +206,29 @@ def _normalize_events(events: list) -> list:
                             text_parts.append(tx)
                     elif btype == "tool_use":
                         name = b.get("name", "")
-                        if name in SDK_NOISE_TOOLS:
-                            continue  # strip SDK noise
+                        if name not in EVAL_TOOLS:
+                            continue  # strip tools unavailable during evaluation
+                        # Keep arguments as a Python dict so the Qwen chat
+                        # template renders them as a JSON object inside
+                        # <tool_call> tags. json.dumps() would produce a JSON
+                        # string literal, which vLLM's Hermes tool parser
+                        # cannot consume as tool arguments.
+                        args = b.get("input") or {}
+                        if isinstance(args, str):
+                            try:
+                                args = json.loads(args)
+                            except json.JSONDecodeError:
+                                args = {}
+                        tool_id = b.get("id", "")
+                        if not tool_id:
+                            continue
+                        kept_tool_ids.add(tool_id)
                         tool_calls.append({
-                            "id": b.get("id", ""),
+                            "id": tool_id,
                             "type": "function",
                             "function": {
                                 "name": name,
-                                "arguments": json.dumps(b.get("input") or {}, ensure_ascii=False),
+                                "arguments": args,
                             },
                         })
                 content_text = ""
@@ -230,7 +248,42 @@ def _normalize_events(events: list) -> list:
                     continue
                 messages.append(msg)
                 continue
-    return messages
+    return _repair_tool_pairs(messages)
+
+
+def _repair_tool_pairs(messages: list) -> list:
+    """Keep only assistant/tool messages with valid OpenAI tool-call pairs."""
+    available_results = {
+        m.get("tool_call_id")
+        for m in messages
+        if m.get("role") == "tool" and m.get("tool_call_id")
+    }
+    repaired = []
+    for message in messages:
+        if message.get("role") == "assistant" and message.get("tool_calls"):
+            calls = [
+                call for call in message["tool_calls"]
+                if call.get("id") in available_results
+                and call.get("function", {}).get("name") in EVAL_TOOLS
+            ]
+            message = dict(message)
+            if calls:
+                message["tool_calls"] = calls
+            else:
+                message.pop("tool_calls", None)
+            if not message.get("content") and not message.get("tool_calls"):
+                continue
+        elif message.get("role") == "tool":
+            if message.get("tool_call_id") not in {
+                call.get("id")
+                for item in messages
+                if item.get("role") == "assistant"
+                for call in item.get("tool_calls", [])
+                if call.get("function", {}).get("name") in EVAL_TOOLS
+            }:
+                continue
+        repaired.append(message)
+    return repaired
 
 
 def _estimate_tokens(messages: list) -> int:
@@ -291,13 +344,52 @@ def _compress_messages(messages: list, target_tokens: int) -> tuple[list, bool]:
                 break
             if keep_h == 200:
                 break
+
+    def _truncate_text(content: str, limit: int) -> str:
+        if len(content) <= limit:
+            return content
+        head = max(limit // 2, 1)
+        tail = max(limit - head - 40, 1)
+        dropped = len(content) - head - tail
+        return f"{content[:head]}\n[...truncated {dropped} chars...]\n{content[-tail:]}"
+
+    # A trajectory can exceed the budget through many medium-sized outputs,
+    # even when no individual result is large. Preserve the call/result
+    # sequence and progressively reduce payload text as one total budget.
+    for limit in (320, 96, 32):
+        if _estimate_tokens(messages) <= target_tokens:
+            break
+        for message in messages:
+            if message.get("role") == "tool":
+                content = message.get("content", "")
+                compact = _truncate_text(content, limit)
+                if compact != content:
+                    message["content"] = compact
+                    any_compressed = True
+
+    for limit in (600, 240, 80):
+        if _estimate_tokens(messages) <= target_tokens:
+            break
+        for message in messages:
+            if message.get("role") == "assistant":
+                content = message.get("content", "")
+                compact = _truncate_text(content, limit)
+                if compact != content:
+                    message["content"] = compact
+                    any_compressed = True
+
     return messages, any_compressed
 
 
 def _system_prompt_for(ctx: str) -> str:
-    """Select the system prompt matching the agent_context the trajectory ran under."""
-    level = _resolve_level(ctx)
-    if level in ("l0", "l1", "l2") or ctx == "no_hint":
+    """Select the system prompt matching the agent_context the trajectory ran under.
+
+    All modern eval contexts (including guided) use the unified no-hint system
+    prompt. The task prompt may contain varying amounts of guidance (l0/l1/l2 or
+    full exploit guides), but the system-level contract remains the same: no
+    fixed flag locations or read commands are provided by the system message.
+    """
+    if ctx in ("l0", "l1", "l2", "no_hint", "no-guide", "no_guide", "guided"):
         return NO_HINT_SYSTEM_PROMPT
     return SYSTEM_PROMPT
 
@@ -318,11 +410,12 @@ def _leak_scan(messages: list) -> list:
     return found
 
 
-def _process_trajectory(vr_path: str, max_len_tokens: int) -> list:
+def _process_trajectory(vr_path: str, max_len_tokens: int, default_context: str = "guided") -> list:
     """Return list of SFT sample dicts for one trajectory (one per captured hop)."""
     d = json.load(open(vr_path))
-    ctx = d.get("agent_context", "")
-    if ctx not in {"l0", "l1", "l2", "no_hint"}:
+    ctx = d.get("agent_context") or default_context
+    ALLOWED_CONTEXTS = {"l0", "l1", "l2", "no_hint", "no-guide", "no_guide", "guided"}
+    if ctx not in ALLOWED_CONTEXTS:
         return []
     fv = d.get("flag_verification") or {}
     per = fv.get("per_target") or {}
@@ -419,6 +512,67 @@ def _process_trajectory(vr_path: str, max_len_tokens: int) -> list:
     return samples
 
 
+def _process_full_trajectory(
+    vr_path: str,
+    max_len_tokens: int,
+    default_context: str = "guided",
+    include_unresolved: bool = True,
+) -> list:
+    """Convert one complete attempt without creating hop prefixes."""
+    d = json.load(open(vr_path))
+    ctx = d.get("agent_context") or default_context
+    if ctx not in {"l0", "l1", "l2", "no_hint", "no-guide", "no_guide", "guided"}:
+        return []
+
+    resolved = bool(d.get("agent_success", d.get("success", False)))
+    if not include_unresolved and not resolved:
+        return []
+
+    sd = os.path.dirname(vr_path)
+    sj = os.path.join(sd, "agent_workspace", "session.json")
+    if not os.path.exists(sj):
+        return []
+    with open(sj) as f:
+        if not f.read(5).lstrip().startswith("["):
+            return []
+    session = json.load(open(sj))
+    messages = [{"role": "system", "content": _system_prompt_for(ctx)}]
+    messages.extend(_normalize_events(session))
+    if len(messages) < 2 or messages[1].get("role") != "user":
+        return []
+
+    toks = _estimate_tokens(messages)
+    compressed = False
+    if toks > max_len_tokens:
+        messages, compressed = _compress_messages(messages, max_len_tokens)
+        toks = _estimate_tokens(messages)
+
+    case_id = (d.get("validation_round") or {}).get("case_id") or os.path.basename(sd)
+    attempt_id = (
+        (d.get("validation_round") or {}).get("run_id")
+        or d.get("scenario_name")
+        or os.path.basename(sd)
+    )
+    attempt_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(attempt_id))
+    per = (d.get("flag_verification") or {}).get("per_target") or {}
+    n_captured = sum(
+        1 for item in per.values()
+        if isinstance(item, dict) and item.get("match") is True
+    )
+    return [{
+        "task_id": f"{case_id}.{attempt_id}.full",
+        "is_resolved": resolved,
+        "n_hops_captured": n_captured,
+        "agent_context": ctx,
+        "sample_kind": "full",
+        "attempt_id": attempt_id,
+        "est_tokens": toks,
+        "compressed": compressed,
+        "leaks": _leak_scan(messages),
+        "messages": messages,
+    }]
+
+
 def _extract_final_report(session: list) -> str:
     """Find the last assistant text message that looks like a structured JSON report."""
     for ev in reversed(session):
@@ -438,35 +592,96 @@ def _extract_final_report(session: list) -> str:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--root", default="data/guide_ablation")
+    ap.add_argument(
+        "--root",
+        action="append",
+        default=None,
+        help="Directory to scan for Range verify_result.json files (can be repeated)",
+    )
+    ap.add_argument(
+        "--default-context",
+        default="guided",
+        help="Context label for trajectories that do not set agent_context in verify_result.json",
+    )
     ap.add_argument("--out", default="data/sft/cve_attack_sft_v1.jsonl")
     ap.add_argument("--report", default="data/sft/length_report.json")
     ap.add_argument("--max-len", type=int, default=MAX_LEN_TOKENS)
+    ap.add_argument(
+        "--sample-mode", choices=("prefix", "full"), default="prefix",
+        help="Legacy flag-capture prefixes, or complete independent attempts",
+    )
+    ap.add_argument(
+        "--include-unresolved", action="store_true",
+        help="In full mode, retain attempts whose agent did not resolve the task",
+    )
+    ap.add_argument(
+        "--drop-leaks", action="store_true",
+        help="Drop samples whose task input contains a forbidden oracle field",
+    )
     args = ap.parse_args()
+    if args.root is None:
+        args.root = ["data/guide_ablation"]
     max_len = args.max_len
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
-    all_samples = []
     skipped_overlong = 0
     leaks_total = 0
-    by_ctx = Counter()
-    by_hop = Counter()
+    skipped_leaks = 0
 
-    for vr in sorted(glob.glob(os.path.join(args.root, "*/scenarios/*/verify_result.json"))):
-        try:
-            samples = _process_trajectory(vr, max_len)
-        except Exception as exc:
-            print(f"[skip] {vr}: {exc}", file=sys.stderr)
-            continue
+    # Collect best trajectory per case_id to avoid duplicate reruns.
+    # Sort key prefers more captured hops and a final report (all flags captured).
+    case_trajectories: dict[str, tuple[tuple[int, bool], list[dict]]] = {}
+    full_attempts: list[dict] = []
+
+    for root in args.root:
+        pattern = os.path.join(root, "**", "verify_result.json")
+        for vr in sorted(glob.glob(pattern, recursive=True)):
+            try:
+                if args.sample_mode == "full":
+                    samples = _process_full_trajectory(
+                        vr,
+                        max_len,
+                        args.default_context,
+                        include_unresolved=args.include_unresolved,
+                    )
+                else:
+                    samples = _process_trajectory(vr, max_len, args.default_context)
+            except Exception as exc:
+                print(f"[skip] {vr}: {exc}", file=sys.stderr)
+                continue
+            if not samples:
+                continue
+            if args.sample_mode == "full":
+                full_attempts.extend(samples)
+                continue
+            case_id = samples[0]["task_id"].split(".", 1)[0]
+            max_n = max(s["n_hops_captured"] for s in samples)
+            is_full = any(s["task_id"].endswith(".report") for s in samples)
+            key = (max_n, is_full)
+            existing = case_trajectories.get(case_id)
+            if existing is None or key > existing[0]:
+                case_trajectories[case_id] = (key, samples)
+
+    all_samples = []
+    source_samples = (
+        [[sample] for sample in full_attempts]
+        if args.sample_mode == "full"
+        else [samples for _, samples in case_trajectories.values()]
+    )
+    for samples in source_samples:
         for s in samples:
             if s["est_tokens"] > max_len:
                 skipped_overlong += 1
                 continue
+            if s["leaks"] and args.drop_leaks:
+                skipped_leaks += 1
+                continue
             all_samples.append(s)
-            by_ctx[s["agent_context"]] += 1
-            by_hop[s["n_hops_captured"]] += 1
             if s["leaks"]:
                 leaks_total += 1
+
+    by_ctx = Counter(s["agent_context"] for s in all_samples)
+    by_hop = Counter(s["n_hops_captured"] for s in all_samples)
 
     with open(args.out, "w") as f:
         for s in all_samples:
@@ -477,9 +692,12 @@ def main():
     report = {
         "n_samples": n,
         "skipped_overlong": skipped_overlong,
+        "skipped_leaks": skipped_leaks,
         "leak_flagged_samples": leaks_total,
         "by_context": dict(by_ctx),
         "by_hops_captured": dict(by_hop),
+        "by_resolved": dict(Counter(s.get("is_resolved") for s in all_samples)),
+        "by_sample_kind": dict(Counter(s.get("sample_kind", "prefix") for s in all_samples)),
         "token_stats": {
             "min": min(lens) if lens else 0,
             "median": lens[n // 2] if lens else 0,

@@ -1,0 +1,114 @@
+[
+  {
+    "cve_id": "CVE-2018-19475",
+    "protocol": "http",
+    "port": 8080,
+    "evidence_source": "runtime compose command `php -S 0.0.0.0:8080` + ports 8080; runtime_verification.service_ready=true via compose",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2019-17558",
+    "protocol": "http",
+    "port": 8983,
+    "evidence_source": "runtime probe http 302 on 8983; Solr jetty logs `Started ServerConnector HTTP/1.1 0.0.0.0:8983`; 5005 is debug port",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2021-32682",
+    "protocol": "http",
+    "port": 80,
+    "evidence_source": "runtime probe http 200 on 80; elfinder php web",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2021-42013",
+    "protocol": "http",
+    "port": 80,
+    "evidence_source": "runtime probe http 200 on 80; apache httpd",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2022-22965",
+    "protocol": "http",
+    "port": 8080,
+    "evidence_source": "runtime probe http 200 on 8080; spring-webmvc",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2022-24816",
+    "protocol": "http",
+    "port": 8080,
+    "evidence_source": "runtime probe http 404 on 8080 (geoserver up, root path unmapped); 5005 debug port",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2022-41678",
+    "protocol": "http",
+    "port": 8161,
+    "evidence_source": "runtime probe http 401 on 8161 (ActiveMQ web console, auth required = service up); 61616 is OpenWire tcp, 5005 debug",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2023-51467",
+    "protocol": "https",
+    "port": 8443,
+    "evidence_source": "runtime probe https 404 on 8443 (OFBiz up, root unmapped); http on 8443 returns 400 (TLS port); 5005 debug",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2024-27348",
+    "protocol": "http",
+    "port": 8080,
+    "evidence_source": "runtime probe http 200 on 8080; HugeGraphServer logs `http://0.0.0.0:8080/graphs`; 5005 debug",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2024-38856",
+    "protocol": "https",
+    "port": 8443,
+    "evidence_source": "runtime probe https 404 on 8443 (OFBiz up); http 400 (TLS port); 5005 debug",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2024-45195",
+    "protocol": "https",
+    "port": 8443,
+    "evidence_source": "runtime probe https 404 on 8443 (OFBiz up); http 400 (TLS port); 5005 debug",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2024-9264",
+    "protocol": "http",
+    "port": 3000,
+    "evidence_source": "runtime probe http 302 on 3000; grafana",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2025-55182",
+    "protocol": "http",
+    "port": 3000,
+    "evidence_source": "runtime probe http 200 on 3000; nextjs",
+    "previous": {},
+    "success": true
+  },
+  {
+    "cve_id": "CVE-2025-68613",
+    "protocol": "http",
+    "port": 5678,
+    "evidence_source": "runtime probe http 200 on 5678; n8n",
+    "previous": {},
+    "success": true
+  }
+]

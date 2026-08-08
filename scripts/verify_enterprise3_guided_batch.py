@@ -266,7 +266,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--noise-level", default="none",
-        help="Noise level key from the template's noise_levels (none/baseline). "
+        help="Noise level key from the template's noise_levels (none/low/medium/high). "
              "Inserts benign decoy nodes into zone LANs; orthogonal to --agent-context.",
     )
     parser.add_argument(
@@ -900,16 +900,14 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
             _persist(output_dir, state)
 
         if fatal_stop and not active:
-            # Fatal quota exhaustion: finalize every non-terminal case as
-            # skipped so --resume won't re-run them and the summary reflects
-            # the stop cause. Do not mark them as failures (success=False
-            # already set by the infra-result stub); keep failure_stage.
+            # Fatal quota exhaustion: keep every non-terminal case explicitly
+            # resumable. Do not mark skipped work as completed in the summary.
             for cid in state["selected_case_ids"]:
                 it = state["cases"][cid]
-                if it["status"] not in {"completed", "interrupted"}:
+                if it["status"] not in {"completed", "interrupted", "quota_skipped"}:
                     _save_case_result(it, _result_for_infra(
                         it, FATAL_API_STAGE, "skipped: API quota exhausted, batch stopped"))
-                    it["status"] = "completed"
+                    it["status"] = "quota_skipped"
             _persist(output_dir, state)
             print("[Fatal] batch stopped due to API quota exhaustion", flush=True)
             return False
@@ -1006,8 +1004,8 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                         os.killpg(rproc.pid, signal.SIGTERM)
                     except ProcessLookupError:
                         pass
-                # This case is terminal.
-                item["status"] = "completed"
+                # Preserve this case as resumable after quota is restored.
+                item["status"] = "quota_skipped"
             # Persistent rate limit: pause this case (do NOT count as a
             # failure attempt) and re-queue it after the cooldown so other
             # cases can progress in the meantime.
@@ -1101,10 +1099,16 @@ def main() -> int:
         # Completed research outcomes are immutable.  Only interrupted or
         # unfinished infrastructure work is eligible to resume.
         for item in state.get("cases", {}).values():
-            if item.get("status") == "interrupted":
-                item["status"] = "runtime_prepared"
+            if item.get("status") in {"interrupted", "quota_skipped"}:
+                item["status"] = (
+                    "runtime_prepared"
+                    if Path(item.get("scenario_dir", "")).is_dir()
+                    else "pending"
+                )
         for item in state.get("cases", {}).values():
-            if item.get("status") in {"interrupted", "running", "leased", "cleaning"}:
+            if item.get("status") in {
+                "interrupted", "quota_skipped", "running", "leased", "cleaning",
+            }:
                 release_control_lease(item.get("control_network_lease"))
                 item["control_network_lease"] = None
                 item["status"] = "runtime_prepared" if Path(item.get("scenario_dir", "")).is_dir() else "pending"

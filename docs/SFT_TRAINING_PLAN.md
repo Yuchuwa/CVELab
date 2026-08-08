@@ -46,7 +46,9 @@
 
 切分锚点：ground_truth 的 flag 值在 session 工具结果中首次出现的位置（已验证 100% 可定位，flag 不需注入训练输入）。
 
-### 2.3 转换器 `scripts/convert_trajectories_to_sft.py`
+### 2.3 转换器 `sft/convert_trajectories_to_sft.py`
+
+（注意：文件位于 `sft/convert_trajectories_to_sft.py`，不是 `scripts/`。）
 
 输入 → 输出流程：
 
@@ -66,6 +68,8 @@ verify_result.json (筛 ctx + ≥1 flag match)
      5. task_id = validation_round.case_id + f".hop{k}"
   → 输出 SFT JSONL
 ```
+
+**重要格式约定（2026-07-25 修正）**：`tool_calls[].function.arguments` 必须保持为 Python dict，不能 `json.dumps()` 成字符串。Qwen2.5-Instruct 的 chat template 对 `arguments` 使用 `| tojson`；如果 `arguments` 已经是字符串，会被渲染成双重转义的 JSON 字符串字面量，导致 vLLM `--tool-call-parser hermes` 解析失败。
 
 ### 2.4 长度处理（不硬截断尾部）
 
@@ -153,41 +157,48 @@ group_by_length = True         # 按长度分桶减少 padding 浪费
 
 ### Phase 0：数据管线（无训练）
 **任务**：
-1. 写 `scripts/convert_trajectories_to_sft.py`
+1. 写 `sft/convert_trajectories_to_sft.py`（位于 `sft/`，不是 `scripts/`）
 2. 跑出 `data/sft/cve_attack_sft_v1.jsonl`
 3. 写长度统计 + 反泄漏扫描校验脚本
+4. 用 `sft/adapter_smoke_test.py` 或等价的 tokenizer 渲染检查确认 `tool_calls[].function.arguments` 被渲染为 JSON object（不是字符串字面量）
 
 **验收门**：
-- [ ] 产出 ~600 条 JSONL，schema 符合 `{task_id, is_resolved, messages}`
-- [ ] 长度分布复核：≤32k 占比 ≥80%
-- [ ] 反泄漏扫描 0 命中
-- [ ] 抽查 3 条样本人工可读、tool_calls 格式正确
+- [x] 产出 ~600 条 JSONL，schema 符合 `{task_id, is_resolved, messages}`（实际 694 条）
+- [x] 长度分布复核：≤32k 占比 ≥80%（实际 694/861 ≈ 80.6%）
+- [x] 反泄漏扫描 0 命中
+- [x] 抽查 3 条样本人工可读、tool_calls 格式正确
+- [x] 用 `apply_chat_template` 验证 `arguments` 渲染为 JSON object
+- [ ] 等待训练环境 `trl`/`transformers` 版本修复后重新训练 v2
 
 ### Phase 1：环境与 smoke（小步验证）
 **任务**：
-1. `pip install trl peft datasets`（playbook env）
-2. 写 `scripts/train_sft.py`（trl SFTTrainer + peft 配置）
-3. 三档 smoke（各跑 20-50 步）：
+1. 修复 `trl`/`transformers` 版本兼容问题（当前 `trl 1.9.0` + `transformers 4.48.3` 导入 `SFTConfig` 报错）
+2. `pip install trl peft datasets`（playbook env，按兼容版本）
+3. 写 `sft/train_sft.py`（trl SFTTrainer + peft 配置）
+4. 三档 smoke（各跑 20-50 步）：
    - `max_seq_length=8192` → 验证链路 + loss 下降
    - `max_seq_length=16384` → 测显存
    - `max_seq_length=32768` → 确认单卡峰值不 OOM
+5. 训练前/后运行 `sft/adapter_smoke_test.py`：短 prompt + Range prompt 多轮工具调用格式检查
 
 **验收门**：
 - [ ] 三档 smoke 都不崩
 - [ ] 32k 单卡峰值显存 <46GB（留余量）
 - [ ] loss 正常下降（不 NaN/爆炸）
 - [ ] 记录 tokens/sec 决定是否调 seq 或 epochs
+- [ ] `adapter_smoke_test.py` 在 Range prompt 多轮下通过
 
 ### Phase 2：正式训练
 **任务**：
 1. 按 Phase 1 确认的 seq_len 跑完整 3 epochs
 2. 每 epoch 存 checkpoint + 评估 loss
-3. 训练日志写 `tb-runs/sft_v1/`
+3. 训练日志写 `tb-runs/sft_v2/`
 
 **验收门**：
 - [ ] 训练完成，final loss 明显低于初始
-- [ ] 产出 `data/sft/adapter_v1/`（LoRA adapter 可加载）
+- [ ] 产出 `data/sft/adapter_v2/`（LoRA adapter 可加载）
 - [ ] 能用 `peft` + transformers 加载并推理
+- [ ] `sft/adapter_smoke_test.py` 对 `adapter_v2` 通过（含 Range 多轮）
 
 ### Phase 3：域内评测
 **任务**：
@@ -231,9 +242,10 @@ group_by_length = True         # 按长度分桶减少 padding 浪费
 | 32k 单卡 OOM | 中 | 降到 16k 或 24k；或只训 ≤16k 样本 |
 | 600 条泛化不足 | 中高 | 接受域内验证；后续跑更多 batch 扩量 |
 | thinking 压缩损失信号 | 中 | 先全保留跑一次，对比压缩版 |
-| tool 格式归一化错 | 中 | 抽查 3 条 + 用微调模型实际 tool call 测试 |
+| tool 格式归一化错 | 中 | 已发生：已修正 `arguments` 为 dict 并加 `adapter_smoke_test.py` 校验 |
 | 评测污染（训练轨迹复用） | 高 | 强制重新 deploy 新 Range，不复用 scenario |
 | GPU 0-3 跨组 PCIe 慢 | 低 | 可只用 0,1 双卡 NVLink 对 |
+| trl/transformers 版本不兼容 | 中 | 已发现，需先修复依赖再训练 v2 |
 
 ---
 
@@ -241,14 +253,16 @@ group_by_length = True         # 按长度分桶减少 padding 浪费
 
 | 产物 | 路径 |
 |---|---|
-| 转换器 | `scripts/convert_trajectories_to_sft.py` |
+| 转换器 | `sft/convert_trajectories_to_sft.py` |
 | 长度探针 | `scripts/probe_trajectory_split.py`（已写） |
-| 训练脚本 | `scripts/train_sft.py` |
+| 训练脚本 | `sft/train_sft.py` |
+| adapter smoke test | `sft/adapter_smoke_test.py` |
+| 转换器回归测试 | `tests/sft/test_convert_trajectories.py` |
 | SFT 数据 | `data/sft/cve_attack_sft_v1.jsonl` |
 | 长度报告 | `data/sft/length_report.json` |
-| LoRA adapter | `data/sft/adapter_v1/` |
-| 训练日志 | `tb-runs/sft_v1/` |
-| 评测结果 | `data/guide_ablation/sft_v1_eval/` |
+| LoRA adapter | `data/sft/adapter_v2/`（待训练） |
+| 训练日志 | `tb-runs/sft_v2/` |
+| 评测结果 | `data/guide_ablation/sft_v2_eval/` |
 | 进度记录 | `docs/WORK_PROGRESS_REPORT.md`（每 phase 追加） |
 
 ---

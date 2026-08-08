@@ -1,2 +1,36 @@
 """Backward-compatible imports for the pre-orchestrator package layout."""
+from .paper_workflow import (
+    AgentArtifact,
+    AgentBackend,
+    AgentRole,
+    AttackEdge,
+    CandidateRange,
+    CapabilityProbeEvidence,
+    CapabilityProbeRegistry,
+    DependencyPlanner,
+    Diagnoser,
+    Diagnosis,
+    ExplorerResult,
+    FailureClass,
+    Generator,
+    IncompatibilityRecord,
+    IncompatibilityStore,
+    PrefixState,
+    StageAgent,
+    ExploiterAgent,
+    ExplorerAgent,
+    GeneratorAgent,
+    ComposerAgent,
+    ExecutorAgent,
+    DiagnoserAgent,
+    RangeFactoryWorkflow,
+)
 
+__all__ = [
+    "AgentArtifact", "AgentBackend", "AgentRole", "AttackEdge", "CandidateRange",
+    "CapabilityProbeEvidence", "CapabilityProbeRegistry", "DependencyPlanner",
+    "Diagnoser", "Diagnosis", "ExplorerResult", "FailureClass", "Generator",
+    "IncompatibilityRecord", "IncompatibilityStore", "PrefixState", "StageAgent",
+    "ExploiterAgent", "ExplorerAgent", "GeneratorAgent", "ComposerAgent",
+    "ExecutorAgent", "DiagnoserAgent", "RangeFactoryWorkflow",
+]
