@@ -88,3 +88,59 @@
    - debug/错误页型验证语义不适配
    - 概率型/协议型 exploit 自动化不稳定
 3. 后续模板扩展优先使用 `full_pass` 组作为锚点样本
+
+---
+
+## 六、2026-07-18 批量 Atom 供给补充记录
+
+本节为 superseding runtime/batch snapshot，不改写前述历史重建结果。
+
+- 批次状态文件：`data/atom_batch_2026-07-18_status.md`
+- 本批选择：`CVE-2022-0543`。Redis 5.0.7 / RESP 6379，native/orchestrated
+  事实已成功，Guide v2 ready，runtime image、digest、完整 smoke 与 6379
+  service readiness 已通过。
+- runtime image：`cvelab-runtime-2022-0543-e422f13fd5b6`
+- runtime digest：`sha256:fcb14f42a918acbe68a1269b7ff9ea6979594238c52963fa53d4890e91d3bcc0`
+- source bundle aggregate hash：`926550b0b05e55db`
+- 分类：`structure-healthy`；runtime-ready data-service candidate；由于
+  `exploit_access.required_service` 仍为空，暂不升级为 template-candidate。
+- 本批 deferred/rejected：`CVE-2019-0193`（精确镜像缺失）、`CVE-2016-3714`
+  （bundle 文件/目录冲突）、`CVE-2016-3088`（readiness 端口契约风险）、
+  `CVE-2017-10271`（WebLogic 数据面绑定风险）、`CVE-2019-20933`（v2/无
+  bundle/Guide/native capability）、`CVE-2017-12635`（无 native 成功与完整 v3）。
+- 以上失败分类分别记录为 environment/build risk、validation-model mismatch
+  或 deferred service/template family；没有重复强行重试。
+
+---
+
+## 七、2026-07-18 Phase 2 / Reconstruction Wave 002
+
+本节为 wave-002 独立记录，不改写前述历史结果。选择依据和全部排除项见：
+
+- `data/atom_reconstruction_audit_wave_002.json`
+- `data/atom_reconstruction_wave_002.json`
+- `data/atom_reconstruction_wave_002_results.json`
+- `data/atom_reconstruction_wave_002_handoff.md`
+
+- 选择：25 条，包含 `14 rebuild_runtime_or_bundle` 与 `11 full_reconstruction`。
+- Runtime 路径：13 条 runtime image、完整 smoke 和 service readiness 通过；
+  `CVE-2013-4547` 因 port 80 service readiness 失败而 deferred。
+- Full 路径：`CVE-2026-24061`、`CVE-2026-21858`、`CVE-2025-32433` 通过
+  native、Guide、runtime 和 orchestrated 首阶段 gates，分类为
+  `template-anchor`。
+- Runtime rebuild 通过项使用既有 native/orchestrated/Guide 事实和本轮 runtime
+  证据，分类为 `template-candidate`，不冒充 fresh full rebuild anchor。
+
+### Wave-002 deferred / rejected
+
+| CVE | 失败层级 | 分类 | 事实 |
+|---|---|---|---|
+| CVE-2013-4547 | runtime | environment/build risk | runtime smoke 后 port 80 未 readiness |
+| CVE-2021-40438 | runtime/Guide | environment/build risk; validation-model mismatch | 隔离 Docker 配置后 native/orchestrated 通过，但 runtime 无 service-port contract，Guide schema 拒绝结构化 endpoint |
+| CVE-2022-24706 | native | validation-model mismatch | Agent 证明 RCE，但 native flag recovery 读到的值缺首字符，未通过 verifier |
+| CVE-2021-42392 | native/Guide | exploit automation instability | JNDI/LDAP payload 在 80 turns 内未收敛，未生成 Guide |
+| CVE-2014-0160 | Guide | validation-model mismatch | native/orchestrated/runtime 通过，但 Agent Guide material schema 校验失败 |
+| CVE-2024-1561 | runtime | runtime tool/profile compatibility | `python3_psycopg2` smoke 失败 |
+| CVE-2018-1273 | native/Guide | exploit automation instability | Agent 工具执行失败，未捕获 flag，未生成 Guide |
+| CVE-2017-12794 | orchestrated/runtime | environment/build risk | native/Guide 通过，但 host port 冲突且 runtime `python3_requests` smoke 失败 |
+| CVE-2024-45507 | Guide | validation-model mismatch | native/orchestrated/runtime 通过，但 Agent material/execution Guide schema 校验失败 |

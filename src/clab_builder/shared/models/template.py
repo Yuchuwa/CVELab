@@ -4,7 +4,7 @@
 """
 
 from typing import Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from clab_builder.shared.models.atom import CapabilityType
 
@@ -126,9 +126,25 @@ class NoiseService(BaseModel):
     name: str
     zone: str
     image: str
-    ports: List[int] = Field(default_factory=list)
+    ports: List[int] = Field(default_factory=list, validate_default=True)
     command: str = ""
     environment: Dict[str, str] = Field(default_factory=dict)
+    # Optional runtime surface metadata used by matched-surface decoys. These
+    # fields describe a protocol facade, not exploitability.
+    surface_profile: str = ""
+    surface_banner: str = ""
+    entrypoint: str = ""
+
+    @field_validator("ports")
+    @classmethod
+    def validate_ports(cls, ports: List[int]) -> List[int]:
+        if not ports:
+            raise ValueError("noise service must declare at least one TCP port")
+        if len(set(ports)) != len(ports):
+            raise ValueError("noise service ports must be unique")
+        if any(port < 1 or port > 65535 for port in ports):
+            raise ValueError("noise service ports must be between 1 and 65535")
+        return ports
 
 
 class TopologyTemplate(BaseModel):

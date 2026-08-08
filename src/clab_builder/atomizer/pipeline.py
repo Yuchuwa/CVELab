@@ -169,6 +169,38 @@ class AtomizerPipeline:
                 network_name=cve_network,
             )
 
+            # Explorer is a separate role, but it reuses the already deployed
+            # target and foothold.  Preserve the Exploiter artifact before the
+            # second runner writes its own output/session files.
+            exploiter_session = workspace / "session.json"
+            if exploiter_session.exists():
+                shutil.copy2(exploiter_session, workspace / "exploiter_session.json")
+            try:
+                (workspace / "exploiter_output.json").write_text(
+                    json.dumps(agent_output.__dict__, ensure_ascii=False, indent=2, default=str)
+                )
+            except (OSError, TypeError):
+                pass
+
+            # The paper separates exploit reproduction from post-compromise
+            # capability discovery.  Explorer reuses the same live agent
+            # session/foothold and can only contribute probe-confirmed grants.
+            explorer_output = None
+            if agent_output.success:
+                print("\n[3b/5] Exploring post-compromise capabilities")
+                explorer_output = self._run_explorer_agent(
+                    cve_info, workspace, agent_output,
+                    api_key=api_key, base_url=base_url, model=model,
+                    network_name=cve_network,
+                )
+                explorer_session = workspace / "session.json"
+                if explorer_session.exists():
+                    shutil.copy2(explorer_session, workspace / "explorer_session.json")
+                # Keep the exploit transcript as the primary execution
+                # artifact consumed by guide generation and legacy tooling.
+                if (workspace / "exploiter_session.json").exists():
+                    shutil.copy2(workspace / "exploiter_session.json", workspace / "session.json")
+
             # Step 4: guide 在 _save_atom 中依据结构化 Agent 输出生成。
             # SysField 仅作为旧消费者的兼容产物，失败不影响 Atom 保存。
             print(f"\n[4/5] Generating exploit guide")
@@ -182,6 +214,7 @@ class AtomizerPipeline:
             verified, flag_matched = self._save_atom(
                 atom_dir,
                 agent_output=agent_output,
+                explorer_output=explorer_output,
                 llm_checker=llm_checker,
                 api_key=api_key,
                 base_url=base_url,
@@ -1072,6 +1105,37 @@ class AtomizerPipeline:
         )
         return agent.run(cve_input, str(workspace))
 
+    def _run_explorer_agent(self, cve_info: ContainerInfo, workspace: Path,
+                            exploit_output, api_key: str, base_url: str,
+                            model: str, network_name: str = ""):
+        """Run Explorer on the foothold established by the Exploiter.
+
+        The same agent container and workspace are reused, so Explorer receives
+        the live execution context without being allowed to replay a fresh
+        vulnerability attack.  If a legacy runner cannot complete Explorer,
+        the caller keeps the native exploit result and records no verified
+        post-compromise grants.
+        """
+        if not getattr(self, "_agent", None):
+            return None
+        foothold = {
+            "principal": (exploit_output.extra_fields or {}).get("exploit_principal", "unknown"),
+            "capabilities": (exploit_output.extra_fields or {}).get("capability_grants", []),
+            "exploit_guide": exploit_output.exploit_guide or {},
+        }
+        explorer_input = CVEInput(
+            cve_id=self.env.cve_id,
+            description="Probe capabilities from the established foothold",
+            target_ip=cve_info.container_ip,
+            target_ports=cve_info.ports,
+            writeup=self.env.readme_content,
+            environment_context=self._build_agent_environment_context(cve_info, network_name),
+            role="explorer",
+            foothold_context=foothold,
+            exploit_guidance="Use only the established channel; do not repeat the CVE exploit.",
+        )
+        return self._agent.run(explorer_input, str(workspace))
+
     def _generate_exploit_playbook(self, atom_dir: Path, agent_output, cve_info):
         """从 Agent 结果生成 SysField playbook。
 
@@ -1219,6 +1283,7 @@ class AtomizerPipeline:
         api_key: str = "",
         base_url: str = "",
         model: str = "",
+        explorer_output=None,
     ) -> tuple[bool, bool]:
         """保存 atom.yaml v2 元数据，返回 (verified, flag_matched) 供调用方复用判断。"""
         from datetime import datetime
@@ -1343,9 +1408,26 @@ class AtomizerPipeline:
         flag_cmd = agent_extra.get("flag_verify_command", "")
 
         # ── v4: exploit_access + capability_grants（从 agent 输出提取）──
+        explorer_caps = None
+        if explorer_output is not None:
+            probe_items = getattr(explorer_output, "probe_evidence", []) or []
+            explorer_caps = {
+                str(item.get("capability")) for item in probe_items
+                if isinstance(item, dict) and item.get("passed") is True
+            }
+            if explorer_caps:
+                agent_extra = dict(agent_extra)
+                agent_extra["capability_grants"] = sorted(explorer_caps)
+                principals = [
+                    str(item.get("principal")) for item in probe_items
+                    if isinstance(item, dict) and item.get("passed") is True
+                ]
+                if principals:
+                    agent_extra["exploit_principal"] = principals[0]
         exploit_access, capability_grants = self._build_capability_contract(
             agent_extra, verified, self.env.main_ports,
             env=self.env, vulhub_dir=self.vulhub_dir,
+            verified_capabilities=explorer_caps,
         )
         # Surface capability names the Agent emitted that were dropped because
         # they were not valid CapabilityType values. Previously this was a
@@ -1616,6 +1698,10 @@ class AtomizerPipeline:
             if session_src.exists():
                 shutil.copy2(str(session_src), str(atom_dir / "session.json"))
                 print(f"  Session saved: {atom_dir / 'session.json'}")
+            for artifact_name in ("exploiter_session.json", "explorer_session.json", "exploiter_output.json"):
+                artifact_src = workspace / artifact_name
+                if artifact_src.exists():
+                    shutil.copy2(str(artifact_src), str(atom_dir / artifact_name))
             self._force_rmtree(workspace)
 
         return verified, flag_matched
@@ -2078,7 +2164,8 @@ class AtomizerPipeline:
 
     @staticmethod
     def _build_capability_contract(agent_extra, verified, main_ports,
-                                   env=None, vulhub_dir: str = ""):
+                                   env=None, vulhub_dir: str = "",
+                                   verified_capabilities: set[str] | None = None):
         """从 agent 输出构建 (exploit_access, capability_grants)。
 
         agent 在新 prompt 下输出 exploit_access / capability_grants /
@@ -2174,10 +2261,17 @@ class AtomizerPipeline:
         if cap_list and isinstance(cap_list, list):
             for cap in cap_list:
                 try:
+                    per_cap_level = ev_level
+                    if verified_capabilities is not None:
+                        per_cap_level = (
+                            _EvidenceLevel.VERIFIED
+                            if cap in verified_capabilities
+                            else _EvidenceLevel.INFERRED
+                        )
                     capability_grants.append(_CapabilityGrant(
                         type=_CapabilityType(cap),
                         principal=principal,
-                        evidence_level=ev_level,
+                        evidence_level=per_cap_level,
                         evidence_ref=ev_ref,
                     ))
                 except (ValueError, KeyError):
@@ -2201,10 +2295,17 @@ class AtomizerPipeline:
                 _PivotCapability.CREDENTIAL: [_CapabilityType.READ_CREDENTIAL],
             }
             for cap_type in compat_map.get(pivot, []):
+                per_cap_level = ev_level
+                if verified_capabilities is not None:
+                    per_cap_level = (
+                        _EvidenceLevel.VERIFIED
+                        if cap_type.value in verified_capabilities
+                        else _EvidenceLevel.INFERRED
+                    )
                 capability_grants.append(_CapabilityGrant(
                     type=cap_type,
                     principal=principal,
-                    evidence_level=ev_level,
+                    evidence_level=per_cap_level,
                     evidence_ref="verification.native_verification.evidence",
                 ))
         # Fallback: when the agent emitted no exploit_access and the env has no

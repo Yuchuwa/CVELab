@@ -1,0 +1,171 @@
+{
+  "task": "OPENCODE_HETEROGENEITY_ATOM_TASK",
+  "generated_at": "2026-07-20T12:50:47.779411+00:00",
+  "A_backfill": {
+    "target": 14,
+    "completed": 14,
+    "results": "data/atom_required_service_backfill_results.json"
+  },
+  "B_new_entry": {
+    "target_min": 5,
+    "accepted": 3,
+    "candidates_attempted": 15
+  },
+  "C_new_datastore": {
+    "target_min": 2,
+    "accepted": 1,
+    "candidates_attempted": 3
+  },
+  "accepted": [
+    {
+      "cve_id": "CVE-2021-25646",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8888,
+      "attack_method": "single_request"
+    },
+    {
+      "cve_id": "CVE-2017-12149",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 9990,
+      "attack_method": "deserialization"
+    },
+    {
+      "cve_id": "CVE-2023-41892",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8088,
+      "attack_method": "single_request"
+    },
+    {
+      "cve_id": "CVE-2022-0543",
+      "slot": "data-store",
+      "protocol": "redis",
+      "port": 6379,
+      "attack_method": "single_request"
+    }
+  ],
+  "deferred": [
+    {
+      "cve_id": "CVE-2017-3066",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8500,
+      "attack_method": "deserialization",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2023-32315",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 9090,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2020-7247",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8825,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2018-1297",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 1099,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2017-12635",
+      "slot": "data-store",
+      "protocol": "http",
+      "port": 5984,
+      "attack_method": "single_request",
+      "failure_class": "environment/build risk"
+    },
+    {
+      "cve_id": "CVE-2019-10758",
+      "slot": "data-store",
+      "protocol": "http",
+      "port": 8081,
+      "attack_method": "multi_step_http",
+      "failure_class": "environment/build risk"
+    },
+    {
+      "cve_id": "CVE-2017-8386",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 3322,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2024-39907",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 10086,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2024-27198",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8111,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2022-26134",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8090,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2021-26084",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8090,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2018-7600",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8080,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2023-22515",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8090,
+      "attack_method": "single_request",
+      "failure_class": "validation-model mismatch"
+    },
+    {
+      "cve_id": "CVE-2025-49001",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 8100,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    },
+    {
+      "cve_id": "CVE-2024-47177",
+      "slot": "dmz-web",
+      "protocol": "http",
+      "port": 631,
+      "attack_method": "single_request",
+      "failure_class": "exploit automation instability"
+    }
+  ]
+}

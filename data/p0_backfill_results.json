@@ -1,0 +1,468 @@
+[
+  {
+    "cve_id": "CVE-2014-6271",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 80
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2015-3337",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 9200
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2016-1897",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2016-4977",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2017-4971",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2017-5645",
+    "status": "ok",
+    "service": {
+      "protocol": "log4j-socket",
+      "port": 4712
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2017-8046",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2017-9841",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 80
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2018-1000861",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 50000
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2018-10054",
+    "status": "probe_failed",
+    "reason": "run failed: docker: Error response from daemon: driver failed programming external connectivity on endpoint p0probe-CVE-2018-10054 (b1b548c2a082e09c9c036b1a23ef07"
+  },
+  {
+    "cve_id": "CVE-2018-1270",
+    "status": "probe_failed",
+    "reason": "run failed: docker: Error response from daemon: driver failed programming external connectivity on endpoint p0probe-CVE-2018-1270 (27338e064f41215b5d516df257733fb"
+  },
+  {
+    "cve_id": "CVE-2018-19518",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 80
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2018-3760",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 3000
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2018-7490",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2019-15107",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 10000
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2019-17564",
+    "status": "probe_failed",
+    "reason": "run failed: docker: Error response from daemon: driver failed programming external connectivity on endpoint p0probe-CVE-2019-17564 (c52300ce5ad22b4be97e28009496a4"
+  },
+  {
+    "cve_id": "CVE-2019-5418",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 3000
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2019-7238",
+    "status": "probe_failed",
+    "reason": "run failed: docker: Error response from daemon: driver failed programming external connectivity on endpoint p0probe-CVE-2019-7238 (02f222509c81942beb9e5017607692e"
+  },
+  {
+    "cve_id": "CVE-2020-10199",
+    "status": "probe_failed",
+    "reason": "run failed: docker: Error response from daemon: driver failed programming external connectivity on endpoint p0probe-CVE-2020-10199 (b54e882be2d4b876ee7e7fffc89d87"
+  },
+  {
+    "cve_id": "CVE-2020-11652",
+    "status": "probe_failed",
+    "reason": "run failed: Unable to find image 'vulhub/saltstack:2019.2.3' locally\n2019.2.3: Pulling from vulhub/saltstack\n90fe46dd8199: Pulling fs layer\n35a4f1977689: Pulling "
+  },
+  {
+    "cve_id": "CVE-2020-11981",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 5555
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2020-13942",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 9443
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2020-13945",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 9080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2020-14882",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 7001
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2020-16846",
+    "status": "probe_failed",
+    "reason": "run failed: Unable to find image 'vulhub/saltstack:3002' locally\n3002: Pulling from vulhub/saltstack\ne4c3d3e4f7b0: Already exists\n101c41d0463b: Already exists\n827"
+  },
+  {
+    "cve_id": "CVE-2020-17519",
+    "status": "probe_failed",
+    "reason": "run failed: Unable to find image 'vulhub/flink:1.11.2' locally\n1.11.2: Pulling from vulhub/flink\n756975cb9c7e: Pulling fs layer\nd77915b4e630: Pulling fs layer\n756"
+  },
+  {
+    "cve_id": "CVE-2020-35476",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 4242
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2021-22205",
+    "status": "probe_failed",
+    "reason": "run failed: timeout"
+  },
+  {
+    "cve_id": "CVE-2021-26120",
+    "status": "probe_failed",
+    "reason": "run failed: Unable to find image 'vulhub/cmsms:2.2.9.1' locally\n2.2.9.1: Pulling from vulhub/cmsms\n6ec7b7d162b2: Pulling fs layer\ndb606474d60c: Pulling fs layer\na"
+  },
+  {
+    "cve_id": "CVE-2021-41277",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 3000
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2021-42342",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 80
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2021-43008",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 80
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2021-43798",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 3000
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2022-22963",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2022-23221",
+    "status": "probe_failed",
+    "reason": "run failed: docker: Error response from daemon: driver failed programming external connectivity on endpoint p0probe-CVE-2022-23221 (adeaab3e7438298e5bc21488a2ccb1"
+  },
+  {
+    "cve_id": "CVE-2022-4223",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 5050
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2022-44268",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2023-37582",
+    "status": "ok",
+    "service": {
+      "protocol": "rocketmq",
+      "port": 10911
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2023-38646",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 3000
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2023-42793",
+    "status": "probe_failed",
+    "reason": "run failed: timeout"
+  },
+  {
+    "cve_id": "CVE-2023-4450",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8085
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2023-49070",
+    "status": "probe_failed",
+    "reason": "run failed: timeout"
+  },
+  {
+    "cve_id": "CVE-2023-51449",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 7860
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2024-23897",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 50000
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2024-36401",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2024-4956",
+    "status": "probe_failed",
+    "reason": "run failed: Unable to find image 'vulhub/nexus:3.68.0' locally\n3.68.0: Pulling from vulhub/nexus\n22ebf0e44c85: Pulling fs layer\nb4a7cc3b0585: Pulling fs layer\n577"
+  },
+  {
+    "cve_id": "CVE-2025-24813",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2025-2945",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 5050
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2025-30208",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 5173
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2025-32395",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 5173
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2025-3248",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 7860
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2025-41242",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8080
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2025-67303",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8188
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2026-25253",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 18789
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2026-25887",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 4018
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2026-34197",
+    "status": "ok",
+    "service": {
+      "protocol": "openwire",
+      "port": 61616
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "CVE-2026-39363",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 5173
+    },
+    "previous": {}
+  },
+  {
+    "cve_id": "PIL-CVE-2017-8291",
+    "status": "ok",
+    "service": {
+      "protocol": "http",
+      "port": 8000
+    },
+    "previous": {}
+  }
+]

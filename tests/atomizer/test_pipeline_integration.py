@@ -363,6 +363,30 @@ def test_build_capability_contract_from_agent_v4_fields():
 
 
 @pytest.mark.unit
+def test_explorer_probe_evidence_limits_verified_grants():
+    """Only Explorer-confirmed probe results become verified capabilities."""
+    from clab_builder.atomizer.pipeline import AtomizerPipeline
+    from clab_builder.shared.models.atom import CapabilityType, EvidenceLevel
+
+    _access, grants = AtomizerPipeline._build_capability_contract(
+        {
+            "exploit_principal": "service_user",
+            "exploit_access": {
+                "attack_vector": "network",
+                "required_service": {"protocol": "http", "port": 80},
+            },
+            "capability_grants": ["execute_command", "read_file"],
+        },
+        verified=True,
+        main_ports=[80],
+        verified_capabilities={"execute_command"},
+    )
+    levels = {grant.type: grant.evidence_level for grant in grants}
+    assert levels[CapabilityType.EXECUTE_COMMAND] == EvidenceLevel.VERIFIED
+    assert levels[CapabilityType.READ_FILE] == EvidenceLevel.INFERRED
+
+
+@pytest.mark.unit
 def test_build_capability_contract_agent_flat_service_fields():
     """agent 用 required_service_protocol/_port flat 字段时也能解析。"""
     from clab_builder.atomizer.pipeline import AtomizerPipeline

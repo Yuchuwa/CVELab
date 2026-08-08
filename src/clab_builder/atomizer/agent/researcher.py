@@ -44,12 +44,16 @@ class CVEInput:
     flag_hint: str = ""  # where the flag lives on the target (location only, NOT the value)
     environment_context: Dict[str, Any] = None
     exploit_guidance: str = ""
+    role: str = "exploiter"
+    foothold_context: Dict[str, Any] = None
 
     def __post_init__(self):
         if self.exploit_files is None:
             self.exploit_files = {}
         if self.environment_context is None:
             self.environment_context = {}
+        if self.foothold_context is None:
+            self.foothold_context = {}
 
 
 @dataclass
@@ -66,12 +70,15 @@ class AgentOutput:
     requirements: Dict[str, Any] = None
     # v2 额外字段（agent 明确输出时优先，缺失时 pipeline 走推断）
     extra_fields: Dict[str, Any] = None
+    probe_evidence: List[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.requirements is None:
             self.requirements = {}
         if self.extra_fields is None:
             self.extra_fields = {}
+        if self.probe_evidence is None:
+            self.probe_evidence = []
 
 
 class SecurityResearcherAgent:
@@ -263,11 +270,25 @@ class SecurityResearcherAgent:
             "flag_hint": cve_input.flag_hint,
             "environment_context": cve_input.environment_context,
             "exploit_guidance": cve_input.exploit_guidance,
+            "role": cve_input.role,
+            "foothold_context": cve_input.foothold_context,
         }
         input_path = workspace / "input.json"
         input_path.write_text(json.dumps(input_data, ensure_ascii=False, indent=2))
 
         output_path = workspace / "output.json"
+
+        # Never let a failed retry (or a second role such as Explorer) read a
+        # previous role's result.  The runner writes this file only after it
+        # has completed; removing it makes an absent/partial result explicit.
+        # A fresh Exploiter workspace is already cleaned by AtomizerPipeline.
+        # Explorer runs in that same workspace, so only Explorer must remove
+        # the prior role's result before launching its runner.  Keeping the
+        # legacy Exploiter behavior also makes the lightweight runner mock
+        # used by downstream integrations backwards compatible.
+        if cve_input.role != "exploiter":
+            output_path.unlink(missing_ok=True)
+            (workspace / "session.json").unlink(missing_ok=True)
 
         # 执行 agent_runner.py（挂载在 /opt/agent_runner.py）
         # 实时流式输出 Agent 的 stderr（进度信息）
@@ -386,6 +407,7 @@ class SecurityResearcherAgent:
             vulnerability_type=output_data.get("vulnerability_type", ""),
             captured_flag=output_data.get("captured_flag", ""),
             requirements=output_data.get("requirements", {}),
+            probe_evidence=output_data.get("probe_evidence", []),
             extra_fields={
                 k: output_data[k]
                 for k in [
@@ -397,6 +419,7 @@ class SecurityResearcherAgent:
                     "captured_flag",
                     "exploit_principal", "exploit_access", "capability_grants",
                     "exploit_guide",
+                    "probe_evidence",
                 ]
                 if k in output_data
             },

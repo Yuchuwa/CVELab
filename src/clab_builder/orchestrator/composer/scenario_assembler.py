@@ -7,6 +7,7 @@
 import copy
 import hashlib
 import ipaddress
+import random
 import re
 import secrets
 import shlex
@@ -29,6 +30,7 @@ from clab_builder.orchestrator.composer.cve_matcher import (
     effective_service_role,
     service_access_matches,
 )
+from clab_builder.shared.service_resolver import protocol_for_port, resolve_service_family
 
 
 def _generate_flag() -> str:
@@ -36,18 +38,13 @@ def _generate_flag() -> str:
     return f"flag{{{secrets.token_hex(16)}}}"
 
 
-# Docker registry mirror prefix applied to all container images referenced in
-# generated scenarios.  When the host cannot reach Docker Hub directly set this
-# to a working mirror (e.g., "docker.1ms.run/").  An empty string disables it.
+# Docker registry mirror prefix applied to generated scenarios when configured.
 _REGISTRY_MIRROR_PREFIX = ""
 
 
 def _mirror(image: str) -> str:
-    """Prepend the registry mirror prefix unless the image already carries one."""
     if not image or not _REGISTRY_MIRROR_PREFIX:
         return image
-    # Already has a registry prefix (contains a dot-separated host: docker.io/…,
-    # ghcr.io/…, docker.1ms.run/…, quay.io/…)
     if "/" in image:
         prefix = image.split("/", 1)[0]
         if "." in prefix or prefix in ("ghcr",):
@@ -92,6 +89,181 @@ def _generate_scenario_hash(scenario_name: str, cve_ids: list[str]) -> str:
     """场景去重 hash"""
     payload = f"{scenario_name}:{','.join(sorted(cve_ids))}"
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+
+def _http_surface_command(
+    port: int,
+    banner: str,
+    routes: dict[str, dict[str, str]],
+    http_version: str = "1.1",
+    include_server_header: bool = True,
+) -> str:
+    default = routes.get("/", {})
+    body = default.get("body", "")
+    body_literal = body.replace("'", "'\"'\"'")
+    extra_headers = default.get("extra_headers", "")
+    extra_header_block = f"{extra_headers}\\r\\n" if extra_headers else ""
+    server_header = f"Server: {banner}\\r\\n" if include_server_header else ""
+    script = (
+        "while true; do "
+        f"{{ printf 'HTTP/{http_version} {default.get('status', '200 OK')}\\r\\n"
+        f"{server_header}Content-Type: {default.get('content_type', 'text/html')}\\r\\n"
+        f"Content-Length: {len(body.encode())}\\r\\n"
+        f"Connection: close\\r\\n{extra_header_block}\\r\\n'; "
+        f"printf '%s' '{body_literal}'; }} "
+        f"| nc -l -p {port}; done"
+    )
+    return f"sh -c {shlex.quote(script)}"
+
+
+def _surface_spec(injection: dict) -> dict[str, str]:
+    """Derive a safe protocol facade from runtime metadata, not a CVE ID."""
+    source_image = str(injection.get("source_image", "") or "")
+    image_name = source_image.rsplit("/", 1)[-1]
+    product, _, version = image_name.partition(":")
+    product = product.lower()
+    version = version or "unknown"
+    port = int(injection.get("exploit_port") or (injection.get("ports") or [0])[0])
+    family = str(injection.get("service_family", "") or "").lower()
+    protocol = str(
+        injection.get("service_protocol") or protocol_for_port(port)
+    ).lower()
+    family = family if family and family != "unknown" else resolve_service_family(
+        source_image, "", injection.get("ports", [])
+    )
+
+    if family == "elasticsearch" or product in {"elasticsearch", "opensearch"} or port == 9200:
+        root = (
+            '{"status":200,"name":"decoy-node","version":'
+            f'{{"number":"{version}","build_hash":"f1585f096d3f3985e73456debdc1a0745f512bbc",'
+            '"build_snapshot":false,"lucene_version":"4.7"},'
+            '"tagline":"You Know, for Search"}'
+        )
+        health = (
+            '{"cluster_name":"elasticsearch","status":"green",'
+            '"number_of_nodes":1,"active_primary_shards":1}'
+        )
+        return {
+            "profile": "elasticsearch-http",
+            "protocol": "http",
+            "banner": f"Elasticsearch/{version}",
+            "command": _http_surface_command(port, f"Elasticsearch/{version}", {
+                "/": {"body": root, "content_type": "application/json; charset=UTF-8"},
+                "/_cluster/health": {
+                    "body": health,
+                    "content_type": "application/json; charset=UTF-8",
+                },
+            }, http_version="1.0", include_server_header=False),
+        }
+
+    if product == "solr" or port == 8983:
+        admin = (
+            '<html ng-app="solrAdminApp"><head><title>Solr Admin</title></head>'
+            '<body>Solr Admin Dashboard</body></html>'
+        )
+        api = (
+            '{"responseHeader":{"status":0,"QTime":1},'
+            '"response":{"numFound":0,"start":0,"docs":[]}}'
+        )
+        return {
+            "profile": "solr-http",
+            "protocol": "http",
+            "banner": f"Apache Solr/{version}",
+            "real_image": "vulhub/solr:8.2.0",
+            "real_entrypoint": "solr",
+            "real_command": f"-f -force -p {port}",
+            "real_environment": {"SOLR_HEAP": "128m"},
+            "command": _http_surface_command(port, f"Apache Solr/{version}", {
+                "/": {
+                    "status": "302 Found",
+                    "content_type": "text/html",
+                    "extra_headers": "Location: /solr/",
+                    "body": "",
+                },
+                "/solr/": {"content_type": "text/html", "body": admin},
+                "/solr/select": {"body": api},
+            }),
+        }
+
+    if protocol in {"http", "https"} or port in {80, 443, 8080, 8443, 8888}:
+        if product == "php":
+            banner = "Apache/2.4.10"
+            extra = f"X-Powered-By: PHP/{version}"
+        else:
+            banner = product or "Apache"
+            extra = ""
+        body = "<html><title>Service</title><body>OK</body></html>"
+        return {
+            "profile": "http-web",
+            "protocol": "http",
+            "banner": banner,
+            "command": _http_surface_command(port, banner, {
+                "/": {
+                    "content_type": "text/html",
+                    "extra_headers": extra,
+                    "body": body,
+                },
+            }),
+        }
+
+    return {
+        "profile": f"tcp-{protocol or 'generic'}",
+        "protocol": protocol or "tcp",
+        "banner": "",
+        "command": "",
+    }
+
+
+def _matched_noise_services(noise_services, injections):
+    """Build high-density decoys with target-like, non-exploitable surfaces."""
+    ports_by_zone: dict[str, list[int]] = defaultdict(list)
+    for injection in injections:
+        port = injection.get("exploit_port")
+        if port is None:
+            ports = injection.get("ports", []) or []
+            port = ports[0] if ports else None
+        if port is not None:
+            ports_by_zone[injection["zone"]].append(int(port))
+
+    matched = []
+    for index, service in enumerate(noise_services):
+        candidates = ports_by_zone.get(service.zone, [])
+        if not candidates:
+            matched.append(service)
+            continue
+        port = candidates[index % len(candidates)]
+        injection = next(
+            item for item in injections
+            if item.get("zone") == service.zone
+            and int(item.get("exploit_port") or (item.get("ports") or [0])[0]) == port
+        )
+        surface = _surface_spec(injection)
+        if surface["profile"] == "solr-http":
+            image = surface["real_image"]
+            command = surface["real_command"]
+            environment = surface.get("real_environment", {})
+        elif surface["profile"] in {"http-web", "elasticsearch-http"}:
+            image, command = "alpine:latest", surface["command"]
+            environment = {}
+        elif port == 6379:
+            image, command = "redis:7.4-alpine", ""
+            environment = {}
+        elif port in {22, 3306, 5432}:
+            image, command = "alpine:latest", f"nc -lk -p {port} -e /bin/true"
+            environment = {}
+        else:
+            image, command = "busybox:latest", f"httpd -f -p {port}"
+            environment = {}
+        matched.append(service.model_copy(update={
+            "image": image,
+            "ports": [port],
+            "command": command,
+            "surface_profile": surface["profile"],
+            "surface_banner": surface["banner"],
+            "entrypoint": surface.get("real_entrypoint", ""),
+            "environment": environment,
+        }))
+    return matched
 
 
 def _parse_interface_map(clab: dict) -> dict[str, dict[str, str]]:
@@ -653,6 +825,13 @@ class ScenarioAssembler:
                 "mitre_phase": atom.primary_mitre_phase.value,
                 "service_family": effective_service_family(atom),
                 "service_role": effective_service_role(atom),
+                "source_image": (
+                    getattr(getattr(atom, "runtime_spec", None), "source_image", None)
+                    or atom.docker_image
+                ),
+                "service_protocol": required_service.get("protocol") or (
+                    protocol_for_port(int(exploit_port)) if exploit_port is not None else ""
+                ),
                 "ports": list(atom.ports),
                 "exploit_port": int(exploit_port) if exploit_port is not None else None,
                 "readiness_probes": _readiness_probes(atom),
@@ -684,8 +863,21 @@ class ScenarioAssembler:
         # closure. They only raise Agent target-identification difficulty by
         # mixing benign services into the zone subnet (paper §A.3).
         noise_nodes_meta: list[dict] = []
-        noise_services = list(template.noise_levels.get(noise_level, []) or [])
+        # ``high`` is the target-surface-matched high-density arm.  Keep the
+        # public noise vocabulary at none/low/medium/high; matched-high was a
+        # temporary experiment label and is intentionally not a separate arm.
+        if noise_level == "matched-high":
+            raise ValueError("noise_level 'matched-high' is historical; use 'high'")
+        if noise_level == "high":
+            noise_services = _matched_noise_services(
+                template.noise_levels.get("high", []) or [],
+                injections,
+            )
+        else:
+            noise_services = list(template.noise_levels.get(noise_level, []) or [])
         for svc in noise_services:
+            if not svc.ports:
+                raise ValueError(f"noise service {svc.name!r} must declare at least one port")
             if svc.name in clab["topology"]["nodes"]:
                 raise ValueError(f"noise service name collides with clab node: {svc.name}")
             if svc.zone not in template.zones:
@@ -700,6 +892,8 @@ class ScenarioAssembler:
                 node_def["env"] = dict(svc.environment)
             if svc.command:
                 node_def["cmd"] = svc.command
+            if svc.entrypoint:
+                node_def["entrypoint"] = svc.entrypoint
             clab["topology"]["nodes"][svc.name] = node_def
 
             zone_router = template.zones[svc.zone].router
@@ -739,7 +933,7 @@ class ScenarioAssembler:
                     ),
                     "register": register_name,
                     "changed_when": False,
-                    "failed_when": False,
+                    "failed_when": f"{register_name}.rc != 0",
                     "until": f"{register_name}.rc == 0",
                     "retries": 3,
                     "delay": 2,
@@ -758,6 +952,8 @@ class ScenarioAssembler:
                 "image": svc.image,
                 "ports": list(svc.ports),
                 "command": svc.command,
+                "surface_profile": svc.surface_profile,
+                "surface_banner": svc.surface_banner,
             })
 
         injection_by_slot = {item["ip_id"]: item for item in injections}
@@ -771,7 +967,12 @@ class ScenarioAssembler:
         slot_to_node = {item["ip_id"]: item["node_name"] for item in injections}
 
         # ── IP 分配 ──────────────────────────────────────
-        ip_alloc = self._allocate_ips(template, iface_map, zone_targets)
+        # Keep target/decoy address placement paired across noise levels while
+        # avoiding a stable target=.2 / decoys-after-targets signal.
+        allocation_seed = f"{template_name}|{'|'.join(used_cves)}"
+        ip_alloc = self._allocate_ips(
+            template, iface_map, zone_targets, allocation_seed=allocation_seed,
+        )
 
         # 生成 base.yaml（含 IP 配置、路由、管理网络禁用）
         ansible_base = self._generate_base_yaml(template, ip_alloc, scenario_name)
@@ -787,6 +988,10 @@ class ScenarioAssembler:
             "scenario": scenario_name,
             "template": template_name,
             "attack_path": [],
+            "network_subnets": [
+                *(zone.subnet for zone in template.zones.values()),
+                *(transit.subnet for transit in template.transits),
+            ],
             "network_policy_checks": [],
             "noise_nodes": [],
         }
@@ -1170,8 +1375,13 @@ class ScenarioAssembler:
                 )
             service_node = injection.get("service_node", injection["node_name"])
             container = f"clab-{scenario_name}-{service_node}"
+            # A service may accept TCP while an HTTP/database request hangs
+            # indefinitely.  Keep each asset attempt bounded so Ansible's
+            # retries can classify readiness failures instead of blocking the
+            # whole Range worker until its outer timeout.
             docker_command = (
-                f"docker exec {shlex.quote(container)} sh -c {shlex.quote(command)}"
+                f"timeout 20s docker exec {shlex.quote(container)} sh -c "
+                f"{shlex.quote(command)}"
             )
             register_name = re.sub(
                 r"[^A-Za-z0-9_]", "_", f"asset_{command_key}_{asset.id}"
@@ -1201,6 +1411,7 @@ class ScenarioAssembler:
         template: TopologyTemplate,
         iface_map: dict[str, dict[str, str]],
         zone_targets: dict[str, list[str]],
+        allocation_seed: str = "",
     ) -> dict:
         """自动分配数据面 IP（多 transit + 多 zone）
 
@@ -1265,9 +1476,12 @@ class ScenarioAssembler:
                     "zone": zone_name,
                 })
 
-            # Targets
-            for i, tgt_name in enumerate(node_names):
-                tgt_ip = str(zone_hosts[i + 1])
+            # Assign addresses from a stable per-chain permutation.  The seed
+            # excludes noise level so paired none/high cases share target IPs.
+            address_hosts = zone_hosts[1:]
+            random.Random(f"{allocation_seed}|{zone_name}").shuffle(address_hosts)
+            for tgt_name, tgt_ip in zip(node_names, address_hosts):
+                tgt_ip = str(tgt_ip)
                 ip_alloc[tgt_name] = {
                     "eth1": f"{tgt_ip}/{zone_net.prefixlen}",
                     "gateway": str(zone_hosts[0]),
@@ -1379,22 +1593,63 @@ class ScenarioAssembler:
     ) -> str:
         """生成完整的 base.yaml：配置所有节点的数据面网络。"""
         tasks = []
+        bootstrapped_nodes: set[str] = set()
+
+        def bootstrap_network_tool(node: str) -> None:
+            """Install ``iproute2`` inside tool-light service images.
+
+            Docker socket access is sufficient for this operation.  Keeping
+            the bootstrap inside the container avoids requiring host-level
+            namespace privileges just because an image lacks ``ip``.
+            """
+            if node in bootstrapped_nodes:
+                return
+            bootstrapped_nodes.add(node)
+            container = f"clab-{scenario_name}-{node}"
+            script = """
+if command -v ip >/dev/null 2>&1; then
+    exit 0
+fi
+if command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y -qq iproute2
+elif command -v apk >/dev/null 2>&1; then
+    apk add --no-cache iproute2
+elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y iproute
+elif command -v microdnf >/dev/null 2>&1; then
+    microdnf install -y iproute
+elif command -v yum >/dev/null 2>&1; then
+    yum install -y iproute
+else
+    printf '%s\\n' 'network bootstrap requires iproute2 or a supported package manager' >&2
+    exit 127
+fi
+command -v ip >/dev/null 2>&1
+""".strip()
+            tasks.append({
+                "name": f"Bootstrap iproute2 in {node}",
+                "ansible.builtin.shell": (
+                    "{% raw %}docker exec -u 0 "
+                    + shlex.quote(container)
+                    + " sh -c "
+                    + shlex.quote(script)
+                    + "{% endraw %}"
+                ),
+                "changed_when": False,
+            })
 
         def node_cmd(node: str, cmd: str) -> dict:
-            """Prefer Docker root exec; use a privileged helper for minimal images."""
+            """Run network configuration through Docker, never host nsenter."""
+            bootstrap_network_tool(node)
             container = f"clab-{scenario_name}-{node}"
             tool = cmd.split(maxsplit=1)[0]
             direct_probe = shlex.quote(f"command -v {tool} >/dev/null 2>&1")
             direct = f"docker exec -u 0 {shlex.quote(container)} sh -c {shlex.quote(cmd)}"
-            fallback = (
-                "docker run --rm --privileged --pid host --network none alpine:latest "
-                "nsenter -t $(docker inspect -f '{{.State.Pid}}' "
-                + shlex.quote(container)
-                + ") -n sh -c " + shlex.quote(cmd)
-            )
             shell_cmd = (
                 f"if docker exec -u 0 {shlex.quote(container)} sh -c {direct_probe}; then "
-                f"{direct}; else {fallback}; fi"
+                f"{direct}; else echo 'network tool unavailable after bootstrap' >&2; exit 127; fi"
             )
             return {
                 "name": f"Configure {node}: {cmd[:60]}",
@@ -1450,7 +1705,7 @@ class ScenarioAssembler:
             # A multi-target zone is a shared L2 LAN.  Build the bridge and
             # enslave all zone-facing interfaces before assigning its gateway
             # address.  Each task begins with ``ip`` so node_cmd can use the
-            # normal docker-exec root path instead of the nsenter fallback.
+            # normal Docker-exec root path after the per-node bootstrap.
             for bridge in router_config.get("bridges", []):
                 bridge_name = bridge["name"]
                 tasks.append(node_cmd(
@@ -1490,9 +1745,11 @@ class ScenarioAssembler:
                     f"ip route replace {route['dst']} via {route['via']}"
                 ))
 
-        # 2. Targets: IP + default route + flush eth0 (禁用管理网)
+        # 2. Data-plane nodes: IP + default route + flush eth0 (禁用管理网).
+        # This includes both injection targets and decoys; both need a real
+        # address on the shared zone LAN for exposure verification.
         for node_name, config in ip_alloc.items():
-            if not node_name.startswith("target-"):
+            if "eth1" not in config or "gateway" not in config:
                 continue
             tasks.append(node_cmd(
                 node_name,

@@ -48,6 +48,10 @@ except ImportError:  # The caller may provide all settings through the environme
 from clab_builder.orchestrator.composer.scenario import ScenarioPipeline
 from clab_builder.orchestrator.composer.sysfield_exporter import SysFieldExporter
 from clab_builder.orchestrator.composer.verifier import ScenarioVerifier
+from clab_builder.shared.models.artifact_contracts import (
+    load_scenario_manifest,
+    load_verification_result,
+)
 
 
 # Keep the baseline and the controlled slot substitutions together.  The order
@@ -92,8 +96,12 @@ CASES: tuple[dict[str, object], ...] = (
 
 
 CASE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$")
-MGMT_NETWORK_NAME = "cvelab-range-mgmt"
-MGMT_SUBNETS = [f"172.30.{octet}.0/24" for octet in range(240, 256)]
+MGMT_NETWORK_NAME = "cvelab-range-mgmt-v2"
+# /23 (510 usable IPs) so high-node-count scenarios (50 nodes) can run at
+# parallel 8+ without hitting the /24 (254 IP) cap. 172.30.240.0/23 covers
+# 172.30.240.0 - 172.30.241.255; the next /23 starts at .242, etc.
+MGMT_SUBNETS = [f"172.30.{240 + 2*i}.0/23" for i in range(8)]
+MGMT_CAPACITY = 510
 CONTROL_SUBNETS = [f"172.31.{octet}.0/28" for octet in range(240, 256)] + [
     f"10.254.{octet}.0/28" for octet in range(240, 256)
 ]
@@ -101,6 +109,26 @@ INFRA_RETRY_STAGES = {
     "worker_launch", "worker_timeout", "deploy", "scheduler_conflict",
     "agent_transport", "cleanup_failed",
 }
+# API error classes that the coordinator handles specially (not as ordinary
+# agent failures). See WORK_PROGRESS_REPORT 2026-07-25 'API error triage'.
+FATAL_API_STAGE = "agent_quota_exhausted"
+RATE_LIMIT_API_STAGE = "agent_rate_limit"
+# Cap paused-case re-queues so a permanently rate-limited case cannot loop
+# forever. Each pause is one launch; beyond this the case is finalized as
+# a rate-limit failure.
+MAX_RATE_LIMIT_PAUSES = 3
+# Cooldown before a paused case is eligible for re-queue, so the gateway
+# rate-limit window can clear.
+RATE_LIMIT_COOLDOWN_S = 60
+
+
+def _api_error_action(failure_stage: str, pauses: int) -> str:
+    """Return the coordinator action for a classified Agent API failure."""
+    if failure_stage == FATAL_API_STAGE:
+        return "stop"
+    if failure_stage == RATE_LIMIT_API_STAGE:
+        return "finalize" if pauses > MAX_RATE_LIMIT_PAUSES else "pause"
+    return "ordinary"
 
 
 def utcnow() -> str:
@@ -238,7 +266,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--noise-level", default="none",
-        help="Noise level key from the template's noise_levels (none/baseline). "
+        help="Noise level key from the template's noise_levels (none/low/medium/high). "
              "Inserts benign decoy nodes into zone LANs; orthogonal to --agent-context.",
     )
     parser.add_argument(
@@ -399,6 +427,7 @@ def _digest_inputs(selected: list[dict[str, object]], args: argparse.Namespace) 
         "agent_context": args.agent_context,
         "noise_level": str(getattr(args, "noise_level", "none")),
         "agent_runner": args.agent_runner,
+        "model": args.model,
         "sysarmor": bool(getattr(args, "sysarmor", False)),
         "sysarmor_detection": bool(getattr(args, "sysarmor_detection", False)),
         "sysarmor_signal_window": int(getattr(args, "sysarmor_signal_window", 30)),
@@ -517,7 +546,9 @@ def _runner_base_url(agent_runner: str, base_url: str) -> str:
 def scenario_reserved_subnets(scenario_dir: Path) -> list[str]:
     try:
         import yaml
-        data = yaml.safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+        data = load_scenario_manifest(
+            yaml.safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+        ).model_dump(mode="json", exclude_none=True)
         return [str(item) for item in data.get("network_subnets") or []]
     except Exception:
         return []
@@ -580,7 +611,9 @@ def run_worker(spec_path: Path) -> int:
             persisted_path = Path(spec["scenario_dir"]) / "verify_result.json"
             if persisted_path.exists():
                 try:
-                    raw = json.loads(persisted_path.read_text())
+                    raw = load_verification_result(
+                        json.loads(persisted_path.read_text())
+                    ).model_dump(mode="json", exclude_none=True)
                 except json.JSONDecodeError:
                     pass
             result = summarize(spec["case"], Path(spec["scenario_dir"]), raw)
@@ -621,6 +654,8 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
         "validation_mode": "guided_agent", "environment_only": state["options"]["environment_only"],
         "agent_context": state["options"].get("agent_context", "guided"),
         "noise_level": state["options"].get("noise_level", "none"),
+        "model": state["options"].get("model", ""),
+        "agent_runner": state["options"].get("agent_runner", "claude"),
         # Top-level validation-round tag: identifies which batch this summary
         # belongs to so downstream level/agent experiments can reuse a set of
         # Ranges with a traceable "validated in round X" provenance. Each
@@ -629,6 +664,8 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
             "run_id": state["run_id"],
             "agent_context": state["options"].get("agent_context", "guided"),
             "noise_level": state["options"].get("noise_level", "none"),
+            "model": state["options"].get("model", ""),
+            "agent_runner": state["options"].get("agent_runner", "claude"),
             "environment_only": state["options"]["environment_only"],
             "max_turns": state["options"].get("max_turns"),
             "agent_timeout": state["options"].get("agent_timeout"),
@@ -698,7 +735,9 @@ def _prewarm_cases(state: dict[str, Any], args: argparse.Namespace, output_dir: 
         scenario_dir = Path(item["scenario_dir"])
         try:
             import yaml
-            meta = yaml.safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+            meta = load_scenario_manifest(
+                yaml.safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+            ).model_dump(mode="json", exclude_none=True)
             images = meta.get("runtime_images") or []
             key = hashlib.sha256(json.dumps(images, sort_keys=True).encode()).hexdigest()
             if key in prepared:
@@ -797,11 +836,12 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
     log_positions: dict[str, int] = {}
     log_pending: dict[str, str] = {}
     interrupted = False
+    fatal_stop = False
     case_timeout = args.case_timeout or max(1800, args.agent_timeout + 1800)
     while True:
         ready = [state["cases"][case_id] for case_id in state["selected_case_ids"]
                  if state["cases"][case_id]["status"] in {"runtime_prepared", "leased"}]
-        while ready and len(active) < args.parallel and not interrupted:
+        while ready and len(active) < args.parallel and not interrupted and not fatal_stop:
             item = ready.pop(0)
             case_id = item["case"]["id"]
             if not args.environment_only and not args.generate_only and not item.get("control_network_lease"):
@@ -859,9 +899,37 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 log_pending.pop(case_id, None)
             _persist(output_dir, state)
 
+        if fatal_stop and not active:
+            # Fatal quota exhaustion: keep every non-terminal case explicitly
+            # resumable. Do not mark skipped work as completed in the summary.
+            for cid in state["selected_case_ids"]:
+                it = state["cases"][cid]
+                if it["status"] not in {"completed", "interrupted", "quota_skipped"}:
+                    _save_case_result(it, _result_for_infra(
+                        it, FATAL_API_STAGE, "skipped: API quota exhausted, batch stopped"))
+                    it["status"] = "quota_skipped"
+            _persist(output_dir, state)
+            print("[Fatal] batch stopped due to API quota exhaustion", flush=True)
+            return False
         if not active:
+            # Re-queue a paused (rate-limited) case once its cooldown elapsed,
+            # so it is picked up in the next loop iteration's `ready` list.
             if not any(state["cases"][case_id]["status"] in {"runtime_prepared", "leased", "running"}
                        for case_id in state["selected_case_ids"]):
+                paused = [state["cases"][cid] for cid in state["selected_case_ids"]
+                          if state["cases"][cid]["status"] == "paused"]
+                if paused:
+                    paused.sort(key=lambda it: it.get("paused_at", 0.0))
+                    candidate = paused[0]
+                    if time.monotonic() - candidate.get("paused_at", 0.0) >= RATE_LIMIT_COOLDOWN_S:
+                        candidate["status"] = "runtime_prepared"
+                        print(f"[Warn] {candidate['case']['id']}: re-queuing after "
+                              f"rate-limit cooldown", flush=True)
+                        _persist(output_dir, state)
+                        continue
+                    # Still cooling down: wait for it rather than declaring done.
+                    time.sleep(0.5)
+                    continue
                 return not interrupted
             time.sleep(0.1)
             continue
@@ -896,8 +964,12 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 _stream_log_updates(active, log_positions, log_pending)
             result_path = Path(item["result_path"])
             if not result_path.exists():
-                stage = "interrupted" if interrupted else "worker_failed"
-                _save_case_result(item, _result_for_infra(item, stage, "worker exited without a result"))
+                stage = FATAL_API_STAGE if fatal_stop else ("interrupted" if interrupted else "worker_failed")
+                error = (
+                    "skipped: API quota exhausted, batch stopped"
+                    if fatal_stop else "worker exited without a result"
+                )
+                _save_case_result(item, _result_for_infra(item, stage, error))
             try:
                 result = json.loads(result_path.read_text())
             except (OSError, json.JSONDecodeError):
@@ -912,18 +984,59 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 _save_case_result(item, result)
             release_control_lease(item.get("control_network_lease"))
             item["control_network_lease"] = None
+            failure_stage = result.get("failure_stage", "")
             retry = _should_retry(result, item["attempts"], interrupted)
-            if interrupted:
+            # --- API error triage (2026-07-25) -------------------------------
+            # Fatal quota exhaustion: stop the whole batch and kill running
+            # workers so no more quota is burned. Remaining cases are marked
+            # skipped (not failed) and do not auto-retry.
+            api_action = _api_error_action(
+                failure_stage, item.get("rate_limit_pauses", 0) + 1
+            )
+            if api_action == "stop":
+                fatal_stop = True
+                print(f"[Fatal] {case_id}: API quota exhausted — stopping batch "
+                      f"and terminating {max(0, len(active) - 1)} running worker(s)", flush=True)
+                for rid, (rproc, _rstart, _rlog) in list(active.items()):
+                    if rid == case_id:
+                        continue
+                    try:
+                        os.killpg(rproc.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                # Preserve this case as resumable after quota is restored.
+                item["status"] = "quota_skipped"
+            # Persistent rate limit: pause this case (do NOT count as a
+            # failure attempt) and re-queue it after the cooldown so other
+            # cases can progress in the meantime.
+            elif api_action in {"pause", "finalize"}:
+                pauses = item.get("rate_limit_pauses", 0) + 1
+                item["rate_limit_pauses"] = pauses
+                if api_action == "finalize":
+                    print(f"[Warn] {case_id}: rate-limit paused {pauses} times "
+                          f"(> {MAX_RATE_LIMIT_PAUSES}), finalizing as rate-limit failure", flush=True)
+                    item["status"] = "completed"
+                else:
+                    print(f"[Warn] {case_id}: rate-limit persistent — pausing, "
+                          f"will re-queue after {RATE_LIMIT_COOLDOWN_S}s "
+                          f"(pause #{pauses}/{MAX_RATE_LIMIT_PAUSES})", flush=True)
+                    item["status"] = "paused"
+                    item["paused_at"] = time.monotonic()
+                    # Roll back the attempts increment so a rate-limit pause
+                    # does not eat into the infra-retry budget.
+                    item["attempts"] = max(0, item["attempts"] - 1)
+            elif interrupted:
                 item["status"] = "interrupted"
             else:
                 item["status"] = "runtime_prepared" if retry else "completed"
+            # ----------------------------------------------------------------
             item["attempt_records"][-1].update({
-                "finished_at": utcnow(), "failure_stage": result.get("failure_stage", ""),
+                "finished_at": utcnow(), "failure_stage": failure_stage,
                 "success": bool(result.get("success", False)),
                 "cleanup_failed": bool(result.get("cleanup_failed", False)),
                 "cleanup": cleanup,
             })
-            item["last_failure_stage"] = result.get("failure_stage", "")
+            item["last_failure_stage"] = failure_stage
             active.pop(case_id)
             if args.live_output:
                 pending_line = log_pending.pop(case_id, "")
@@ -986,10 +1099,16 @@ def main() -> int:
         # Completed research outcomes are immutable.  Only interrupted or
         # unfinished infrastructure work is eligible to resume.
         for item in state.get("cases", {}).values():
-            if item.get("status") == "interrupted":
-                item["status"] = "runtime_prepared"
+            if item.get("status") in {"interrupted", "quota_skipped"}:
+                item["status"] = (
+                    "runtime_prepared"
+                    if Path(item.get("scenario_dir", "")).is_dir()
+                    else "pending"
+                )
         for item in state.get("cases", {}).values():
-            if item.get("status") in {"interrupted", "running", "leased", "cleaning"}:
+            if item.get("status") in {
+                "interrupted", "quota_skipped", "running", "leased", "cleaning",
+            }:
                 release_control_lease(item.get("control_network_lease"))
                 item["control_network_lease"] = None
                 item["status"] = "runtime_prepared" if Path(item.get("scenario_dir", "")).is_dir() else "pending"
@@ -1002,7 +1121,8 @@ def main() -> int:
             "options": {"environment_only": args.environment_only, "generate_only": args.generate_only,
                         "parallel": args.parallel, "agent_timeout": args.agent_timeout, "max_turns": args.max_turns,
                         "agent_context": args.agent_context,
-                        "noise_level": str(getattr(args, "noise_level", "none"))},
+                        "noise_level": str(getattr(args, "noise_level", "none")),
+                        "model": args.model, "agent_runner": args.agent_runner},
             "selected_case_ids": [str(case["id"]) for case in selected], "cases": {},
         }
         for case in selected:
@@ -1038,8 +1158,8 @@ def main() -> int:
         management = select_management_network()
         node_count = max((len((__import__("yaml").safe_load((Path(item["scenario_dir"]) / "clab.yaml").read_text()) or {}).get("topology", {}).get("nodes", {}))
                           for item in state["cases"].values() if item["status"] == "runtime_prepared"), default=0)
-        if node_count * args.parallel + int(management.get("endpoints", "0")) > 254:
-            raise SystemExit("selected parallelism exceeds the shared /24 management-network endpoint capacity")
+        if node_count * args.parallel + int(management.get("endpoints", "0")) > MGMT_CAPACITY:
+            raise SystemExit("selected parallelism exceeds the shared management-network endpoint capacity")
         completed_cleanly = _launch_workers(state, args, output_dir, management)
         _persist(output_dir, state)
         results = []

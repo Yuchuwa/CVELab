@@ -39,8 +39,13 @@ def main():
     help="Agent context: difficulty level l0/l1/l2 (l0=entry IP only, "
          "l1=+topology, l2=+CVE+credentials) or legacy guided/no_guide/no_hint",
 )
+@click.option("--composition-mode", type=click.Choice(["legacy", "paper"]),
+              default="legacy", show_default=True,
+              help="Composition engine; paper uses dependency-constrained backtracking.")
+@click.option("--incompatibility-store", default="", show_default=False,
+              help="Optional JSON memory of confirmed binding incompatibilities (paper mode).")
 def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir,
-             validation_mode, agent_context):
+             validation_mode, agent_context, composition_mode, incompatibility_store):
     """Generate scenario files from topology template.
 
     TEMPLATE_NAME is the template directory name (e.g. dmz_simple).
@@ -50,7 +55,10 @@ def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir,
     cve_ids = [c.strip() for c in cve.split(",")] if cve else None
 
     click.echo(f"Generating: {template_name}")
-    pipeline = ScenarioPipeline(templates_dir=templates_dir, atoms_dir=atoms_dir)
+    pipeline = ScenarioPipeline(
+        templates_dir=templates_dir, atoms_dir=atoms_dir,
+        incompatibility_path=incompatibility_store or None,
+    )
     try:
         scenario = pipeline.generate(
             template_name=template_name,
@@ -60,6 +68,7 @@ def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir,
             seed=seed,
             validation_mode=validation_mode,
             agent_context=agent_context,
+            composition_mode=composition_mode,
         )
     except (FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}")
@@ -107,9 +116,14 @@ def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir,
     help="Agent context: difficulty level l0/l1/l2 (l0=entry IP only, "
          "l1=+topology, l2=+CVE+credentials) or legacy guided/no_guide/no_hint",
 )
+@click.option("--composition-mode", type=click.Choice(["legacy", "paper"]),
+              default="legacy", show_default=True,
+              help="Composition engine; paper uses dependency-constrained backtracking.")
+@click.option("--incompatibility-store", default="", show_default=False,
+              help="Optional JSON memory of confirmed binding incompatibilities (paper mode).")
 def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
            api_key, base_url, model, max_turns, environment_only, strict_guide_compatibility,
-           validation_mode, agent_context):
+           validation_mode, agent_context, composition_mode, incompatibility_store):
     """Generate + deploy + agent verify + destroy + save (all-in-one).
 
     TEMPLATE_NAME is the template directory name (e.g. dmz_simple).
@@ -125,7 +139,10 @@ def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
 
     # 1. Generate
     click.echo("[1/4] Generating scenario...")
-    pipeline = ScenarioPipeline(templates_dir=templates_dir, atoms_dir=atoms_dir)
+    pipeline = ScenarioPipeline(
+        templates_dir=templates_dir, atoms_dir=atoms_dir,
+        incompatibility_path=incompatibility_store or None,
+    )
     try:
         scenario = pipeline.generate(
             template_name=template_name,
@@ -135,6 +152,7 @@ def verify(template_name, cve, name, output, seed, templates_dir, atoms_dir,
             seed=seed,
             validation_mode=validation_mode,
             agent_context=agent_context,
+            composition_mode=composition_mode,
         )
     except (FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}")

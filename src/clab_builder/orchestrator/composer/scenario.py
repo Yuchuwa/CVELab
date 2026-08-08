@@ -16,6 +16,7 @@ from clab_builder.atomizer.output.sysfield_playbook import SysFieldPlaybookGener
 from clab_builder.shared.models.atom import CapabilityType
 from clab_builder.shared.models.artifact_contracts import ScenarioManifestV1
 from clab_builder.shared.models.exploit_guide import ExploitGuide, validate_exploit_guide
+from clab_builder.core.paper_workflow import DependencyPlanner, Generator, IncompatibilityStore
 
 
 class ScenarioPipeline:
@@ -26,12 +27,17 @@ class ScenarioPipeline:
         templates_dir: str = "templates",
         atoms_dir: str = "data/atoms",
         default_validation_mode: str = "guided_agent",
+        incompatibility_path: str | None = None,
     ):
         if default_validation_mode not in {"guided_agent", "sysfield"}:
             raise ValueError("default_validation_mode must be guided_agent or sysfield")
         self.templates_dir = templates_dir
         self.atoms_dir = atoms_dir
         self.default_validation_mode = default_validation_mode
+        self.incompatibility_store = (
+            IncompatibilityStore(incompatibility_path)
+            if incompatibility_path else None
+        )
         self.template_loader = TemplateLoader(templates_dir=templates_dir)
         self.atom_loader = AtomLoader(atoms_dir=atoms_dir)
         self.assembler = ScenarioAssembler(self.template_loader)
@@ -46,6 +52,7 @@ class ScenarioPipeline:
         validation_mode: Optional[str] = None,
         agent_context: str = "guided",
         noise_level: str = "none",
+        composition_mode: str = "legacy",
     ) -> dict:
         """生成完整场景
 
@@ -70,8 +77,14 @@ class ScenarioPipeline:
         validation_mode = validation_mode or self.default_validation_mode
         if validation_mode not in {"guided_agent", "sysfield"}:
             raise ValueError("validation_mode must be guided_agent or sysfield")
+        if composition_mode not in {"legacy", "paper"}:
+            raise ValueError("composition_mode must be legacy or paper")
 
         template = self.template_loader.load(template_name)
+        if composition_mode == "paper":
+            template_errors = Generator.validate(template)
+            if template_errors:
+                raise ValueError("Template rejected by Generator gate: " + "; ".join(template_errors))
         verified_atoms = self.atom_loader.load_all_verified(single_service_only=True)
         all_atoms = [
             atom for atom in verified_atoms
@@ -93,7 +106,35 @@ class ScenarioPipeline:
         resolved_closures = {}
         available_assets: set[str] = set()
 
-        for ip in template.injection_points:
+        # The legacy path is retained for old experiment manifests.  The
+        # paper path uses the shared dependency planner, so single-scenario
+        # generation and matrix generation consume the same compatibility
+        # gate, prefix state, backtracking, and incompatibility semantics.
+        if composition_mode == "paper":
+            planner_atoms = all_atoms
+            if cve_ids:
+                requested = set(cve_ids)
+                planner_atoms = [atom for atom in all_atoms if atom.cve_id in requested]
+                missing = requested - {atom.cve_id for atom in planner_atoms}
+                if missing:
+                    raise ValueError("Requested atoms are unavailable: " + ", ".join(sorted(missing)))
+            candidates = DependencyPlanner(
+                incompatibilities=self.incompatibility_store
+            ).compose(template, planner_atoms, max_candidates=1)
+            if not candidates:
+                raise ValueError("No dependency-compatible attack-chain candidate")
+            chosen = candidates[0]
+            selected_atoms = [self.atom_loader.load(chosen.bindings[slot.id]) for slot in template.injection_points]
+            used_cves = [atom.cve_id for atom in selected_atoms]
+            for slot, atom in zip(template.injection_points, selected_atoms):
+                resolved_upstream[slot.id] = atom
+                closure = close_capabilities(
+                    seed_capabilities(atom, host_scope=slot.id), template.assets
+                )
+                resolved_closures[slot.id] = closure
+                available_assets.update(closure.assets)
+
+        for ip in ([] if composition_mode == "paper" else template.injection_points):
             missing_dependencies = [
                 dependency for dependency in ip.depends_on
                 if dependency not in resolved_upstream

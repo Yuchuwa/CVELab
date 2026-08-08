@@ -121,7 +121,7 @@ noise_levels:
     zone: dmz
     image: nginx:alpine
     ports: &id006
-    - 8443
+    - 80
   - name: decoy-dmz-07
     zone: dmz
     image: alpine:latest
@@ -138,7 +138,7 @@ noise_levels:
     zone: dmz
     image: redis:7.4-alpine
     ports: &id009
-    - 6380
+    - 6379
   - name: decoy-dmz-10
     zone: dmz
     image: busybox:latest
@@ -242,7 +242,7 @@ noise_levels:
     zone: dmz
     image: nginx:alpine
     ports:
-    - 8443
+    - 80
   - name: decoy-dmz-07
     zone: dmz
     image: alpine:latest
@@ -259,7 +259,7 @@ noise_levels:
     zone: dmz
     image: redis:7.4-alpine
     ports:
-    - 6380
+    - 6379
   - name: decoy-dmz-10
     zone: dmz
     image: busybox:latest
@@ -298,7 +298,7 @@ noise_levels:
     zone: dmz
     image: nginx:alpine
     ports:
-    - 8443
+    - 80
   - name: decoy-dmz-17
     zone: dmz
     image: alpine:latest
@@ -315,7 +315,7 @@ noise_levels:
     zone: app
     image: redis:7.4-alpine
     ports:
-    - 6380
+    - 6379
   - name: decoy-app-20
     zone: app
     image: busybox:latest
@@ -354,7 +354,7 @@ noise_levels:
     zone: app
     image: nginx:alpine
     ports:
-    - 8443
+    - 80
   - name: decoy-app-27
     zone: app
     image: alpine:latest
@@ -371,7 +371,7 @@ noise_levels:
     zone: app
     image: redis:7.4-alpine
     ports:
-    - 6380
+    - 6379
   - name: decoy-app-30
     zone: app
     image: busybox:latest
@@ -410,7 +410,7 @@ noise_levels:
     zone: data
     image: nginx:alpine
     ports:
-    - 8443
+    - 80
   - name: decoy-data-37
     zone: data
     image: alpine:latest
@@ -427,7 +427,7 @@ noise_levels:
     zone: data
     image: redis:7.4-alpine
     ports:
-    - 6380
+    - 6379
   - name: decoy-data-40
     zone: data
     image: busybox:latest

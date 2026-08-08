@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Decoy ablation experiment: 4 noise levels (none/low/medium/high) x 8 cases,
 # deepseek-v4-pro, claude runner, parallel=6 within each level, levels serial.
-# Single sudo invocation for the whole loop (one password prompt).
+# Use the current user's Docker/ContainerLab access when available; otherwise
+# fall back to one sudo invocation for the whole loop.
 
 set -euo pipefail
 
@@ -32,7 +33,18 @@ set +a
 [[ -n "$_LLM_MODEL_OVERRIDE" ]] && LLM_MODEL="$_LLM_MODEL_OVERRIDE"
 [[ -n "$_LLM_TEMPERATURE_OVERRIDE" ]] && LLM_TEMPERATURE="$_LLM_TEMPERATURE_OVERRIDE"
 
-sudo -E env \
+_PRIVILEGE=()
+if command -v docker >/dev/null 2>&1 \
+  && docker ps >/dev/null 2>&1 \
+  && command -v clab >/dev/null 2>&1 \
+  && clab version >/dev/null 2>&1; then
+  echo "Using current user's Docker/ContainerLab access."
+else
+  echo "Current user cannot access Docker/ContainerLab; using sudo."
+  _PRIVILEGE=(sudo -E)
+fi
+
+"${_PRIVILEGE[@]}" env \
   HOME="$HOME" \
   PATH="$PATH" \
   PYTHONPATH="$ROOT/src" \

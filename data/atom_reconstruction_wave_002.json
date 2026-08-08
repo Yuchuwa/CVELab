@@ -1,0 +1,1625 @@
+{
+  "source_audit": "data/atom_reconstruction_audit_wave_002.json",
+  "b1_ledger": "data/atom_batch_2026-07-18_status.md",
+  "max_wave": 25,
+  "selection_policy": {
+    "exclude_b1_runtime_ready": true,
+    "exclude_b1_deferred_without_shared_profile_fix": true,
+    "prefer_runtime_rebuild": true,
+    "ranking": "verified capability, source availability, native/environment/Guide evidence, role and family diversity"
+  },
+  "selected": [
+    {
+      "cve_id": "CVE-2025-68613",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 14,
+      "selection_score": [
+        3,
+        2,
+        26,
+        1,
+        0,
+        "CVE-2025-68613"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [
+        "execute_command",
+        "read_file"
+      ],
+      "source_image": "vulhub/n8n:1.65.0",
+      "source_image_local": "present",
+      "native_success": true,
+      "environment_ready": null,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2017-1000028",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 7,
+      "selection_score": [
+        0,
+        1,
+        14,
+        0,
+        1,
+        "CVE-2017-1000028"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {
+        "protocol": "https",
+        "port": 4848
+      },
+      "verified_capabilities": [
+        "read_credential",
+        "read_file"
+      ],
+      "source_image": "vulhub/glassfish:4.1",
+      "source_image_local": "not_local",
+      "native_success": true,
+      "environment_ready": true,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2025-55182",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 14,
+      "selection_score": [
+        0,
+        0,
+        26,
+        1,
+        0,
+        "CVE-2025-55182"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [
+        "execute_command",
+        "read_file"
+      ],
+      "source_image": "vulhub/nextjs:15.5.6",
+      "source_image_local": "present",
+      "native_success": true,
+      "environment_ready": null,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2024-9264",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 14,
+      "selection_score": [
+        0,
+        0,
+        26,
+        1,
+        0,
+        "CVE-2024-9264"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [
+        "execute_command",
+        "read_file"
+      ],
+      "source_image": "vulhub/grafana:11.0.0",
+      "source_image_local": "present",
+      "native_success": true,
+      "environment_ready": null,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2024-38856",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 14,
+      "selection_score": [
+        0,
+        0,
+        26,
+        1,
+        0,
+        "CVE-2024-38856"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [
+        "execute_command",
+        "read_file"
+      ],
+      "source_image": "vulhub/ofbiz:18.12.14",
+      "source_image_local": "present",
+      "native_success": true,
+      "environment_ready": null,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2013-4547",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 12,
+      "selection_score": [
+        0,
+        0,
+        24,
+        1,
+        1,
+        "CVE-2013-4547"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {
+        "protocol": "http",
+        "port": 80
+      },
+      "verified_capabilities": [
+        "execute_command",
+        "read_file"
+      ],
+      "source_image": "vulhub/php:5.6-fpm",
+      "source_image_local": "present",
+      "native_success": true,
+      "environment_ready": null,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2026-25887",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 12,
+      "selection_score": [
+        0,
+        0,
+        24,
+        1,
+        0,
+        "CVE-2026-25887"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [
+        "execute_command",
+        "read_file"
+      ],
+      "source_image": "vulhub/chartbrew:4.8.0",
+      "source_image_local": "present",
+      "native_success": true,
+      "environment_ready": null,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2024-45195",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 12,
+      "selection_score": [
+        0,
+        0,
+        24,
+        1,
+        0,
+        "CVE-2024-45195"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [
+        "execute_command",
+        "read_file"
+      ],
+      "source_image": "vulhub/ofbiz:18.12.15",
+      "source_image_local": "present",
+      "native_success": true,
+      "environment_ready": null,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2022-41678",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 12,
+      "selection_score": [
+        0,
+        0,
+        24,
+        1,
+        0,
+        "CVE-2022-41678"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [
+        "execute_command",
+        "read_file"
+      ],
+      "source_image": "vulhub/activemq:5.17.3",
+      "source_image_local": "present",
+      "native_success": true,
+      "environment_ready": null,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2021-32682",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 12,
+      "selection_score": [
+        0,
+        0,
+        24,
+        1,
+        0,
+        "CVE-2021-32682"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [
+        "execute_command",
+        "read_file"
+      ],
+      "source_image": "vulhub/elfinder:2.1.58",
+      "source_image_local": "present",
+      "native_success": true,
+      "environment_ready": null,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2023-26360",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 6,
+      "selection_score": [
+        0,
+        0,
+        12,
+        0,
+        1,
+        "CVE-2023-26360"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {
+        "protocol": "http",
+        "port": 8500
+      },
+      "verified_capabilities": [
+        "read_file"
+      ],
+      "source_image": "vulhub/coldfusion:2018.0.15",
+      "source_image_local": "not_local",
+      "native_success": true,
+      "environment_ready": true,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2018-18778",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 6,
+      "selection_score": [
+        0,
+        0,
+        12,
+        0,
+        1,
+        "CVE-2018-18778"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {
+        "protocol": "http",
+        "port": 8080
+      },
+      "verified_capabilities": [
+        "read_file"
+      ],
+      "source_image": "vulhub/mini_httpd:1.29",
+      "source_image_local": "not_local",
+      "native_success": true,
+      "environment_ready": true,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2017-14849",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 6,
+      "selection_score": [
+        0,
+        0,
+        12,
+        0,
+        1,
+        "CVE-2017-14849"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {
+        "protocol": "http",
+        "port": 3000
+      },
+      "verified_capabilities": [
+        "read_file"
+      ],
+      "source_image": "vulhub/node:8.5.0",
+      "source_image_local": "not_local",
+      "native_success": true,
+      "environment_ready": true,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2010-2861",
+      "planned_path": "rebuild_runtime_or_bundle",
+      "source_audit_classification": "rebuild_runtime_or_bundle",
+      "source_audit_reasons": [
+        "runtime contract not ready"
+      ],
+      "value_score": 6,
+      "selection_score": [
+        0,
+        0,
+        12,
+        0,
+        1,
+        "CVE-2010-2861"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {
+        "protocol": "http",
+        "port": 8500
+      },
+      "verified_capabilities": [
+        "read_file"
+      ],
+      "source_image": "vulhub/coldfusion:8.0.1",
+      "source_image_local": "not_local",
+      "native_success": true,
+      "environment_ready": true,
+      "guide_ready": true,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2022-24706",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 3,
+      "selection_score": [
+        3,
+        0,
+        5,
+        1,
+        0,
+        "CVE-2022-24706"
+      ],
+      "service_role": "database",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/couchdb:3.2.1",
+      "source_image_local": "present",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2021-40438",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 3,
+      "selection_score": [
+        3,
+        0,
+        5,
+        1,
+        0,
+        "CVE-2021-40438"
+      ],
+      "service_role": "middleware",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/tomcat:8.5.19",
+      "source_image_local": "present",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2026-24061",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 3,
+      "selection_score": [
+        3,
+        0,
+        3,
+        0,
+        0,
+        "CVE-2026-24061"
+      ],
+      "service_role": "system_service",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/inetutils:2.5",
+      "source_image_local": "not_local",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2021-42392",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 3,
+      "selection_score": [
+        3,
+        0,
+        3,
+        0,
+        0,
+        "CVE-2021-42392"
+      ],
+      "service_role": "framework",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/spring-with-h2database:2.0.204",
+      "source_image_local": "not_local",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2014-0160",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "ready guide unavailable"
+      ],
+      "value_score": 3,
+      "selection_score": [
+        0,
+        0,
+        6,
+        0,
+        1,
+        "CVE-2014-0160"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {
+        "protocol": "https",
+        "port": 443
+      },
+      "verified_capabilities": [],
+      "source_image": "vulhub/openssl:1.0.1c-with-nginx",
+      "source_image_local": "not_local",
+      "native_success": true,
+      "environment_ready": true,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2026-21858",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 3,
+      "selection_score": [
+        0,
+        0,
+        5,
+        1,
+        0,
+        "CVE-2026-21858"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/n8n:1.65.0",
+      "source_image_local": "present",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2024-1561",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 3,
+      "selection_score": [
+        0,
+        0,
+        5,
+        1,
+        0,
+        "CVE-2024-1561"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/gradio:4.12.0",
+      "source_image_local": "present",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2018-1273",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 3,
+      "selection_score": [
+        0,
+        0,
+        5,
+        1,
+        0,
+        "CVE-2018-1273"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/spring-data-commons:2.0.5",
+      "source_image_local": "present",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2017-12794",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 3,
+      "selection_score": [
+        0,
+        0,
+        5,
+        1,
+        0,
+        "CVE-2017-12794"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/django:1.11.4",
+      "source_image_local": "present",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2025-32433",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 1,
+      "selection_score": [
+        0,
+        0,
+        3,
+        1,
+        0,
+        "CVE-2025-32433"
+      ],
+      "service_role": "middleware",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/erlang:27.3.2-with-ssh",
+      "source_image_local": "present",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    },
+    {
+      "cve_id": "CVE-2024-45507",
+      "planned_path": "full_reconstruction",
+      "source_audit_classification": "full_reconstruction",
+      "source_audit_reasons": [
+        "version<3",
+        "native verification unavailable",
+        "ready guide unavailable"
+      ],
+      "value_score": 1,
+      "selection_score": [
+        0,
+        0,
+        3,
+        1,
+        0,
+        "CVE-2024-45507"
+      ],
+      "service_role": "web_application",
+      "service_family": null,
+      "service_access": {},
+      "verified_capabilities": [],
+      "source_image": "vulhub/ofbiz:18.12.15",
+      "source_image_local": "present",
+      "native_success": false,
+      "environment_ready": null,
+      "guide_ready": false,
+      "runtime_ready": false
+    }
+  ],
+  "excluded": [
+    {
+      "cve_id": "CVE-2012-1823",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2014-3120",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2015-1427",
+      "reason": "already range_ready in current audit"
+    },
+    {
+      "cve_id": "CVE-2015-5531",
+      "reason": "already range_ready in current audit"
+    },
+    {
+      "cve_id": "CVE-2016-3088",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2016-3714",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2017-10271",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2017-11610",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2017-12615",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2017-15715",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2017-17405",
+      "reason": "deferred in B1; no new shared profile correction"
+    },
+    {
+      "cve_id": "CVE-2017-17562",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2018-10933",
+      "reason": "already range_ready in current audit"
+    },
+    {
+      "cve_id": "CVE-2018-12613",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2018-16509",
+      "reason": "already range_ready in current audit"
+    },
+    {
+      "cve_id": "CVE-2018-19475",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2018-2894",
+      "reason": "deferred in B1; no new shared profile correction"
+    },
+    {
+      "cve_id": "CVE-2019-0193",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2019-11043",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2019-17558",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2019-9193",
+      "reason": "already range_ready in current audit"
+    },
+    {
+      "cve_id": "CVE-2020-10199",
+      "reason": "deferred in B1; no new shared profile correction"
+    },
+    {
+      "cve_id": "CVE-2021-32568",
+      "reason": "deferred in B1; no new shared profile correction"
+    },
+    {
+      "cve_id": "CVE-2021-42013",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2022-0543",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2022-22965",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2022-24816",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2023-4450",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2023-51467",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2024-27348",
+      "reason": "completed in B1: runtime-ready"
+    },
+    {
+      "cve_id": "CVE-2015-5254",
+      "reason": "low marginal capability/access value for bounded runtime rebuild"
+    },
+    {
+      "cve_id": "CVE-2017-12636",
+      "reason": "low marginal capability/access value for bounded runtime rebuild"
+    },
+    {
+      "cve_id": "CVE-2017-7494",
+      "reason": "low marginal capability/access value for bounded runtime rebuild"
+    },
+    {
+      "cve_id": "CVE-2010-3863",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2012-2122",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2014-3704",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2014-6271",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2015-3337",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2015-8562",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2016-1897",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2016-4437",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2016-4977",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2016-5385",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2016-5734",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2016-9086",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-1000353",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-12149",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-12629-RCE",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-12635",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-16082",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-3066",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-4971",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-5223",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-5645",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-6920",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-7504",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-7525",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-7529",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-8046",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-8386",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-8917",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-9841",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2017-9993",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-1000006",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-1000533",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-1000861",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-10054",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-1058",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-1270",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-1297",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-14574",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-15473",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-15685",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-18925",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-19518",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-2628",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-3760",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-7490",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-7600",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-7602",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2018-8715",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-10758",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-11581",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-14234",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-15107",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-17564",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-20933",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-3396",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-5418",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-6116",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-6339",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-6341",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-7238",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-7609",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2019-9053",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-10204",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-11651",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-11652",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-11981",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-13942",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-13945",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-14882",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-15906",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-16846",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-17518",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-17519",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-17526",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-1938",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-1957",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-35476",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-7012",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-7247",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-7961",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-9402",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2020-9496",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-21311",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-21351",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-22205",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-22911",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-23592",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-25646",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-26084",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-26120",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-27341",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-28073",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-28164",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-28169",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-29441",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-29442",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-29505",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-3129",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-34371",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-34429",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-35042",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-4034",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-40822",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-41277",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-41773",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-42342",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-43008",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-43798",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-44228",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-45232",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2021-45788",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-0778",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-22947",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-22963",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-22978",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-23221",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-26134",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-34265",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-4223",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-44268",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-44645",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2022-46169",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-2160",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-21839",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-22515",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-22527",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-23752",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-25157",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-25194",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-25826",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-27524",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-28432",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-29300",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-32315",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-33246",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-37582",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-37941",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-38633",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-38646",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-39361",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-41892",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-42793",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-42820",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-46604",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-49070",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-49103",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-5002",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2023-51449",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-23897",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-27198",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-28752",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-2961",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-32114",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-36401",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-39907",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-42323",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-43441",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-4367",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-47177",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-4956",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2024-56145",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-13780",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-1974",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-24813",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-2945",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-29927",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-30208",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-32395",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-3248",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-41242",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-49001",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-54068",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2025-67303",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2026-22777",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2026-25253",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2026-27944",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2026-31816",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2026-34197",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2026-34486",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "CVE-2026-39363",
+      "reason": "lower marginal value after value/diversity ranking"
+    },
+    {
+      "cve_id": "PIL-CVE-2017-8291",
+      "reason": "lower marginal value after value/diversity ranking"
+    }
+  ]
+}

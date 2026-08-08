@@ -38,10 +38,8 @@ class TestTemplateModel:
         assert r.connects == ["attacker", "dmz"]
 
     def test_noise_service_defaults(self):
-        n = NoiseService(name="x", zone="dmz", image="nginx:alpine")
-        assert n.ports == []
-        assert n.command == ""
-        assert n.environment == {}
+        with pytest.raises(ValueError, match="at least one TCP port"):
+            NoiseService(name="x", zone="dmz", image="nginx:alpine")
 
     def test_noise_service_full_fields(self):
         n = NoiseService(

@@ -1,0 +1,210 @@
+{
+  "total_atoms": 95,
+  "pivot_capability_dist": {
+    "none": 88,
+    "shell": 7
+  },
+  "pivotable_count": 7,
+  "slot_report": [
+    {
+      "template": "dmz_simple",
+      "slot": "dmz-target-1",
+      "zone": "dmz",
+      "matched_count": 95,
+      "pivotable_count": 7,
+      "role_dist": {
+        "web_application": 60,
+        "middleware": 15,
+        "system_service": 4,
+        "framework": 13,
+        "database": 3
+      },
+      "phase_dist": {
+        "initial_access": 93,
+        "execution": 2
+      },
+      "required_mitre": [
+        "initial_access",
+        "execution"
+      ],
+      "required_role": [
+        "web_application",
+        "middleware",
+        "framework",
+        "database",
+        "system_service",
+        "file_service"
+      ],
+      "required_vulncat": [
+        "RCE",
+        "LFI",
+        "SSRF",
+        "Deserialization",
+        "Auth_Bypass",
+        "Info_Leak"
+      ]
+    },
+    {
+      "template": "dmz_dual",
+      "slot": "dmz-target-1",
+      "zone": "dmz",
+      "matched_count": 88,
+      "pivotable_count": 4,
+      "role_dist": {
+        "web_application": 60,
+        "middleware": 15,
+        "framework": 13
+      },
+      "phase_dist": {
+        "initial_access": 88
+      },
+      "required_mitre": [
+        "initial_access",
+        "execution"
+      ],
+      "required_role": [
+        "web_application",
+        "middleware",
+        "framework"
+      ],
+      "required_vulncat": [
+        "RCE",
+        "LFI",
+        "SSRF",
+        "Deserialization",
+        "Auth_Bypass"
+      ]
+    },
+    {
+      "template": "dmz_dual",
+      "slot": "dmz-target-2",
+      "zone": "dmz",
+      "matched_count": 82,
+      "pivotable_count": 7,
+      "role_dist": {
+        "web_application": 60,
+        "middleware": 15,
+        "system_service": 4,
+        "database": 3
+      },
+      "phase_dist": {
+        "initial_access": 80,
+        "execution": 2
+      },
+      "required_mitre": [
+        "initial_access",
+        "execution"
+      ],
+      "required_role": [
+        "web_application",
+        "middleware",
+        "system_service",
+        "database"
+      ],
+      "required_vulncat": [
+        "RCE",
+        "LFI",
+        "SSRF",
+        "Deserialization",
+        "Auth_Bypass",
+        "Info_Leak",
+        "Injection"
+      ]
+    },
+    {
+      "template": "enterprise_3tier",
+      "slot": "dmz-web",
+      "zone": "dmz",
+      "matched_count": 88,
+      "pivotable_count": 4,
+      "role_dist": {
+        "web_application": 60,
+        "middleware": 15,
+        "framework": 13
+      },
+      "phase_dist": {
+        "initial_access": 88
+      },
+      "required_mitre": [
+        "initial_access",
+        "execution"
+      ],
+      "required_role": [
+        "web_application",
+        "middleware",
+        "framework"
+      ],
+      "required_vulncat": [
+        "RCE",
+        "LFI",
+        "SSRF",
+        "Deserialization",
+        "Auth_Bypass"
+      ]
+    },
+    {
+      "template": "enterprise_3tier",
+      "slot": "app-service",
+      "zone": "app",
+      "matched_count": 88,
+      "pivotable_count": 4,
+      "role_dist": {
+        "web_application": 60,
+        "middleware": 15,
+        "framework": 13
+      },
+      "phase_dist": {
+        "initial_access": 88
+      },
+      "required_mitre": [
+        "initial_access",
+        "execution",
+        "lateral_movement",
+        "persistence"
+      ],
+      "required_role": [
+        "web_application",
+        "middleware",
+        "framework"
+      ],
+      "required_vulncat": [
+        "RCE",
+        "Deserialization",
+        "Auth_Bypass",
+        "Injection"
+      ]
+    },
+    {
+      "template": "enterprise_3tier",
+      "slot": "data-store",
+      "zone": "data",
+      "matched_count": 7,
+      "pivotable_count": 3,
+      "role_dist": {
+        "system_service": 4,
+        "database": 3
+      },
+      "phase_dist": {
+        "initial_access": 5,
+        "execution": 2
+      },
+      "required_mitre": [
+        "initial_access",
+        "execution",
+        "privilege_escalation"
+      ],
+      "required_role": [
+        "database",
+        "file_service",
+        "system_service"
+      ],
+      "required_vulncat": [
+        "RCE",
+        "LPE",
+        "Auth_Bypass",
+        "Info_Leak",
+        "Injection"
+      ]
+    }
+  ]
+}
