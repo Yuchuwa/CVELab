@@ -6967,3 +6967,13 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   public release remains privacy-gated by the tracked private-key material and
   is not claimed by this check. No Docker/ContainerLab deployment, live LLM
   Agent trial or GPU SFT training was run.
+
+### 2026-08-10 correction — internal research release boundary confirmed
+
+- Release scope decision: this “上线” is for the internal research
+  environment, not a public repository/data release. The tracked Vulhub
+  `id_rsa` PoC material is therefore retained for the Atom/Agent path under
+  the internal-only boundary; no public push is authorized by this decision.
+- The four-lane contract result remains green for internal use. The public
+  export/privacy finding remains recorded and must be resolved separately if a
+  public release is later requested.
