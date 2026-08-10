@@ -6931,3 +6931,39 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   the committed lifecycle/matrix snapshot; keep the deferred Agent runner,
   runtime-image mismatch and `CVE-2017-10271` runtime blocker separate from
   this clean-clone result.
+
+### 2026-08-10 — final four-lane release gate
+
+- Shared handoff check: on commit `d451615`, the canonical chain passes from
+  Atom lifecycle (`46` completed Atoms) to the completed-only Range matrix
+  (`1,800` legal compositions and `506` selected cases), then through v1 Agent
+  envelopes and a synthetic v1 SFT record. All producer/consumer snapshot and
+  schema assertions passed.
+- Lane tests from a fresh checkout: Atom **56 passed**, Range **102 passed**,
+  Agent **158 passed**, and SFT **12 passed / 2 optional skipped**. The full
+  suite is **793 passed / 9 skipped**. CLI help, locked sync, Atom freshness,
+  status/docs contracts and clean Git status also pass.
+- Runtime-free integration smoke: `cvelab generate enterprise_3tier` with
+  `CVE-2012-1823`, `CVE-2016-3088` and `CVE-2019-9193` successfully materialized
+  `scenario.yaml`, `clab.yaml`, Ground Truth and per-slot Exploit Guides in a
+  temporary directory; the temporary output was removed. This proves
+  Atom-to-Range generation, not Docker deployment or live Agent success.
+- Generic Range correction: the generated manifest had previously retained all
+  `1,800` cases while maintained views claimed `506` selected cases. The
+  generator now records `summary.selected_cases`, the status contract checks it
+  against `len(manifest.cases)`, and the canonical manifest was regenerated
+  with `--max-cases 506`.
+- Publication finding: `data/atoms/CVE-2017-8386/source_bundle/id_rsa` is a
+  tracked PEM RSA private key and its Atom metadata marks it `visibility:
+  always`. It is an intentional Vulhub PoC material for the internal Atom/Agent
+  path, but it is not publication-safe under `DATA_POLICY.md` without an
+  explicit internal-only exception or a sanitized public export boundary.
+- Handoff limitation: the tracked Guide-ablation manifest is case metadata, but
+  its `source_summary` references ignored historical batch outputs absent from
+  a clean checkout. Tracked SFT length reports are summaries; the actual corpus,
+  raw sessions, adapters and live Agent evidence remain private and are not
+  proven reproducible by this core gate.
+- Verdict: the four engineering interfaces are connected and contract-green;
+  public release remains privacy-gated by the tracked private-key material and
+  is not claimed by this check. No Docker/ContainerLab deployment, live LLM
+  Agent trial or GPU SFT training was run.
