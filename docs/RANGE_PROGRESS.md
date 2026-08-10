@@ -21,7 +21,7 @@ summaries remain the machine-readable evidence.
 | Agent evaluation | Operational | L2 DeepSeek batch: 50 evaluated; 15 Agent successes | Model/context-specific result |
 | Objective verification | Operational | Same L2 batch: 13 objective successes | Must remain separate from Agent success |
 | Cleanup | Operational | Same L2 batch: 49 cleanups passed, 1 cleanup failure | Cleanup is an independent lifecycle result |
-| Versioned artifacts | Implemented, uncommitted | Scenario/Truth/Agent/Batch/Material envelopes v1 and Verification Result v1 round-trip | Raw tool/session events remain outside the typed envelopes |
+| Versioned artifacts | Implemented, committed in `86af178` | Scenario/Truth/Agent/Batch/Material envelopes v1 and Verification Result v1 round-trip | Raw tool/session events remain outside the typed envelopes |
 
 ## Active Matrix Sources
 

@@ -161,6 +161,7 @@ def test_compact_matrix_status_is_range_owned(tmp_path):
     assert status["range_candidate_atom_ids"] == ["CVE-A", "CVE-B"]
     assert status["selected_atom_ids"] == ["CVE-A"]
     assert status["summary"]["selected_atoms"] == 1
+    assert status["summary"]["selected_cases"] == 1
     assert status["range_input_rejection_counts"] == {
         "atom_build_not_completed": 1
     }

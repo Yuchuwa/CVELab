@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-10T08:25:56.109979+00:00",
+  "generated_at": "2026-08-10T10:21:04.299300+00:00",
   "template": "enterprise_3tier",
   "matrix_manifest": "data/range_matrices/enterprise_3tier_completed.json",
-  "matrix_manifest_sha256": "e86ede48f028f917a2f6292d54ed74f7d92931ae52b865aa97455868d65b868d",
+  "matrix_manifest_sha256": "625f464acd7422b570f04fd8decd24dc1b5cbbfd103e8e9a8a1e6dba6e733900",
   "atom_status": {
     "schema_version": 2,
     "snapshot_hash": "4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd",
@@ -84,6 +84,7 @@
     "range_candidate_atoms": 39,
     "selected_atoms": 28,
     "accepted_cases": 1800,
+    "selected_cases": 506,
     "range_input_rejections": 245,
     "composition_rejections": 21989
   },

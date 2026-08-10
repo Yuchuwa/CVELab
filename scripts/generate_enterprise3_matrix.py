@@ -395,6 +395,7 @@ def build_matrix_status(payload: dict, manifest_path: Path) -> dict:
             "range_candidate_atoms": payload["candidate_atom_count"],
             "selected_atoms": len(selected_atom_ids),
             "accepted_cases": payload["accepted_case_count"],
+            "selected_cases": len(payload.get("cases") or []),
             "range_input_rejections": len(payload["range_input_rejections"]),
             "composition_rejections": len(payload["rejections"]),
         },
