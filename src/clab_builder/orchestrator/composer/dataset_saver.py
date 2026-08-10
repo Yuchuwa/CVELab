@@ -27,7 +27,20 @@ def _scenario_to_record(
     gt = scenario.get("ground_truth", {})
     injections = scenario.get("injections", [])
     agent_result = verify_result.get("agent_result", {})
+    agent_reported = (
+        agent_result.get("agent_reported")
+        if isinstance(agent_result, dict)
+        else {}
+    )
+    if not isinstance(agent_reported, dict):
+        agent_reported = agent_result
     flag_verif = verify_result.get("flag_verification", {})
+    validation_round = verify_result.get("validation_round") or {}
+    agent_context = verify_result.get("agent_context", "guided")
+    agent_profile = verify_result.get("agent_exposure_profile", {})
+    batch_fingerprint = verify_result.get("batch_fingerprint") or validation_round.get(
+        "batch_fingerprint", ""
+    )
 
     # 构建攻击路径摘要
     attack_path = []
@@ -49,10 +62,22 @@ def _scenario_to_record(
         "all_flags_captured": flag_verif.get("all_captured", False),
         "attack_path": json.dumps(attack_path, ensure_ascii=False),
         "ground_truth": json.dumps(gt, ensure_ascii=False),
-        "agent_success": agent_result.get("success", False),
+        "agent_success": verify_result.get(
+            "agent_success", agent_reported.get("success", False)
+        ),
         "reference_path_verified": verify_result.get("reference_path_verified")
         if verify_result.get("validation_mode", "sysfield") == "sysfield" else None,
         "validation_mode": verify_result.get("validation_mode", "sysfield"),
+        "agent_context": agent_context,
+        "agent_exposure_profile": json.dumps(agent_profile, ensure_ascii=False, sort_keys=True),
+        "prompt_hygiene": json.dumps(
+            verify_result.get("prompt_hygiene", {}), ensure_ascii=False, sort_keys=True
+        ),
+        "material_audit": json.dumps(
+            agent_result.get("material_audit", {}), ensure_ascii=False, sort_keys=True
+        ),
+        "validation_round": json.dumps(validation_round, ensure_ascii=False, sort_keys=True),
+        "batch_fingerprint": batch_fingerprint,
         "guide_integrity_valid": verify_result.get(
             "guide_integrity", {}
         ).get("valid"),
@@ -86,7 +111,7 @@ def _scenario_to_record(
         "objective_verification": json.dumps(
             verify_result.get("objective_verification", {}), ensure_ascii=False
         ),
-        "agent_evidence": json.dumps(agent_result.get("evidence", []), ensure_ascii=False),
+        "agent_evidence": json.dumps(agent_reported.get("evidence", []), ensure_ascii=False),
         "verified_at": datetime.utcnow().isoformat(),
         "clab_yaml": json.dumps(scenario.get("clab", {}), ensure_ascii=False),
         "ansible_cve_setup": json.dumps(scenario.get("cve_setup", []), ensure_ascii=False),
@@ -116,7 +141,13 @@ def save_parquet(
 
     # 按 hash 去重，保留最新的
     if "scenario_hash" in df.columns:
-        df = df.drop_duplicates(subset=["scenario_hash"], keep="last")
+        dedupe_fields = [
+            field for field in (
+                "scenario_hash", "agent_context", "agent_exposure_profile", "batch_fingerprint"
+            )
+            if field in df.columns
+        ]
+        df = df.drop_duplicates(subset=dedupe_fields or ["scenario_hash"], keep="last")
 
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,7 @@
 """Tests for Scenario Assembler"""
 
 import json
+import hashlib
 import pytest
 import yaml
 from pathlib import Path
@@ -13,6 +14,8 @@ from clab_builder.shared.models.atom import (
     RuntimeBuildSpec,
     RuntimeStatus,
     SourceBundle,
+    MaterialMetadata,
+    MaterialVisibility,
     ExploitAccess,
 )
 from clab_builder.shared.models.template import InjectionPoint
@@ -226,6 +229,42 @@ class TestAssemblerDMZSimple:
         attacker = result["clab"]["topology"]["nodes"]["attacker"]
 
         assert not any("/vulhub/" in bind for bind in attacker.get("binds", []))
+
+    @pytest.mark.parametrize("agent_context", ["guided", "no_guide", "l2", "no_hint"])
+    def test_attacker_mounts_follow_material_visibility(self, assembler, tmp_path, agent_context):
+        atom = _make_atom("CVE-MATERIAL-0001")
+        materials = [
+            "source_bundle/private.txt",
+            "source_bundle/assisted.py",
+            "source_bundle/always.key",
+            "source_bundle/legacy.key",
+        ]
+        atom.source_bundle = SourceBundle(
+            poc_materials=materials,
+            hashes={material: hashlib.sha256(material.encode()).hexdigest() for material in materials},
+            material_metadata={
+                materials[0]: MaterialMetadata(visibility=MaterialVisibility.PRIVATE),
+                materials[1]: MaterialMetadata(visibility=MaterialVisibility.ASSISTED),
+                materials[2]: MaterialMetadata(visibility=MaterialVisibility.ALWAYS),
+            },
+        )
+        bundle = tmp_path / atom.cve_id / "source_bundle"
+        bundle.mkdir(parents=True)
+        for material in materials:
+            (tmp_path / atom.cve_id / material).write_text(material)
+
+        result = assembler.assemble(
+            "dmz_simple", [atom], atoms_dir=str(tmp_path), agent_context=agent_context
+        )
+        binds = result["clab"]["topology"]["nodes"]["attacker"].get("binds", [])
+
+        assert not any("private.txt" in bind for bind in binds)
+        if agent_context in {"guided", "no_guide"}:
+            assert any("assisted.py" in bind for bind in binds)
+        else:
+            assert not any("assisted.py" in bind for bind in binds)
+        assert any("always.key" in bind for bind in binds)
+        assert any("legacy.key" in bind for bind in binds)
 
     def test_declared_dockerfile_becomes_runtime_build_manifest(self, assembler, tmp_path):
         atom = _make_atom("CVE-BUILD-0001")

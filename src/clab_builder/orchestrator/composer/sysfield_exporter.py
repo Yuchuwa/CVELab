@@ -11,6 +11,9 @@ import yaml
 
 from clab_builder.atomizer.output.sysfield_playbook import SysFieldPlaybookGenerator
 from clab_builder.orchestrator.composer.atom_loader import AtomLoader
+from clab_builder.shared.source_bundle import select_agent_materials
+from clab_builder.shared.source_bundle import verify_material_hash
+from clab_builder.shared.models.artifact_contracts import normalize_agent_context
 
 _TEMPLATE_RE = re.compile(r"{{\s*([^{}\s]+)\s*}}")
 
@@ -77,11 +80,13 @@ class SysFieldExporter:
                 "description": f"CVELab execution node {actor_node_for_step}",
                 "capabilities": ["network", "exploit", "pivot"],
             })
+            agent_context = self._agent_context(meta)
             self._validate_actor_materials(
                 atom,
                 target,
                 actor_node_for_step,
                 topology_nodes,
+                agent_context,
             )
             for sub_index, atom_step in enumerate(self._select_steps(atom, target, meta, actor_node_for_step), 1):
                 command = self._adapt_command(atom_step["command"], target)
@@ -193,14 +198,40 @@ class SysFieldExporter:
             "listener_port": "1389", "lib_path": "/usr/lib/x86_64-linux-gnu/liblua5.1.so.0",
             "payload": "cat /flag.txt", "command": "cat /flag.txt", "command_to_execute": "cat /flag.txt",
         }
-        materials = atom.source_bundle.poc_materials if getattr(atom, "source_bundle", None) else []
+        agent_context = self._agent_context(meta)
+        materials = select_agent_materials(atom, agent_context)
+        declared_materials = list(
+            getattr(getattr(atom, "source_bundle", None), "poc_materials", []) or []
+        )
+        selected_materials = set(materials)
+        for material in declared_materials:
+            if material in selected_materials:
+                continue
+            name = Path(material).name
+            if f"/vulhub/{name}" in command or f"/vulhub/{atom.cve_id}__{name}" in command:
+                raise ValueError(
+                    f"Atom {atom.cve_id} command references material excluded by "
+                    f"agent exposure profile: {material}"
+                )
         for material in materials:
             if Path(material).is_absolute() or ".." in Path(material).parts:
                 raise ValueError(f"Atom {atom.cve_id} has an unsafe PoC material path: {material}")
             src = self.atoms_dir / atom.cve_id / material
             if not src.is_file():
                 raise ValueError(f"Atom {atom.cve_id} declares missing PoC material: {material}")
-            name = Path(material).name
+            material_name = Path(material).name
+            material_is_referenced = (
+                f"/vulhub/{material_name}" in command
+                or f"/vulhub/{atom.cve_id}__{material_name}" in command
+                or "{{poc_path}}" in command
+                and Path(material_name).suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".py", ".sh"}
+            )
+            bundle_hashes = getattr(getattr(atom, "source_bundle", None), "hashes", {}) or {}
+            if material_is_referenced and bundle_hashes and not verify_material_hash(
+                atom, self.atoms_dir / atom.cve_id, material
+            ):
+                raise ValueError(f"Atom {atom.cve_id} material hash mismatch: {material}")
+            name = material_name
             mounted = f"/vulhub/{atom.cve_id}__{name}"
             if "id_rsa" in name or "id_dsa" in name or "id_ed25519" in name:
                 values.update({"key_path": "/tmp/" + name, "ssh_key": "/tmp/" + name})
@@ -315,10 +346,11 @@ class SysFieldExporter:
             )
         return rendered
 
-    def _validate_actor_materials(self, atom, target, actor_node, topology_nodes):
+    def _validate_actor_materials(
+        self, atom, target, actor_node, topology_nodes, agent_context="guided"
+    ):
         """Fail before SysField when a local actor cannot see executed PoC files."""
-        bundle = getattr(atom, "source_bundle", None)
-        materials = list(getattr(bundle, "poc_materials", []) if bundle else [])
+        materials = select_agent_materials(atom, agent_context)
         if not materials:
             return
         if target.get("material_staging"):
@@ -337,6 +369,16 @@ class SysFieldExporter:
                 f"Atom {atom.cve_id} materials are not available on actor {actor_node}: "
                 + ", ".join(missing)
             )
+
+    @staticmethod
+    def _agent_context(meta: dict[str, Any]) -> str:
+        profile = meta.get("agent_exposure_profile") or {}
+        profile_context = profile.get("context") if isinstance(profile, dict) else None
+        raw_context = meta.get("agent_context")
+        if profile_context and raw_context:
+            if normalize_agent_context(raw_context) != normalize_agent_context(profile_context):
+                raise ValueError("scenario agent_context disagrees with pinned exposure profile")
+        return normalize_agent_context(profile_context or raw_context or "guided")
 
     def _required_actor_material_mounts(self, atom, materials: list[str]) -> list[str]:
         """Return source_bundle materials actually referenced by SysField commands."""

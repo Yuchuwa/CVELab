@@ -18,7 +18,12 @@ from typing import Any, Optional
 import yaml
 
 from clab_builder.shared.models.atom import AtomConfig
-from clab_builder.shared.models.artifact_contracts import ScenarioManifestV1
+from clab_builder.shared.models.artifact_contracts import (
+    AgentExposureProfile,
+    ScenarioManifestV1,
+    normalize_agent_context,
+    normalize_ground_truth,
+)
 from clab_builder.shared.models.template import TopologyTemplate, InjectionPoint
 from clab_builder.orchestrator.composer.template_loader import TemplateLoader
 from clab_builder.orchestrator.composer.capability_closure import (
@@ -31,6 +36,11 @@ from clab_builder.orchestrator.composer.cve_matcher import (
     service_access_matches,
 )
 from clab_builder.shared.service_resolver import protocol_for_port, resolve_service_family
+from clab_builder.shared.source_bundle import (
+    is_credential_material,
+    select_agent_materials,
+    verify_material_hash,
+)
 
 
 def _generate_flag() -> str:
@@ -52,30 +62,15 @@ def _mirror(image: str) -> str:
     return _REGISTRY_MIRROR_PREFIX + image
 
 
-# PoC material classification shared with verifier.py (levels). Keep in sync
-# with ScenarioVerifier._CREDENTIAL_MATERIAL_PATTERNS / _PAYLOAD_MATERIAL_PATTERNS.
-_CREDENTIAL_MATERIAL_PATTERNS = (
-    "id_rsa", "id_dsa", "id_ed25519", "id_ecdsa",
-    ".pem", ".key", ".p12", "id_rsa.pub",
-)
-_PAYLOAD_MATERIAL_PATTERNS = (
-    "poc.py", "poc.sh", "poc.png", "poc.jpg", "poc.gif",
-    "exploit.py", "exploit.sh", "exp.py", "exp.sh",
-    "evil.py", "evil.sh",
-)
-
-
 def _is_credential_material(material: str) -> bool:
-    base = str(Path(material).name).lower()
-    if any(base == p or base.endswith(p) for p in _PAYLOAD_MATERIAL_PATTERNS):
-        return False
-    return any(p in base for p in _CREDENTIAL_MATERIAL_PATTERNS)
+    """Compatibility wrapper for the shared material classifier."""
+    return is_credential_material(material)
 
 
 def _agent_context_level(agent_context: str) -> Optional[str]:
     """Map agent_context to a difficulty level (l0/l1/l2) or None.
 
-    None means the legacy guided/no_guide path (mount all materials).
+    None identifies the guided/no_guide profiles.
     "no_hint" is a legacy alias mapping to l2 (credential-only mount).
     """
     if agent_context in ("l0", "l1", "l2"):
@@ -601,11 +596,10 @@ class ScenarioAssembler:
             }
 
         ``agent_context`` controls how PoC materials are bind-mounted into the
-        attacker container. Levels l0/l1/l2 (and the legacy no_hint alias) only
-        mount credential-type materials (leaked keys) for l2; payload-type PoC
-        files are never mounted at any level. guided/no_guide keep the original
-        full-material mount.
+        attacker container through the shared source-bundle visibility policy.
         """
+        agent_context = normalize_agent_context(agent_context)
+        agent_exposure_profile = AgentExposureProfile.from_context(agent_context)
         template = self.template_loader.load(template_name)
         clab_base = self.template_loader.load_clab_base(template_name)
 
@@ -626,32 +620,26 @@ class ScenarioAssembler:
         # deterministic Range exporter uses the same names when rendering
         # /vulhub/<CVE>__<file> references.
         #
-        # Material mounting policy by agent_context:
-        #   guided / no_guide : mount all declared PoC materials (legacy).
-        #   l0 / l1           : mount no PoC materials (no payload, no creds).
-        #   l2 (incl no_hint) : mount credential-type materials only (leaked
-        #                       credential locations, AGENTCYBERRANGE Level-2).
-        # Payload-type PoC files (poc.py/poc.png/exploit.py/...) are never
-        # mounted at any level — they would hand the Agent a working exploit.
+        # Material visibility and level restrictions are centralized in the
+        # shared selector so private bundle files cannot leak through mounts.
         attacker_node = clab.get("topology", {}).get("nodes", {}).get("attacker")
         if attacker_node is not None:
             attacker_binds = list(attacker_node.get("binds", []))
             atoms_path = Path(atoms_dir).resolve()
-            level = _agent_context_level(agent_context)
             for atom in atoms:
-                bundle = getattr(atom, "source_bundle", None)
-                for material in getattr(bundle, "poc_materials", []) if bundle else []:
+                for material in select_agent_materials(atom, agent_context):
                     if Path(material).is_absolute() or ".." in Path(material).parts:
                         raise ValueError(f"Atom {atom.cve_id} has an unsafe PoC material path: {material}")
-                    if level is not None and not _is_credential_material(material):
-                        # Levels never mount payload-type PoC materials.
-                        continue
-                    if level in ("l0", "l1"):
-                        # No materials at all for l0/l1 (not even credentials).
-                        continue
                     source = atoms_path / atom.cve_id / material
                     if not source.is_file():
                         raise ValueError(f"Atom {atom.cve_id} declares missing PoC material: {material}")
+                    bundle_hashes = getattr(atom.source_bundle, "hashes", {}) or {}
+                    if bundle_hashes and not verify_material_hash(
+                        atom, atoms_path / atom.cve_id, material
+                    ):
+                        raise ValueError(
+                            f"Atom {atom.cve_id} PoC material hash mismatch: {material}"
+                        )
                     target = f"/vulhub/{atom.cve_id}__{Path(material).name}"
                     attacker_binds.append(f"{source}:{target}:ro")
             if attacker_binds:
@@ -1125,6 +1113,8 @@ class ScenarioAssembler:
             ],
             "runtime_builds": runtime_builds,
             "runtime_images": runtime_image_selections,
+            "agent_context": agent_context,
+            "agent_exposure_profile": agent_exposure_profile.model_dump(mode="json"),
         }
 
     @staticmethod
@@ -1816,7 +1806,11 @@ command -v ip >/dev/null 2>&1
 
         # Ground truth
         (out / "ground_truth.json").write_text(
-            __import__("json").dumps(scenario["ground_truth"], indent=2, ensure_ascii=False)
+            __import__("json").dumps(
+                normalize_ground_truth(scenario["ground_truth"]),
+                indent=2,
+                ensure_ascii=False,
+            )
         )
 
         # Scenario metadata
@@ -1836,6 +1830,13 @@ command -v ip >/dev/null 2>&1
             "match_report": scenario.get("match_report", []),
             "runtime_builds": scenario.get("runtime_builds", []),
             "runtime_images": scenario.get("runtime_images", []),
+            "agent_context": scenario.get("agent_context", "guided"),
+            "agent_exposure_profile": scenario.get(
+                "agent_exposure_profile",
+                AgentExposureProfile.from_context(
+                    scenario.get("agent_context", "guided")
+                ).model_dump(mode="json"),
+            ),
         }).model_dump(mode="json")
         (out / "scenario.yaml").write_text(
             yaml.dump(meta, default_flow_style=False, sort_keys=False)

@@ -39,6 +39,10 @@ from clab_builder.shared.models.exploit_guide import (
     ExploitGuide,
     validate_exploit_guide,
 )
+from clab_builder.shared.source_bundle import (
+    missing_material_metadata,
+    select_agent_materials,
+)
 
 
 @dataclass
@@ -64,12 +68,26 @@ class QualificationResult:
 def _bundle_check(atom: AtomConfig, atom_dir: Optional[Path]) -> dict:
     bundle = atom.source_bundle
     if bundle is None:
-        return {"present": False, "ok": False, "reasons": ["no source_bundle"]}
+        return {
+            "present": False,
+            "ok": False,
+            "reasons": ["no source_bundle"],
+            "material_metadata": {"ok": False, "missing": []},
+        }
     reasons: list[str] = []
     if atom_dir is None:
         # cannot verify file existence; report structural only
         ok = bool(bundle.compose_file or bundle.dockerfiles)
-        return {"present": True, "ok": ok, "reasons": [] if ok else ["no build source"]}
+        missing_metadata = missing_material_metadata(bundle)
+        return {
+            "present": True,
+            "ok": ok,
+            "reasons": [] if ok else ["no build source"],
+            "material_metadata": {
+                "ok": not missing_metadata,
+                "missing": missing_metadata,
+            },
+        }
     # compose or dockerfile must exist to rebuild
     compose_ok = bool(bundle.compose_file and (atom_dir / bundle.compose_file).is_file())
     df_ok = any((atom_dir / df).is_file() for df in (bundle.dockerfiles or []))
@@ -104,7 +122,25 @@ def _bundle_check(atom: AtomConfig, atom_dir: Optional[Path]) -> dict:
             hash_bad += 1
     if hash_bad:
         reasons.append(f"{hash_bad} hash mismatch")
-    return {"present": True, "ok": not reasons, "reasons": reasons}
+    missing_metadata = missing_material_metadata(bundle)
+    return {
+        "present": True,
+        "ok": not reasons,
+        "reasons": reasons,
+        "material_metadata": {
+            "ok": not missing_metadata,
+            "missing": missing_metadata,
+        },
+    }
+
+
+def _guide_materials(guide: ExploitGuide) -> set[str]:
+    materials = set(guide.requirements.materials)
+    for step in guide.steps:
+        materials.update(step.materials)
+        if step.execution:
+            materials.update(material.ref for material in step.execution.materials)
+    return materials
 
 
 def _service_check(atom: AtomConfig) -> dict:
@@ -187,6 +223,20 @@ def _guide_integrity_check(atom: AtomConfig, atom_dir: Optional[Path]) -> dict:
             source_bundle_materials=mats,
             forbidden_values=forbidden,
         )
+        not_visible = sorted(
+            _guide_materials(guide) - set(select_agent_materials(atom, "guided"))
+        )
+        if not_visible:
+            return {
+                "present": True,
+                "ready": True,
+                "ok": False,
+                "reasons": [
+                    "guide references materials excluded by guided profile: "
+                    + ", ".join(not_visible)
+                ],
+                "advisory": [],
+            }
     except (ValueError, TypeError) as exc:
         return {"present": True, "ready": True, "ok": False,
                 "reasons": [f"guide integrity: {exc}"], "advisory": []}
@@ -230,8 +280,18 @@ def qualify_atom(
     bundle = _bundle_check(atom, atom_dir)
     if not bundle["ok"]:
         struct_reasons.extend(bundle["reasons"])
+    metadata_ok = atom.version < 3 or bundle["material_metadata"]["ok"]
+    if atom.version >= 3 and not metadata_ok:
+        struct_reasons.append(
+            "missing material_metadata: "
+            + ",".join(bundle["material_metadata"]["missing"])
+        )
     r.checks["source_bundle"] = bundle
-    r.structure_healthy = atom.version >= 3 and bundle["ok"]
+    r.structure_healthy = (
+        atom.version >= 3
+        and bundle["ok"]
+        and metadata_ok
+    )
 
     # native truth
     native = (atom.verification or {}).get("native_verification") or {}

@@ -2,6 +2,13 @@ import pytest
 from pydantic import ValidationError
 
 from clab_builder.shared.models.artifact_contracts import (
+    AgentExposureProfile,
+    AgentInputV1,
+    AgentOutputV1,
+    BatchStateV1,
+    BatchSummaryV1,
+    GroundTruthV1,
+    MaterialAuditV1,
     LegacyScenarioManifest,
     LegacyVerificationResult,
     ScenarioManifestV1,
@@ -9,6 +16,11 @@ from clab_builder.shared.models.artifact_contracts import (
     load_scenario_manifest,
     load_verification_result,
     normalize_verification_result,
+    normalize_agent_input,
+    normalize_agent_output,
+    normalize_batch_state,
+    normalize_batch_summary,
+    normalize_ground_truth,
 )
 
 
@@ -27,6 +39,47 @@ def test_scenario_manifest_v1_round_trip():
 
     assert isinstance(model, ScenarioManifestV1)
     assert model.model_dump(mode="json")["schema_version"] == 1
+
+
+def test_agent_exposure_profile_normalizes_context_and_is_versioned():
+    profile = AgentExposureProfile.model_validate({"context": "no-guide"})
+
+    assert profile.schema_version == 1
+    assert profile.context == "no_guide"
+    assert profile.profile == "guide_removed"
+    assert profile.hint_profile == "guide_removed"
+
+
+def test_agent_exposure_profile_rejects_context_label_mismatch():
+    with pytest.raises(ValidationError, match="does not match context"):
+        AgentExposureProfile.model_validate({
+            "context": "l1",
+            "profile": "full_guide",
+        })
+
+
+def test_agent_exposure_profile_rejects_unknown_version():
+    with pytest.raises(ValidationError, match="unsupported agent exposure profile"):
+        AgentExposureProfile.model_validate({"schema_version": 2, "context": "guided"})
+
+
+def test_manifest_profile_and_context_are_kept_in_lockstep():
+    model = load_scenario_manifest({
+        **_scenario_payload(),
+        "agent_context": "no-hint",
+    })
+
+    assert model.agent_context == "no_hint"
+    assert model.agent_exposure_profile.context == "no_hint"
+
+
+def test_manifest_rejects_profile_context_mismatch():
+    with pytest.raises(ValidationError, match="profile/context mismatch"):
+        load_scenario_manifest({
+            **_scenario_payload(),
+            "agent_context": "guided",
+            "agent_exposure_profile": {"context": "l2"},
+        })
 
 
 def test_scenario_manifest_v1_requires_identity():
@@ -97,3 +150,46 @@ def test_unversioned_verification_result_is_legacy_compatible():
     assert isinstance(model, LegacyVerificationResult)
     assert model.schema_version == 0
     assert model.model_dump()["historical_field"] == "kept"
+
+
+def test_private_ground_truth_and_agent_envelopes_are_versioned():
+    ground_truth = normalize_ground_truth({
+        "scenario": "range-1",
+        "attack_path": [{"target_node": "target-1", "flag": "private"}],
+    })
+    agent_input = normalize_agent_input({
+        "scenario_name": "range-1",
+        "targets": [{"node_name": "target-1"}],
+        "agent_context": "no-guide",
+    })
+    agent_output = normalize_agent_output({
+        "scenario_name": "range-1",
+        "agent_context": "no-guide",
+        "agent_reported": {"success": True, "evidence": ["observed"]},
+    })
+
+    assert GroundTruthV1.model_validate(ground_truth).schema_version == 1
+    assert AgentInputV1.model_validate(agent_input).agent_exposure_profile.context == "no_guide"
+    assert AgentOutputV1.model_validate(agent_output).agent_reported.success is True
+
+
+def test_material_audit_and_batch_envelopes_preserve_unknown_extensions():
+    audit = MaterialAuditV1.model_validate({
+        "agent_context": "guided",
+        "items": [{"cve_id": "CVE-X", "material": "poc.py", "visible": True}],
+        "future_field": "kept",
+    })
+    state = normalize_batch_state({
+        "run_id": "run-1",
+        "fingerprint": "f" * 64,
+        "cases": {"case-1": {"status": "pending"}},
+    })
+    summary = normalize_batch_summary({
+        "run_id": "run-1",
+        "selected_cases": ["case-1"],
+        "results": [],
+    })
+
+    assert audit.model_dump()["future_field"] == "kept"
+    assert BatchStateV1.model_validate(state).cases["case-1"].status == "pending"
+    assert BatchSummaryV1.model_validate(summary).schema_version == 1

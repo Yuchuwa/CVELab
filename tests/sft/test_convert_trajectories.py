@@ -1,5 +1,6 @@
 """Tests for trajectory-to-SFT conversion."""
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -8,6 +9,7 @@ import pytest
 
 # Import the converter directly without package installation.
 CONVERTER = Path(__file__).resolve().parents[2] / "sft" / "convert_trajectories_to_sft.py"
+TRAINER = Path(__file__).resolve().parents[2] / "sft" / "train_sft.py"
 
 
 @pytest.fixture(scope="module")
@@ -15,6 +17,14 @@ def converter():
     spec = __import__("importlib.util").util.spec_from_file_location("convert_trajectories_to_sft", CONVERTER)
     module = __import__("importlib.util").util.module_from_spec(spec)
     sys.modules["convert_trajectories_to_sft"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="module")
+def trainer():
+    spec = __import__("importlib.util").util.spec_from_file_location("train_sft", TRAINER)
+    module = __import__("importlib.util").util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
@@ -124,6 +134,7 @@ class TestRenderedFormat:
         This is the contract vLLM's Hermes tool-call parser expects for
         Qwen2.5-Instruct served with --tool-call-parser hermes.
         """
+        pytest.importorskip("transformers")
         from transformers import AutoTokenizer
 
         tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-7B-Instruct", trust_remote_code=True)
@@ -209,3 +220,207 @@ class TestCompression:
         ]
         results = [message["tool_call_id"] for message in compressed if message.get("role") == "tool"]
         assert calls == results
+
+
+def _write_source(root: Path, name: str, session, *, openai: bool, case_id: str | None = None):
+    case_dir = root / name
+    workspace = case_dir / "agent_workspace"
+    workspace.mkdir(parents=True)
+    verify_result = {
+        "agent_context": "l2",
+        "agent_success": True,
+        "scenario_name": name,
+        "validation_round": {"case_id": case_id or name, "run_id": "run-1"},
+        "flag_verification": {"per_target": {}},
+    }
+    (case_dir / "verify_result.json").write_text(json.dumps(verify_result))
+    session_path = workspace / "session.json"
+    if openai:
+        session_path.write_text("".join(json.dumps(event) + "\n" for event in session))
+        (workspace / "input.json").write_text(
+            json.dumps(
+                {
+                    "agent_context": "l2",
+                    "scenario_name": name,
+                    "attacker_ip": "192.0.2.10",
+                    "targets": [{"ip": "192.0.2.20", "zone": "dmz"}],
+                }
+            )
+        )
+    else:
+        session_path.write_text(json.dumps(session))
+    return case_dir
+
+
+def _claude_session():
+    return [
+        {"type": "user", "message": {"role": "user", "content": "Inspect the target."}},
+        {
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "claude-call-1",
+                        "name": "Bash",
+                        "input": {"command": "id"},
+                    }
+                ],
+            },
+        },
+        {
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "claude-call-1",
+                        "content": "uid=0",
+                    }
+                ],
+            },
+        },
+    ]
+
+
+def _openai_session():
+    return [
+        {
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "openai-call-1",
+                        "type": "function",
+                        "function": {"name": "Bash", "arguments": '{"command":"id"}'},
+                    }
+                ],
+            },
+            "turn": 0,
+        },
+        {
+            "type": "tool",
+            "message": {
+                "role": "tool",
+                "name": "Bash",
+                "args": {"command": "id"},
+                "result": "uid=0",
+            },
+            "turn": 0,
+        },
+    ]
+
+
+class TestCorpusConversion:
+    def test_claude_and_openai_sessions_emit_versioned_deterministic_manifest(
+        self, converter, trainer, tmp_path
+    ):
+        pytest.importorskip("datasets")
+        root = tmp_path / "sources"
+        _write_source(root, "claude-case", _claude_session(), openai=False)
+        _write_source(root, "openai-case", _openai_session(), openai=True)
+        invalid = _write_source(root, "invalid-case", [], openai=False)
+        (invalid / "agent_workspace" / "session.json").write_text("not json")
+        unsupported = _write_source(root, "unsupported-case", [], openai=False)
+        (unsupported / "agent_workspace" / "session.json").write_text(
+            json.dumps([{"unsupported": True}])
+        )
+
+        out = tmp_path / "corpus" / "corpus.jsonl"
+        report_path = tmp_path / "reports" / "report.json"
+        args = converter._build_parser().parse_args(
+            [
+                "--root",
+                str(root),
+                "--sample-mode",
+                "full",
+                "--out",
+                str(out),
+                "--report",
+                str(report_path),
+            ]
+        )
+        report = converter.convert(args)
+        rows = [json.loads(line) for line in out.read_text().splitlines()]
+
+        assert len(rows) == 2
+        assert {row["session_format"] for row in rows} == {
+            "claude_json_array",
+            "openai_jsonl",
+        }
+        assert all(row["schema_version"] == converter.SFT_RECORD_SCHEMA_VERSION for row in rows)
+        assert all(row["messages"] for row in rows)  # trainer consumes this field unchanged
+        assert len({row["sample_id"] for row in rows}) == 2
+        assert all(len(row["source_content_sha256"]) == 64 for row in rows)
+
+        assert report["schema_version"] == converter.CORPUS_MANIFEST_SCHEMA_VERSION
+        assert report["source_counts"] == {"discovered": 4, "converted": 2, "skipped": 2}
+        assert report["skipped_by_reason"] == {
+            "invalid_openai_jsonl_line_1": 1,
+            "unsupported_claude_event_shape": 1,
+        }
+        assert report["output"]["sha256"] == hashlib.sha256(out.read_bytes()).hexdigest()
+        assert report["output"]["record_count"] == 2
+        assert report["converter"]["version"] == converter.CONVERTER_VERSION
+        assert str(root) not in json.dumps(report["converter"]["arguments"])
+        assert "secret" not in json.dumps(report).lower()
+
+        dataset = trainer.load_jsonl_dataset(str(out))
+        assert len(dataset) == 2
+        assert all(row["messages"] for row in dataset)
+
+        training_args = trainer._build_parser().parse_args(
+            [
+                "--corpus",
+                str(out),
+                "--corpus-manifest",
+                str(report_path),
+                "--output",
+                str(tmp_path / "adapter"),
+                "--validate-only",
+            ]
+        )
+        loaded_records, loaded_manifest, corpus_info = trainer.load_validated_corpus(training_args)
+        assert len(loaded_records) == 2
+        assert loaded_manifest["corpus_id"] == report["corpus_id"]
+        assert corpus_info["sha256"] == report["output"]["sha256"]
+
+        manifest_only_args = trainer._build_parser().parse_args(
+            [
+                "--corpus-manifest",
+                str(report_path),
+                "--output",
+                str(tmp_path / "adapter-manifest-only"),
+                "--validate-only",
+            ]
+        )
+        manifest_records, _, _ = trainer.load_validated_corpus(manifest_only_args)
+        assert len(manifest_records) == 2
+
+        first_ids = ([row["sample_id"] for row in rows], report["corpus_id"])
+        second_report = converter.convert(args)
+        second_rows = [json.loads(line) for line in out.read_text().splitlines()]
+        assert ([row["sample_id"] for row in second_rows], second_report["corpus_id"]) == first_ids
+
+    def test_duplicate_task_ids_fail_validation(self, converter, tmp_path):
+        root = tmp_path / "sources"
+        _write_source(root, "attempt-a", _claude_session(), openai=False, case_id="same-case")
+        _write_source(root, "attempt-b", _claude_session(), openai=False, case_id="same-case")
+        args = converter._build_parser().parse_args(
+            [
+                "--root",
+                str(root),
+                "--sample-mode",
+                "full",
+                "--out",
+                str(tmp_path / "corpus.jsonl"),
+                "--report",
+                str(tmp_path / "report.json"),
+            ]
+        )
+
+        with pytest.raises(ValueError, match="duplicate task_id values: same-case.run-1.full"):
+            converter.convert(args)

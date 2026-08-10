@@ -3,6 +3,7 @@
 import pytest
 import yaml
 from pathlib import Path
+from types import SimpleNamespace
 
 from clab_builder.orchestrator.composer.scenario import ScenarioPipeline
 
@@ -94,6 +95,16 @@ def _write_pipeline_atoms(atoms_dir: Path, count: int = 3) -> None:
         _write_pipeline_atom(atoms_dir, f"CVE-PIPELINE-{index:04d}")
 
 
+def _enable_legacy_cli_fixture_admission(monkeypatch) -> None:
+    original_init = ScenarioPipeline.__init__
+
+    def compatibility_init(self, *args, **kwargs):
+        kwargs["atom_admission_mode"] = "legacy_verified"
+        original_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(ScenarioPipeline, "__init__", compatibility_init)
+
+
 class TestScenarioPipelineGenerate:
     @pytest.fixture
     def pipeline(self, tmp_path):
@@ -103,6 +114,7 @@ class TestScenarioPipelineGenerate:
             templates_dir="templates",
             atoms_dir=str(atoms_dir),
             default_validation_mode="sysfield",
+            atom_admission_mode="legacy_verified",
         )
 
     def test_generate_auto_match(self, pipeline, tmp_path):
@@ -124,12 +136,26 @@ class TestScenarioPipelineGenerate:
         assert result["sysfield_playbook"] == str(out / "sysfield" / "playbook.yaml")
         scenario_meta = yaml.safe_load((out / "scenario.yaml").read_text())
         assert scenario_meta["schema_version"] == 1
+        assert scenario_meta["agent_exposure_profile"]["context"] == "guided"
         assert "ground_truth" not in scenario_meta
+
+    def test_explicit_multi_service_atom_is_rejected_by_slot_contract(self):
+        pipeline = ScenarioPipeline(atom_admission_mode="completed")
+        pipeline.atom_loader.load_completed = lambda _cve: SimpleNamespace(
+            cve_id="CVE-MULTI-0001", services=[{}, {}]
+        )
+
+        with pytest.raises(ValueError, match="single-service Range slot contract"):
+            pipeline._load_admitted_atom("CVE-MULTI-0001")
 
     def test_generate_guided_agent_copies_guides(self, tmp_path):
         atoms_dir = tmp_path / "atoms"
         _write_pipeline_atom(atoms_dir, "CVE-GUIDED-0001", with_guide=True)
-        pipeline = ScenarioPipeline(templates_dir="templates", atoms_dir=str(atoms_dir))
+        pipeline = ScenarioPipeline(
+            templates_dir="templates",
+            atoms_dir=str(atoms_dir),
+            atom_admission_mode="legacy_verified",
+        )
         result = pipeline.generate(
             template_name="dmz_simple",
             cve_ids=["CVE-GUIDED-0001"],
@@ -143,6 +169,7 @@ class TestScenarioPipelineGenerate:
         assert result["guide_compatibility"]["overall_status"] == "unknown_legacy"
         scenario_meta = yaml.safe_load((out / "scenario.yaml").read_text())
         assert scenario_meta["schema_version"] == 1
+        assert scenario_meta["agent_exposure_profile"]["context"] == "guided"
         assert scenario_meta["guide_compatibility"]["overall_status"] == "unknown_legacy"
 
     def test_guide_alignment_difference_is_advisory(self, tmp_path):
@@ -158,7 +185,11 @@ class TestScenarioPipelineGenerate:
                 "evidence_level": "verified",
             }],
         )
-        pipeline = ScenarioPipeline(templates_dir="templates", atoms_dir=str(atoms_dir))
+        pipeline = ScenarioPipeline(
+            templates_dir="templates",
+            atoms_dir=str(atoms_dir),
+            atom_admission_mode="legacy_verified",
+        )
         result = pipeline.generate(
             template_name="dmz_simple",
             cve_ids=["CVE-GUIDED-MISMATCH"],
@@ -220,6 +251,25 @@ class TestScenarioPipelineGenerate:
                 output_dir=str(tmp_path),
             )
 
+    def test_explicit_verified_building_atom_is_rejected_by_default(self, tmp_path):
+        atoms_dir = tmp_path / "atoms"
+        _write_pipeline_atom(atoms_dir, "CVE-VERIFIED-BUILDING")
+        pipeline = ScenarioPipeline(
+            templates_dir="templates",
+            atoms_dir=str(atoms_dir),
+            default_validation_mode="sysfield",
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Atom CVE-VERIFIED-BUILDING lifecycle is building;.*schema_v3",
+        ):
+            pipeline.generate(
+                template_name="dmz_simple",
+                cve_ids=["CVE-VERIFIED-BUILDING"],
+                output_dir=str(tmp_path / "scenarios"),
+            )
+
 
 class TestScenarioPipelineBatch:
     @pytest.fixture
@@ -230,6 +280,7 @@ class TestScenarioPipelineBatch:
             templates_dir="templates",
             atoms_dir=str(atoms_dir),
             default_validation_mode="sysfield",
+            atom_admission_mode="legacy_verified",
         )
 
     def test_batch_generates_multiple(self, pipeline, tmp_path):
@@ -264,6 +315,7 @@ class TestScenarioPipelineMultiTemplate:
             templates_dir="templates",
             atoms_dir=str(atoms_dir),
             default_validation_mode="sysfield",
+            atom_admission_mode="legacy_verified",
         )
 
     def test_dmz_dual_generates_two_targets(self, pipeline, tmp_path):
@@ -350,6 +402,7 @@ class TestScenarioPipelineMultiTemplate:
         pipeline = ScenarioPipeline(
             templates_dir="templates",
             atoms_dir=str(atoms_dir),
+            atom_admission_mode="legacy_verified",
         )
 
         result = pipeline.generate(
@@ -376,13 +429,14 @@ class TestScenarioPipelineMultiTemplate:
 class TestCLIIntegration:
     """CLI command integration tests"""
 
-    def test_cli_scenario_generate(self, tmp_path):
+    def test_cli_scenario_generate(self, tmp_path, monkeypatch):
         """Test CLI scenario generate command"""
         from click.testing import CliRunner
         from clab_builder.cli import main
 
         atoms_dir = tmp_path / "cli-atoms"
         _write_pipeline_atoms(atoms_dir)
+        _enable_legacy_cli_fixture_admission(monkeypatch)
         runner = CliRunner()
         result = runner.invoke(main, [
             "generate", "dmz_simple",
@@ -396,13 +450,14 @@ class TestCLIIntegration:
         assert "cli-test" in result.output
         assert "CVE-2014-6271" in result.output
 
-    def test_cli_scenario_batch(self, tmp_path):
+    def test_cli_scenario_batch(self, tmp_path, monkeypatch):
         """Test CLI scenario batch command"""
         from click.testing import CliRunner
         from clab_builder.cli import main
 
         atoms_dir = tmp_path / "cli-batch-atoms"
         _write_pipeline_atoms(atoms_dir)
+        _enable_legacy_cli_fixture_admission(monkeypatch)
         runner = CliRunner()
         result = runner.invoke(main, [
             "batch", "dmz_simple",
@@ -413,3 +468,35 @@ class TestCLIIntegration:
         ])
         assert result.exit_code == 0, result.output
         assert "Generated" in result.output
+
+    def test_cli_atom_list_shows_canonical_lifecycle_and_blockers(self, tmp_path):
+        from click.testing import CliRunner
+        from clab_builder.cli import main
+
+        atoms_dir = tmp_path / "list-atoms"
+        partial = atoms_dir / "CVE-PARTIAL-0001"
+        partial.mkdir(parents=True)
+        (partial / "session.json").write_text("{}\n")
+        _write_pipeline_atom(atoms_dir, "CVE-VERIFIED-BUILDING")
+        (tmp_path / "atom_build_attempts.json").write_text(
+            '{"schema_version": 1, "attempts": [{'
+            '"attempt_id": "attempt-partial", '
+            '"cve_id": "CVE-PARTIAL-0001", '
+            '"state": "deferred", '
+            '"started_at": "2026-08-10T00:00:00+00:00", '
+            '"updated_at": "2026-08-10T00:00:00+00:00", '
+            '"owner": "atomizer", "phase": "construction", '
+            '"failure_class": "atom_yaml_missing", '
+            '"source_kind": "test"}]}'
+        )
+
+        result = CliRunner().invoke(main, [
+            "atom", "list",
+            "--output", str(atoms_dir),
+            "--build-plan", str(tmp_path / "missing-plan.json"),
+        ])
+
+        assert result.exit_code == 0, result.output
+        assert "0 planned, 2 building, 0 completed" in result.output
+        assert "CVE-PARTIAL-0001  [building]  blockers: atom_yaml_missing" in result.output
+        assert "CVE-VERIFIED-BUILDING  [building]  blockers: schema_v3" in result.output

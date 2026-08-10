@@ -64,6 +64,21 @@ class TestScenarioToRecord:
         cve_ids = json.loads(record["cve_ids"])
         assert "CVE-2014-6271" in cve_ids
 
+    def test_record_uses_verifier_owned_agent_success(self):
+        scenario = _make_scenario()
+        verify = {
+            **_make_verify_result(),
+            "agent_success": False,
+            "agent_result": {
+                "success": True,
+                "agent_reported": {"success": True, "evidence": []},
+            },
+        }
+
+        record = _scenario_to_record(scenario, verify)
+
+        assert record["agent_success"] is False
+
     def test_record_attack_path(self):
         scenario = _make_scenario()
         verify = _make_verify_result()

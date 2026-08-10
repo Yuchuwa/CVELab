@@ -49,8 +49,13 @@ from clab_builder.orchestrator.composer.scenario import ScenarioPipeline
 from clab_builder.orchestrator.composer.sysfield_exporter import SysFieldExporter
 from clab_builder.orchestrator.composer.verifier import ScenarioVerifier
 from clab_builder.shared.models.artifact_contracts import (
+    AgentExposureProfile,
     load_scenario_manifest,
     load_verification_result,
+    normalize_agent_context,
+    normalize_agent_exposure_profile,
+    normalize_batch_state,
+    normalize_batch_summary,
 )
 
 
@@ -107,7 +112,7 @@ CONTROL_SUBNETS = [f"172.31.{octet}.0/28" for octet in range(240, 256)] + [
 ]
 INFRA_RETRY_STAGES = {
     "worker_launch", "worker_timeout", "deploy", "scheduler_conflict",
-    "agent_transport", "cleanup_failed",
+    "agent_transport", "agent_preflight", "cleanup_failed",
 }
 # API error classes that the coordinator handles specially (not as ordinary
 # agent failures). See WORK_PROGRESS_REPORT 2026-07-25 'API error triage'.
@@ -328,6 +333,7 @@ def load_manifest_cases(path_value: str) -> tuple[dict[str, object], ...]:
             "cves": [str(cve) for cve in item["cves"]],
             "purpose": str(item.get("purpose", "matrix-generated combination")),
             "asset_variants": dict(item.get("asset_variants") or {}),
+            "slot_atoms": dict(item.get("slot_atoms") or {}),
         })
     return tuple(cases)
 
@@ -352,6 +358,12 @@ def validate_cases(cases: list[dict[str, object]]) -> None:
 
 def summarize(case: dict[str, object], scenario_dir: Path, result: dict) -> dict:
     agent_result = result.get("agent_result") or {}
+    raw_context = result.get("agent_context")
+    raw_profile = result.get("agent_exposure_profile")
+    if raw_context is None and isinstance(raw_profile, dict):
+        raw_context = raw_profile.get("context")
+    context = normalize_agent_context(raw_context or "guided")
+    profile = normalize_agent_exposure_profile(raw_profile, context=context)
     return {
         "case_id": case["id"],
         "purpose": case["purpose"],
@@ -359,7 +371,12 @@ def summarize(case: dict[str, object], scenario_dir: Path, result: dict) -> dict
         "asset_variants": case.get("asset_variants", {}),
         "resolved_asset_bindings": result.get("resolved_asset_bindings", {}),
         "scenario_dir": str(scenario_dir),
-        "agent_context": result.get("agent_context", "guided"),
+        "agent_context": context,
+        "agent_exposure_profile": profile.model_dump(mode="json"),
+        "requested_agent_context": result.get("requested_agent_context", ""),
+        "requested_agent_exposure_profile": result.get(
+            "requested_agent_exposure_profile", {}
+        ),
         "success": bool(result.get("success", False)),
         "environment_verified": bool(result.get("environment_verified", False)),
         "environment_success": bool(result.get("environment_success", False)),
@@ -385,8 +402,13 @@ def summarize(case: dict[str, object], scenario_dir: Path, result: dict) -> dict
             result.get("guide_advisories", result.get("guide_compatibility", {})) or {}
         ).get("overall_status", ""),
         "agent_termination_reason": result.get("agent_termination_reason", ""),
+        "batch_fingerprint": result.get("batch_fingerprint", "")
+        or (result.get("validation_round") or {}).get("batch_fingerprint", ""),
         "hint_profile": result.get("hint_profile", ""),
         "prompt_hygiene": result.get("prompt_hygiene", {}),
+        "material_audit": (
+            agent_result.get("material_audit") or result.get("material_audit", {})
+        ),
         "agent_structured_result": bool(agent_result.get("structured_result", False)),
         "agent_partial_result": bool(agent_result.get("partial_result", False)),
         "observed_progress": agent_result.get("observed_progress", {}),
@@ -398,6 +420,13 @@ def summarize(case: dict[str, object], scenario_dir: Path, result: dict) -> dict
 
 def _agent_attempt_evaluated(result: dict[str, Any]) -> bool:
     """Whether an Agent trial already consumed research/API resources."""
+    if result.get("agent_termination_reason") in {
+        "prompt_hygiene", "agent_exposure_profile_mismatch",
+    }:
+        return False
+    hygiene = result.get("prompt_hygiene")
+    if isinstance(hygiene, dict) and hygiene.get("profile") == "not_evaluated":
+        return False
     return bool(result.get("agent_evaluated") or result.get("guided_trial_evaluated"))
 
 
@@ -419,34 +448,72 @@ def _digest_inputs(selected: list[dict[str, object]], args: argparse.Namespace) 
     """Fingerprint experiment inputs without storing API credentials."""
     digest = hashlib.sha256()
     digest.update(json.dumps(selected, sort_keys=True, ensure_ascii=False).encode())
+    context = normalize_agent_context(getattr(args, "agent_context", "guided"))
+    profile = AgentExposureProfile.from_context(context).model_dump(mode="json")
     digest.update(json.dumps({
         "templates_dir": args.templates_dir, "atoms_dir": args.atoms_dir,
         "max_turns": args.max_turns, "agent_timeout": args.agent_timeout,
         "environment_only": args.environment_only, "generate_only": args.generate_only,
         "validation_mode": "guided_agent",
-        "agent_context": args.agent_context,
+        "agent_context": context,
+        "agent_exposure_profile": profile,
         "noise_level": str(getattr(args, "noise_level", "none")),
         "agent_runner": args.agent_runner,
         "model": args.model,
+        "base_url": args.base_url,
+        "llm_temperature": os.environ.get("LLM_TEMPERATURE", ""),
+        "max_tokens": os.environ.get("MAX_TOKENS", os.environ.get("LLM_MAX_TOKENS", "")),
         "sysarmor": bool(getattr(args, "sysarmor", False)),
         "sysarmor_detection": bool(getattr(args, "sysarmor_detection", False)),
         "sysarmor_signal_window": int(getattr(args, "sysarmor_signal_window", 30)),
+        "seed": getattr(args, "seed", None),
+        "parallel": int(getattr(args, "parallel", 0)),
+        "case_timeout": int(getattr(args, "case_timeout", 0)),
     }, sort_keys=True).encode())
-    paths = [ROOT / "templates" / "enterprise_3tier" / "template.yaml", Path(__file__),
+    paths = [Path(__file__),
+             ROOT / "data" / "atom_pool_status.json",
+             ROOT / "data" / "range_matrix_status.json",
              ROOT / "src/clab_builder/orchestrator/composer/verifier.py",
+             ROOT / "src/clab_builder/orchestrator/composer/scenario.py",
+             ROOT / "src/clab_builder/orchestrator/composer/scenario_assembler.py",
              ROOT / "src/clab_builder/orchestrator/composer/scenario_runner.py",
-             ROOT / "src/clab_builder/orchestrator/composer/openai_scenario_runner.py"]
+             ROOT / "src/clab_builder/orchestrator/composer/openai_scenario_runner.py",
+             ROOT / "src/clab_builder/orchestrator/composer/sysfield_exporter.py",
+             ROOT / "src/clab_builder/shared/models/artifact_contracts.py",
+             ROOT / "src/clab_builder/shared/source_bundle.py",
+             ROOT / "src/clab_builder/shared/atom_pool_status.py",
+             ROOT / args.templates_dir]
+    if args.case_manifest:
+        case_manifest = Path(args.case_manifest)
+        paths.append(case_manifest if case_manifest.is_absolute() else ROOT / case_manifest)
     for case in selected:
         for cve in case["cves"]:
             atom_dir = ROOT / args.atoms_dir / str(cve)
-            paths.extend([atom_dir / "atom.yaml", atom_dir / "exploit_guide.yaml",
-                          atom_dir / "source_bundle" / "manifest.json", atom_dir / "runtime" / "manifest.json"])
-    for path in paths:
-        digest.update(str(path).encode())
+            paths.extend([
+                atom_dir / "atom.yaml",
+                atom_dir / "exploit_guide.yaml",
+                atom_dir / "source_bundle",
+                atom_dir / "runtime",
+            ])
+
+    def update_path(path: Path) -> None:
+        try:
+            label = path.resolve().relative_to(ROOT.resolve()).as_posix()
+        except ValueError:
+            label = str(path.resolve())
+        digest.update(label.encode())
         if path.is_file():
             digest.update(path.read_bytes())
-        else:
-            digest.update(b"<missing>")
+            return
+        if path.is_dir():
+            files = sorted(item for item in path.rglob("*") if item.is_file())
+            for item in files:
+                update_path(item)
+            return
+        digest.update(b"<missing>")
+
+    for path in paths:
+        update_path(path)
     return digest.hexdigest()
 
 
@@ -580,6 +647,10 @@ def run_worker(spec_path: Path) -> int:
     spec = json.loads(spec_path.read_text())
     result_path = Path(spec["result_path"])
     started = utcnow()
+    context = normalize_agent_context(spec.get("agent_context", "guided"))
+    profile = normalize_agent_exposure_profile(
+        spec.get("agent_exposure_profile"), context=context
+    )
     try:
         if load_dotenv is not None:
             load_dotenv(ROOT / ".env")
@@ -600,8 +671,9 @@ def run_worker(spec_path: Path) -> int:
                     "ansible_paths": spec["ansible_paths"], "mgmt_network": spec.get("mgmt_network") or {},
                     "control_network_lease": spec.get("control_network_lease") or {},
                     "noise_level": spec.get("noise_level", "none"),
+                    "batch_fingerprint": spec.get("batch_fingerprint", ""),
                 },
-                agent_context=str(spec.get("agent_context", "guided")),
+                agent_context=context,
                 agent_runner=str(spec.get("agent_runner", "claude")),
                 sysarmor=spec.get("sysarmor") or {},
             )
@@ -628,11 +700,15 @@ def run_worker(spec_path: Path) -> int:
         stage = "scheduler_conflict" if str(exc) == "scheduler_conflict" else "worker_failed"
         result = {"case_id": spec["case"]["id"], "purpose": spec["case"]["purpose"],
                   "cves": spec["case"]["cves"], "scenario_dir": str(spec["scenario_dir"]),
+                  "agent_context": context,
+                  "agent_exposure_profile": profile.model_dump(mode="json"),
                   "success": False, "failure_stage": stage, "error": repr(exc),
                   "execution_complete": False}
     except Exception as exc:
         result = {"case_id": spec["case"]["id"], "purpose": spec["case"]["purpose"],
                   "cves": spec["case"]["cves"], "scenario_dir": str(spec["scenario_dir"]),
+                  "agent_context": context,
+                  "agent_exposure_profile": profile.model_dump(mode="json"),
                   "success": False, "failure_stage": "worker_failed", "error": repr(exc),
                   "execution_complete": False}
     atomic_json(result_path, result)
@@ -649,10 +725,16 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
                 ordered.append(json.loads(result_path.read_text()))
             except json.JSONDecodeError:
                 pass
-    atomic_json(output_dir / "summary.json", {
+    context = normalize_agent_context(state["options"].get("agent_context", "guided"))
+    profile = normalize_agent_exposure_profile(
+        state["options"].get("agent_exposure_profile"), context=context
+    )
+    summary = {
+        "schema_version": 1,
         "created_at": utcnow(), "run_id": state["run_id"], "template": "enterprise_3tier",
         "validation_mode": "guided_agent", "environment_only": state["options"]["environment_only"],
-        "agent_context": state["options"].get("agent_context", "guided"),
+        "agent_context": context,
+        "agent_exposure_profile": profile.model_dump(mode="json"),
         "noise_level": state["options"].get("noise_level", "none"),
         "model": state["options"].get("model", ""),
         "agent_runner": state["options"].get("agent_runner", "claude"),
@@ -662,32 +744,45 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
         # per-scenario verify_result.json also carries its own validation_round.
         "validation_round": {
             "run_id": state["run_id"],
-            "agent_context": state["options"].get("agent_context", "guided"),
+            "agent_context": context,
+            "agent_exposure_profile": profile.model_dump(mode="json"),
             "noise_level": state["options"].get("noise_level", "none"),
             "model": state["options"].get("model", ""),
             "agent_runner": state["options"].get("agent_runner", "claude"),
             "environment_only": state["options"]["environment_only"],
             "max_turns": state["options"].get("max_turns"),
             "agent_timeout": state["options"].get("agent_timeout"),
+            "seed": state["options"].get("seed"),
+            "case_timeout": state["options"].get("case_timeout"),
             "created_at": state.get("created_at", utcnow()),
         },
         "selected_cases": state["selected_case_ids"], "results": ordered,
         "case_states": {key: value["status"] for key, value in state["cases"].items()},
         "fingerprint": state["fingerprint"],
-    })
+    }
+    atomic_json(output_dir / "summary.json", normalize_batch_summary(summary))
 
 
 def _persist(output_dir: Path, state: dict[str, Any]) -> None:
     state["updated_at"] = utcnow()
+    normalized = normalize_batch_state(state)
+    state.clear()
+    state.update(normalized)
     atomic_json(output_dir / "batch_state.json", state)
     _write_summary(output_dir, state)
 
 
 def _result_for_infra(case_state: dict[str, Any], stage: str, error: str) -> dict[str, Any]:
     case = case_state["case"]
+    context = normalize_agent_context(case_state.get("agent_context", "guided"))
+    profile = normalize_agent_exposure_profile(
+        case_state.get("agent_exposure_profile"), context=context
+    )
     return {
         "case_id": case["id"], "purpose": case["purpose"], "cves": case["cves"],
         "scenario_dir": case_state["scenario_dir"], "success": False,
+        "agent_context": context,
+        "agent_exposure_profile": profile.model_dump(mode="json"),
         "failure_stage": stage, "error": error, "execution_complete": False,
     }
 
@@ -744,7 +839,9 @@ def _prewarm_cases(state: dict[str, Any], args: argparse.Namespace, output_dir: 
                 prior = prepared[key]
                 check = {**prior, "action": "deduplicated", "source_check": prior.get("action", "prewarm")}
             else:
-                check = verifier.prepare_runtime_images(str(scenario_dir))
+                check = verifier.prepare_runtime_images(
+                    str(scenario_dir), runtime_policy="verify_only"
+                )
                 prepared[key] = check
             if not check.get("ok"):
                 item["status"] = "completed"
@@ -774,13 +871,17 @@ def _janitor(case_state: dict[str, Any], management: dict[str, Any]) -> dict[str
 def _worker_spec(state: dict[str, Any], case_state: dict[str, Any], args: argparse.Namespace,
                  output_dir: Path, worker_id: int, management: dict[str, Any]) -> Path:
     work_dir = output_dir / ".batch" / "work" / case_state["case"]["id"]
+    context = normalize_agent_context(getattr(args, "agent_context", "guided"))
+    profile = AgentExposureProfile.from_context(context).model_dump(mode="json")
     spec = {
         "run_id": state["run_id"], "worker_id": str(worker_id), "case": case_state["case"],
+        "batch_fingerprint": state.get("fingerprint", ""),
         "lab_name": case_state["lab_name"], "scenario_dir": case_state["scenario_dir"],
         "result_path": case_state["result_path"], "lab_lock_path": str(work_dir / "lab.lock"),
         "atoms_dir": args.atoms_dir, "max_turns": args.max_turns, "agent_timeout": args.agent_timeout,
         "environment_only": args.environment_only,
-        "agent_context": str(getattr(args, "agent_context", "guided")).replace("-", "_"),
+        "agent_context": context,
+        "agent_exposure_profile": profile,
         "noise_level": str(getattr(args, "noise_level", "none")),
         "agent_runner": str(getattr(args, "agent_runner", "claude")),
         "strict_guide_compatibility": args.strict_guide_compatibility,
@@ -1048,7 +1149,10 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
 
 def main() -> int:
     args = parse_args()
-    args.agent_context = args.agent_context.replace("-", "_")
+    args.agent_context = normalize_agent_context(args.agent_context)
+    agent_exposure_profile = AgentExposureProfile.from_context(
+        args.agent_context
+    ).model_dump(mode="json")
     os.chdir(ROOT)
     if hasattr(args, "worker_spec"):
         return run_worker(Path(args.worker_spec))
@@ -1118,9 +1222,13 @@ def main() -> int:
         run_id = secrets.token_hex(12)
         state = {
             "schema_version": 1, "created_at": utcnow(), "run_id": run_id, "fingerprint": fingerprint,
+            "agent_context": args.agent_context,
+            "agent_exposure_profile": agent_exposure_profile,
             "options": {"environment_only": args.environment_only, "generate_only": args.generate_only,
                         "parallel": args.parallel, "agent_timeout": args.agent_timeout, "max_turns": args.max_turns,
+                        "seed": args.seed, "case_timeout": args.case_timeout,
                         "agent_context": args.agent_context,
+                        "agent_exposure_profile": agent_exposure_profile,
                         "noise_level": str(getattr(args, "noise_level", "none")),
                         "model": args.model, "agent_runner": args.agent_runner},
             "selected_case_ids": [str(case["id"]) for case in selected], "cases": {},
@@ -1130,6 +1238,8 @@ def main() -> int:
             lab_name = physical_lab_name(run_id, case_id)
             state["cases"][case_id] = {
                 "case": case, "lab_name": lab_name, "status": "pending", "attempts": 0,
+                "agent_context": args.agent_context,
+                "agent_exposure_profile": agent_exposure_profile,
                 "scenario_dir": str(output_dir / "scenarios" / lab_name),
                 "result_path": str(batch_dir / "results" / f"{case_id}.json"),
             }
@@ -1145,6 +1255,7 @@ def main() -> int:
                         "cves": item["case"]["cves"], "scenario_dir": item["scenario_dir"],
                         "generated": True, "preflight": True, "success": True,
                         "agent_context": args.agent_context,
+                        "agent_exposure_profile": agent_exposure_profile,
                         "noise_level": str(getattr(args, "noise_level", "none")),
                         "sysarmor": {
                             "enabled": bool(getattr(args, "sysarmor", False)),

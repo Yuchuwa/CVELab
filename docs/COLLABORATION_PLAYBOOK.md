@@ -2,242 +2,192 @@
 
 Status: active
 
-Last reviewed: 2026-07-30
+Last reviewed: 2026-08-09
 
 ## Purpose
 
-This document turns the architecture and contract registry into work that can
-be divided safely. It defines three workstreams, handoff rules, interface
-documentation requirements, progress reporting and the first collaboration
-sprint. It does not assign people; maintainers record the current assignee in
-the issue or pull request.
+This playbook divides CVELab into four technical lanes while keeping the
+release-integrator duty explicit. A lane owns its producer and scientific
+meaning; consumers review the handoff rather than silently redefining it.
 
-Read this together with:
+Read this with:
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) for system and dependency boundaries;
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) for dependency direction;
 - [`INTERFACES.md`](INTERFACES.md) for persisted contracts;
-- [`CURRENT_STATUS.md`](CURRENT_STATUS.md) for established current state;
-- [`ROADMAP.md`](ROADMAP.md) for ordered project work;
-- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for change and review rules.
+- [`OPERATIONS.md`](OPERATIONS.md) for commands and artifact handoffs;
+- [`CURRENT_STATUS.md`](CURRENT_STATUS.md) for generated live status;
+- [`ROADMAP.md`](ROADMAP.md) for ordered work;
+- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for pull-request rules.
 
-## Workstreams and Technical Boundaries
+## Four Lanes
 
-The project has many technical modules but only three people-facing
-workstreams. Technical boundaries identify interfaces; they are not separate
-staffing roles.
+| Lane | Owns | Primary paths | Handoff output | Required reviewer |
+|---|---|---|---|---|
+| Atom lane | Source acquisition, native verification, runtime/source bundle, Exploit Guide and three-state lifecycle | `src/clab_builder/atomizer/`, Atom models, `data/atoms/`, `tests/atomizer/` and relevant `tests/shared/` | Reviewed `data/atoms/<CVE>/` plus lifecycle evidence | Range lane |
+| Range lane | Template matching, matrix selection, scenario assembly, deterministic environment/graph/path gates and Range manifests | `src/clab_builder/orchestrator/composer/`, `templates/`, Range scripts, `tests/orchestrator/` | Versioned scenario, matrix and verification artifacts | Atom lane for consumed Atom contracts; Agent lane for exposure/results |
+| Agent lane | `AgentExposureProfile`, prompt/input boundaries, runners, structured Agent results and experiment trial semantics | `scenario_runner.py`, `openai_scenario_runner.py`, verifier Agent boundary, batch runner and Agent tests | Exposure-pinned input/result/batch evidence with hygiene outcome | Range lane and SFT lane |
+| SFT lane | Sanitized trajectory conversion, corpus/split lineage, training runs and evaluation manifests | `sft/`, `tests/sft/` | Content-addressed corpus, split and run manifests; sanitized exports only | Agent lane |
 
-| Workstream | End-to-end responsibility | Primary paths | Main handoff |
-|---|---|---|---|
-| A. Atom and vulnerability supply | Source ingestion, native verification, runtime/source bundle, Guide review, Atom qualification and Atom status | `src/clab_builder/atomizer/`, Atom-related `shared/`, `data/atoms/`, `tests/atomizer/`, relevant `tests/shared/` | Publishes a reviewed `data/atoms/<CVE>/` artifact |
-| B. Range and evaluation | Template matching, scenario assembly, deterministic verification, Agent contexts/runners, batch experiments and result interpretation | `src/clab_builder/orchestrator/composer/`, `templates/`, Range scripts, `tests/orchestrator/` | Consumes Atom artifacts and publishes versioned scenario/verification/batch results |
-| C. Engineering and research support | CLI/config/package, CI, documentation, release/data policy, sanitization, SFT conversion/training/evaluation | cross-cutting `shared/`, `src/clab_builder/cli.py`, `.github/`, `docs/`, `sft/`, `tests/sft/` | Keeps A and B reproducible, reviewable and publishable |
+The release integrator is a rotating duty, not a fifth scientific lane. It owns
+generated status views, CI, documentation indexes, release scope and the final
+artifact-chain check. It must not change Atom, Range, Agent or SFT semantics to
+make a gate pass.
 
-Schema ownership follows the producing workstream instead of assigning all
-models to a fourth “shared” owner:
+## Ownership Rules
 
-- A owns Atom, Exploit Guide, source-bundle and qualification contracts; B
-  reviews changes that affect Range consumption.
-- B owns Template, Scenario, Ground Truth, Agent I/O, verification and batch
-  contracts; C reviews privacy, publication or SFT effects.
-- C owns configuration, package, CI and public-export contracts; A or B reviews
-  changes that alter their execution environment.
+- The lane that produces a persisted field owns its meaning and migration path.
+- A change crossing a lane names the producer, every known consumer, the
+  contract version, the privacy boundary and the next owner in the handoff.
+- `shared/` is not an unowned lane. The issue names the producing lane for every
+  shared-model change.
+- Atom lifecycle is exactly `planned`, `building` or `completed`; matrix
+  membership belongs to Range.
+- Range consumes live `completed` Atoms and never mutates Atom-owned files.
+- Agent success never overwrites deterministic Range gates or private objective
+  verification.
+- SFT consumes a versioned sanitized export and never changes historical Agent
+  or verification semantics.
+- Generated status views have one producer: the release integrator regenerates
+  them in the documented order after upstream freshness checks pass.
 
-Files under `shared/` therefore require a named producing workstream in the
-issue. Directory location alone does not decide ownership.
+## Review Rules
 
-### Staffing
-
-For three people:
-
-| Person | Primary workstream | Secondary review |
-|---|---|---|
-| Person 1 | A. Atom and vulnerability supply | Reviews Atom-to-Range handoff |
-| Person 2 | B. Range and evaluation | Reviews Range consumption of Atom contracts |
-| Person 3 | C. Engineering and research support | Reviews CI, privacy and release impact |
-
-For two people:
-
-| Person | Primary workstream | Additional duty |
-|---|---|---|
-| Person 1 | A. Atom and vulnerability supply | Atom-facing shared contracts and status |
-| Person 2 | B. Range and evaluation | C is handled as a rotating maintenance duty |
-
-With two people, do not run a separate support backlog in parallel. Schedule CI,
-documentation, release and SFT tasks as bounded maintenance work between Atom
-and Range milestones. Cross-boundary contract changes still require the other
-person's review.
-
-Person B owns the experiment workstream: model/runner comparisons, Agent input
-levels, Guide and decoy dimensions, batch denominators and result
-interpretation. A third support person may maintain execution/SFT tooling but
-does not take over scientific ownership.
-
-The broad files `atomizer/pipeline.py`, `scenario_assembler.py` and
-`verifier.py` remain temporary ownership hotspots. Coordinate edits to them in
-an issue before parallel implementation. Only one person edits a hotspot at a
-time. Split it only after its file contracts have regression tests.
-
-## Change and Handoff Flow
-
-```text
-Issue: scope + primary workstream + affected contract + acceptance evidence
-  -> implementation in the owning workstream
-  -> focused tests
-  -> producer/consumer and privacy tests for contract changes
-  -> status/ledger update
-  -> review by the other affected workstream when a contract changed
-```
-
-A handoff is complete only when it states:
-
-1. the input artifact or callable and its authoritative definition;
-2. the output artifact and its producer;
-3. assumptions, supported versions and privacy boundary;
-4. the verification command and established result;
-5. known limitations and the next owner.
-
-Do not hand off a chat summary as the only record. Put the durable fact in the
-appropriate active document, issue, schema or progress entry.
-
-## Interface Documentation Standard
-
-CVELab has two interface types:
-
-- **Python interfaces** used inside a process;
-- **artifact interfaces** such as `atom.yaml`, `template.yaml`,
-  `scenario.yaml`, Agent input/output, `verify_result.json` and batch summaries.
-
-Artifact interfaces are the more important subsystem boundary. Documenting only
-functions is insufficient.
-
-Every interface entry in [`INTERFACES.md`](INTERFACES.md) must identify:
-
-| Field | Required content |
-|---|---|
-| Name and version | Stable identifier; say `unversioned` when that is the gap |
-| Producer | Module or command that writes/returns it |
-| Consumer | Modules or commands that read it |
-| Authority | Pydantic model, JSON Schema, implementation or test fixture |
-| Location/transport | File path pattern, function import or process boundary |
-| Required semantics | Invariants, not a duplicate list of every field |
-| Privacy | Public, Agent-visible, verifier-private or sensitive |
-| Compatibility | Reader/writer expectations and migration policy |
-| Failure behavior | How invalid input is rejected and classified |
-| Tests | Round-trip, negative and privacy regression coverage |
-
-For a new or changed persisted contract, the same pull request must update:
-
-1. the producer;
-2. every known consumer;
-3. the versioned model or schema;
-4. positive and negative contract tests;
-5. privacy tests when Agent or publication visibility is involved;
-6. `INTERFACES.md` and migration notes.
-
-Use small examples in fixtures. Do not copy real flags, credentials, private
-objectives or raw trajectories into interface documentation.
-
-## Progress Documentation
-
-Progress has three distinct records:
-
-| Record | Purpose | Update rule |
-|---|---|---|
-| `docs/CURRENT_STATUS.md` | Concise current-state dashboard | Edit when an established current fact changes |
-| `docs/ROADMAP.md` | Prioritized future work and acceptance gates | Edit when priorities or gates change |
-| `docs/WORK_PROGRESS_REPORT.md` | Append-only evidence and decision ledger | Append every work session; supersede, never rewrite |
-
-Machine-readable status or experiment files are evidence, not substitutes for
-those three views. Every count must name its population and denominator.
-
-Use this ledger entry shape:
-
-```markdown
-### YYYY-MM-DD — <workstream>: <result>
-
-- Scope: <what was inspected or changed>
-- Atom build status: <planned | building | completed | not applicable>
-- Result class: <Atom evidence | Range selection | experiment | docs>
-- Result: <established facts, including negative results>
-- Verification: <commands and exact outcome>
-- Evidence: <paths to durable artifacts>
-- Limitations: <what this does not prove>
-- Next owner: <workstream and concrete next action>
-```
-
-An issue or pull request should use this shorter status block:
+Every pull request states:
 
 ```text
 State: planned | in progress | blocked | in review | done
-Owner workstream:
-Affected contracts:
-Acceptance:
-Evidence:
-Blocker or next action:
+Primary lane:
+Affected contracts and versions:
+Producer and consumers:
+Focused tests:
+Freshness/status result:
+Privacy/publication impact:
+Known limitations and next owner:
 ```
 
-“Done” means the acceptance evidence exists. A running batch, generated file,
-Agent claim or unreviewed local result is not completion.
+Review is required from the lane owner and every required cross-lane reviewer
+listed above. Each required reviewer checks the contract boundary, not only the
+changed implementation. The release integrator reviews any change that touches generated
+status, CI, docs, package policy, publication state or handoff metadata. The
+integrator may approve release plumbing only after the affected scientific lane
+confirms that semantics are unchanged.
 
-## Parallel Work Rules
+Additional rules:
 
-- Start from a named commit and record it in the issue or experiment.
-- Keep one primary workstream per branch or commit.
-- Never stage the whole dirty worktree to collect one change.
-- Coordinate before editing a listed hotspot or shared schema.
-- Generated scenarios and raw runs are immutable evidence, not merge targets.
-- Fix a reusable construction or orchestration contract; do not add a
-  CVE-specific or Range-specific branch.
-- Rebase or merge only after preserving uncommitted experiment evidence.
+- A contract change updates producer, consumer, model or schema, positive and
+  negative tests, privacy tests where relevant, and `INTERFACES.md` together.
+- The producer author does not provide the sole approval for a cross-lane
+  contract change.
+- Hotspots `atomizer/pipeline.py`, `scenario_assembler.py` and `verifier.py`
+  have one active editor at a time; coordinate before editing them.
+- Do not add a CVE-specific or generated-Range-specific branch.
+- Do not stage the whole worktree. Keep unrelated Atom, Range, Agent and SFT
+  evidence out of a documentation or CI change.
+- CI must use synthetic fixtures and tracked compact status, never private raw
+  Range runs, raw sessions, flags, credentials or model adapters.
+- A reviewer checks both the positive path and the intended rejection path.
 
-## First Collaboration Sprint
+## Handoff Contract
 
-The simplest safe first step is a short contract-and-baseline sprint. Do not
-begin with package refactoring.
+A handoff is complete only when the receiving lane can reproduce it without
+chat history. Record:
 
-| Work package | Workstream | Deliverable | Acceptance |
-|---|---|---|---|
-| 1. Repository and CI baseline | C | Classify the dirty tree and align CI/test/Python policy | Intended public files are classified and a clean pull request runs active tests |
-| 2. Atom status and handoff | A | Normalize Atom populations and confirm the Atom-to-Range artifact contract | One generated snapshot has consistent JSON/CSV/Markdown and explicit qualification meanings |
-| 3. Range result contracts | B | Add versioned Scenario and Verification Result models before changing orchestration structure | Round-trip, invalid-input and privacy tests pass |
-| 4. First integrated handoff | A + B, coordinated by C | Generate and verify a small representative Range from the normalized Atom snapshot | Atom, environment, graph, Agent and objective outcomes are recorded separately |
+1. the input artifact or callable and its authoritative definition;
+2. the output artifact, producer and schema/version;
+3. assumptions, supported versions and privacy boundary;
+4. the exact `uv run` verification command and established result;
+5. hashes, snapshot identity or run fingerprint where applicable;
+6. known limitations and the next owner.
 
-Recommended order:
+The normal order is:
 
 ```text
-1 repository and CI baseline
-  -> 2 Atom status + 3 Range result contracts in parallel
-  -> 4 integrated handoff
-  -> only then structural module splitting
+Atom lifecycle/status
+  -> completed-only Range matrix
+  -> scenario and deterministic verification
+  -> immutable Agent exposure and trial result
+  -> sanitized SFT corpus and split
+  -> training/evaluation run manifest
 ```
 
-The first sprint is complete when a new contributor can clone the reviewed
-baseline, choose a workstream, find its contracts, run its focused tests,
-make a scoped change and report evidence without relying on chat history.
+The receiving lane may reject an incomplete handoff. Rejection records the
+contract or evidence gap; it does not change the source lane's lifecycle state.
 
-## Current Conflict Map
+## Contract Documentation
 
-| Conflict | Why it happens | Working rule |
-|---|---|---|
-| Atom schema versus Range consumption | Atom fields are produced in A but interpreted in B | A owns the producer change; B must review the consumer and migration |
-| Range result versus Agent/SFT interpretation | Result fields are assembled across verifier, runner, batch and SFT code | B owns online semantics; C may consume but cannot redefine historical meaning |
-| Shared-directory ownership | `shared/` contains contracts used by both pipelines | Name A, B or C by contract producer; never use `shared/` as an unowned fourth area |
-| Hotspot merge conflicts | Three broad files contain several responsibilities | One active editor per hotspot; coordinate before work and add contract tests before splitting |
-| Canonical versus generated data | The dirty tree mixes reviewed assets, runs and local evidence | C classifies publication state; A/B decide scientific validity |
-| Active versus legacy code | Old packages and docs still coexist with the active pipeline | New work follows `atomizer/` and `orchestrator/composer/`; legacy changes require a named consumer |
+Artifact interfaces are first-class boundaries. Each `INTERFACES.md` entry
+names the contract/version, producer, consumers, authority, location or
+transport, required invariants, privacy class, compatibility policy, failure
+behavior and contract-test coverage. Say `untyped` explicitly when a schema is
+missing.
 
-## Known Baseline Gaps
+The same pull request updates the producer, known consumers, schema or version
+boundary, positive and negative tests, privacy tests when visibility is
+involved, and migration notes. Examples use synthetic values only; never copy
+flags, credentials, private objectives or raw trajectories into docs or
+fixtures.
 
-The initial inventory found these collaboration blockers:
+## Lane Checklists
 
-- Scenario, Ground Truth, Agent I/O, verification and batch artifacts are not
-  all backed by versioned models or JSON Schemas.
-- The active implementation and legacy `atomic/`, `core/`, `models/` and older
-  orchestrator paths coexist.
-- Docker, ContainerLab, network and slow tests still need a prepared-host gate
-  outside the default non-Docker CI job.
-- Local research state, reviewed public state and Git history are not yet one
-  clean release snapshot.
+### Atom Lane
 
-These are project-level tasks. They must not be “fixed” by changing one Atom,
-one generated Range or one historical result.
+- Capture a self-contained source bundle and record material hashes.
+- Preserve runtime startup semantics and readiness evidence.
+- Separate native exploit evidence from orchestrated environment evidence.
+- Produce a reviewed Guide whose material references are source-bundle-relative.
+- Regenerate/check Atom status before offering an Atom to Range.
+
+### Range Lane
+
+- Select only live `completed` Atoms and record the Atom snapshot hash.
+- Keep template, slot, dependency, capability and asset rejection reasons.
+- Persist scenario and verification schema versions.
+- Keep environment, graph, path, Agent and objective outcomes independent.
+- Hand Agent only the declared public exposure profile; keep Ground Truth private.
+
+### Agent Lane
+
+- Pin `AgentExposureProfile` at generation, input, result and batch boundaries.
+- Abort profile mismatches before an LLM call and audit serialized inputs/prompts.
+- Keep API credentials out of Agent subprocess environments and artifacts.
+- Record runner, model, endpoint class, budgets and termination category.
+- Exclude hygiene aborts from the model-evaluated denominator.
+
+### SFT Lane
+
+- Accept only a versioned corpus manifest and exact JSONL content hash.
+- Record every discovered source and every skip reason.
+- Split by chain/CVE/source identity so related samples cannot cross splits.
+- Keep training and evaluation manifests portable and free of machine paths or
+  secrets.
+- Publish only sanitized exports; raw sessions and adapters remain local.
+
+## Release Integrator Gate
+
+The release integrator runs the fast gate in a fresh clone and stops at the
+first failure:
+
+```text
+Atom status freshness
+  -> tracked status and matrix provenance
+  -> documentation/workflow contracts
+  -> focused contract tests
+  -> lane-specific tests requested by reviewers
+```
+
+The integrator records the exact commands and results in the pull request. A
+green CI job proves contract and documentation consistency only; it does not
+prove Docker deployment, exploit success, Agent success, objective success or
+SFT model improvement.
+
+## Progress Records
+
+Use active documents for current guidance and the append-only progress ledger
+for established evidence. Every work session that changes or evaluates a
+contract records its scope, result class, command, evidence, limitation and
+next owner in `docs/WORK_PROGRESS_REPORT.md`. Generated status views are not a
+substitute for that evidence, and historical entries are never rewritten.
+
+The release integrator updates `CURRENT_STATUS.md` only from generated sources
+and names the population and denominator for every count. A matrix count is a
+composition count unless a separate environment or Agent result says otherwise.

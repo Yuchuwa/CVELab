@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-30T17:05:11.257831+00:00",
+  "generated_at": "2026-08-10T08:25:56.109979+00:00",
   "template": "enterprise_3tier",
   "matrix_manifest": "data/range_matrices/enterprise_3tier_completed.json",
-  "matrix_manifest_sha256": "0256dfa96040384a622db47b2bcfae58916b98cf33a1a6400d8b6a27175e7a36",
+  "matrix_manifest_sha256": "e86ede48f028f917a2f6292d54ed74f7d92931ae52b865aa97455868d65b868d",
   "atom_status": {
     "schema_version": 2,
-    "snapshot_hash": "1649e1ba411a85e2a29f8ce3be88daae737173169d49581c15964addc311a2e5",
+    "snapshot_hash": "4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd",
     "completed_count": 46
   },
   "range_candidate_atom_ids": [
@@ -84,11 +84,11 @@
     "range_candidate_atoms": 39,
     "selected_atoms": 28,
     "accepted_cases": 1800,
-    "range_input_rejections": 200,
+    "range_input_rejections": 245,
     "composition_rejections": 21989
   },
   "range_input_rejection_counts": {
-    "atom_build_not_completed": 193,
+    "atom_build_not_completed": 238,
     "multiple_services_not_supported_by_matrix": 7
   },
   "composition_rejection_counts": {

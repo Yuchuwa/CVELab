@@ -293,34 +293,49 @@ def atom_run(cve_path, output, api_key, base_url, model, skip_agent, force, max_
 
 @atom.command("list")
 @click.option("--output", "-o", default="data/atoms", help="Atoms directory")
-def atom_list(output):
-    """List all generated atoms."""
+@click.option(
+    "--build-plan",
+    default="data/atom_build_plan.json",
+    help="Atom build plan containing the planned queue.",
+)
+def atom_list(output, build_plan):
+    """List Atoms by canonical lifecycle status and completion blockers."""
+    from clab_builder.shared.atom_pool_status import (
+        build_lifecycle_index,
+        load_planned_ids,
+    )
+    from clab_builder.shared.atom_build_ledger import latest_attempts
+
     atoms_dir = Path(output)
-    if not atoms_dir.exists():
+    plan_path = Path(build_plan)
+    if not atoms_dir.exists() and not plan_path.is_file():
         click.echo("No atoms directory.")
         return
 
-    atoms = sorted([d.name for d in atoms_dir.iterdir() if d.is_dir()])
-    if not atoms:
+    lifecycle = build_lifecycle_index(
+        atoms_dir,
+        planned_ids=load_planned_ids(plan_path),
+        build_attempts=latest_attempts(
+            atoms_dir.parent / "atom_build_attempts.json"
+        ),
+    )
+    if not lifecycle:
         click.echo("No atoms yet.")
         return
 
-    counts = {"verified": 0, "unverified": 0, "incomplete": 0}
-    entries = []
-    for cve_id in atoms:
-        atom_yaml = atoms_dir / cve_id / "atom.yaml"
-        if atom_yaml.exists():
-            import yaml as _yaml
-            data = _yaml.safe_load(atom_yaml.read_text())
-            status = "verified" if data.get("verified") else "unverified"
-        else:
-            status = "incomplete"
-        counts[status] += 1
-        entries.append((cve_id, status))
-
-    click.echo(f"Atoms ({len(atoms)}): {counts['verified']} verified, {counts['unverified']} unverified, {counts['incomplete']} incomplete")
-    for cve_id, status in entries:
-        click.echo(f"  {cve_id}  [{status}]")
+    counts = {
+        status: sum(row["build_status"] == status for row in lifecycle.values())
+        for status in ("planned", "building", "completed")
+    }
+    click.echo(
+        f"Atoms ({len(lifecycle)}): {counts['planned']} planned, "
+        f"{counts['building']} building, {counts['completed']} completed"
+    )
+    for cve_id, row in lifecycle.items():
+        blockers = ", ".join(row.get("blockers") or []) or "none"
+        click.echo(
+            f"  {cve_id}  [{row['build_status']}]  blockers: {blockers}"
+        )
 
 
 @atom.command("sysfield")

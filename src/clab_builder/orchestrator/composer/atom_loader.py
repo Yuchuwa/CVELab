@@ -4,14 +4,19 @@ import yaml
 from pathlib import Path
 from typing import Optional
 
+from clab_builder.shared.atom_pool_status import build_lifecycle_index
+from clab_builder.shared.atom_build_ledger import latest_attempts
 from clab_builder.shared.models.atom import AtomConfig
 
 
 class AtomLoader:
     """从 data/atoms/ 目录加载已验证的 atom"""
 
-    def __init__(self, atoms_dir: str = "data/atoms"):
+    def __init__(self, atoms_dir: str = "data/atoms", build_attempts_path: str | None = None):
         self.atoms_dir = Path(atoms_dir)
+        self.build_attempts_path = Path(build_attempts_path) if build_attempts_path else (
+            self.atoms_dir.parent / "atom_build_attempts.json"
+        )
 
     def load(self, cve_id: str) -> AtomConfig:
         """加载指定 CVE 的 atom
@@ -41,13 +46,9 @@ class AtomLoader:
             raise ValueError(f"Invalid atom.yaml in {atom_dir}: {e}") from e
 
     def load_all_verified(self, single_service_only: bool = True) -> list[AtomConfig]:
-        """加载所有已验证的 atom
+        """Legacy compatibility loader based only on ``verified``.
 
-        Args:
-            single_service_only: 仅返回单服务 atom (len(services) <= 1)
-
-        Returns:
-            AtomConfig 列表
+        Production Range construction must use :meth:`load_all_completed`.
         """
         atoms = []
         if not self.atoms_dir.exists():
@@ -73,6 +74,41 @@ class AtomLoader:
 
             atoms.append(atom)
 
+        return atoms
+
+    def lifecycle_index(self) -> dict[str, dict]:
+        """Return the canonical lifecycle computed from the live Atom tree."""
+        return build_lifecycle_index(
+            self.atoms_dir,
+            build_attempts=latest_attempts(self.build_attempts_path),
+        )
+
+    def load_completed(self, cve_id: str) -> AtomConfig:
+        """Load one Atom only when every live completion gate passes."""
+        row = self.lifecycle_index().get(cve_id)
+        if row is None:
+            raise FileNotFoundError(f"Atom not found: {self.atoms_dir / cve_id}")
+        if row["build_status"] != "completed":
+            blockers = ", ".join(row.get("blockers") or []) or "unknown"
+            raise ValueError(
+                f"Atom {cve_id} lifecycle is {row['build_status']}; "
+                f"completion blockers: {blockers}"
+            )
+        return self.load(cve_id)
+
+    def load_all_completed(
+        self,
+        single_service_only: bool = True,
+    ) -> list[AtomConfig]:
+        """Load production Atoms backed by the canonical live lifecycle."""
+        atoms = []
+        for cve_id, row in self.lifecycle_index().items():
+            if row["build_status"] != "completed":
+                continue
+            atom = self.load(cve_id)
+            if single_service_only and len(atom.services) > 1:
+                continue
+            atoms.append(atom)
         return atoms
 
     def list_available(self) -> list[str]:

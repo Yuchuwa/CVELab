@@ -6,6 +6,26 @@
 > 复现脚本: `PYTHONPATH=src python scripts/gap_analysis_v2.py`
 > 结果文件: `data/gap_analysis_v2.json`
 
+## 2026-08-09 Snapshot Correction
+
+The script now consumes completed single-service Atoms through the production
+admission contract. The current result is **35** Atoms, with **0** pivotable
+Atoms and **506** current enterprise matrix compositions. The 95-Atom and
+7-pivot figures in the historical sections below belong to an earlier
+verified-only snapshot and are retained as historical evidence; use
+`data/gap_analysis_v2.json` and `data/atom_pool_status.json` for current state.
+
+## 2026-08-10 Snapshot Correction
+
+Four legacy Atoms were admitted after a generic contract backfill from existing
+runtime manifests and source Compose evidence. The current production view is
+now **39 completed single-service Atoms**, with **0** pivotable Atoms and **506**
+coverage-first selected enterprise matrix cases from **1,800** legal
+compositions. `CVE-2017-10271` remains building because its WebLogic service is
+not reachable across the Range data plane. Older 35/506 and 95/7 figures below
+remain historical; use `data/gap_analysis_v2.json` and
+`data/atom_pool_status.json` for the current snapshot.
+
 ## 1. 结论先说
 
 当前系统已经从“完全不能做真实攻击链”变成“可以做真实攻击链，但可用的上游跳板太少”。

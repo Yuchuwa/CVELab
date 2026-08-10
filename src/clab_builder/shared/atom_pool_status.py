@@ -6,9 +6,10 @@ import csv
 import hashlib
 import io
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 import yaml
 
@@ -31,6 +32,7 @@ DEFINITIONS = {
 COMPLETION_GATES = (
     "schema_v3",
     "source_bundle_complete",
+    "source_bundle_material_metadata_complete",
     "source_bundle_hashed",
     "self_contained_paths",
     "runtime_spec_explicit",
@@ -44,6 +46,19 @@ COMPLETION_GATES = (
     "guide_ready_valid",
     "orchestrated_environment_verified",
 )
+
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def load_planned_ids(build_plan: Path) -> list[str]:
+    """Load the canonical planned queue from a build-plan JSON file."""
+    if not build_plan.is_file():
+        return []
+    plan = json.loads(build_plan.read_text())
+    return [
+        item["cve_id"] if isinstance(item, dict) else str(item)
+        for item in plan.get("planned", [])
+    ]
 
 
 def _is_relative_artifact_path(value: Any) -> bool:
@@ -102,10 +117,34 @@ def _runtime_build_reproducible(
     if any(not runtime_build.get(key) for key in required_values):
         return False
     required_paths = ("context", "dockerfile", "install_script")
-    if any(not (atom_dir / runtime_build[key]).exists() for key in required_paths):
+    for key in required_paths:
+        value = runtime_build[key]
+        if not _is_relative_artifact_path(value):
+            return False
+        path = atom_dir / value
+        if not path.exists() or (key != "context" and not path.is_file()):
+            return False
+    generated_hash = str(runtime_build["generated_hash"])
+    if not _SHA256_RE.fullmatch(generated_hash):
         return False
     source_dockerfile = runtime_build.get("source_dockerfile")
-    return not source_dockerfile or (atom_dir / source_dockerfile).is_file()
+    if source_dockerfile and (
+        not _is_relative_artifact_path(source_dockerfile)
+        or not (atom_dir / source_dockerfile).is_file()
+    ):
+        return False
+
+    # New runtime builders persist the exact input hash in this manifest. If
+    # the manifest exists, a copied or hand-edited build must not qualify.
+    manifest_path = atom_dir / "runtime" / "manifest.yaml"
+    if manifest_path.is_file():
+        try:
+            manifest = yaml.safe_load(manifest_path.read_text()) or {}
+        except (OSError, yaml.YAMLError):
+            return False
+        if manifest.get("generated_hash") != generated_hash:
+            return False
+    return True
 
 
 def _completion_checks(
@@ -124,6 +163,11 @@ def _completion_checks(
         "schema_v3": atom.version >= 3,
         "source_bundle_complete": bool(
             checks.get("source_bundle", {}).get("ok")
+        ),
+        "source_bundle_material_metadata_complete": bool(
+            checks.get("source_bundle", {})
+            .get("material_metadata", {})
+            .get("ok")
         ),
         "source_bundle_hashed": _source_bundle_hashed(raw),
         "self_contained_paths": _self_contained_paths(raw),
@@ -177,7 +221,9 @@ def _building_row(atom_dir: Path) -> dict[str, Any]:
     checks = _completion_checks(raw, atom, atom_dir)
     blockers = [name for name in COMPLETION_GATES if not checks[name]]
     return {
-        "cve_id": atom.cve_id,
+        # Directory identity is canonical. A YAML ID mismatch is a build
+        # blocker instead of silently re-keying or overwriting another row.
+        "cve_id": atom_dir.name,
         "build_status": "completed" if not blockers else "building",
         "version": atom.version,
         "service_role": atom.service_role.value,
@@ -185,31 +231,108 @@ def _building_row(atom_dir: Path) -> dict[str, Any]:
         "primary_mitre_phase": atom.primary_mitre_phase.value,
         "completion_checks": checks,
         "blockers": blockers,
+        **(
+            {"declared_cve_id": atom.cve_id, "build_status": "building",
+             "blockers": [*blockers, "atom_directory_id_mismatch"]}
+            if atom.cve_id != atom_dir.name else {}
+        ),
     }
+
+
+def build_lifecycle_index(
+    atoms_dir: Path,
+    *,
+    planned_ids: Iterable[str] = (),
+    build_attempts: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Build the canonical live lifecycle index from Atom and plan evidence."""
+    rows: dict[str, dict[str, Any]] = {}
+    attempts = dict(build_attempts or {})
+    if atoms_dir.is_dir():
+        for path in sorted(atoms_dir.iterdir()):
+            if not path.is_dir():
+                continue
+            if (path / "atom.yaml").is_file():
+                row = _building_row(path)
+            elif path.name in attempts:
+                row = {
+                    "cve_id": path.name,
+                    "build_status": "building",
+                    "completion_checks": {
+                        name: False for name in COMPLETION_GATES
+                    },
+                    "blockers": ["atom_yaml_missing"],
+                    "build_attempt": dict(attempts[path.name]),
+                }
+            else:
+                # Local workspaces are not lifecycle evidence by themselves:
+                # they are ignored by Git and therefore invisible in clean CI.
+                continue
+            rows[row["cve_id"]] = row
+
+    for cve_id, attempt in sorted(attempts.items()):
+        if cve_id in rows:
+            continue
+        rows[cve_id] = {
+            "cve_id": cve_id,
+            "build_status": "building",
+            "completion_checks": {
+                name: False for name in COMPLETION_GATES
+            },
+            "blockers": ["atom_yaml_missing"],
+            "build_attempt": dict(attempt),
+        }
+
+    for cve_id in sorted(set(planned_ids) - rows.keys()):
+        rows[cve_id] = {
+            "cve_id": cve_id,
+            "build_status": "planned",
+            "completion_checks": {},
+            "blockers": ["atom_not_started"],
+        }
+    return dict(sorted(rows.items()))
+
+
+def snapshot_semantic_identity(snapshot: dict[str, Any]) -> str:
+    """Return the schema-v2 identity independent of generation time."""
+    payload = {
+        "definitions": snapshot.get("definitions"),
+        "completion_gates": snapshot.get("completion_gates"),
+        "atoms": snapshot.get("atoms"),
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()
+    ).hexdigest()
+
+
+def compare_snapshots(
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+) -> list[str]:
+    """Compare two snapshots by semantic identity, not ``generated_at``."""
+    errors = []
+    actual_identity = snapshot_semantic_identity(actual)
+    if actual.get("snapshot_hash") != actual_identity:
+        errors.append("stored JSON snapshot_hash does not match its content")
+    if snapshot_semantic_identity(expected) != actual_identity:
+        errors.append("stored Atom lifecycle snapshot is stale")
+    return errors
 
 
 def build_snapshot(
     atoms_dir: Path,
     *,
     planned_ids: Iterable[str] = (),
+    build_attempts: Mapping[str, Mapping[str, Any]] | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
-    rows = [
-        _building_row(path)
-        for path in sorted(atoms_dir.iterdir())
-        if path.is_dir() and (path / "atom.yaml").is_file()
-    ]
-    existing = {row["cve_id"] for row in rows}
-    rows.extend(
-        {
-            "cve_id": cve_id,
-            "build_status": "planned",
-            "completion_checks": {},
-            "blockers": ["atom_not_started"],
-        }
-        for cve_id in sorted(set(planned_ids) - existing)
+    rows = list(
+        build_lifecycle_index(
+            atoms_dir,
+            planned_ids=planned_ids,
+            build_attempts=build_attempts,
+        ).values()
     )
-    rows.sort(key=lambda row: row["cve_id"])
 
     summary = {"total": len(rows)}
     summary.update(
@@ -218,23 +341,16 @@ def build_snapshot(
             for status in DEFINITIONS
         }
     )
-    digest_payload = {
-        "definitions": DEFINITIONS,
-        "completion_gates": COMPLETION_GATES,
-        "atoms": rows,
-    }
-    snapshot_hash = hashlib.sha256(
-        json.dumps(digest_payload, sort_keys=True, ensure_ascii=False).encode()
-    ).hexdigest()
-    return {
+    snapshot = {
         "schema_version": 2,
         "generated_at": generated_at or datetime.now(timezone.utc).isoformat(),
-        "snapshot_hash": snapshot_hash,
         "definitions": DEFINITIONS,
         "completion_gates": list(COMPLETION_GATES),
         "summary": summary,
         "atoms": rows,
     }
+    snapshot["snapshot_hash"] = snapshot_semantic_identity(snapshot)
+    return snapshot
 
 
 def render_csv(snapshot: dict[str, Any]) -> str:
@@ -310,3 +426,36 @@ def write_snapshot(snapshot: dict[str, Any], output_prefix: Path) -> None:
     )
     output_prefix.with_suffix(".csv").write_text(render_csv(snapshot))
     output_prefix.with_suffix(".md").write_text(render_markdown(snapshot))
+
+
+def check_snapshot_files(
+    live_snapshot: dict[str, Any],
+    output_prefix: Path,
+) -> list[str]:
+    """Validate stored JSON/CSV/Markdown views without writing to disk."""
+    paths = {
+        "JSON": output_prefix.with_suffix(".json"),
+        "CSV": output_prefix.with_suffix(".csv"),
+        "Markdown": output_prefix.with_suffix(".md"),
+    }
+    errors = [f"missing {name} snapshot: {path}" for name, path in paths.items()
+              if not path.is_file()]
+    if errors:
+        return errors
+
+    try:
+        stored = json.loads(paths["JSON"].read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"invalid JSON snapshot: {exc}"]
+
+    errors.extend(compare_snapshots(live_snapshot, stored))
+    try:
+        if paths["CSV"].read_text() != render_csv(stored):
+            errors.append("stored CSV snapshot is stale or has a different identity")
+        if paths["Markdown"].read_text() != render_markdown(stored):
+            errors.append(
+                "stored Markdown snapshot is stale or has a different identity"
+            )
+    except (KeyError, TypeError, OSError) as exc:
+        errors.append(f"stored snapshot views are invalid: {exc}")
+    return errors

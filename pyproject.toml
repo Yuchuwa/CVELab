@@ -12,6 +12,7 @@ dependencies = [
     "requests>=2.31.0",
     "click>=8.0.0",
     "claude-agent-sdk>=0.2.87",
+    "openai>=1.0.0",
     "pandas>=2.3.3",
     "pyarrow>=24.0.0",
 ]
@@ -22,6 +23,14 @@ dev = [
     "pytest-cov>=4.1.0",
     "black>=24.0.0",
     "ruff>=0.1.0",
+]
+sft = [
+    "accelerate>=1.0.0",
+    "datasets>=3.0.0",
+    "peft>=0.13.0",
+    "torch>=2.5.0",
+    "transformers>=4.46.0",
+    "trl>=1.0.0",
 ]
 
 [project.scripts]

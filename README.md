@@ -36,6 +36,7 @@ compatibility code and are not the starting point for new work.
 - [File and Python interfaces](docs/INTERFACES.md)
 - [Current project status](docs/CURRENT_STATUS.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Fresh-clone operations runbook](docs/OPERATIONS.md)
 - [Contribution guide](CONTRIBUTING.md)
 - [Data and publication policy](docs/DATA_POLICY.md)
 - [Historical progress ledger](docs/WORK_PROGRESS_REPORT.md)
@@ -58,11 +59,16 @@ Pydantic models and current code
 - `uv`
 
 ```bash
-uv sync --group dev
-cd docker && bash build.sh
+uv sync --locked --group dev
 ```
 
-Create a local `.env` for Agent runs. Never commit it.
+The Agent container is optional for core tests and is built only on a Docker host:
+
+```bash
+(cd docker && bash build.sh)
+```
+
+Create a local `.env` or export variables for Agent runs. Never commit it.
 
 ```bash
 LLM_API_KEY=your-key
@@ -75,23 +81,23 @@ LLM_MODEL=your-model
 Build or inspect Atoms:
 
 ```bash
-cvelab atom run data/vulhub/bash/CVE-2014-6271
-cvelab atom list
+uv run cvelab atom run data/vulhub/bash/CVE-2014-6271
+uv run cvelab atom list
 ```
 
 Generate a scenario without deployment:
 
 ```bash
-cvelab generate enterprise_3tier \
-  --cve CVE-2012-1823,CVE-2021-42013,CVE-2014-3120 \
+uv run cvelab generate enterprise_3tier \
+  --cve CVE-2012-1823,CVE-2021-42013,CVE-2019-9193 \
   --name enterprise-demo
 ```
 
 Run deterministic environment verification without an Agent:
 
 ```bash
-cvelab verify enterprise_3tier \
-  --cve CVE-2012-1823,CVE-2021-42013,CVE-2014-3120 \
+uv run cvelab verify enterprise_3tier \
+  --cve CVE-2012-1823,CVE-2021-42013,CVE-2019-9193 \
   --name enterprise-env \
   --environment-only
 ```
@@ -99,14 +105,18 @@ cvelab verify enterprise_3tier \
 Run focused tests before changing a subsystem:
 
 ```bash
-pytest -q --no-cov tests/shared
-pytest -q --no-cov tests/atomizer
-pytest -q --no-cov tests/orchestrator
+uv run python scripts/generate_atom_pool_status.py --check
+uv run python scripts/tests/check_status_contracts.py
+uv run python scripts/tests/check_docs_contracts.py
+uv run pytest -q --no-cov tests/shared tests/atomizer
+uv run pytest -q --no-cov tests/orchestrator
 ```
 
-The batch experiment runner has more controls than the installed CLI. See
-[`docs/INTERFACES.md`](docs/INTERFACES.md) before using
-`scripts/verify_enterprise3_guided_batch.py`.
+The installed CLI exposes `atom`, `batch`, `generate`, `sysfield` and `verify`.
+There is no `cvelab scenario` or `cvelab catalog` command. The batch experiment
+runner has more controls than the installed CLI; invoke it as
+`uv run python scripts/verify_enterprise3_guided_batch.py` and see
+[`docs/INTERFACES.md`](docs/INTERFACES.md) first.
 
 ## Result Semantics
 

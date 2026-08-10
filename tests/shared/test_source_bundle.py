@@ -10,6 +10,7 @@ Covers:
   - material_metadata roles/visibilities are recorded
 """
 from pathlib import Path
+import hashlib
 
 import yaml
 
@@ -17,10 +18,13 @@ from clab_builder.shared.source_bundle import (
     capture_source_bundle,
     scan_source_bundle,
     classify_material,
+    verify_material_hash,
 )
 from clab_builder.shared.models.atom import (
     MaterialRole,
     MaterialVisibility,
+    MaterialMetadata,
+    SourceBundle,
 )
 
 
@@ -47,6 +51,7 @@ def _write_cve_factory_src(src: Path):
     (src / "task.yaml").write_text("cve_id: CVE-X\ncategory: web\n")
     (src / "run-tests.sh").write_text("pytest tests/\n")
     (src / "solution.sh").write_text("#!/bin/sh\n# full writeup")
+    (src / "ANALYZER_SUMMARY.txt").write_text("private analysis\n")
     (src / "tests").mkdir()
     (src / "tests" / "test_vuln.py").write_text("def test_vuln(): assert False\n")
     (src / "tests" / "test_func.py").write_text("def test_func(): assert True\n")
@@ -99,6 +104,8 @@ def test_capture_cve_factory_source_test_vuln_is_assisted(tmp_path):
     # solution.sh is a full writeup, private
     assert md["source_bundle/solution.sh"].role == MaterialRole.SOLUTION
     assert md["source_bundle/solution.sh"].visibility == MaterialVisibility.PRIVATE
+    assert md["source_bundle/ANALYZER_SUMMARY.txt"].role == MaterialRole.VERIFICATION
+    assert md["source_bundle/ANALYZER_SUMMARY.txt"].visibility == MaterialVisibility.PRIVATE
     # task.yaml / run-tests.sh are verification scaffolding
     assert md["source_bundle/task.yaml"].role == MaterialRole.VERIFICATION
     # test_vuln.py IS a poc_material (so Range can mount it under assisted profile)
@@ -166,3 +173,88 @@ def test_classify_material_explicit():
     assert classify_material("x/test_vuln.py", "test_vuln.py", "vulhub") == (
         MaterialRole.EXPLOIT_MATERIAL, MaterialVisibility.ALWAYS,
     )
+
+
+def test_select_agent_materials_applies_visibility_and_profile_restrictions():
+    from clab_builder.shared.source_bundle import select_agent_materials
+
+    bundle = SourceBundle(
+        poc_materials=[
+            "source_bundle/private.txt",
+            "source_bundle/assisted.py",
+            "source_bundle/always.key",
+            "source_bundle/legacy.key",
+        ],
+        material_metadata={
+            "source_bundle/private.txt": MaterialMetadata(
+                visibility=MaterialVisibility.PRIVATE
+            ),
+            "source_bundle/assisted.py": MaterialMetadata(
+                visibility=MaterialVisibility.ASSISTED
+            ),
+            "source_bundle/always.key": MaterialMetadata(
+                visibility=MaterialVisibility.ALWAYS
+            ),
+        },
+    )
+
+    assert select_agent_materials(bundle, "guided") == [
+        "source_bundle/assisted.py",
+        "source_bundle/always.key",
+        "source_bundle/legacy.key",
+    ]
+    assert select_agent_materials(bundle, "no_guide") == [
+        "source_bundle/assisted.py",
+        "source_bundle/always.key",
+        "source_bundle/legacy.key",
+    ]
+    assert select_agent_materials(bundle, "l0") == []
+    assert select_agent_materials(bundle, "l1") == []
+    assert select_agent_materials(bundle, "l2") == [
+        "source_bundle/always.key",
+        "source_bundle/legacy.key",
+    ]
+    assert select_agent_materials(bundle, "no_hint") == [
+        "source_bundle/always.key",
+        "source_bundle/legacy.key",
+    ]
+
+
+def test_verify_material_hash_detects_source_bundle_drift(tmp_path):
+    atom_dir = tmp_path / "CVE-HASH"
+    material = atom_dir / "source_bundle" / "poc.py"
+    material.parent.mkdir(parents=True)
+    material.write_text("print('ok')\n")
+    bundle = SourceBundle(
+        poc_materials=["source_bundle/poc.py"],
+        hashes={
+            "source_bundle/poc.py": hashlib.sha256(material.read_bytes()).hexdigest()
+        },
+    )
+
+    assert verify_material_hash(bundle, atom_dir, "source_bundle/poc.py") is True
+    material.write_text("print('changed')\n")
+    assert verify_material_hash(bundle, atom_dir, "source_bundle/poc.py") is False
+
+
+def test_v3_selector_fails_closed_for_unannotated_materials():
+    from clab_builder.shared.source_bundle import select_agent_materials
+
+    assert select_agent_materials({
+        "version": 3,
+        "source_bundle": {"poc_materials": ["source_bundle/solution.sh"]},
+    }, "guided") == []
+
+
+def test_missing_material_metadata_reports_declared_materials():
+    from clab_builder.shared.source_bundle import missing_material_metadata
+
+    assert missing_material_metadata({
+        "version": 3,
+        "source_bundle": {
+            "poc_materials": ["source_bundle/poc.py", "source_bundle/id_rsa"],
+            "material_metadata": {
+                "source_bundle/poc.py": {"visibility": "always"},
+            },
+        },
+    }) == ["source_bundle/id_rsa"]

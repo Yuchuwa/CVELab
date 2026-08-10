@@ -14,7 +14,10 @@ from clab_builder.orchestrator.composer.scenario_assembler import ScenarioAssemb
 from clab_builder.orchestrator.composer.sysfield_exporter import SysFieldExporter
 from clab_builder.atomizer.output.sysfield_playbook import SysFieldPlaybookGenerator
 from clab_builder.shared.models.atom import CapabilityType
-from clab_builder.shared.models.artifact_contracts import ScenarioManifestV1
+from clab_builder.shared.models.artifact_contracts import (
+    ScenarioManifestV1,
+    normalize_agent_context,
+)
 from clab_builder.shared.models.exploit_guide import ExploitGuide, validate_exploit_guide
 from clab_builder.core.paper_workflow import DependencyPlanner, Generator, IncompatibilityStore
 
@@ -28,12 +31,18 @@ class ScenarioPipeline:
         atoms_dir: str = "data/atoms",
         default_validation_mode: str = "guided_agent",
         incompatibility_path: str | None = None,
+        atom_admission_mode: str = "completed",
     ):
         if default_validation_mode not in {"guided_agent", "sysfield"}:
             raise ValueError("default_validation_mode must be guided_agent or sysfield")
+        if atom_admission_mode not in {"completed", "legacy_verified"}:
+            raise ValueError(
+                "atom_admission_mode must be completed or legacy_verified"
+            )
         self.templates_dir = templates_dir
         self.atoms_dir = atoms_dir
         self.default_validation_mode = default_validation_mode
+        self.atom_admission_mode = atom_admission_mode
         self.incompatibility_store = (
             IncompatibilityStore(incompatibility_path)
             if incompatibility_path else None
@@ -79,25 +88,36 @@ class ScenarioPipeline:
             raise ValueError("validation_mode must be guided_agent or sysfield")
         if composition_mode not in {"legacy", "paper"}:
             raise ValueError("composition_mode must be legacy or paper")
+        agent_context = normalize_agent_context(agent_context)
 
         template = self.template_loader.load(template_name)
         if composition_mode == "paper":
             template_errors = Generator.validate(template)
             if template_errors:
                 raise ValueError("Template rejected by Generator gate: " + "; ".join(template_errors))
-        verified_atoms = self.atom_loader.load_all_verified(single_service_only=True)
+        if cve_ids:
+            # Fail explicit production requests with the Atom's canonical
+            # lifecycle and blockers before considering automatic candidates.
+            for cve_id in cve_ids:
+                self._load_admitted_atom(cve_id)
+        completed_atoms = self._load_admitted_atoms(single_service_only=True)
         all_atoms = [
-            atom for atom in verified_atoms
+            atom for atom in completed_atoms
             if self._range_usable_atom(atom, validation_mode=validation_mode)
         ]
 
         if not all_atoms:
-            if validation_mode == "guided_agent" and verified_atoms:
+            admission = (
+                "completed"
+                if self.atom_admission_mode == "completed"
+                else "legacy verified"
+            )
+            if validation_mode == "guided_agent" and completed_atoms:
                 raise ValueError(
-                    "No verified single-service atoms with ready exploit guides; "
+                    f"No {admission} single-service atoms with ready exploit guides; "
                     "backfill/review guides or use --validation-mode sysfield"
                 )
-            raise ValueError("No verified single-service atoms available")
+            raise ValueError(f"No {admission} single-service atoms available")
 
         # Determine atoms for each injection point
         selected_atoms = []
@@ -124,7 +144,10 @@ class ScenarioPipeline:
             if not candidates:
                 raise ValueError("No dependency-compatible attack-chain candidate")
             chosen = candidates[0]
-            selected_atoms = [self.atom_loader.load(chosen.bindings[slot.id]) for slot in template.injection_points]
+            selected_atoms = [
+                self._load_admitted_atom(chosen.bindings[slot.id])
+                for slot in template.injection_points
+            ]
             used_cves = [atom.cve_id for atom in selected_atoms]
             for slot, atom in zip(template.injection_points, selected_atoms):
                 resolved_upstream[slot.id] = atom
@@ -164,9 +187,7 @@ class ScenarioPipeline:
             if cve_ids and len(cve_ids) > len(selected_atoms):
                 # User specified CVEs — load directly
                 cve_id = cve_ids[len(selected_atoms)]
-                atom = self.atom_loader.load(cve_id)
-                if not atom.verified:
-                    raise ValueError(f"Atom {cve_id} is not verified")
+                atom = self._load_admitted_atom(cve_id)
                 if cve_id in used_cves:
                     raise ValueError(f"Atom {cve_id} is used more than once in the scenario")
                 # Narrow authoritative gate mirroring _range_usable_atom: only
@@ -305,6 +326,31 @@ class ScenarioPipeline:
         )
 
         return scenario
+
+    def _load_admitted_atom(self, cve_id: str):
+        """Load one production Atom or use explicitly requested compatibility."""
+        if self.atom_admission_mode == "completed":
+            atom = self.atom_loader.load_completed(cve_id)
+        else:
+            atom = self.atom_loader.load(cve_id)
+            if not atom.verified:
+                raise ValueError(f"Legacy Atom {cve_id} is not verified")
+        if len(atom.services) > 1:
+            raise ValueError(
+                f"Atom {cve_id} declares {len(atom.services)} services; "
+                "the single-service Range slot contract does not support it"
+            )
+        return atom
+
+    def _load_admitted_atoms(self, *, single_service_only: bool):
+        """Load the configured admission pool; completed is the default."""
+        if self.atom_admission_mode == "completed":
+            return self.atom_loader.load_all_completed(
+                single_service_only=single_service_only
+            )
+        return self.atom_loader.load_all_verified(
+            single_service_only=single_service_only
+        )
 
     def _guide_static_compatibility(self, template, atoms: list) -> dict:
         """Report Guide contracts that can be checked before deployment.
@@ -471,16 +517,10 @@ class ScenarioPipeline:
         return diagnostics
 
     def _range_usable_atom(self, atom, *, validation_mode: str = "guided_agent") -> bool:
-        """Filter verified atoms by the selected Range validation contract.
+        """Filter completed atoms by the selected Range validation contract.
 
-        Layered on top of the existing guide/sysfield check is a narrow
-        authoritative gate: refuse only atoms whose guide integrity failed
-        or whose environment_ready is explicitly False. A missing source
-        bundle or an empty required_service is a fixable data gap (the code
-        paths in batches 2-3 already resolve it for fresh builds) and is
-        allowed through so the existing Range-test anchors and the 134
-        legacy atoms without bundles are not swept out by a code-only
-        change. Those become candidate once they are rebuilt.
+        Lifecycle completion is authoritative. This method retains the
+        validation-artifact checks specific to the requested Range mode.
         """
         if validation_mode == "guided_agent":
             if self._load_atom_guide(atom.cve_id) is None:
@@ -494,10 +534,8 @@ class ScenarioPipeline:
             except (OSError, ValueError):
                 return False
 
-        # Narrow authoritative gate: only block the hard failures that the
-        # guide loader already enforces (it returns None for integrity
-        # failures) plus an explicitly failed environment check. Everything
-        # else stays admissible until the legacy pool is rebuilt.
+        # These checks are redundant with completion for guided mode but keep
+        # this helper safe when called independently by diagnostics.
         from clab_builder.shared.atom_qualification import qualify_atom
         atom_dir = Path(self.atoms_dir) / atom.cve_id
         qr = qualify_atom(atom, atom_dir)

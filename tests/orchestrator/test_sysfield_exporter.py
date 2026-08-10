@@ -1,6 +1,7 @@
 """Tests for SysField playbook export."""
 
 import json
+import hashlib
 from pathlib import Path
 
 import yaml
@@ -171,6 +172,51 @@ def test_export_does_not_require_non_executed_source_bundle_materials(tmp_path):
     out = SysFieldExporter(atoms_dir=str(atoms_dir)).export(str(scenario_dir))
 
     assert Path(out).is_file()
+
+
+def test_export_selector_skips_private_materials(tmp_path):
+    atoms_dir = tmp_path / "atoms"
+    scenario_dir = tmp_path / "scenario"
+    cve_id = "CVE-MATERIAL-0001"
+    _write_atom(atoms_dir, cve_id)
+    atom_dir = atoms_dir / cve_id
+    atom_data = yaml.safe_load((atom_dir / "atom.yaml").read_text())
+    atom_data["source_bundle"] = {
+        "poc_materials": [
+            "source_bundle/poc.sh",
+            "source_bundle/solution.sh",
+        ],
+        "material_metadata": {
+            "source_bundle/poc.sh": {"visibility": "always"},
+            "source_bundle/solution.sh": {"visibility": "private"},
+        },
+        "hashes": {
+            "source_bundle/poc.sh": hashlib.sha256(b"#!/bin/sh\n").hexdigest(),
+        },
+    }
+    (atom_dir / "atom.yaml").write_text(yaml.safe_dump(atom_data, sort_keys=False))
+    (atom_dir / "source_bundle").mkdir()
+    (atom_dir / "source_bundle" / "poc.sh").write_text("#!/bin/sh\n")
+    # The private solution is intentionally absent. A selector-aware exporter
+    # must not consume or require it.
+    playbook = atom_dir / "playbook" / "sysfield.yaml"
+    playbook.write_text(yaml.safe_dump({
+        "playbook": {"id": cve_id.lower()},
+        "steps": [{
+            "id": "run-poc",
+            "executor": {"command": "sh {{ poc_path }}"},
+        }],
+    }, sort_keys=False))
+    _write_scenario(scenario_dir, cve_id)
+    scenario = yaml.safe_load((scenario_dir / "ground_truth.json").read_text())
+    scenario["attack_path"][0]["material_staging"] = True
+    (scenario_dir / "ground_truth.json").write_text(json.dumps(scenario))
+
+    out = SysFieldExporter(atoms_dir=str(atoms_dir)).export(str(scenario_dir))
+
+    rendered = Path(out).read_text()
+    assert "CVE-MATERIAL-0001__poc.sh" in rendered
+    assert "solution.sh" not in rendered
 
 
 def test_export_runs_later_steps_from_previous_target_node(tmp_path):

@@ -29,6 +29,12 @@ from clab_builder.orchestrator.composer.scenario import ScenarioPipeline
 from clab_builder.orchestrator.composer.scenario_assembler import (
     _runtime_image_selection,
 )
+from clab_builder.shared.atom_pool_status import (
+    build_snapshot,
+    compare_snapshots,
+    load_planned_ids,
+)
+from clab_builder.shared.atom_build_ledger import latest_attempts
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,6 +46,16 @@ def parse_args() -> argparse.Namespace:
         "--atom-status",
         default="data/atom_pool_status.json",
         help="Atom build-status v2 snapshot; only completed Atoms enter selection.",
+    )
+    parser.add_argument(
+        "--build-plan",
+        default="data/atom_build_plan.json",
+        help="Current Atom build plan used to validate snapshot freshness.",
+    )
+    parser.add_argument(
+        "--build-attempts",
+        default=None,
+        help="Tracked Atom build-attempt ledger.",
     )
     parser.add_argument(
         "--output",
@@ -155,7 +171,11 @@ def runtime_ready_for_batch(atom) -> bool:
     return _runtime_image_selection(atom)["selection"] == "runtime_image"
 
 
-def load_completed_atom_status(path: Path) -> tuple[set[str], dict]:
+def load_completed_atom_status(
+    path: Path,
+    *,
+    live_snapshot: dict | None = None,
+) -> tuple[set[str], dict]:
     status = json.loads(path.read_text())
     if status.get("schema_version") != 2:
         raise ValueError("Range matrix requires Atom build-status schema_version 2")
@@ -171,6 +191,10 @@ def load_completed_atom_status(path: Path) -> tuple[set[str], dict]:
     )
     if unknown:
         raise ValueError(f"unknown Atom build status: {', '.join(unknown)}")
+    if live_snapshot is not None:
+        errors = compare_snapshots(live_snapshot, status)
+        if errors:
+            raise ValueError("stale Atom build-status snapshot: " + "; ".join(errors))
     completed = {
         str(row["cve_id"])
         for row in rows
@@ -195,8 +219,28 @@ def load_completed_atom_status(path: Path) -> tuple[set[str], dict]:
 
 
 def build_manifest(args: argparse.Namespace) -> dict:
+    atoms_path = Path(args.atoms_dir)
+    if not atoms_path.is_absolute():
+        atoms_path = ROOT / atoms_path
+    build_plan_path = Path(
+        getattr(args, "build_plan", "data/atom_build_plan.json")
+    )
+    if not build_plan_path.is_absolute():
+        build_plan_path = ROOT / build_plan_path
+    build_attempts_path = Path(
+        getattr(args, "build_attempts", None)
+        or (atoms_path.parent / "atom_build_attempts.json")
+    )
+    if not build_attempts_path.is_absolute():
+        build_attempts_path = ROOT / build_attempts_path
+    live_snapshot = build_snapshot(
+        atoms_path,
+        planned_ids=load_planned_ids(build_plan_path),
+        build_attempts=latest_attempts(build_attempts_path),
+    )
     completed_ids, atom_status = load_completed_atom_status(
-        ROOT / args.atom_status
+        ROOT / args.atom_status,
+        live_snapshot=live_snapshot,
     )
     pipeline = ScenarioPipeline(
         templates_dir=args.templates_dir,
@@ -206,7 +250,7 @@ def build_manifest(args: argparse.Namespace) -> dict:
     template = pipeline.template_loader.load(args.template)
     completed_atoms = [
         atom
-        for atom in pipeline.atom_loader.load_all_verified(single_service_only=False)
+        for atom in pipeline.atom_loader.load_all_completed(single_service_only=False)
         if atom.cve_id in completed_ids
     ]
     range_input_rejections = list(atom_status.pop("rejections"))

@@ -28,21 +28,23 @@ outcome and failure class; do not invent another lifecycle state.
 1. `atom.yaml` parses as Atom v3 or newer.
 2. `source_bundle` contains an on-disk compose file or Dockerfile and every
    declared PoC material/hash is valid.
-3. Every declared bundle build/material file has a recorded valid hash.
-4. Bundle, Guide and runtime-build paths are relative and cannot escape the
+3. Every declared PoC material has explicit role/visibility metadata, and every
+   Guide-referenced material is visible under the guided profile.
+4. Every declared bundle build/material file has a recorded valid hash.
+5. Bundle, Guide and runtime-build paths are relative and cannot escape the
    Atom directory.
-5. `runtime_spec` is explicit rather than supplied by a compatibility default.
-6. `runtime_spec.runtime_status` is `ready`.
-7. Runtime context, Dockerfile and install script exist, and the build records
+6. `runtime_spec` is explicit rather than supplied by a compatibility default.
+7. `runtime_spec.runtime_status` is `ready`.
+8. Runtime context, Dockerfile and install script exist, and the build records
    its base-image digest and generated hash.
-8. `flag_spec` and `validation_spec` are explicit.
-9. `verified=true` and native verification records `success=true`.
-10. The network service contract is complete when the attack vector is network.
-11. At least one capability grant has verified evidence.
-12. The Exploit Guide exists, is marked `ready` and passes shared integrity
+9. `flag_spec` and `validation_spec` are explicit.
+10. `verified=true` and native verification records `success=true`.
+11. The network service contract is complete when the attack vector is network.
+12. At least one capability grant has verified evidence.
+13. The Exploit Guide exists, is marked `ready` and passes shared integrity
     validation.
-13. `verification.orchestrated_verification` records `success=true`, non-empty
-    evidence and a timestamp.
+14. `verification.orchestrated_verification` records `success=true`, non-empty
+   evidence and a timestamp.
 
 These are completion gates, not optional quality labels. A missing result is
 not treated as success.
