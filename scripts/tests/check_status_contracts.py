@@ -109,10 +109,17 @@ def _check_range_status(atom_snapshot: dict) -> None:
     if manifest_atom_status.get("snapshot_hash") != atom_snapshot.get("snapshot_hash"):
         raise AssertionError("Range matrix manifest has stale Atom provenance")
 
-    accepted = status.get("summary", {}).get("accepted_cases")
+    summary = status.get("summary", {})
+    accepted = summary.get("accepted_cases")
+    selected = summary.get("selected_cases")
     manifest_accepted = manifest.get("accepted_case_count")
     if manifest_accepted is not None and manifest_accepted != accepted:
         raise AssertionError("Range matrix accepted count differs between views")
+    manifest_cases = manifest.get("cases")
+    if not isinstance(manifest_cases, list):
+        raise AssertionError("Range matrix manifest has no cases list")
+    if selected != len(manifest_cases):
+        raise AssertionError("Range matrix selected count differs between views")
 
 
 def main() -> int:
