@@ -20,10 +20,10 @@ from clab_builder.shared.models.atom import PivotCapability
 
 
 def main() -> None:
-    atoms = AtomLoader(atoms_dir="data/atoms").load_all_verified(
-        single_service_only=True, high_confidence_only=False
+    atoms = AtomLoader(atoms_dir="data/atoms").load_all_completed(
+        single_service_only=True
     )
-    print(f"== 加载 atom: {len(atoms)} 个 (verified + single-service) ==\n")
+    print(f"== 加载 atom: {len(atoms)} 个 (completed + single-service) ==\n")
 
     # ── 1. pivot_capability 分布 (可达性维度, v2 核心缺口) ──
     print("== 1. pivot_capability 分布 (可达性维度) ==")

@@ -2,95 +2,91 @@
 
 Status: generated snapshot
 
-Snapshot date: 2026-07-30
+Snapshot date: 2026-08-10
 
-Scope: local working tree, not a clean public release
+Scope: local working tree and its tracked generated status artifacts, not a
+clean public release
 
-This dashboard reports established facts and their evidence. Counts describe
-the current local snapshot; the public GitHub branch can lag behind until a
-reviewed release includes the corresponding code and data.
+This dashboard is a generated current-state view. Counts below come from the
+live tracked status sources named in the evidence column. A matrix acceptance
+is a composition result; it is not an environment, Agent or objective success
+claim.
 
 ## Summary
 
 | Area | Current state | Evidence | Main limitation |
 |---|---|---|---|
-| Shared contracts | Atom, Guide, Template, Scenario v1 and Verification Result v1 models exist | `shared/models/` | Ground Truth, Agent I/O and batch contracts remain untyped |
-| Atom build | 239 tracked; 0 planned, 193 building, 46 completed | `data/atom_pool_status.json` | Most historical Atoms do not meet the strict completion contract |
-| Atom diversity | 175 RCE; 228 initial-access; 197 web-application | same snapshot | Weak privilege, credential, lateral, persistence and collection coverage |
-| Templates | Three templates; enterprise three-tier is the active research template | `templates/` | Complex template diversity is limited |
-| Matrix planning | Completed-only enterprise matrix records 1,800 accepted combinations using 28 selected Atoms from 39 Range inputs | `data/range_matrix_status.json` | Accepted does not mean freshly deployed |
-| Range environment | Multiple 50-case runs reached 50/50 deterministic environment gates | experiment summaries | Historical evidence is not a fresh guarantee for every current Atom |
-| Range build ledger | 2,345 unique Range definitions; latest state 574 succeeded, 35 failed, 1,736 incomplete | `data/range_build_status.json` | Historical attempts span different code and Atom snapshots |
-| Agent evaluation | 136 batches and 3,787 sanitized result records are indexed | `data/experiment_status.json` | Historical summaries did not persist model identity |
-| Decoys | Noise generation, readiness and interaction diagnostics work | template/tests/experiment summaries | No clean causal decoy estimate yet |
-| SFT | Conversion, adapters and evaluation paths exist | `sft/`, `data/sft/` | No reliable measured model improvement yet |
-| Public data | Code repository exists | Git remote and tracked files | Raw trajectories and latest research state are not publication-safe |
+| Shared contracts | Atom, Guide, Template, Scenario/Truth/Agent/Batch/Material envelopes and Verification Result are represented | `src/clab_builder/shared/models/`, `docs/INTERFACES.md` | Raw tool/session streams and historical extension fields remain outside the typed envelopes |
+| Atom lifecycle | **284 total: 0 planned, 238 building, 46 completed** | `data/atom_pool_status.json` | `completed` requires every strict Atom gate; building is not a verified release state |
+| Range matrix | **506 selected cases from 1,800 legal** enterprise three-tier compositions | `data/range_matrix_status.json` and its referenced manifest | Selection is no-deploy composition compatibility only; it does not claim deployment or Agent success |
+| Range experiments | Existing historical and local result ledgers remain separate from the current matrix snapshot | `data/range_build_status.json`, `data/experiment_status.json` | Results span different code, Atom and model snapshots; no new outcome is inferred here |
+| Agent evaluation | Agent runners and exposure-profile paths are operational interfaces | `src/clab_builder/orchestrator/composer/`, `scripts/verify_enterprise3_guided_batch.py` | Trial outcomes require an explicit run manifest and denominator |
+| SFT | Versioned corpus, split and run-lineage paths are present | `sft/`, `docs/INTERFACES.md` | No reliable model-improvement claim is made by this dashboard |
+| Public data | Code, reviewed contracts and selected status views are tracked | `docs/DATA_POLICY.md`, `.gitignore` | Raw sessions, flags, credentials, generated ranges and adapters remain private |
 
 ## Atom Snapshot
 
-The canonical generated build status contains:
+The live generated Atom status is:
 
-- 239 tracked entries.
-- 0 `planned`.
-- 193 `building`.
-- 46 `completed`.
+- `284` total entries;
+- `0` `planned`;
+- `238` `building`;
+- `46` `completed`.
 
-Atom has only these three lifecycle states. `completed` requires every strict
-gate in [`ATOM_BUILD_GUIDE.md`](ATOM_BUILD_GUIDE.md); missing evidence remains
-`building`. CSV and Markdown are views of the same JSON snapshot and carry the
-same timestamp and hash. Matrix membership is owned by Range and is not an Atom
-status. Distribution remains heavily skewed:
+Atom has exactly these three lifecycle states. `completed` requires every
+strict gate in [`ATOM_BUILD_GUIDE.md`](ATOM_BUILD_GUIDE.md), including source
+bundle, runtime, native, Guide and orchestrated-environment evidence. Matrix
+membership is owned by Range and is not an Atom lifecycle state.
 
-- 228 `initial_access`, 6 `execution`, 2 `credential_access`, 2 `discovery`
-  and 1 `privilege_escalation`.
-- 175 RCE, 23 LFI, 16 Auth Bypass, 8 Injection, 7 Info Leak,
-  5 Deserialization, 4 SSRF and 1 LPE.
-- 197 web applications, 22 middleware, 9 databases, 6 system services,
-  4 frameworks and 1 file service.
+The release-integrator freshness command is read-only:
 
-Older Atom-scale datasets and progress entries use different historical
-populations. Always name the population when reporting a count.
+```bash
+uv run python scripts/generate_atom_pool_status.py --check
+```
+
+It recomputes the live lifecycle index and checks the generated JSON, CSV and
+Markdown views for one semantic snapshot hash and timestamp.
 
 ## Range Snapshot
 
-The most mature pattern is:
+The current generated matrix source is:
 
 ```text
 dmz-web -> app-service -> data-store
 ```
 
-It supports network isolation, dependency/capability closure, private business
-objectives and PostgreSQL/Elasticsearch asset variants. Historical three-hop
-environment and Agent evidence exists, but environment validity, Agent success
-and objective success must be reported separately.
+`data/range_matrix_status.json` records `1,800` legal compositions and `506`
+coverage-first selected cases for `enterprise_3tier`, with Atom snapshot
+provenance. The referenced manifest is a no-deploy matrix and its selected
+cases have not thereby been deployed or sent to an Agent. Environment, graph,
+path, Agent and objective outcomes remain independent result fields in their
+own artifacts.
 
-Representative local artifacts include:
-
-- `data/range_matrices/enterprise_3tier_hetero.json`
-- `data/guide_ablation/guided_reconciled/summary.json`
-- `data/guide_ablation/l2_deepseek_v3/summary.json`
-- `data/guide_ablation/glm52_l2_none_50_rerun_20260728/summary.json`
-
-These are local research artifacts and are not automatically approved for
-publication.
-
-See [`RANGE_PROGRESS.md`](RANGE_PROGRESS.md) for stage-by-stage counts.
+See [`RANGE_PROGRESS.md`](RANGE_PROGRESS.md) for historical Range-stage
+evidence; do not substitute its older populations for this live matrix count.
 
 ## Current Risks
 
-1. The working tree contains many modified and untracked code/data artifacts.
-2. Current documentation and public Git history describe different snapshots.
-3. Raw experiments contain flags, internal IPs, credentials and attack commands.
-4. Tracked history contains credential-like strings in documentation, scripts,
-   tests and research artifacts; candidates must be reviewed and real
-   credentials rotated before public sharing.
-5. The active pipeline and legacy architecture coexist without package-level
-   enforcement.
-6. Ground Truth, Agent I/O and batch files still have untyped contracts.
-7. Three broad orchestration modules are likely merge-conflict hotspots.
+1. The working tree contains local Atom, Range, Agent and SFT changes that are
+   not automatically a public release.
+2. Raw tool/session streams, provider diagnostics and historical batch extension
+   fields still need separate migration/retention policy.
+3. Raw experiments can contain flags, internal addresses, credentials and
+   attack commands and must not enter normal CI.
+4. Docker, ContainerLab, external vulnerability checkouts and LLM endpoints
+   are prepared-host dependencies, not core CI assumptions.
+5. The active pipeline and legacy architecture coexist; new work follows the
+   active paths named in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-## Status Update Rule
+## Status Source Rule
 
-Update this file only when a current fact changes. Record the underlying run or
-decision separately in `WORK_PROGRESS_REPORT.md`. Never paste long experiment
-logs into this dashboard.
+The release integrator regenerates/checks upstream status before downstream
+views in this order:
+
+```text
+Atom lifecycle -> Range matrix -> Range/Agent status -> SFT lineage -> this dashboard
+```
+
+Never hand-edit generated data to make a count or gate pass. Record the source
+snapshot, denominator, command and limitation in the append-only progress
+ledger when the project process permits a ledger update.

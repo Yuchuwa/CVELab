@@ -2,7 +2,7 @@
 
 Status: active
 
-Last reviewed: 2026-07-30
+Last reviewed: 2026-08-09
 
 This page is the entry point for current CVELab documentation. Documents not
 listed as active below may describe an earlier architecture, a completed task,
@@ -22,6 +22,8 @@ or a historical experiment.
 | What is the current Range progress? | [`RANGE_PROGRESS.md`](RANGE_PROGRESS.md) |
 | How are model/Agent experiments maintained? | [`EXPERIMENT_PROGRESS.md`](EXPERIMENT_PROGRESS.md) |
 | What should be done next? | [`ROADMAP.md`](ROADMAP.md) |
+| How are the collaboration gaps being repaired? | [`COLLABORATION_ALIGNMENT_REPAIR_PLAN.md`](COLLABORATION_ALIGNMENT_REPAIR_PLAN.md) |
+| How do I run a clean clone and hand off artifacts? | [`OPERATIONS.md`](OPERATIONS.md) |
 | How should changes be developed and reviewed? | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | What data can be committed or published? | [`DATA_POLICY.md`](DATA_POLICY.md) |
 
@@ -32,9 +34,11 @@ or a historical experiment.
 - [`ATOM_RUNTIME_TO_RANGE_HANDOFF.md`](ATOM_RUNTIME_TO_RANGE_HANDOFF.md): runtime and source-bundle handoff.
 - [`AGENT_INPUT_LEVEL_INTERFACE.md`](AGENT_INPUT_LEVEL_INTERFACE.md): Guided and L0/L1/L2 information exposure.
 - [`INTERFACES.md`](INTERFACES.md): current contract registry and compatibility rules.
+- [`OPERATIONS.md`](OPERATIONS.md): fresh-clone commands, external dependencies and handoffs.
 - [`ATOM_BUILD_GUIDE.md`](ATOM_BUILD_GUIDE.md): three-state Atom lifecycle and strict completion gates.
 - [`RANGE_BUILD_GUIDE.md`](RANGE_BUILD_GUIDE.md): Range-owned matrix selection and validation gates.
 - [`EXPERIMENT_PROGRESS.md`](EXPERIMENT_PROGRESS.md): experiment code, dimensions, ownership and progress.
+- [`COLLABORATION_ALIGNMENT_REPAIR_PLAN.md`](COLLABORATION_ALIGNMENT_REPAIR_PLAN.md): ordered cross-workstream repair plan and acceptance gates.
 
 The Pydantic models and contract tests remain authoritative over prose.
 

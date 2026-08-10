@@ -72,7 +72,7 @@ def test_resolve_from_app_url_default(tmp_path):
         "BASE_URL = os.environ.get('APP_URL', 'http://localhost:3000')\n"
     )
     env = _env()
-    assert resolve_service_contract(env, tmp_path) == ("tcp", 3000)
+    assert resolve_service_contract(env, tmp_path) == ("http", 3000)
 
 
 def test_resolve_none_when_nothing_detectable(tmp_path):
@@ -89,6 +89,7 @@ def test_compose_ports_beat_dockerfile(tmp_path):
 
 def test_protocol_for_port_known_and_unknown():
     assert protocol_for_port(80) == "http"
+    assert protocol_for_port(3000) == "http"
     assert protocol_for_port(5432) == "postgres"
     assert protocol_for_port(9999) == "tcp"
     assert protocol_for_port("notint") == "tcp"

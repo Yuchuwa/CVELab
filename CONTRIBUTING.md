@@ -8,6 +8,7 @@ Before editing code, read:
 - `docs/COLLABORATION_PLAYBOOK.md`
 - `docs/INTERFACES.md`
 - `docs/CURRENT_STATUS.md`
+- `docs/OPERATIONS.md`
 - the active contract linked for the subsystem
 
 Use active implementation paths. Do not add new functionality to `atomic/` or
@@ -37,18 +38,35 @@ an Agent success text override deterministic or private verification.
 
 ## Testing
 
-Run focused tests for the changed subsystem:
+Run the fast contract gate before a lane-specific test:
 
 ```bash
-pytest -q --no-cov tests/shared
-pytest -q --no-cov tests/atomizer
-pytest -q --no-cov tests/orchestrator
-pytest -q --no-cov tests/sft
+uv run python scripts/generate_atom_pool_status.py --check
+uv run python scripts/tests/check_status_contracts.py
+uv run python scripts/tests/check_docs_contracts.py
+uv run pytest -q --no-cov \
+  tests/shared/test_artifact_contracts.py \
+  tests/shared/test_atom_pool_status.py \
+  tests/orchestrator/test_guided_batch_runner.py
+```
+
+Run focused tests for the changed lane:
+
+```bash
+uv run pytest -q --no-cov tests/shared tests/atomizer -m "not docker and not slow"
+uv run pytest -q --no-cov tests/orchestrator -m "not docker and not slow"
+uv run pytest -q --no-cov tests/sft/test_convert_trajectories.py \
+  -k "not test_qwen_template_renders_tool_arguments_as_object"
 ```
 
 Run broader tests when a shared model, template, Agent input or result contract
 changes. Docker/ContainerLab tests should be reported separately from unit
 tests; do not claim they ran when the host prerequisites were unavailable.
+
+Core CI does not require `data/guide_ablation/`, raw session files,
+`data/sft/`, model adapters or an LLM endpoint. SFT contract tests use synthetic
+fixtures; training/evaluation dependencies are an optional prepared-host
+install (`uv sync --locked --group dev --extra sft`).
 
 Before a commit:
 
@@ -72,6 +90,23 @@ Prefer one reviewable purpose per commit:
 Do not commit the entire shared working tree to capture one task. Stage only the
 files intentionally reviewed for that commit.
 
+## Lane and Review Rules
+
+The four ownership lanes are Atom, Range, Agent and SFT. The lane that produces
+a contract owns its meaning; every consumer lane reviews a cross-boundary
+change. A rotating release integrator reviews CI, documentation, generated
+status, package policy and publication changes, and regenerates shared status
+views only after upstream freshness checks pass. The producer author is never
+the sole approval for a cross-lane contract change.
+
+Every pull request names:
+
+- primary lane and required reviewer;
+- affected contracts and versions, producer and consumers;
+- focused tests and exact status/freshness result;
+- privacy/publication impact and known limitations;
+- artifact handoff and next owner.
+
 ## Data Safety
 
 Follow `docs/DATA_POLICY.md`. In particular, do not commit `.env`, API keys, raw
@@ -93,3 +128,5 @@ source checkouts.
 - No CVE-specific workaround was added.
 - No secrets, flags, private Ground Truth or generated runtime state are staged.
 - Current status or roadmap was updated when the project state changed.
+- The release integrator or delegated reviewer confirms generated views are
+  fresh and CI does not depend on private raw Range/SFT data.

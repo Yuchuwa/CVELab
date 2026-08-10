@@ -55,6 +55,8 @@ try:
         classify_termination,
         audit_no_hint,
         _resolve_level,
+        normalize_agent_context,
+        _agent_result_defaults,
     )
 except ImportError:
     from clab_builder.orchestrator.composer.scenario_runner import (  # noqa: E402
@@ -66,6 +68,8 @@ except ImportError:
         classify_termination,
         audit_no_hint,
         _resolve_level,
+        normalize_agent_context,
+        _agent_result_defaults,
     )
 
 DEFAULT_MAX_TURNS = 500
@@ -668,7 +672,7 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
         input_data = json.load(f)
 
     prompt = build_prompt(input_data)
-    agent_context = str(input_data.get("agent_context", "guided"))
+    agent_context = normalize_agent_context(input_data.get("agent_context", "guided"))
     level = _resolve_level(agent_context)
     needs_hygiene = agent_context == "no_hint" or bool(level)
     system_prompt = NO_HINT_SYSTEM_PROMPT if needs_hygiene else SYSTEM_PROMPT
@@ -690,24 +694,15 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
         {"role": "user", "content": prompt},
     ]
 
-    result = {
-        "scenario_name": input_data.get("scenario_name", ""),
-        "agent_context": agent_context,
-        "success": False,
-        "verified_flags": {},
-        "objective_results": {},
-        "attack_log": [],
-        "evidence": [],
-        "failed_targets": [],
-        "observed_progress": {"flag_claims": [], "targets_with_claimed_flags": []},
-    }
-    result["prompt_hygiene"] = (
+    prompt_hygiene = (
         audit_no_hint(input_data, prompt)
         if needs_hygiene
         else {"profile": "not_applicable", "ok": True, "violations": []}
     )
+    result = _agent_result_defaults(input_data, prompt_hygiene)
+    result["observed_progress"] = {"flag_claims": [], "targets_with_claimed_flags": []}
     if needs_hygiene and not result["prompt_hygiene"]["ok"]:
-        result["evidence"].append("prompt hygiene audit failed")
+        result["agent_reported"]["evidence"].append("prompt hygiene audit failed")
         result["termination_reason"] = "prompt_hygiene"
         result["structured_result"] = False
         result["partial_result"] = False
@@ -824,31 +819,31 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
                 print(f"[ToolResult] {tool_result[:160]}", file=sys.stderr)
         else:
             termination_hint = f"Agent reached max-turns ({max_turns}) without a final report"
-            result["evidence"].append(termination_hint)
+            result["agent_reported"]["evidence"].append(termination_hint)
 
     except QuotaExhaustedError as exc:
         # Fatal: signal the coordinator to stop the whole batch.
         print(f"[Fatal] quota exhausted, signaling batch stop: {exc}", file=sys.stderr)
-        result["evidence"].append(f"API quota exhausted: {exc}")
+        result["agent_reported"]["evidence"].append(f"API quota exhausted: {exc}")
         termination_override = "quota_exhausted"
         result["api_error_class"] = "quota_exhausted"
     except RateLimitPersistentError as exc:
         # Persistent rate limit: signal the coordinator to pause this case
         # (don't count as failure, retry at end of batch).
         print(f"[Warn] rate-limit persistent, signaling case pause: {exc}", file=sys.stderr)
-        result["evidence"].append(f"API rate-limit persistent: {exc}")
+        result["agent_reported"]["evidence"].append(f"API rate-limit persistent: {exc}")
         termination_override = "rate_limit_persistent"
         result["api_error_class"] = "rate_limit_persistent"
     except Exception as exc:  # noqa: BLE001
         print(f"[Error] {exc}", file=sys.stderr)
-        result["evidence"].append(f"Agent error: {exc}")
+        result["agent_reported"]["evidence"].append(f"Agent error: {exc}")
         termination_hint = f"{termination_hint}\n{exc}"
 
     extracted = extract_json(full_text)
     if extracted:
-        result.update(extracted)
+        result["agent_reported"].update(extracted)
     else:
-        result["evidence"].append(full_text[:2000])
+        result["agent_reported"]["evidence"].append(full_text[:2000])
     partial_result = bool(full_text.strip())
     result["partial_result"] = partial_result
     result["structured_result"] = bool(extracted)
@@ -858,7 +853,7 @@ def run_agent(input_path: str, output_path: str, max_turns: int = DEFAULT_MAX_TU
         result["termination_reason"] = termination_override
     else:
         result["termination_reason"] = classify_termination(
-            f"{termination_hint}\n{full_text}\n{result.get('evidence', [])}",
+            f"{termination_hint}\n{full_text}\n{result['agent_reported'].get('evidence', [])}",
             structured_result=bool(extracted),
             partial_result=partial_result,
         )

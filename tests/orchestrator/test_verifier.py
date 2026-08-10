@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from clab_builder.orchestrator.composer.verifier import ScenarioVerifier
+from clab_builder.shared.models.artifact_contracts import AgentExposureProfile
 from clab_builder.orchestrator.composer.scenario_runner import (
     NO_HINT_SYSTEM_PROMPT,
     audit_no_hint,
@@ -73,9 +74,7 @@ class TestVerifyFlags:
         assert result["per_target"]["target-1"]["captured"] == ""
 
     def test_flag_captured_by_anonymized_node_key(self, verifier):
-        """L1 neutralizes topology to node-X but ground truth uses target-X.
-        The verifier must treat node-X and target-X as equivalent aliases.
-        """
+        """Anonymous names resolve through the private identity map."""
         agent_result = {
             "success": True,
             "verified_flags": {
@@ -91,7 +90,10 @@ class TestVerifyFlags:
                  "flag": "flag{def456}", "cve_id": "CVE-2"},
             ],
         }
-        result = verifier.verify_flags(agent_result, ground_truth)
+        result = verifier.verify_flags(agent_result, ground_truth, {
+            "node-1": {"node_name": "target-1", "ip": "192.168.100.2"},
+            "node-2": {"node_name": "target-2", "ip": "10.10.1.2"},
+        })
         assert result["all_captured"] is True
         assert result["per_target"]["target-1"]["match"] is True
         assert result["per_target"]["target-2"]["match"] is True
@@ -108,7 +110,9 @@ class TestVerifyFlags:
                 {"target_node": "target-1", "flag": "flag{abc123}", "cve_id": "CVE-1"},
             ],
         }
-        result = verifier.verify_flags(agent_result, ground_truth)
+        result = verifier.verify_flags(agent_result, ground_truth, {
+            "node-1": {"node_name": "target-1", "ip": "192.168.100.2"},
+        })
         assert result["all_captured"] is False
         assert result["per_target"]["target-1"]["match"] is False
         assert result["per_target"]["target-1"]["captured"] == "flag{wrong}"
@@ -149,7 +153,10 @@ class TestVerifyFlags:
                 {"target_node": "target-2", "target_ip": "10.10.1.248", "flag": "flag{app}"},
             ],
         }
-        result = verifier.verify_flags(agent_result, ground_truth)
+        result = verifier.verify_flags(agent_result, ground_truth, {
+            "node-2": {"node_name": "target-1", "ip": "192.168.100.61"},
+            "node-1": {"node_name": "target-2", "ip": "10.10.1.248"},
+        })
         assert result["all_captured"] is True
 
     def test_multiple_targets_all_captured(self, verifier):
@@ -186,6 +193,56 @@ class TestVerifyFlags:
         result = verifier.verify_flags(agent_result, ground_truth)
         assert result["all_captured"] is False
 
+    def test_shuffled_anonymous_names_use_private_identity_map(self, verifier):
+        ground_truth = {
+            "attack_path": [
+                {"target_node": "target-1", "target_ip": "10.0.0.2", "flag": "flag{one}"},
+                {"target_node": "target-2", "target_ip": "10.0.1.2", "flag": "flag{two}"},
+            ],
+        }
+        # The shuffle deliberately swaps the numeric positions.  A positional
+        # target-X/node-X alias would reject this correctly bound result.
+        identity_map = {
+            "node-1": {"node_name": "target-2", "ip": "10.0.1.2"},
+            "node-2": {"node_name": "target-1", "ip": "10.0.0.2"},
+        }
+
+        result = verifier.verify_flags({
+            "verified_flags": {"node-1": "flag{two}", "node-2": "flag{one}"},
+        }, ground_truth, identity_map)
+
+        assert result["all_captured"] is True
+
+    def test_anonymous_name_without_private_map_is_not_a_positional_alias(self, verifier):
+        result = verifier.verify_flags({
+            "verified_flags": {"node-1": "flag{one}"},
+        }, {
+            "attack_path": [{
+                "target_node": "target-1", "flag": "flag{one}",
+            }],
+        })
+
+        assert result["all_captured"] is False
+        assert result["per_target"]["target-1"]["captured"] == ""
+
+
+def test_agent_trial_evaluated_honors_runner_owned_false_marker():
+    assert ScenarioVerifier._agent_trial_evaluated({"agent_evaluated": False}) is False
+    assert ScenarioVerifier._agent_trial_evaluated({"agent_evaluated": True}) is True
+
+
+def test_objective_witness_reads_tool_results_not_assistant_report(tmp_path):
+    workspace = tmp_path / "agent_workspace"
+    workspace.mkdir()
+    (workspace / "session.json").write_text(json.dumps([
+        {"type": "tool", "message": {"role": "tool", "result": "marker=CVELAB-CANARY"}},
+        {"type": "assistant", "message": {"role": "assistant", "content": "marker=CVELAB-CANARY"}},
+    ]))
+
+    assert ScenarioVerifier._load_agent_execution_witness(
+        tmp_path, [{"id": "objective", "success_pattern": "CVELAB-CANARY"}]
+    ) == {"objective": True}
+
 
 class TestObjectiveVerification:
     @pytest.fixture
@@ -214,7 +271,7 @@ class TestObjectiveVerification:
                     "evidence": "marker=CVELAB-CANARY",
                 }
             }
-        }, [self._objective()])
+        }, [self._objective()], execution_witness={"read-customer-records": True})
         assert result["all_satisfied"] is True
         assert result["per_objective"]["read-customer-records"]["matched"] is True
 
@@ -231,7 +288,10 @@ class TestObjectiveVerification:
                     "evidence": "marker=CVELAB-CANARY",
                 }
             }
-        }, [self._objective()])
+        }, [self._objective()], identity_map={
+            "node-2": {"node_name": "target-2"},
+            "node-3": {"node_name": "target-3"},
+        }, execution_witness={"read-customer-records": True})
         assert result["all_satisfied"] is True
         item = result["per_objective"]["read-customer-records"]
         assert item["matched"] is True
@@ -255,7 +315,10 @@ class TestObjectiveVerification:
         }, [self._objective()], {
             "target-2": "10.10.1.248",
             "target-3": "10.10.2.106",
-        })
+        }, {
+            "node-1": {"node_name": "target-2", "ip": "10.10.1.248"},
+            "node-3": {"node_name": "target-3", "ip": "10.10.2.106"},
+        }, execution_witness={"read-customer-records": True})
         assert result["all_satisfied"] is True
 
     def test_unrelated_agent_text_cannot_satisfy_objective(self, verifier):
@@ -278,6 +341,23 @@ class TestObjectiveVerification:
         item = result["per_objective"]["read-customer-records"]
         assert result["all_satisfied"] is False
         assert item["failure_reason"] == "missing_objective_result"
+
+    def test_anonymous_objective_requires_private_identity_map(self, verifier):
+        result = verifier._verify_objectives({
+            "objective_results": {
+                "read-customer-records": {
+                    "achieved": True,
+                    "actor_node": "node-1",
+                    "target_node": "node-2",
+                    "evidence": "marker=CVELAB-CANARY",
+                }
+            }
+        }, [self._objective()])
+
+        assert result["all_satisfied"] is False
+        item = result["per_objective"]["read-customer-records"]
+        assert item["actor_valid"] is False
+        assert item["target_valid"] is False
 
 
 class TestGuidedObjectivePrompt:
@@ -427,6 +507,7 @@ class TestGuidedObjectivePrompt:
         payload = json.loads((scenario_dir / "agent_workspace" / "input.json").read_text())
         target = payload["targets"][0]
         assert payload["agent_context"] == "no_guide"
+        assert payload["agent_exposure_profile"]["context"] == "no_guide"
         assert target["exploit_guide"] == ""
         assert target["playbook"] == ""
         assert target["material_paths"] == {}
@@ -505,6 +586,7 @@ class TestGuidedObjectivePrompt:
         payload = json.loads((scenario_dir / "agent_workspace" / "input.json").read_text())
         target = payload["targets"][0]
         assert payload["agent_context"] == "no_hint"
+        assert payload["agent_exposure_profile"]["context"] == "no_hint"
         assert "flag_hint" not in target
         assert "flag_verify_command" not in target
         assert "exploit_guide" not in target
@@ -749,6 +831,66 @@ class TestDifficultyLevels:
         command = popen_commands[0]
         assert "-v" in command
         assert f"{vulhub_dir.resolve()}:/vulhub:ro" in command
+
+    def test_agent_material_selector_never_exposes_private_files(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: private-materials\n")
+        atoms_dir = tmp_path / "atoms"
+        bundle = atoms_dir / "CVE-A" / "source_bundle"
+        bundle.mkdir(parents=True)
+        (bundle / "always.txt").write_text("public material")
+        atom = self._atom_with(["source_bundle/always.txt", "source_bundle/secret.txt"])
+        atom.source_bundle.material_metadata = {
+            "source_bundle/always.txt": {"visibility": "always"},
+            "source_bundle/secret.txt": {"visibility": "private"},
+        }
+        verifier = ScenarioVerifier(atoms_dir=str(atoms_dir))
+
+        class FakeProcess:
+            returncode = 1
+            stderr = iter(())
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def kill(self):
+                self.returncode = -9
+
+        ground_truth = {
+            "scenario": "private-materials",
+            "attack_path": [{
+                "target_node": "target-1",
+                "cve_id": "CVE-A",
+                "injection_point": "dmz-target-1",
+            }],
+        }
+        ip_alloc = {
+            "attacker": {"eth1": "10.0.0.2/24"},
+            "target-1": {"eth1": "10.0.0.3/24"},
+        }
+        with patch.object(verifier, "_load_scenario_guide", return_value=""), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=atom), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run",
+                   return_value=subprocess.CompletedProcess(["noop"], 0, "", "")), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.Popen",
+                   return_value=FakeProcess()):
+            verifier._run_agent(
+                str(scenario_dir), ground_truth, ip_alloc,
+                api_key="test", agent_context="guided", agent_runner="claude",
+            )
+
+        payload = json.loads((scenario_dir / "agent_workspace" / "input.json").read_text())
+        assert "source_bundle/always.txt" in payload["targets"][0]["material_paths"]
+        assert "source_bundle/secret.txt" not in payload["targets"][0]["material_paths"]
+        vulhub_dir = scenario_dir / "agent_workspace" / "vulhub"
+        assert (vulhub_dir / "CVE-A__always.txt").is_file()
+        assert not (vulhub_dir / "CVE-A__secret.txt").exists()
 
     def test_claude_materials_reject_paths_outside_source_bundle(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
@@ -1052,6 +1194,75 @@ class TestLevelPoCMaterialMount:
         assert result["guided_reference_success"] is True
         assert result["reference_path_verified"] is None
         assert result["success"] is True
+
+    def test_profile_context_mismatch_is_rejected_before_agent_call(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        verifier = ScenarioVerifier(validation_mode="guided_agent")
+        pinned = AgentExposureProfile.from_context("guided").model_dump(mode="json")
+        with patch.object(verifier, "_load_scenario_context", return_value=(
+            {"scenario": "profile-mismatch", "attack_path": []},
+            {},
+            {"agent_context": "guided", "agent_exposure_profile": pinned},
+        )), \
+             patch.object(verifier, "_materialize_runtime_images") as materialize, \
+             patch.object(verifier, "_run_agent") as run_agent:
+            result = verifier.run_full(
+                str(scenario_dir), api_key="test", agent_context="no_guide"
+            )
+
+        materialize.assert_not_called()
+        run_agent.assert_not_called()
+        assert result["failure_stage"] == "agent_exposure_profile_mismatch"
+        assert result["agent_context"] == "guided"
+        assert result["agent_exposure_profile"]["context"] == "guided"
+        assert result["requested_agent_context"] == "no_guide"
+        saved = json.loads((scenario_dir / "verify_result.json").read_text())
+        assert saved["agent_exposure_profile"]["context"] == "guided"
+        assert saved["requested_agent_exposure_profile"]["context"] == "no_guide"
+
+    def test_prompt_hygiene_abort_is_not_agent_evaluated(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "ground_truth.json").write_text(json.dumps({
+            "scenario": "hygiene-abort",
+            "attack_path": [{
+                "injection_point": "dmz-target-1",
+                "target_node": "target-1",
+                "cve_id": "CVE-TEST",
+                "flag": "flag{abc}",
+                "depends_on": [],
+            }],
+        }))
+        (scenario_dir / "scenario.yaml").write_text("name: hygiene-abort\n")
+        verifier = ScenarioVerifier(validation_mode="guided_agent")
+        with patch.object(verifier, "_deploy", return_value=True), \
+             patch.object(verifier, "_run_ansible", return_value={"ok": True, "skipped": True}), \
+             patch.object(verifier, "_verify_environment", return_value={"all_targets_verified": True}), \
+             patch.object(verifier, "_verify_attack_path_reachability", return_value={"all_edges_verified": True}), \
+             patch.object(verifier, "_run_guide_runtime_preflight", return_value={
+                 "evaluated": True, "overall_status": "compatible",
+                 "integrity_valid": True, "agent_allowed": True, "entries": [],
+             }), \
+             patch.object(verifier, "_prepare_agent_transport", return_value={"ok": True}), \
+             patch.object(verifier, "_run_agent", return_value={
+                 "termination_reason": "prompt_hygiene",
+                 "prompt_hygiene": {
+                     "profile": "level_l1_hints_removed", "ok": False, "violations": [],
+                 },
+                 "agent_reported": {"success": True, "verified_flags": {}},
+             }), \
+             patch.object(verifier, "_destroy"), \
+             patch.object(verifier, "_save_result", side_effect=lambda _path, result: result):
+            result = verifier.run_full(str(scenario_dir), api_key="test")
+
+        assert result["environment_success"] is True
+        assert result["attack_graph_valid"] is True
+        assert result["attack_path_reachable"] is True
+        assert result["agent_evaluated"] is False
+        assert result["guided_trial_evaluated"] is False
+        assert result["agent_success"] is False
+        assert result["failure_stage"] == "prompt_hygiene"
 
     def test_no_guide_agent_skips_guide_preflight_but_uses_same_verifier(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
@@ -1484,7 +1695,9 @@ class TestAgentTransport:
             return subprocess.CompletedProcess(command, 0, "built", "")
 
         with patch.object(verifier, "_run_command", side_effect=fake_run):
-            result = verifier._materialize_runtime_images(str(scenario_dir))
+            result = verifier._materialize_runtime_images(
+                str(scenario_dir), runtime_policy="rebuild_missing"
+            )
 
         assert result["ok"] is True
         assert calls[0][0][:4] == ["docker", "build", "--file", str(dockerfile)]
@@ -1494,12 +1707,16 @@ class TestAgentTransport:
         scenario_dir = tmp_path / "scenario"
         scenario_dir.mkdir()
         (scenario_dir / "scenario.yaml").write_text(yaml.safe_dump({
+            "injections": [{"cve_id": "CVE-RUNTIME-0001", "service_node": "target-1"}],
             "runtime_images": [{
                 "cve_id": "CVE-RUNTIME-0001",
                 "selected_image": "cvelab-runtime-test:abc",
                 "selection": "runtime_image",
                 "runtime_image_digest": "sha256:expected",
             }],
+        }))
+        (scenario_dir / "clab.yaml").write_text(yaml.safe_dump({
+            "topology": {"nodes": {"target-1": {"image": "cvelab-runtime-test:abc"}}}
         }))
         verifier = ScenarioVerifier()
         calls = []
@@ -1519,7 +1736,66 @@ class TestAgentTransport:
         assert result["runtime_images"][0]["action"] == "verified_local_image"
         assert calls == [(["docker", "image", "inspect", "cvelab-runtime-test:abc"], 30)]
 
-    def test_mismatched_runtime_image_is_rebuilt_not_deployed(self, tmp_path):
+    def test_runtime_image_must_match_injection_and_clab_topology(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "scenario.yaml").write_text(yaml.safe_dump({
+            "schema_version": 1,
+            "injections": [{"cve_id": "CVE-EXPECTED", "service_node": "target-1"}],
+            "runtime_images": [{
+                "cve_id": "CVE-OTHER",
+                "selected_image": "cvelab-runtime-test:abc",
+                "selection": "runtime_image",
+                "runtime_image_digest": "sha256:expected",
+            }],
+        }))
+        (scenario_dir / "clab.yaml").write_text(yaml.safe_dump({
+            "topology": {"nodes": {"target-1": {"image": "cvelab-runtime-test:abc"}}}
+        }))
+
+        result = ScenarioVerifier()._materialize_runtime_images(str(scenario_dir))
+
+        assert result["ok"] is False
+        assert result["runtime_images"][0]["action"] == "runtime_topology_mismatch"
+
+    @pytest.mark.parametrize(
+        ("selection", "action"),
+        [
+            ({
+                "selection": "source_image",
+                "selected_image": "vulhub/test:latest",
+                "runtime_image_digest": "sha256:expected",
+            }, "runtime_image_missing"),
+            ({
+                "selection": "runtime_image",
+                "selected_image": "cvelab-runtime-test:abc",
+            }, "runtime_pin_missing"),
+        ],
+    )
+    def test_runtime_preflight_rejects_missing_image_or_pin(
+        self, tmp_path, selection, action
+    ):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "scenario.yaml").write_text(yaml.safe_dump({
+            "injections": [{"cve_id": "CVE-RUNTIME-0001", "service_node": "target-1"}],
+            "runtime_images": [{"cve_id": "CVE-RUNTIME-0001", **selection}],
+        }))
+        (scenario_dir / "clab.yaml").write_text(yaml.safe_dump({
+            "topology": {"nodes": {"target-1": {
+                "image": selection.get("selected_image") or "vulhub/test:latest"
+            }}}
+        }))
+        verifier = ScenarioVerifier()
+
+        with patch.object(verifier, "_run_command") as inspect:
+            result = verifier._materialize_runtime_images(str(scenario_dir))
+
+        assert result["ok"] is False
+        assert result["runtime_images"][0]["action"] == action
+        inspect.assert_not_called()
+
+    def test_explicit_legacy_rebuild_rejects_digest_drift(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
         scenario_dir.mkdir()
         selection = {
@@ -1529,7 +1805,11 @@ class TestAgentTransport:
             "runtime_image_digest": "sha256:expected",
         }
         (scenario_dir / "scenario.yaml").write_text(yaml.safe_dump({
+            "injections": [{"cve_id": "CVE-RUNTIME-0001", "service_node": "target-1"}],
             "runtime_images": [selection],
+        }))
+        (scenario_dir / "clab.yaml").write_text(yaml.safe_dump({
+            "topology": {"nodes": {"target-1": {"image": "cvelab-runtime-test:abc"}}}
         }))
         verifier = ScenarioVerifier()
 
@@ -1540,12 +1820,19 @@ class TestAgentTransport:
             ]), ""),
         ), patch.object(
             verifier, "_rebuild_runtime_image",
-            return_value={"ok": True, "action": "rebuilt_and_reverified"},
+            return_value={
+                "ok": True,
+                "action": "rebuilt_and_reverified",
+                "actual_runtime_image_digest": "sha256:wrong",
+                "runtime_digest_changed": True,
+            },
         ) as rebuild:
-            result = verifier._materialize_runtime_images(str(scenario_dir))
+            result = verifier._materialize_runtime_images(
+                str(scenario_dir), runtime_policy="rebuild_missing"
+            )
 
-        assert result["ok"] is True
-        assert result["runtime_images"][0]["action"] == "rebuilt_and_reverified"
+        assert result["ok"] is False
+        assert result["runtime_images"][0]["action"] == "runtime_digest_mismatch"
         rebuild.assert_called_once_with(selection)
 
     def test_verify_only_runtime_policy_never_rebuilds_a_mismatch(self, tmp_path):
@@ -1555,7 +1842,13 @@ class TestAgentTransport:
             "cve_id": "CVE-RUNTIME-0001", "selected_image": "cvelab-runtime-test:abc",
             "selection": "runtime_image", "runtime_image_digest": "sha256:expected",
         }
-        (scenario_dir / "scenario.yaml").write_text(yaml.safe_dump({"runtime_images": [selection]}))
+        (scenario_dir / "scenario.yaml").write_text(yaml.safe_dump({
+            "injections": [{"cve_id": "CVE-RUNTIME-0001", "service_node": "target-1"}],
+            "runtime_images": [selection],
+        }))
+        (scenario_dir / "clab.yaml").write_text(yaml.safe_dump({
+            "topology": {"nodes": {"target-1": {"image": "cvelab-runtime-test:abc"}}}
+        }))
         verifier = ScenarioVerifier()
         with patch.object(
             verifier, "_run_command",
@@ -1566,7 +1859,7 @@ class TestAgentTransport:
             result = verifier._materialize_runtime_images(str(scenario_dir), runtime_policy="verify_only")
 
         assert result["ok"] is False
-        assert result["runtime_images"][0]["action"] == "verification_failed_no_rebuild"
+        assert result["runtime_images"][0]["action"] == "runtime_digest_mismatch"
         rebuild.assert_not_called()
 
     def test_batch_management_network_is_persisted_in_topology(self, tmp_path):
@@ -1582,7 +1875,7 @@ class TestAgentTransport:
             "network": "cvelab-range-mgmt", "ipv4-subnet": "172.30.240.0/24",
         }
 
-    def test_missing_runtime_image_is_rebuilt_with_shared_builder(self, tmp_path):
+    def test_missing_runtime_image_is_rejected_without_atom_rebuild(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
         scenario_dir.mkdir()
         atoms_dir = tmp_path / "atoms"
@@ -1597,36 +1890,33 @@ class TestAgentTransport:
             "runtime_build_generated_hash": "runtime-build-hash",
         }
         (scenario_dir / "scenario.yaml").write_text(yaml.safe_dump({
+            "injections": [{"cve_id": "CVE-RUNTIME-0001", "service_node": "target-1"}],
             "runtime_images": [selection],
         }))
+        (scenario_dir / "clab.yaml").write_text(yaml.safe_dump({
+            "topology": {"nodes": {"target-1": {"image": "cvelab-runtime-test:abc"}}}
+        }))
         verifier = ScenarioVerifier(atoms_dir=str(atoms_dir))
-        from clab_builder.atomizer.runtime_builder import RuntimeBuildResult
-        from clab_builder.shared.models.atom import RuntimeStatus
 
         missing = subprocess.CompletedProcess([], 1, "", "not found")
-        rebuilt = RuntimeBuildResult(
-            status=RuntimeStatus.READY,
-            runtime_image="cvelab-runtime-test:abc",
-            base_image_digest="sha256:base",
-            runtime_image_digest="sha256:rebuilt",
+        before = sorted(
+            path.relative_to(atoms_dir).as_posix()
+            for path in atoms_dir.rglob("*")
         )
-        with patch.object(verifier, "_run_command", return_value=missing), patch(
-            "clab_builder.atomizer.runtime_generator.generate_runtime_artifacts",
-            return_value=SimpleNamespace(
-                unsupported_reason="",
-                manifest={"generated_hash": "runtime-build-hash"},
-            ),
-        ), patch(
-            "clab_builder.atomizer.runtime_builder.build_runtime_image",
-            return_value=rebuilt,
-        ) as build:
+        with patch.object(verifier, "_run_command", return_value=missing), patch.object(
+            verifier, "_rebuild_runtime_image"
+        ) as rebuild:
             result = verifier._materialize_runtime_images(str(scenario_dir))
 
-        assert result["ok"] is True
+        assert result["ok"] is False
         check = result["runtime_images"][0]
-        assert check["action"] == "rebuilt_and_reverified"
-        assert check["runtime_digest_changed"] is True
-        build.assert_called_once()
+        assert check["action"] == "runtime_image_missing"
+        rebuild.assert_not_called()
+        after = sorted(
+            path.relative_to(atoms_dir).as_posix()
+            for path in atoms_dir.rglob("*")
+        )
+        assert after == before
 
 
 class TestServiceReadiness:
@@ -2558,12 +2848,14 @@ class TestVerifierDefaults:
         assert vr["lab_name"] == "e3-round123-matrixxyz"
         assert vr["worker_id"] == "w3"
         assert vr["agent_context"] == "guided"
+        assert result["agent_exposure_profile"]["context"] == "guided"
         assert vr["noise_level"] == "none"
         assert vr["validated_at"]  # ISO timestamp present
         # Persisted file carries the tag too.
         saved = json.loads((scenario_dir / "verify_result.json").read_text())
         assert result["schema_version"] == 1
         assert saved["schema_version"] == 1
+        assert saved["agent_exposure_profile"]["context"] == "guided"
         assert saved["validation_round"]["run_id"] == "round123abc"
 
     def test_save_result_no_validation_round_without_run_id(self, tmp_path):

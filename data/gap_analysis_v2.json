@@ -1,27 +1,25 @@
 {
-  "total_atoms": 95,
+  "total_atoms": 39,
   "pivot_capability_dist": {
-    "none": 88,
-    "shell": 7
+    "none": 39
   },
-  "pivotable_count": 7,
+  "pivotable_count": 0,
   "slot_report": [
     {
       "template": "dmz_simple",
       "slot": "dmz-target-1",
       "zone": "dmz",
-      "matched_count": 95,
-      "pivotable_count": 7,
+      "matched_count": 39,
+      "pivotable_count": 0,
       "role_dist": {
-        "web_application": 60,
-        "middleware": 15,
-        "system_service": 4,
-        "framework": 13,
-        "database": 3
+        "web_application": 33,
+        "middleware": 2,
+        "system_service": 3,
+        "database": 1
       },
       "phase_dist": {
-        "initial_access": 93,
-        "execution": 2
+        "initial_access": 36,
+        "execution": 3
       },
       "required_mitre": [
         "initial_access",
@@ -48,15 +46,14 @@
       "template": "dmz_dual",
       "slot": "dmz-target-1",
       "zone": "dmz",
-      "matched_count": 88,
-      "pivotable_count": 4,
+      "matched_count": 31,
+      "pivotable_count": 0,
       "role_dist": {
-        "web_application": 60,
-        "middleware": 15,
-        "framework": 13
+        "web_application": 31
       },
       "phase_dist": {
-        "initial_access": 88
+        "initial_access": 29,
+        "execution": 2
       },
       "required_mitre": [
         "initial_access",
@@ -79,17 +76,17 @@
       "template": "dmz_dual",
       "slot": "dmz-target-2",
       "zone": "dmz",
-      "matched_count": 82,
-      "pivotable_count": 7,
+      "matched_count": 39,
+      "pivotable_count": 0,
       "role_dist": {
-        "web_application": 60,
-        "middleware": 15,
-        "system_service": 4,
-        "database": 3
+        "web_application": 33,
+        "middleware": 2,
+        "system_service": 3,
+        "database": 1
       },
       "phase_dist": {
-        "initial_access": 80,
-        "execution": 2
+        "initial_access": 36,
+        "execution": 3
       },
       "required_mitre": [
         "initial_access",
@@ -115,15 +112,14 @@
       "template": "enterprise_3tier",
       "slot": "dmz-web",
       "zone": "dmz",
-      "matched_count": 88,
-      "pivotable_count": 4,
+      "matched_count": 31,
+      "pivotable_count": 0,
       "role_dist": {
-        "web_application": 60,
-        "middleware": 15,
-        "framework": 13
+        "web_application": 31
       },
       "phase_dist": {
-        "initial_access": 88
+        "initial_access": 29,
+        "execution": 2
       },
       "required_mitre": [
         "initial_access",
@@ -146,22 +142,16 @@
       "template": "enterprise_3tier",
       "slot": "app-service",
       "zone": "app",
-      "matched_count": 88,
-      "pivotable_count": 4,
+      "matched_count": 25,
+      "pivotable_count": 0,
       "role_dist": {
-        "web_application": 60,
-        "middleware": 15,
-        "framework": 13
+        "web_application": 25
       },
       "phase_dist": {
-        "initial_access": 88
+        "initial_access": 23,
+        "execution": 2
       },
-      "required_mitre": [
-        "initial_access",
-        "execution",
-        "lateral_movement",
-        "persistence"
-      ],
+      "required_mitre": [],
       "required_role": [
         "web_application",
         "middleware",
@@ -178,15 +168,16 @@
       "template": "enterprise_3tier",
       "slot": "data-store",
       "zone": "data",
-      "matched_count": 7,
-      "pivotable_count": 3,
+      "matched_count": 4,
+      "pivotable_count": 0,
       "role_dist": {
-        "system_service": 4,
-        "database": 3
+        "middleware": 2,
+        "web_application": 1,
+        "database": 1
       },
       "phase_dist": {
-        "initial_access": 5,
-        "execution": 2
+        "initial_access": 3,
+        "execution": 1
       },
       "required_mitre": [
         "initial_access",
@@ -194,9 +185,7 @@
         "privilege_escalation"
       ],
       "required_role": [
-        "database",
-        "file_service",
-        "system_service"
+        "database"
       ],
       "required_vulncat": [
         "RCE",

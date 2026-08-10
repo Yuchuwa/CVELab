@@ -1,7 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-07-30T17:05:00.766779+00:00",
-  "snapshot_hash": "1649e1ba411a85e2a29f8ce3be88daae737173169d49581c15964addc311a2e5",
+  "generated_at": "2026-08-10T08:25:48.169003+00:00",
   "definitions": {
     "planned": "accepted into the Atom build queue; atom.yaml does not exist yet",
     "building": "Atom construction or verification has started but strict completion gates do not all pass",
@@ -10,6 +9,7 @@
   "completion_gates": [
     "schema_v3",
     "source_bundle_complete",
+    "source_bundle_material_metadata_complete",
     "source_bundle_hashed",
     "self_contained_paths",
     "runtime_spec_explicit",
@@ -24,9 +24,9 @@
     "orchestrated_environment_verified"
   ],
   "summary": {
-    "total": 239,
+    "total": 284,
     "planned": 0,
-    "building": 193,
+    "building": 238,
     "completed": 46
   },
   "atoms": [
@@ -40,6 +40,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -65,6 +66,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -81,6 +83,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -104,6 +107,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -129,6 +133,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -145,6 +150,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -168,6 +174,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -196,6 +203,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -224,6 +232,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -249,6 +258,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -265,6 +275,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -288,6 +299,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -321,6 +333,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -346,6 +359,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -379,6 +393,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -409,6 +424,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -434,6 +450,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -450,6 +467,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -464,6 +482,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2016-10134",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2016-10134",
+        "cve_id": "CVE-2016-10134",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2016-1897",
       "build_status": "building",
       "version": 2,
@@ -473,6 +527,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -489,6 +544,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -511,6 +567,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -536,6 +593,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -561,6 +619,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -577,6 +636,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -600,6 +660,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -633,6 +694,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -649,6 +711,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -672,6 +735,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -688,6 +752,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -711,6 +776,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -727,6 +793,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -750,6 +817,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -775,6 +843,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -791,6 +860,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -814,6 +884,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -841,6 +912,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -866,6 +938,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -891,6 +964,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -916,6 +990,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -932,6 +1007,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -955,6 +1031,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -980,6 +1057,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1010,6 +1088,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1040,6 +1119,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1065,6 +1145,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1090,6 +1171,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1106,6 +1188,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1129,6 +1212,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1157,6 +1241,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1173,6 +1258,42 @@
       "blockers": []
     },
     {
+      "cve_id": "CVE-2017-2824",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2017-2824",
+        "cve_id": "CVE-2017-2824",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2017-3066",
       "build_status": "building",
       "version": 3,
@@ -1182,6 +1303,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1212,6 +1334,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1245,6 +1368,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1261,6 +1385,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1284,6 +1409,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1317,6 +1443,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1333,6 +1460,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1356,6 +1484,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1386,6 +1515,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1402,6 +1532,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1425,6 +1556,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1441,6 +1573,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1464,6 +1597,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1480,6 +1614,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1503,6 +1638,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1536,6 +1672,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1566,6 +1703,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1582,6 +1720,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1605,6 +1744,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1638,6 +1778,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1654,6 +1795,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1677,6 +1819,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1693,6 +1836,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1716,6 +1860,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1732,6 +1877,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1755,6 +1901,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1788,6 +1935,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1821,6 +1969,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -1837,6 +1986,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -1860,6 +2010,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1885,6 +2036,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1910,6 +2062,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1943,6 +2096,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -1973,6 +2127,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2003,6 +2158,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2019,6 +2175,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2042,6 +2199,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2058,6 +2216,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2081,6 +2240,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2097,6 +2257,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2120,6 +2281,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2136,6 +2298,42 @@
       "blockers": []
     },
     {
+      "cve_id": "CVE-2018-17246",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2018-17246",
+        "cve_id": "CVE-2018-17246",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2018-18778",
       "build_status": "completed",
       "version": 3,
@@ -2145,6 +2343,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2170,6 +2369,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2186,6 +2386,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2209,6 +2410,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2234,6 +2436,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2267,6 +2470,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2283,6 +2487,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2306,6 +2511,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2334,6 +2540,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2367,6 +2574,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2400,6 +2608,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2430,6 +2639,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2446,6 +2656,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2469,6 +2680,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2485,6 +2697,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2508,6 +2721,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2533,6 +2747,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2558,6 +2773,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2583,6 +2799,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2599,6 +2816,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2613,6 +2831,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2019-12107",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2019-12107",
+        "cve_id": "CVE-2019-12107",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2019-14234",
       "build_status": "building",
       "version": 2,
@@ -2622,6 +2876,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2638,6 +2893,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2661,6 +2917,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2685,6 +2942,78 @@
       ]
     },
     {
+      "cve_id": "CVE-2019-15138",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2019-15138",
+        "cve_id": "CVE-2019-15138",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2019-16792",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2019-16792",
+        "cve_id": "CVE-2019-16792",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2019-17558",
       "build_status": "completed",
       "version": 3,
@@ -2694,6 +3023,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2719,6 +3049,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2752,6 +3083,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2768,6 +3100,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2791,6 +3124,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2807,6 +3141,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2830,6 +3165,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -2863,6 +3199,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2879,6 +3216,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2902,6 +3240,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2918,6 +3257,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2941,6 +3281,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -2957,6 +3298,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -2980,6 +3322,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3014,6 +3357,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3030,6 +3374,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3053,6 +3398,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3069,6 +3415,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3092,6 +3439,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3117,6 +3465,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3146,6 +3495,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3162,6 +3512,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3185,6 +3536,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3201,6 +3553,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3224,6 +3577,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3249,6 +3603,78 @@
       ]
     },
     {
+      "cve_id": "CVE-2020-11800",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-11800",
+        "cve_id": "CVE-2020-11800",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2020-11978",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-11978",
+        "cve_id": "CVE-2020-11978",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2020-11981",
       "build_status": "building",
       "version": 2,
@@ -3258,6 +3684,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3282,6 +3709,78 @@
       ]
     },
     {
+      "cve_id": "CVE-2020-12666",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-12666",
+        "cve_id": "CVE-2020-12666",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2020-13450",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-13450",
+        "cve_id": "CVE-2020-13450",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2020-13942",
       "build_status": "building",
       "version": 2,
@@ -3291,6 +3790,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3324,6 +3824,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3357,6 +3858,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3381,6 +3883,78 @@
       ]
     },
     {
+      "cve_id": "CVE-2020-15120",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-15120",
+        "cve_id": "CVE-2020-15120",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2020-15149",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-15149",
+        "cve_id": "CVE-2020-15149",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2020-15906",
       "build_status": "building",
       "version": 2,
@@ -3390,6 +3964,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3406,6 +3981,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3429,6 +4005,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3445,6 +4022,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3468,6 +4046,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3484,6 +4063,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3507,6 +4087,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3523,6 +4104,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3546,6 +4128,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3562,6 +4145,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3585,6 +4169,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3601,6 +4186,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3624,6 +4210,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3640,6 +4227,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3654,6 +4242,150 @@
       ]
     },
     {
+      "cve_id": "CVE-2020-22452",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-22452",
+        "cve_id": "CVE-2020-22452",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2020-26232",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-26232",
+        "cve_id": "CVE-2020-26232",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2020-26236",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-26236",
+        "cve_id": "CVE-2020-26236",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2020-29599",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2020-29599",
+        "cve_id": "CVE-2020-29599",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2020-35476",
       "build_status": "building",
       "version": 3,
@@ -3663,6 +4395,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3690,6 +4423,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3706,6 +4440,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3728,7 +4463,8 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": true,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -3743,6 +4479,7 @@
         "orchestrated_environment_verified": false
       },
       "blockers": [
+        "source_bundle_complete",
         "native_verified",
         "verified_capability",
         "guide_ready_valid",
@@ -3759,6 +4496,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3775,6 +4513,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3798,6 +4537,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3814,6 +4554,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3837,6 +4578,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3853,6 +4595,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3876,6 +4619,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3892,6 +4636,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3904,6 +4649,42 @@
         "guide_ready_valid",
         "orchestrated_environment_verified"
       ]
+    },
+    {
+      "cve_id": "CVE-2021-21315",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-21315",
+        "cve_id": "CVE-2021-21315",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
     },
     {
       "cve_id": "CVE-2021-21351",
@@ -3915,6 +4696,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3931,6 +4713,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3945,6 +4728,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2021-21404",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-21404",
+        "cve_id": "CVE-2021-21404",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2021-22205",
       "build_status": "building",
       "version": 2,
@@ -3954,6 +4773,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -3970,6 +4790,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -3993,6 +4814,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4009,6 +4831,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4032,6 +4855,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4047,6 +4871,7 @@
       },
       "blockers": [
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_ready",
         "runtime_build_reproducible",
@@ -4058,6 +4883,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2021-23772",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-23772",
+        "cve_id": "CVE-2021-23772",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2021-25646",
       "build_status": "completed",
       "version": 3,
@@ -4067,6 +4928,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4091,7 +4953,8 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": true,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4106,6 +4969,7 @@
         "orchestrated_environment_verified": false
       },
       "blockers": [
+        "source_bundle_complete",
         "native_verified",
         "verified_capability",
         "guide_ready_valid",
@@ -4122,6 +4986,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4138,6 +5003,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4161,6 +5027,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4195,6 +5062,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4211,6 +5079,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4225,6 +5094,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2021-28125",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-28125",
+        "cve_id": "CVE-2021-28125",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2021-28164",
       "build_status": "building",
       "version": 2,
@@ -4234,6 +5139,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4250,6 +5156,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4273,6 +5180,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4289,6 +5197,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4312,6 +5221,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4328,6 +5238,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4351,6 +5262,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4367,6 +5279,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4390,6 +5303,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4406,6 +5320,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4418,6 +5333,42 @@
         "guide_ready_valid",
         "orchestrated_environment_verified"
       ]
+    },
+    {
+      "cve_id": "CVE-2021-31245",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-31245",
+        "cve_id": "CVE-2021-31245",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
     },
     {
       "cve_id": "CVE-2021-3129",
@@ -4429,6 +5380,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4445,6 +5397,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4459,6 +5412,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2021-3172",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-3172",
+        "cve_id": "CVE-2021-3172",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2021-32568",
       "build_status": "building",
       "version": 3,
@@ -4468,6 +5457,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4483,11 +5473,84 @@
       },
       "blockers": [
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_ready",
         "runtime_build_reproducible",
         "orchestrated_environment_verified"
       ]
+    },
+    {
+      "cve_id": "CVE-2021-32637",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-32637",
+        "cve_id": "CVE-2021-32637",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2021-32677",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-32677",
+        "cve_id": "CVE-2021-32677",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
     },
     {
       "cve_id": "CVE-2021-32682",
@@ -4499,6 +5562,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4515,6 +5579,42 @@
       "blockers": []
     },
     {
+      "cve_id": "CVE-2021-32812",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-32812",
+        "cve_id": "CVE-2021-32812",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2021-34371",
       "build_status": "building",
       "version": 2,
@@ -4524,6 +5624,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4540,6 +5641,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4563,6 +5665,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4579,6 +5682,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4602,6 +5706,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4618,6 +5723,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4632,6 +5738,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2021-38698",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-38698",
+        "cve_id": "CVE-2021-38698",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2021-4034",
       "build_status": "building",
       "version": 2,
@@ -4641,6 +5783,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4657,6 +5800,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4680,6 +5824,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4709,6 +5854,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4725,6 +5871,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4748,6 +5895,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4764,6 +5912,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4786,6 +5935,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4802,6 +5952,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -4825,6 +5976,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4850,6 +6002,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4883,6 +6036,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4913,6 +6067,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4937,6 +6092,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2021-43612",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2021-43612",
+        "cve_id": "CVE-2021-43612",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2021-43798",
       "build_status": "building",
       "version": 2,
@@ -4946,6 +6137,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -4979,6 +6171,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -4995,6 +6188,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5018,6 +6212,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5034,6 +6229,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5057,6 +6253,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5073,6 +6270,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5096,6 +6294,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5121,6 +6320,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5137,6 +6337,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5151,6 +6352,78 @@
       ]
     },
     {
+      "cve_id": "CVE-2022-2024",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2022-2024",
+        "cve_id": "CVE-2022-2024",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2022-21953",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2022-21953",
+        "cve_id": "CVE-2022-21953",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2022-22947",
       "build_status": "building",
       "version": 2,
@@ -5160,6 +6433,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5176,6 +6450,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5199,6 +6474,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5232,6 +6508,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5257,6 +6534,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5273,6 +6551,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5296,6 +6575,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5329,6 +6609,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5349,6 +6630,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2022-24757",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2022-24757",
+        "cve_id": "CVE-2022-24757",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2022-24816",
       "build_status": "completed",
       "version": 3,
@@ -5358,6 +6675,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5382,7 +6700,8 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": true,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5397,6 +6716,7 @@
         "orchestrated_environment_verified": false
       },
       "blockers": [
+        "source_bundle_complete",
         "native_verified",
         "verified_capability",
         "guide_ready_valid",
@@ -5413,6 +6733,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5429,6 +6750,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5452,6 +6774,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5477,6 +6800,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5501,6 +6825,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2022-44216",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2022-44216",
+        "cve_id": "CVE-2022-44216",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2022-44268",
       "build_status": "building",
       "version": 2,
@@ -5510,6 +6870,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5543,6 +6904,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5559,6 +6921,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5582,6 +6945,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5598,6 +6962,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5612,6 +6977,330 @@
       ]
     },
     {
+      "cve_id": "CVE-2022-4683",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2022-4683",
+        "cve_id": "CVE-2022-4683",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2022-47024",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2022-47024",
+        "cve_id": "CVE-2022-47024",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2023-0046",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2023-0046",
+        "cve_id": "CVE-2023-0046",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2023-0048",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2023-0048",
+        "cve_id": "CVE-2023-0048",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2023-0297",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2023-0297",
+        "cve_id": "CVE-2023-0297",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2023-0434",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2023-0434",
+        "cve_id": "CVE-2023-0434",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2023-0435",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2023-0435",
+        "cve_id": "CVE-2023-0435",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2023-0509",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2023-0509",
+        "cve_id": "CVE-2023-0509",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
+      "cve_id": "CVE-2023-1105",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2023-1105",
+        "cve_id": "CVE-2023-1105",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2023-2160",
       "build_status": "building",
       "version": 3,
@@ -5621,6 +7310,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5636,6 +7326,7 @@
       },
       "blockers": [
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_ready",
         "runtime_build_reproducible",
@@ -5656,6 +7347,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5672,6 +7364,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5694,7 +7387,8 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": true,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5709,6 +7403,7 @@
         "orchestrated_environment_verified": false
       },
       "blockers": [
+        "source_bundle_complete",
         "native_verified",
         "verified_capability",
         "orchestrated_environment_verified"
@@ -5724,6 +7419,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5740,6 +7436,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5763,6 +7460,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5779,6 +7477,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5802,6 +7501,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5818,6 +7518,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5841,6 +7542,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5857,6 +7559,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5880,6 +7583,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5907,6 +7611,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -5932,6 +7637,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5948,6 +7654,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -5971,6 +7678,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -5987,6 +7695,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6010,6 +7719,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6026,6 +7736,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6049,6 +7760,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6081,6 +7793,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6097,6 +7810,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6120,6 +7834,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6153,6 +7868,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6169,6 +7885,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6192,6 +7909,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6208,6 +7926,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6231,6 +7950,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6264,6 +7984,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6280,6 +8001,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6303,6 +8025,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6328,6 +8051,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6362,6 +8086,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6378,6 +8103,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6401,6 +8127,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6426,6 +8153,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6442,6 +8170,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6465,6 +8194,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6499,6 +8229,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6515,6 +8246,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6538,6 +8270,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6554,6 +8287,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6577,6 +8311,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6610,6 +8345,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6635,6 +8371,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6654,6 +8391,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2024-23334",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2024-23334",
+        "cve_id": "CVE-2024-23334",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2024-23897",
       "build_status": "building",
       "version": 2,
@@ -6663,6 +8436,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6696,6 +8470,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6728,6 +8503,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6753,6 +8529,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6769,6 +8546,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6792,6 +8570,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6808,6 +8587,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6831,6 +8611,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6847,6 +8628,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6870,6 +8652,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6903,6 +8686,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6928,6 +8712,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -6958,6 +8743,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -6974,6 +8760,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -6997,6 +8784,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7013,6 +8801,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7036,6 +8825,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7052,6 +8842,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7075,6 +8866,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7100,6 +8892,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7127,6 +8920,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7157,6 +8951,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7191,6 +8986,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7207,6 +9003,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7221,6 +9018,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2024-56511",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2024-56511",
+        "cve_id": "CVE-2024-56511",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2024-9264",
       "build_status": "completed",
       "version": 3,
@@ -7230,6 +9063,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7255,6 +9089,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7271,6 +9106,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7294,6 +9130,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7310,6 +9147,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7324,6 +9162,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2025-24367",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2025-24367",
+        "cve_id": "CVE-2025-24367",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2025-24813",
       "build_status": "building",
       "version": 2,
@@ -7333,6 +9207,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7366,6 +9241,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7399,6 +9275,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7415,6 +9292,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7438,6 +9316,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7471,6 +9350,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7495,6 +9375,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2025-32432",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2025-32432",
+        "cve_id": "CVE-2025-32432",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2025-32433",
       "build_status": "completed",
       "version": 3,
@@ -7504,6 +9420,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7529,6 +9446,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7553,6 +9471,42 @@
       ]
     },
     {
+      "cve_id": "CVE-2025-32966",
+      "build_status": "building",
+      "completion_checks": {
+        "schema_v3": false,
+        "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
+        "source_bundle_hashed": false,
+        "self_contained_paths": false,
+        "runtime_spec_explicit": false,
+        "runtime_ready": false,
+        "runtime_build_reproducible": false,
+        "flag_contract_explicit": false,
+        "validation_contract_explicit": false,
+        "native_verified": false,
+        "service_contract_complete": false,
+        "verified_capability": false,
+        "guide_ready_valid": false,
+        "orchestrated_environment_verified": false
+      },
+      "blockers": [
+        "atom_yaml_missing"
+      ],
+      "build_attempt": {
+        "attempt_id": "legacy-cve-2025-32966",
+        "cve_id": "CVE-2025-32966",
+        "state": "deferred",
+        "started_at": "2026-08-10T07:30:36.943194+00:00",
+        "updated_at": "2026-08-10T07:30:36.943194+00:00",
+        "owner": "atomizer",
+        "phase": "construction",
+        "failure_class": "atom_yaml_missing",
+        "source_kind": "legacy-local-evidence",
+        "attempt_count": 1
+      }
+    },
+    {
       "cve_id": "CVE-2025-41242",
       "build_status": "building",
       "version": 2,
@@ -7562,6 +9516,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7595,6 +9550,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7625,6 +9581,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7641,6 +9598,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7664,6 +9622,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7689,6 +9648,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7722,6 +9682,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7747,6 +9708,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7772,6 +9734,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7788,6 +9751,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7811,6 +9775,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7836,6 +9801,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7869,6 +9835,7 @@
       "completion_checks": {
         "schema_v3": true,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -7894,6 +9861,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7910,6 +9878,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7933,6 +9902,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -7949,6 +9919,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -7972,6 +9943,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -8005,6 +9977,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": false,
+        "source_bundle_material_metadata_complete": false,
         "source_bundle_hashed": false,
         "self_contained_paths": true,
         "runtime_spec_explicit": false,
@@ -8021,6 +9994,7 @@
       "blockers": [
         "schema_v3",
         "source_bundle_complete",
+        "source_bundle_material_metadata_complete",
         "source_bundle_hashed",
         "runtime_spec_explicit",
         "runtime_ready",
@@ -8044,6 +10018,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -8077,6 +10052,7 @@
       "completion_checks": {
         "schema_v3": false,
         "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
@@ -8100,5 +10076,6 @@
         "orchestrated_environment_verified"
       ]
     }
-  ]
+  ],
+  "snapshot_hash": "4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd"
 }

@@ -32,6 +32,7 @@ from .output.exploit_guide import ExploitGuideGenerator
 from .agent.researcher import SecurityResearcherAgent, CVEInput
 from .environment.container import CVEEnvironmentManager, ContainerInfo
 from clab_builder.shared.models.atom import RuntimeSpec
+from clab_builder.shared.atom_build_ledger import finish_attempt, start_attempt
 from clab_builder.shared.service_resolver import resolve_service_family, service_role_for_family
 
 
@@ -85,6 +86,7 @@ class AtomizerPipeline:
                  network_name: str = "cve-network", max_turns: int = 80):
         self.vulhub_dir = vulhub_dir
         self.output_dir = Path(output_dir)
+        self.build_attempts_path = self.output_dir.parent / "atom_build_attempts.json"
         self.network_name = network_name
         self.max_turns = max_turns
         self._build_runtime = False
@@ -125,20 +127,27 @@ class AtomizerPipeline:
         print(f"  Vulhub: {self.vulhub_dir}")
         print(f"  Output: {atom_dir}")
 
+        attempt_id = start_attempt(
+            self.build_attempts_path,
+            cve_id,
+            source_kind="vulhub",
+        )
+
         # Transactional protection: when force-overwriting an existing atom,
         # snapshot it first so a failed run restores the previous good
         # version instead of leaving a half-written atom that loses verified
         # truth and a working source_bundle.
         backup_dir: Optional[Path] = None
-        if force and atom_dir.exists():
-            backup_dir = atom_dir.parent / f".{atom_dir.name}.bak"
-            if backup_dir.exists():
-                self._force_rmtree(backup_dir)
-            atom_dir.rename(backup_dir)
-            atom_dir.mkdir(parents=True)
-
         succeeded = False
+        failure_class = ""
         try:
+            if force and atom_dir.exists():
+                backup_dir = atom_dir.parent / f".{atom_dir.name}.bak"
+                if backup_dir.exists():
+                    self._force_rmtree(backup_dir)
+                atom_dir.rename(backup_dir)
+                atom_dir.mkdir(parents=True)
+
             # Step 1: 生成 ansible/deploy.yaml
             print(f"\n[1/5] Generating ansible/deploy.yaml")
             ansible_yaml = self._generate_ansible(atom_dir)
@@ -236,11 +245,21 @@ class AtomizerPipeline:
 
         except Exception as e:
             print(f"\n[ERROR] {e}")
+            failure_class = "pipeline_exception"
             import traceback
             traceback.print_exc()
             return {"success": False, "cve_id": cve_id, "error": str(e)}
 
         finally:
+            try:
+                finish_attempt(
+                    self.build_attempts_path,
+                    attempt_id,
+                    state="completed" if succeeded else "failed",
+                    failure_class=failure_class,
+                )
+            except (OSError, KeyError, ValueError) as exc:
+                print(f"  [WARN] Could not finalize Atom build ledger: {exc}")
             # 清理环境
             self._cleanup()
             # Transactional backup resolution.
@@ -2157,7 +2176,7 @@ class AtomizerPipeline:
             80: "http", 110: "pop3", 143: "imap", 443: "https", 445: "smb",
             1433: "mssql", 1521: "oracle", 2049: "nfs", 3306: "mysql",
             5432: "postgres", 5900: "vnc", 6379: "redis", 7001: "http",
-            8080: "http", 8443: "https", 8888: "http", 9042: "cassandra",
+            3000: "http", 8080: "http", 8443: "https", 8888: "http", 9042: "cassandra",
             9200: "elasticsearch", 9300: "elasticsearch", 11211: "memcached",
             27017: "mongodb", 50070: "hadoop",
         }.get(p, "tcp")

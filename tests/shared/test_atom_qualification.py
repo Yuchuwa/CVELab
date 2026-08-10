@@ -375,6 +375,71 @@ def test_poc_material_basename_collision_blocks_candidate(tmp_path):
     assert any("basename collision" in x for x in r.reasons)
 
 
+def test_unannotated_poc_material_blocks_structure(tmp_path):
+    atom_dir = tmp_path / "CVE-MATERIAL-METADATA"
+    atom_dir.mkdir()
+    (atom_dir / "docker-compose.yml").write_text("x")
+    (atom_dir / "README.md").write_text("x")
+    (atom_dir / "source_bundle").mkdir()
+    (atom_dir / "source_bundle" / "poc.py").write_text("x")
+    atom = _base_atom(
+        cve_id="CVE-MATERIAL-METADATA",
+        source_bundle={
+            "compose_file": "docker-compose.yml",
+            "readme_file": "README.md",
+            "poc_materials": ["source_bundle/poc.py"],
+            "hashes": {},
+        },
+    )
+
+    result = qualify_atom(atom, atom_dir)
+
+    assert not result.structure_healthy
+    assert not result.template_candidate
+    assert any("missing material_metadata" in reason for reason in result.reasons)
+
+
+def test_guide_material_must_be_visible_under_guided_profile(tmp_path):
+    atom_dir = tmp_path / "CVE-GUIDE-MATERIAL"
+    atom_dir.mkdir()
+    (atom_dir / "docker-compose.yml").write_text("x")
+    (atom_dir / "README.md").write_text("x")
+    (atom_dir / "source_bundle").mkdir()
+    (atom_dir / "source_bundle" / "poc.py").write_text("x")
+    (atom_dir / "exploit_guide.yaml").write_text(yaml.safe_dump({
+        "version": 1,
+        "cve_id": "CVE-GUIDE-MATERIAL",
+        "steps": [{
+            "id": "exploit",
+            "action": "use material",
+            "procedure": "run it",
+            "success_signal": "output",
+            "materials": ["source_bundle/poc.py"],
+        }],
+    }))
+    atom = _base_atom(
+        cve_id="CVE-GUIDE-MATERIAL",
+        source_bundle={
+            "compose_file": "docker-compose.yml",
+            "readme_file": "README.md",
+            "poc_materials": ["source_bundle/poc.py"],
+            "hashes": {},
+            "material_metadata": {
+                "source_bundle/poc.py": {
+                    "role": "exploit_material",
+                    "visibility": "private",
+                },
+            },
+        },
+        exploit_guide={"path": "exploit_guide.yaml", "status": "ready"},
+    )
+
+    result = qualify_atom(atom, atom_dir)
+
+    assert not result.template_candidate
+    assert any("excluded by guided profile" in reason for reason in result.checks["guide"]["reasons"])
+
+
 def test_qualify_atom_dir(tmp_path):
     atom_dir = tmp_path / "CVE-DIR"
     atom_dir.mkdir()

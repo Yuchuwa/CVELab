@@ -52,6 +52,16 @@ _EXCLUDE_NAMES = {
 # Regex for README-referenced documentation images (not attack PoCs).
 _README_IMG_RE = re.compile(r"!\[.*?\]\(([^)]+)\)|<img[^>]+src=\"([^\"]+)\"")
 
+_CREDENTIAL_MATERIAL_PATTERNS = (
+    "id_rsa", "id_dsa", "id_ed25519", "id_ecdsa",
+    ".pem", ".key", ".p12", "id_rsa.pub",
+)
+_PAYLOAD_MATERIAL_PATTERNS = (
+    "poc.py", "poc.sh", "poc.png", "poc.jpg", "poc.gif",
+    "exploit.py", "exploit.sh", "exp.py", "exp.sh",
+    "evil.py", "evil.sh",
+)
+
 
 def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -59,6 +69,59 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def verify_material_hash(atom_or_bundle, atom_dir: Path, material: str) -> bool:
+    """Verify one declared bundle material before exposing or copying it."""
+    bundle = getattr(atom_or_bundle, "source_bundle", atom_or_bundle)
+    if isinstance(atom_or_bundle, dict) and "source_bundle" in atom_or_bundle:
+        bundle = atom_or_bundle.get("source_bundle")
+    if not bundle:
+        return False
+    hashes = (
+        bundle.get("hashes", {})
+        if isinstance(bundle, dict)
+        else getattr(bundle, "hashes", {}) or {}
+    )
+    expected = hashes.get(material)
+    if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+        return False
+    path = atom_dir / material
+    if not path.is_file() or path.is_symlink():
+        return False
+    try:
+        return _sha256_file(path) == expected
+    except OSError:
+        return False
+
+
+def material_sha256(path: Path) -> str:
+    """Return a material digest, or an empty value when it is unreadable."""
+    try:
+        return _sha256_file(path) if path.is_file() and not path.is_symlink() else ""
+    except OSError:
+        return ""
+
+
+def missing_material_metadata(atom_or_bundle) -> list[str]:
+    """Return declared PoC materials without an explicit metadata record."""
+    bundle = getattr(atom_or_bundle, "source_bundle", atom_or_bundle)
+    if isinstance(atom_or_bundle, dict) and "source_bundle" in atom_or_bundle:
+        bundle = atom_or_bundle.get("source_bundle")
+    if not bundle:
+        return []
+
+    if isinstance(bundle, dict):
+        materials = list(bundle.get("poc_materials") or [])
+        metadata = bundle.get("material_metadata") or {}
+    else:
+        materials = list(getattr(bundle, "poc_materials", []) or [])
+        metadata = getattr(bundle, "material_metadata", {}) or {}
+    return sorted(
+        str(material)
+        for material in materials
+        if material not in metadata or metadata.get(material) is None
+    )
 
 
 def _should_exclude(path: Path, src_root: Path) -> bool:
@@ -105,6 +168,8 @@ def classify_material(
         return MaterialRole.VERIFICATION, MaterialVisibility.PRIVATE
     # CVE-Factory test artifacts
     if source_kind == "cve_factory":
+        if name == "analyzer_summary.txt":
+            return MaterialRole.VERIFICATION, MaterialVisibility.PRIVATE
         if name == "test_vuln.py":
             return MaterialRole.EXPLOIT_REFERENCE, MaterialVisibility.ASSISTED
         if name == "test_func.py":
@@ -115,6 +180,77 @@ def classify_material(
             return MaterialRole.VERIFICATION, MaterialVisibility.PRIVATE
     # Everything else: an exploit material (poc.png, id_rsa, payload.py, etc.)
     return MaterialRole.EXPLOIT_MATERIAL, MaterialVisibility.ALWAYS
+
+
+def is_credential_material(material: str) -> bool:
+    """Return whether a material is an existing Level-2 credential hint."""
+    base = str(Path(material).name).lower()
+    if any(base == pattern or base.endswith(pattern) for pattern in _PAYLOAD_MATERIAL_PATTERNS):
+        return False
+    return any(pattern in base for pattern in _CREDENTIAL_MATERIAL_PATTERNS)
+
+
+def select_agent_materials(atom_or_bundle, agent_context: str = "guided") -> list[str]:
+    """Select source-bundle files visible under one Agent exposure profile.
+
+    Missing metadata remains a compatibility contract for pre-v3 atoms. v3
+    atoms fail closed for unannotated materials. Explicit private metadata
+    always wins, while assisted material is limited to the guided and no-guide
+    profiles. Level restrictions are applied after visibility.
+    """
+    bundle = getattr(atom_or_bundle, "source_bundle", atom_or_bundle)
+    if isinstance(atom_or_bundle, dict) and "source_bundle" in atom_or_bundle:
+        bundle = atom_or_bundle.get("source_bundle")
+    if not bundle:
+        return []
+
+    materials = list(getattr(bundle, "poc_materials", []) or [])
+    if isinstance(bundle, dict):
+        materials = list(bundle.get("poc_materials") or [])
+        metadata = bundle.get("material_metadata") or {}
+    else:
+        metadata = getattr(bundle, "material_metadata", {}) or {}
+
+    strict_metadata = (
+        int(getattr(atom_or_bundle, "version", 0) or 0) >= 3
+        if not isinstance(atom_or_bundle, dict)
+        else int(atom_or_bundle.get("version", 0) or 0) >= 3
+    )
+
+    level = "l2" if agent_context in {"l2", "no_hint"} else ""
+    if agent_context in {"l0", "l1"}:
+        return []
+
+    selected: list[str] = []
+    for material in materials:
+        record = metadata.get(material)
+        if isinstance(record, dict):
+            visibility = record.get("visibility")
+        else:
+            visibility = getattr(record, "visibility", None)
+        visibility = getattr(visibility, "value", visibility)
+        if visibility is None and strict_metadata:
+            continue
+        # An absent metadata entry is the compatibility contract for old
+        # atoms; current v3 atoms take the fail-closed branch above.
+        visibility = str(visibility or MaterialVisibility.ALWAYS.value)
+        if visibility == "legacy":
+            visibility = MaterialVisibility.ALWAYS.value
+        if visibility == MaterialVisibility.PRIVATE.value:
+            continue
+        if visibility == MaterialVisibility.ASSISTED.value and agent_context not in {
+            "guided", "no_guide",
+        }:
+            continue
+        if visibility not in {
+            MaterialVisibility.ASSISTED.value,
+            MaterialVisibility.ALWAYS.value,
+        }:
+            continue
+        if level == "l2" and not is_credential_material(material):
+            continue
+        selected.append(material)
+    return selected
 
 
 def _readme_image_basenames(bundle_dir: Path) -> set[str]:
@@ -248,4 +384,9 @@ __all__ = [
     "capture_source_bundle",
     "scan_source_bundle",
     "classify_material",
+    "is_credential_material",
+    "verify_material_hash",
+    "material_sha256",
+    "missing_material_metadata",
+    "select_agent_materials",
 ]

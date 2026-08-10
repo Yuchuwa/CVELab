@@ -6504,3 +6504,406 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   `data/heterogeneity_vulhub_candidates.json`、`data/p0_probe_results.json` 和
   `data/revalidate_existing_atoms_wave1.txt` 均保留本地，并加入 Atom candidate/raw 忽略边界；
   它们不是未完成的 canonical Atom，而是私有候选供应、重建过程或 probe 证据。
+
+### 2026-08-08 — Atom Guide/runtime quality backlog audit
+
+- 对当前 239 个 `atom.yaml` 做只读审计：62 个记录为 `verified=true`；其中 59 个有
+  `exploit_guide.status=ready` 且 Guide 文件为 v2，另外 3 个 verified Atom 缺少 ready Guide：
+  `CVE-2014-0160`、`CVE-2021-40438`、`CVE-2024-45507`。
+- 当前 63 个 Guide 文件中有 61 个 v2、2 个 v1（`CVE-2012-2122`、`CVE-2016-1897`）；后两者
+  目前均未 verified，不应仅为补齐格式而升级为高置信 Atom。对 59 个当前 ready v2 Guide
+  重新执行只读 Range integrity audit，结果为 **59/59 通过**；但历史记录只明确覆盖此前的
+  47 个，新增 Guide 仍缺逐个语义审阅证据。
+- Guide 缺口属于共享校验/生成契约问题而非单 CVE 恢复问题：`CVE-2014-0160` 的旧 Guide
+  因 v2 execution material 缺少 `ref` 被拒；`CVE-2021-40438` 的 structured endpoint 被
+  现有 `List[str]` schema 拒绝；`CVE-2024-45507` 的 material/execution Guide schema 被拒。
+  下一步应修正 generator/schema 对材料引用和 endpoint 结构的通用处理，再逐个重生成并复核，
+  不直接恢复旧 Guide。
+- Runtime backlog 的代表性分类已明确：`CVE-2021-40438` 的 `runtime_spec.ports` 为空且
+  runtime 标为 unsupported，需解决多服务 compose 的 service-port 提取契约；
+  `CVE-2013-4547`、`CVE-2017-12794`、`CVE-2021-32568`、`CVE-2024-1561` 等有 runtime
+  readiness/smoke 失败，另有 `CVE-2017-10271` 的数据面绑定与 in-container readiness
+  不一致；这些应按通用 runtime/profile/readiness 类修复，不能按 CVE 加例外。
+- `CVE-2017-8386` 当前 runtime/service smoke 通过，但 native Agent 在 80 turns 超时，
+  因此仍为 `verified=false` 且 orchestrated verification 跳过；其 Guide 缺失应等待 native
+  事实重新建立，不能由 source_bundle 中的 `id_rsa` 单独推导完成。
+- 本次审计未修改 Atom、Guide 或 runtime 文件；以上项目继续保持 building/待办状态，历史台账中
+  与当前 `atom.yaml` 冲突的旧 full-pass 记录需以后续 superseding entry 处理。
+
+### 2026-08-08 — Atom three-level qualification clarification
+
+- 确认 Atom 侧已有正式的三层资格判定：`structure_healthy`、`template_candidate`、
+  `template_anchor`，定义位于 `src/clab_builder/shared/atom_qualification.py`，并由
+  `atom_authoritative_audit.py` 和对应测试覆盖。
+- 这三层不是互斥的 `tier` 字段：`template_candidate` 是 `structure_healthy` 的增强条件，
+  `template_anchor` 再要求 `environment_ready=true`；输出的互斥 `status` 是
+  `template_anchor`、`template_candidate`、`review_required` 或 `excluded`。
+- `data/verified_v3_structure_audit.{json,csv}` 中另有历史 `tier` 字段，但当前仅有 A/B 两值，
+  不应与上述 Atom qualification 三层或 Atom lifecycle (`planned/building/completed`) 混用。
+- Agent 的 L0/L1/L2 是输入难度档，也不是 Atom 资格类别。
+
+### 2026-08-08 correction — authoritative Atom lifecycle
+
+- 更正上一条措辞：项目正式的 Atom 三档是唯一且互斥的生命周期状态
+  `planned`、`building`、`completed`，定义见 `ATOM_BUILD_GUIDE.md` 和
+  `shared/atom_pool_status.py`。`structure_healthy`、`template_candidate`、
+  `template_anchor` 只是 Range-facing qualification/evidence，不得称为 Atom 生命周期或
+  Atom 类型。
+- 已提交的 `data/atom_pool_status.*` 快照记录 `0 planned / 193 building / 46 completed`，
+  但按当前 239 个 canonical Atom 只读重算为 **0 planned / 197 building / 42 completed**。
+  差异来自 4 个旧 completed Atom 当前不再通过严格 gate：`CVE-2014-3120`、
+  `CVE-2015-1427` 缺 `runtime_build_reproducible`；`CVE-2024-27348` 缺
+  `runtime_build_reproducible` 与 `service_contract_complete`；`CVE-2024-9264` 缺
+  `service_contract_complete`。状态快照需要重新生成，但本次只读核对未改 Atom 数据。
+
+### 2026-08-08 — three-state lifecycle implementation audit
+
+- 代码中的 canonical projector 已只产生 `planned`、`building`、`completed`：计划队列中
+  尚无 `atom.yaml` 的条目为 planned；存在 `atom.yaml` 但任一严格 gate 不通过为 building；
+  全部 gate 通过才为 completed。生命周期未重复写入 `atom.yaml`，而是由
+  `shared/atom_pool_status.py` 派生，这一设计本身符合三态契约。
+- 但三态尚未端到端维护。状态快照仅由 `scripts/generate_atom_pool_status.py` 手工生成；任何
+  Atom、Guide、runtime 或 verification writer 完成后都不会自动刷新或校验快照，导致当前已提交
+  快照仍为 `0/193/46`，实时派生为 `0/197/42`。
+- `build_snapshot()` 只扫描已有 `atom.yaml` 的目录；当前另有 45 个包含 deploy/workspace 构建
+  证据但没有 `atom.yaml` 的非空 Atom 目录，因此失败或中断的构建没有按规则进入 building
+  denominator。需要在构建开始前写入独立、typed build-attempt ledger/marker，而不是给
+  `atom.yaml` 增加重复状态字段。
+- 默认 `AtomLoader` 和直接 Scenario 生成仍以 `verified`、Guide/environment compatibility 为门槛，
+  不要求 lifecycle `completed`；当前 49 个通过 `_range_usable_atom()` 的条目中有 14 个仍是
+  building。只有 enterprise matrix 选择读取 completed 快照，而该快照又可能过期。
+- `atom list` 仍输出 verified/unverified/incomplete；旧 qualification 仍暴露
+  `template_anchor/template_candidate/review_required/excluded` 的通用 `status`。这些不是生命周期，
+  但当前命名和消费路径仍可能造成第二套 Atom 状态体系的误解。
+- 最小修复顺序应为：增加 live snapshot `--check`/freshness gate；记录 atom.yaml 生成前的 building
+  attempt；让 CLI 与 Range selection 消费同一 live lifecycle index；最后把旧 qualification 输出
+  明确重命名为 diagnostics。此次为只读审计，未修改实现或 Atom 数据。
+
+### 2026-08-09 — public release and multi-maintainer readiness audit
+
+- Scope: 对 Atom 构建、Range 编排、Agent 攻击评估、SFT 训练/评估、跨阶段 artifact contract、
+  状态/进度文档、fresh-clone 环境和公开 Git 数据边界做发布前只读审计。用户确认目标远端为公开仓库。
+- Verdict: 当前本地代码可继续研究，但**不满足公开发布或 3–4 人独立并行维护门槛**。当前工作机全量
+  回归为 **737 passed / 7 skipped**；这只证明现有环境中的代码回归，不证明 clean clone、状态新鲜度、
+  数据公开安全或实验可复现性。
+- Atom lifecycle: canonical projector 只产生 planned/building/completed，但快照仍为
+  `0/193/46`，实时派生为 `0/197/42`；另有 45 个已经产生构建文件但没有 `atom.yaml` 的目录未计入
+  building。默认 Range loader 仍可按 verified/compatibility 接纳 building Atom。
+- Atom-to-Range: 当前 `enterprise_3tier_completed.json` 的 1,800 个组合中，按实时 completed 集合
+  有 **1,294** 个组合至少引用一个 building Atom。Range verifier 仍可重建并修改 Atom runtime，且可
+  接受与场景声明不同的 image digest；Range material 消费也未统一执行 Atom
+  `material_metadata.visibility`。
+- Range/experiment progress: tracked 状态记录 136 batches / 3,787 attempts；当前本地发现并接受
+  156 summaries / 3,931 attempts，其中 Agent evaluated 1,674、Agent success 490、objective success
+  484。生成器依赖被忽略的本地 raw summaries，fresh clone 无法重建这些 denominator。
+- Agent evaluation: scenario 未持久化生成时的 Agent exposure profile，验证时可用另一 context；L1
+  shuffled anonymous node 仍有 positional alias 风险；batch fingerprint 未覆盖完整构建闭包；固定公开
+  objective canary 不是可靠 live witness；Agent 返回 JSON 还能覆盖 runner-owned audit metadata。
+- SFT: Agent/Ground Truth/batch/SFT record 仍缺 versioned schema；converter 只接受 Claude JSON array，
+  当前至少 310 个 OpenAI JSONL session 被静默排除；训练依赖没有在 `pyproject.toml` 声明，也没有
+  immutable corpus/split/adapter/evaluation manifest。现有本地 adapter 和 raw corpus 被正确忽略，但
+  fresh clone 无法复现训练或评估。
+- Public data boundary: 当前 HEAD 仍有 525 个 tracked 文件命中 literal flag marker、31 个 tracked
+  Agent transcript、1 个 private-key-form lab fixture；`origin/master`/`origin/dev` 仍分别追踪 221/225
+  个 Atom session，其中 116/108 个命中 flag marker，`origin/dev` 还含约 30 MB raw SFT corpus。
+  仅在当前 HEAD untrack/ignore 不会清除公开 Git 历史；公开发布前必须做历史清理或建立新的 sanitized
+  public repository，并审计/轮换任何不能证明为纯实验 fixture 的凭据。
+- Collaboration/docs: `CURRENT_STATUS.md`、Atom/Range/experiment snapshots 均已过期；当前 playbook
+  只有 Atom、Range+Agent、support/SFT 三条人力线，未按计划中的 Atom/Range/Agent/SFT 四条独立职责
+  建立 owner/reviewer；无 CODEOWNERS。README 的 clean-clone 命令、外部 Vulhub 获取、SFT 依赖和
+  CLI 示例也未形成可执行 runbook。
+- Required release order: 先冻结公开 push 并处理历史/公开数据边界；随后建立 live status `--check`
+  与 completed-only admission；修复 runtime/material ownership；版本化 Agent exposure/I/O 和 SFT
+  artifact；补 fresh-clone CI/runbook；最后按 Atom -> matrix -> Range/experiment -> dashboard 顺序重生
+  状态，并由单一 release integrator 提交 generated views。
+- Verification: `PYTHONPATH=src python -m pytest -q` 为 737/7；实时 lifecycle、matrix admission、partial
+  build 及 Range progress 均通过只读 Python projector 交叉检查；Git 状态为 `dev` ahead
+  `origin/dev` 68 commits，除本进度报告外无可见工作区改动。本次未修改代码、Atom 或实验数据。
+
+### 2026-08-09 — cross-workstream repair execution
+
+- Scope: 按 `docs/COLLABORATION_ALIGNMENT_REPAIR_PLAN.md` 执行 Phase 1–5 的第一轮共享契约修复；公开
+  数据历史清理按用户决定不作为本轮阻塞。所有修改保持通用层，无 CVE-specific 或 Range-specific 分支。
+- Atom/Range: lifecycle projector 现在把已有构建证据但缺 `atom.yaml` 的目录计为 `building`；新增
+  non-writing status `--check`、live snapshot comparison、completed-only loader 和 production
+  Scenario admission。Range matrix 在生成前校验 Atom snapshot freshness。实时 status 已重生为
+  `284 total / 0 planned / 242 building / 42 completed`。
+- Range ownership: production verifier/batch prewarm 默认 `verify_only`，缺失 runtime image、pin 或
+  digest drift 直接失败；Range 不再为生产验证调用 Atom runtime builder。新增共享 source-bundle
+  material selector，统一 private/assisted/always 与 L0/L1/L2 的可见性策略。
+- Agent: 新增并持久化 `AgentExposureProfile v1`，绑定 scenario/input/result/batch；profile mismatch
+  在 LLM 调用前失败；Agent-reported JSON 与 runner-owned audit fields 隔离；hygiene abort 不进入
+  Agent evaluated denominator；增加私有 anonymous-node identity map，移除 numeric positional alias
+  fallback；batch fingerprint 纳入 profile/context 相关输入。
+- SFT: converter 支持 Claude JSON-array 和 OpenAI JSONL session；增加 skip reason、record/corpus
+  schema、content hashes、stable sample IDs、group-aware split、training/evaluation lineage manifests；
+  SFT optional dependency group 和 `uv.lock` 已更新；core 环境缺少 SFT ML extra 时，模型下载测试显式
+  skip，不阻塞 core CI。
+- Collaboration/CI: 新增四 lane ownership/playbook、`docs/OPERATIONS.md`、Agent/SFT/lifecycle/material
+  registry entries、status/docs contract scripts 和 fast CI contract-gates；CURRENT_STATUS/ROADMAP
+  对齐 live counts。`openai` 已加入核心依赖，fresh locked environment 可运行 Agent contract tests。
+- Generated artifacts: Atom JSON/CSV/Markdown views 已按同一 snapshot hash 重生；`enterprise_3tier`
+  completed matrix 按 live Atom snapshot 重生为 **506** 个 no-deploy accepted compositions，
+  `range_matrix_status.json` 绑定 Atom snapshot 和 manifest hash。该数量不代表部署、Agent 或 objective
+  成功。
+- Verification: `uv sync --locked --group dev` 通过；`uv run pytest -q --no-cov` 为 **774 passed / 9 skipped**；
+  Range/Agent focused batch 为 **210 passed**；SFT contract 在可用 ML 环境为 **12 passed**；status/docs
+  contract scripts、compileall、`git diff --check` 均通过。未运行真实 Docker/ContainerLab、LLM 或 GPU SFT。
+- Remaining phase gates: Ground Truth/完整 Agent I/O/batch/material-audit schema 仍列为 untyped gaps；
+  Range historical progress 仍依赖 local raw summaries；runtime timeout workload hard-stop、provider
+  credential broker、public-history cleanup 仍未处理。当前实现是可协作开发基线，不宣称公开发布或科学
+  结果已完成。
+
+### 2026-08-09 — cross-workstream review fixes
+
+- Review scope: 对 Atom lifecycle、Range ownership、Agent exposure/material provenance 和 SFT lineage
+  做只读交叉审查后，修复了可复现的共享契约问题；未修改单个 CVE 的数据以绕过规则。
+- Agent/Range fixes: pre-Agent copy/cleanup/material-provenance failures now persist explicit
+  `agent_evaluated=false` and classify separately from stochastic Agent failures; parsed runner output is
+  marked evaluated by the runner, not by Agent-reported fields. Batch fingerprints now include the case
+  manifest, Atom/matrix snapshots, template tree, runtime/source-bundle bytes, provider endpoint class,
+  temperature/token budget, exposure profile and runner settings. Worker specs carry the fingerprint.
+- Runtime/material fixes: production `verify_only` preflight requires scenario schema, one injection-bound
+  runtime selection per target, CVE ordering and actual `clab.yaml` service-node image binding. v3 Atoms
+  fail closed for unannotated material metadata; material copies, mounts and SysField references validate
+  declared source hashes when a bundle hash ledger is present. SysField uses the pinned profile and rejects
+  literal references to excluded materials. Explicit multi-service Atoms are rejected by the single-service
+  Range slot contract. Lifecycle rows use directory identity and reject YAML/directory CVE mismatches.
+- Objective/SFT fixes: production objective verification requires the private success pattern to appear in a
+  tool-result witness from the Agent session, not only in Agent-authored evidence. SFT corpus manifests now
+  store report-relative corpus paths and validate source identity/hash/emitted-count accounting. Evaluation
+  manifests pin model/adapter/parameter settings and materialize embedded cases instead of falling back to
+  the default case set. Training validation rejects corpora emptied by unresolved/leak filters before writing
+  a validated run. TRL floor is `>=1.0.0`; CI executes `tests/sft` under the core contract environment.
+- Migration/consumers: stale README/Operations/app-candidate commands were changed to completed Atom IDs;
+  `gap_analysis_v2.py` now uses completed-only admission and its generated current view reports 35 completed
+  single-service Atoms / 0 pivotable Atoms. Historical 95/7 figures remain labeled historical in
+  `docs/GAP_ANALYSIS_V2.md`.
+- Verification: full fresh locked core suite is **783 passed / 9 skipped**; SFT contract suite is
+  **14 collected / 12 passed / 2 optional skips** in the core environment (the optional-extra environment
+  with SFT packages runs all 14); lifecycle status check, status/docs contract checks, lock check, compileall and diff check
+  all pass. No Docker/ContainerLab deployment, live LLM Agent trial or GPU training was run in this slice.
+- Remaining limitations: missing hash ledgers on legacy pre-v3 compatibility objects remain allowed only for
+  compatibility tests; Ground Truth/complete Agent I/O schemas, timeout workload hard-stop, provider
+  credential broker and public-history cleanup remain open. Release integration/commit/push is still owned
+  by the release integrator and has not happened.
+
+### 2026-08-10 — Range artifact envelope completion
+
+- Shared artifact contracts: added versioned `GroundTruthV1`, `AgentInputV1`,
+  `AgentReportedV1`, `AgentOutputV1`, `MaterialAuditItemV1`, `MaterialAuditV1`,
+  `BatchCaseStateV1`, `BatchStateV1` and `BatchSummaryV1` models in
+  `shared/models/artifact_contracts.py`. The models preserve extension fields
+  during migration while fixing the schema version and producer/consumer
+  boundary for persisted envelopes.
+- Consumer wiring: scenario assembly writes normalized Ground Truth v1;
+  verifier normalization and Agent input/output handling preserve the typed
+  envelopes and material audit; batch summaries and dataset records now carry
+  the material audit without exposing private Ground Truth values.
+- Documentation: `docs/INTERFACES.md` and `docs/CURRENT_STATUS.md` now list
+  these envelopes as typed contracts. Remaining gaps are limited to raw
+  private assertions, raw tool/session/provider diagnostics, and historical
+  batch extension fields that still need a separate retention/migration policy.
+- Verification: focused artifact/Range/dataset tests are **233 passed**; the
+  full locked core suite is **785 passed / 9 skipped**. Lifecycle status,
+  status/docs contract checks, `uv lock --check`, locked dev sync dry-run,
+  compileall and `git diff --check` all pass. No Docker/ContainerLab, live LLM
+  Agent trial or GPU SFT run was performed.
+- Atom/Range status: no Atom data, lifecycle count or Range matrix selection
+  was changed in this slice; release integration and commit/push remain the
+  release integrator's responsibility.
+
+### 2026-08-10 — legacy Atom contract backfill and matrix refresh
+
+- Candidate assessment: the five requested Atoms were compared with the full
+  current pool by capability, automation stability, reuse value and environment
+  reliability. `CVE-2014-3120`, `CVE-2015-1427`, `CVE-2024-27348` and
+  `CVE-2024-9264` have repeated historical deterministic Range successes and
+  narrow metadata blockers, so they were high-value repair candidates despite
+  adding no new MITRE phase. `CVE-2017-10271` was not promoted: its historical
+  Range records have zero deterministic build passes because WebLogic 7001 binds
+  only localhost and is unreachable across the Range data plane.
+- Generic migration: added `scripts/backfill_atom_contracts.py`, which only
+  backfills runtime paths/service contracts from existing runtime manifests and
+  source Compose evidence. Added the shared 3000/http protocol mapping and a
+  regression test. No CVE-specific branch, native truth rewrite or lifecycle
+  override was added.
+- Atom result: `CVE-2014-3120`, `CVE-2015-1427`, `CVE-2024-27348` and
+  `CVE-2024-9264` now pass all strict completion gates and are `completed`.
+  `CVE-2017-10271` remains `building` with blocker `runtime_ready`; fixing it
+  requires a runtime/service bind change and fresh orchestrated verification.
+  Pool status is now **284 total: 0 planned, 238 building, 46 completed**.
+- Range result: regenerated the no-deploy matrix from the new Atom snapshot
+  (`077e1a442576d35880f3e8a27575e84decc9daca61d7d2992c3de89ae0b7ea2d`). It now
+  has 39 single-service candidates, 28 selected Atom IDs, 506 coverage-first
+  selected cases from 1,800 legal compositions, 238 building-input rejections
+  and 7 multi-service rejections. All four repaired Atoms enter the current
+  matrix; `CVE-2017-10271` is rejected by the lifecycle gate.
+- Evidence boundary: this was a metadata-contract migration based on existing
+  runtime/native/orchestrated records; no Docker rebuild, ContainerLab run,
+  Agent trial or GPU SFT run was performed in this slice.
+- Verification: targeted migration/service/Range tests are **200 passed**;
+  migration-specific tests are **14 passed**; the full suite is **786 passed /
+  9 skipped**. Lifecycle status, status/docs contract checks, compileall,
+  `uv lock --check` and `git diff --check` pass.
+
+### 2026-08-10 — tracked Atom build-attempt ledger and clean-clone projection
+
+- Contract correction: non-empty local directories without `atom.yaml` are not
+  lifecycle evidence by themselves. They are ignored unless a tracked build
+  attempt records that construction started; this prevents ignored local
+  workspaces from changing a clean-clone snapshot.
+- Ledger migration: added `data/atom_build_attempts.json` with schema version 1
+  and migrated 45 legacy non-empty build directories as `deferred` attempts
+  with failure class `atom_yaml_missing`. The migration is generic and does not
+  copy transcripts, sessions, or other workspace evidence into Git.
+- Integration: status generation, CLI `atom list`, `AtomLoader`, matrix
+  generation, and the Atom pipeline now consume or write the shared ledger.
+  Ledger writes use an advisory lock and atomic validation of attempt states.
+- Current status remains **284 total: 0 planned, 238 building, 46 completed**.
+  The lifecycle snapshot hash is now
+  `195c7f2237096bb387095a362b5365df9c9b5ad08df6289c17c4f20016ccdbce`.
+  The regenerated enterprise matrix has 1,800 accepted compositions, 506
+  selected cases, and 21,989 rejected combinations.
+- Verification: focused ledger/lifecycle/CLI tests are **12 passed**; the full
+  suite is **788 passed / 9 skipped**. Status/docs contract checks,
+  `uv lock --check`, compileall, and `git diff --check` pass. No Docker,
+  ContainerLab, live LLM Agent trial, or GPU SFT run was performed.
+
+### 2026-08-10 — completed Atom material-metadata audit
+
+- Root cause: the v3 lifecycle gates verify that declared `poc_materials` exist
+  and are hashed, but do not require per-file `material_metadata`. The v3
+  `select_agent_materials()` policy intentionally fails closed when metadata is
+  absent, so this gap can leave a structurally `completed` Atom with no Agent
+  material mounts.
+- Scope: among 46 completed Atoms, 38 have no `material_metadata` field at all;
+  10 of those also declare PoC materials, covering 17 files. Only 2 of the 19
+  total completed-Atom PoC material entries are currently selected in the
+  guided profile.
+- Directly affected selected Atoms: `CVE-2017-11610`, `CVE-2018-16509`, and
+  `CVE-2022-41678` have Exploit Guide references to a PoC file whose metadata is
+  missing, so the current selector returns no mount for that required file.
+  Other affected entries are incidental source files and need a policy review,
+  not automatic CVE-specific labeling.
+- Range impact: deterministic source/hash/environment checks can still pass;
+  the guide validator checks membership in `poc_materials` but not selector
+  visibility. The material audit records these files as `policy_excluded`, but
+  does not currently fail the run. Existing historical Range successes therefore
+  do not prove that the current selective mount path exposes the same materials.
+- Next owner/action: implement a generic metadata backfill from
+  `scan_source_bundle()`, add a completion/preflight invariant that every
+  declared `poc_materials` entry has valid metadata, review the classifier output
+  for non-PoC files, and regenerate status/matrix before any new Agent trials.
+  No Atom YAML was changed in this audit.
+
+### 2026-08-10 — material metadata contract repair
+
+- Shared contract: added `source_bundle_material_metadata_complete` to the v3
+  completion gates. Every declared `poc_materials` path must now have explicit
+  role/visibility metadata; a ready Guide must also reference materials visible
+  under the guided profile. Missing metadata is no longer silently represented
+  as `policy_excluded` during a completed Atom admission.
+- Generic migration: extended `scripts/backfill_atom_contracts.py` with
+  `--materials-only`. The migration uses `scan_source_bundle()` and the
+  source-kind classifier, preserving existing native/runtime/Range truth. It
+  backfilled 50 declared material records across 29 Atom directories, including
+  the 10 previously completed Atoms with 17 unannotated PoC entries. The
+  migration is idempotent.
+- Range-facing result: `CVE-2017-11610`, `CVE-2018-16509` and
+  `CVE-2022-41678` now expose their Guide-required PoC files to the guided
+  selector. All 46 completed Atoms pass the new metadata gate; no completed
+  Atom was downgraded. Matrix selection remains 1,800 accepted compositions,
+  506 selected cases and 28 selected Atoms.
+- Status: lifecycle remains **284 total: 0 planned, 238 building, 46
+  completed**. The new Atom snapshot hash is
+  `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd`.
+- Verification: focused metadata/qualification/assembler/verifier tests are
+  **214 passed**; the full suite is **793 passed / 9 skipped**. Status/docs
+  contract checks, `uv lock --check`, compileall and `git diff --check` pass.
+  No Docker, ContainerLab, live LLM Agent trial or GPU SFT run was performed.
+
+### 2026-08-10 — cve-factory analyzer material visibility correction
+
+- Shared classifier correction: `ANALYZER_SUMMARY.txt` is now classified as
+  verification/private for `cve_factory` bundles instead of the generic
+  exploit-material/always fallback. The explicit refresh migration changed one
+  existing generated record (`CVE-2021-27341`); no native or validation truth
+  changed.
+- The materials-only migration is idempotent after the refresh. Final full
+  verification remains **793 passed / 9 skipped**, with status/docs contracts,
+  `uv lock --check`, compileall and `git diff --check` passing.
+
+### 2026-08-10 — material metadata runtime and Agent smoke
+
+- Generate-only: three selected enterprise cases generated and passed
+  deterministic preflight. The emitted `clab.yaml` and Agent input include the
+  repaired materials.
+- Environment-only: one valid case for each repaired Atom completed deployment,
+  base/CVE/asset setup, readiness, attack-graph and attack-path checks, and
+  cleanup:
+  `matrix-2016-3088-2017-11610-2019-9193`,
+  `matrix-2018-16509-2018-19475-2019-9193`, and
+  `matrix-2022-41678-2023-51467-2019-9193`.
+  Several first-choice combinations were rejected before deployment by an
+  unrelated shared runtime-image digest mismatch (`CVE-2015-1427`,
+  `CVE-2014-3120` or `CVE-2022-22965`); they were not counted as material or
+  Agent failures.
+- Material evidence: verifier audits report `visible=true`, `hash_valid=true`
+  and `reason=selected` for `CVE-2017-11610/poc.py`,
+  `CVE-2018-16509/poc.png`, and `CVE-2022-41678/poc.py`; the corresponding
+  `/vulhub/...` paths are present in Agent input and mounted workspace data.
+- Guided Agent: all three environments remained verified and material audits
+  passed. The Agent outcomes were failures because the runner returned only an
+  initial planning message, made no tool calls, emitted no structured result,
+  and captured no flags/objectives. A parallel coordinator also hit a generic
+  `attempt_records` scheduler conflict; a serial CVE-2022 rerun reproduced the
+  Agent-only failure cleanly with successful cleanup. This is Agent runner/
+  planning evidence, not a material metadata regression.
+- Evidence is retained under `data/material_metadata_smoke/`; no Atom or
+  material contract was changed during the runtime smoke.
+
+### 2026-08-10 correction — smoke raw-artifact cleanup
+
+- The temporary `data/material_metadata_smoke/` directory was removed after
+  reviewing the summaries and material audits. It contained raw ContainerLab,
+  Ground Truth, flags, Agent sessions/cache and credential-bearing setup data;
+  none is intended for the commit. The established conclusions remain in this
+  report, and no source contract was changed by cleanup.
+
+### 2026-08-10 — next-task decision after material smoke
+
+- The material-metadata question is closed: generate, environment and verifier
+  material-audit evidence all show the repaired PoC files are selected,
+  hash-valid and mounted. Guided Agent execution is not treated as a material
+  gate for this slice; its initial-message/runner behavior is deferred.
+- Next implementation owner: SFT privacy-contract audit and fix. Review the
+  trajectory converter's flag/private-data detection and fail-closed behavior,
+  add prompt-only and output-only leakage regressions, and keep the work on
+  synthetic contract fixtures without starting GPU training.
+
+### 2026-08-10 — commit-preparation verification
+
+- Rechecked the current working tree without changing or staging files. The
+  locked development environment sync, `cvelab --help`, Atom status freshness,
+  status/docs contracts, compileall and the Operations runbook's 37 focused
+  tests all pass. The full suite is **793 passed / 9 skipped**; `uv lock
+  --check` and `git diff --check` also pass.
+- The temporary material smoke directory and its raw runtime/session artifacts
+  are absent from the worktree. No new raw Range, Ground Truth, Agent-session,
+  credential or SFT corpus artifact was introduced by this verification slice.
+- Release boundary: the worktree still contains a broad uncommitted
+  multi-workstream diff. The material-metadata repair, Atom build-attempt
+  ledger, lifecycle/status refresh and their producer/consumer tests require an
+  explicit path-level staging review; the existing SFT and Agent-runner changes
+  are not advanced or treated as part of this material verification. No commit
+  or push was created.
+- Clean-clone limitation: the runbook was executed against the current tree's
+  equivalent locked environment, contract checks and tests. A fresh checkout
+  containing this uncommitted snapshot cannot be proven until the reviewed
+  commit boundary is staged/committed. The prior Agent-only runner failure,
+  runtime-image digest mismatches and `CVE-2017-10271` `runtime_ready` blocker
+  remain deferred evidence, not material-metadata blockers.
+- Superseding next owner/action: release-integrator scope review and final
+  clean-clone gate. Atom diversity/template-slot gap analysis follows after
+  integration; no SFT privacy audit is started in this slice.

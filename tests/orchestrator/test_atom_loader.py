@@ -94,6 +94,14 @@ class TestAtomLoaderAllVerified:
         single_atoms = loader.load_all_verified(single_service_only=True)
         assert len(all_atoms) >= len(single_atoms)
 
+    def test_completed_loader_rejects_verified_but_building_atom(self, loader):
+        assert loader.load_all_completed() == []
+        with pytest.raises(
+            ValueError,
+            match="lifecycle is building; completion blockers: schema_v3",
+        ):
+            loader.load_completed("CVE-2014-6271")
+
 
 class TestAtomLoaderList:
     @pytest.fixture

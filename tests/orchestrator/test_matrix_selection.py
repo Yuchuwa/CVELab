@@ -1,9 +1,14 @@
 """Regression tests for bounded, coverage-first Range matrix selection."""
 
+import argparse
 import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+import yaml
+
+from clab_builder.shared.atom_pool_status import build_snapshot
 
 SCRIPT = (
     Path(__file__).resolve().parents[2]
@@ -94,6 +99,42 @@ def test_range_matrix_reads_only_completed_atoms_from_v2_status(tmp_path):
         "CVE-WIP",
         "CVE-NEXT",
     }
+
+
+def test_matrix_rejects_snapshot_marking_live_building_atom_completed(tmp_path):
+    atoms_dir = tmp_path / "atoms"
+    atom_dir = atoms_dir / "CVE-VERIFIED-BUILDING"
+    atom_dir.mkdir(parents=True)
+    (atom_dir / "atom.yaml").write_text(yaml.safe_dump({
+        "version": 3,
+        "cve_id": "CVE-VERIFIED-BUILDING",
+        "category": "test",
+        "verified": True,
+        "docker_image": "test:latest",
+        "vuln_category": "RCE",
+        "primary_mitre_phase": "initial_access",
+        "service_role": "web_application",
+        "exploit_complexity": "simple",
+        "attack_method": "single_request",
+    }))
+    stale = build_snapshot(atoms_dir)
+    stale["atoms"][0]["build_status"] = "completed"
+    stale["atoms"][0]["blockers"] = []
+    status_path = tmp_path / "atom-status.json"
+    status_path.write_text(json.dumps(stale))
+    build_plan = tmp_path / "build-plan.json"
+    build_plan.write_text('{"planned": []}\n')
+    args = argparse.Namespace(
+        atoms_dir=str(atoms_dir),
+        atom_status=str(status_path),
+        build_plan=str(build_plan),
+        templates_dir="templates",
+        template="enterprise_3tier",
+        max_cases=0,
+    )
+
+    with pytest.raises(ValueError, match="stale Atom build-status snapshot"):
+        MODULE.build_manifest(args)
 
 
 def test_compact_matrix_status_is_range_owned(tmp_path):

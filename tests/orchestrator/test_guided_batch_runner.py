@@ -82,11 +82,52 @@ def test_no_hint_context_is_supported_and_recorded():
     assert summary["prompt_hygiene"]["ok"] is True
 
 
+def test_summary_preserves_requested_profile_on_mismatch():
+    summary = summarize(
+        {"id": "case-mismatch", "purpose": "test", "cves": ["CVE-TEST"]},
+        Path("/tmp/case-mismatch"),
+        {
+            "agent_context": "guided",
+            "agent_exposure_profile": {"context": "guided"},
+            "requested_agent_context": "no_guide",
+            "requested_agent_exposure_profile": {"context": "no_guide"},
+            "failure_stage": "agent_exposure_profile_mismatch",
+        },
+    )
+
+    assert summary["requested_agent_context"] == "no_guide"
+    assert summary["requested_agent_exposure_profile"]["context"] == "no_guide"
+
+
 def test_model_is_part_of_experiment_fingerprint():
     first = parse_args(["--model", "model-a"])
     second = parse_args(["--model", "model-b"])
 
     assert digest_inputs([], first) != digest_inputs([], second)
+
+
+def test_exposure_profile_and_seed_are_part_of_experiment_fingerprint():
+    guided = parse_args(["--agent-context", "guided", "--seed", "1"])
+    no_hint = parse_args(["--agent-context", "no-hint", "--seed", "1"])
+    other_seed = parse_args(["--agent-context", "guided", "--seed", "2"])
+
+    assert digest_inputs([], guided) != digest_inputs([], no_hint)
+    assert digest_inputs([], guided) != digest_inputs([], other_seed)
+
+
+def test_hygiene_abort_and_not_evaluated_are_outside_agent_denominator():
+    assert MODULE._agent_attempt_evaluated({
+        "agent_evaluated": True,
+        "agent_termination_reason": "prompt_hygiene",
+    }) is False
+    assert MODULE._agent_attempt_evaluated({
+        "agent_evaluated": True,
+        "prompt_hygiene": {"profile": "not_evaluated", "ok": None},
+    }) is False
+    assert MODULE._agent_attempt_evaluated({
+        "agent_evaluated": True,
+        "prompt_hygiene": {"profile": "not_applicable", "ok": True},
+    }) is True
 
 
 def test_batch_summary_records_model_and_runner(tmp_path):
@@ -120,3 +161,5 @@ def test_batch_summary_records_model_and_runner(tmp_path):
     assert summary["model"] == "model-a"
     assert summary["agent_runner"] == "openai"
     assert summary["validation_round"]["model"] == "model-a"
+    assert summary["agent_exposure_profile"]["context"] == "l2"
+    assert summary["validation_round"]["agent_exposure_profile"]["context"] == "l2"

@@ -2,7 +2,7 @@
 
 Status: active current-state view
 
-Snapshot date: 2026-07-30
+Snapshot date: 2026-08-10
 
 This file summarizes Range-side progress. Per-matrix manifests and per-run
 summaries remain the machine-readable evidence.
@@ -11,8 +11,8 @@ summaries remain the machine-readable evidence.
 
 | Stage | State | Current evidence | Limitation |
 |---|---|---|---|
-| Template/slot matching | Operational | Strict snapshot supplies 46 completed Atoms; Range rejects 7 multi-service inputs, evaluates 39 and selects 28 in accepted bindings | Current implementation supports single-service slots |
-| Matrix recording | Operational | Completed-only matrix: 1,800 accepted cases and 21,989 slot/composition rejections | Acceptance means composition only, not deployment |
+| Template/slot matching | Operational | Live snapshot supplies 46 completed Atoms; Range rejects 238 building inputs and 7 multi-service inputs before composition | Current implementation supports single-service slots |
+| Matrix recording | Operational | Current completed-only matrix: 506 selected cases from 1,800 legal compositions, 245 Atom-input rejections and 21,989 composition rejections | Selection means composition only, not deployment |
 | Historical build inventory | Generated | 136 summaries, 3,787 attempts, 2,345 unique Range definitions | Spans different code and Atom snapshots |
 | Latest build outcome | Generated | 574 succeeded, 35 failed, 1,736 incomplete | “Latest” follows recorded summary timestamps |
 | Generate-only | Operational | No-Hint preflight: 71 selected, 70 generated, 1 rejected | One generic slot/service mismatch |
@@ -21,7 +21,7 @@ summaries remain the machine-readable evidence.
 | Agent evaluation | Operational | L2 DeepSeek batch: 50 evaluated; 15 Agent successes | Model/context-specific result |
 | Objective verification | Operational | Same L2 batch: 13 objective successes | Must remain separate from Agent success |
 | Cleanup | Operational | Same L2 batch: 49 cleanups passed, 1 cleanup failure | Cleanup is an independent lifecycle result |
-| Versioned artifacts | Implemented, uncommitted | Scenario Manifest v1 and Verification Result v1 round-trip | Ground Truth, Agent I/O and batch contracts remain untyped |
+| Versioned artifacts | Implemented, uncommitted | Scenario/Truth/Agent/Batch/Material envelopes v1 and Verification Result v1 round-trip | Raw tool/session events remain outside the typed envelopes |
 
 ## Active Matrix Sources
 
@@ -49,8 +49,15 @@ These lists belong to Range. They must not be copied into Atom status as
 
 ## Next Work
 
-1. Run generate-only for the new 1,800-case completed-only matrix.
+1. Use the 506-case completed-only selected matrix for bounded environment validation.
 2. Version the matrix/experiment manifest contract.
 3. Consolidate Ground Truth, Agent input/output and batch state/summary models.
 4. Continue layered environment-only and Agent validation while
    preserving failures as evidence.
+
+## Superseding Correction
+
+The 46-Atom and 1,800-accepted-case figures above the 2026-08-09 snapshot are
+historical values from an earlier Atom snapshot. The canonical current values
+are owned by `data/atom_pool_status.json`, `data/range_matrices/enterprise_3tier_completed.json`
+and `data/range_matrix_status.json`.
