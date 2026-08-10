@@ -6907,3 +6907,27 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
 - Superseding next owner/action: release-integrator scope review and final
   clean-clone gate. Atom diversity/template-slot gap analysis follows after
   integration; no SFT privacy audit is started in this slice.
+
+### 2026-08-10 — cross-workstream contract commit and clean-clone gate
+
+- Release integration: created commit `86af178` (`feat: align cross-workstream
+  artifact contracts`) with 104 reviewed paths covering the Atom, Range, Agent
+  and SFT ownership lanes, shared artifact interfaces, lifecycle/material
+  contracts, generated status/matrix views, tests and collaboration documents.
+  No push was performed.
+- Fresh checkout: cloned the commit into an isolated checkout with a clean Git
+  status and verified `HEAD=86af17850de9fed43dc6b3aa41933b9d9edf39e7`. The
+  temporary checkout has no local Atom workspace, raw Range evidence, raw SFT
+  corpus, Docker state or Agent credentials.
+- Operations runbook result: `uv sync --locked --group dev`, `uv run cvelab
+  --help`, Atom freshness check, status/docs contract checks and the documented
+  37 focused tests all pass from the fresh checkout. The source checkout had
+  already passed the full locked suite at **793 passed / 9 skipped** before
+  commit; no code changed between that verification and commit creation.
+- Evidence boundary: this proves the committed collaboration/core contract
+  baseline is reproducible without private runtime artifacts. It does not claim
+  Docker/ContainerLab deployment, live LLM Agent success or GPU SFT training.
+- Next owner/action: begin Atom diversity and template-slot gap analysis from
+  the committed lifecycle/matrix snapshot; keep the deferred Agent runner,
+  runtime-image mismatch and `CVE-2017-10271` runtime blocker separate from
+  this clean-clone result.
