@@ -171,6 +171,8 @@ cvelab batch dmz_simple --count 5
 | `dmz_simple` | 单层 DMZ，1 个目标 | easy |
 | `dmz_dual` | 单层 DMZ，2 个不同漏洞目标 | easy |
 | `enterprise_3tier` | 三层企业网络 DMZ → App → Data | medium |
+| `enterprise_4tier` | 四层企业网络 DMZ → App → Internal → Data | hard |
+| `enterprise_5tier` | 五层企业网络 DMZ → App → Middleware → Internal → Data | hard |
 
 ### Atom 库与数据集
 
@@ -197,7 +199,7 @@ cvelab batch dmz_simple --count 5
 
 4. **场景组合验证**
    - 用 clean dataset 中的成功 atom 生成单目标和多目标 ContainerLab 场景。
-   - 先验证 `dmz_simple`、`dmz_dual`、`enterprise_3tier` 三类模板，再扩展到更多网络路径和 MITRE 阶段组合。
+   - 先验证 `dmz_simple`、`dmz_dual`、`enterprise_3tier` 三类模板，再扩展到 `enterprise_4tier`、`enterprise_5tier` 等更多网络路径和 MITRE 阶段组合。
    - 场景验证结果必须回写 ground truth 和 verifier 输出，作为 atom 是否可组合的第二层质量门槛。
 
 5. **数据集发布准备**

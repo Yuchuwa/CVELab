@@ -150,6 +150,8 @@ class TestAllTemplates:
         assert "dmz_simple" in templates
         assert "dmz_dual" in templates
         assert "enterprise_3tier" in templates
+        assert "enterprise_4tier" in templates
+        assert "enterprise_5tier" in templates
 
     def test_dmz_dual_structure(self, loader):
         tpl = loader.load("dmz_dual")
@@ -206,6 +208,117 @@ class TestAllTemplates:
         # Should configure all 3 routers
         assert "edge-router" in ansible
         assert "app-router" in ansible
+        assert "data-router" in ansible
+
+    def test_enterprise_4tier_structure(self, loader):
+        tpl = loader.load("enterprise_4tier")
+        assert tpl.name == "enterprise_4tier"
+        assert tpl.difficulty == "hard"
+        assert len(tpl.zones) == 4
+        assert ["dmz", "app", "internal", "data"] == list(tpl.zones.keys())
+        assert len(tpl.routers) == 4
+        assert len(tpl.injection_points) == 4
+        assert len(tpl.transits) == 4
+
+    def test_enterprise_4tier_injection_zones(self, loader):
+        tpl = loader.load("enterprise_4tier")
+        zones = [ip.zone for ip in tpl.injection_points]
+        assert zones == ["dmz", "app", "internal", "data"]
+
+    def test_enterprise_4tier_isolation(self, loader):
+        tpl = loader.load("enterprise_4tier")
+        # 10 rules: attacker->3 deny + dmz->2 deny + app->1 deny + 4 accept
+        assert len(tpl.isolation_rules) == 10
+        # attacker can only reach dmz
+        accept_dmz = any(
+            r.from_zone == "attacker" and r.to_zone == "dmz" and r.action == "accept"
+            for r in tpl.isolation_rules
+        )
+        assert accept_dmz
+        # attacker denied from data
+        deny_data = any(
+            r.from_zone == "attacker" and r.to_zone == "data" and r.action == "deny"
+            for r in tpl.isolation_rules
+        )
+        assert deny_data
+
+    def test_enterprise_4tier_clab_base(self, loader):
+        clab = loader.load_clab_base("enterprise_4tier")
+        nodes = clab["topology"]["nodes"]
+        assert "attacker" in nodes
+        assert "edge-router" in nodes
+        assert "app-router" in nodes
+        assert "internal-router" in nodes
+        assert "data-router" in nodes
+        # 4 transit links: attacker-edge, edge-app, app-internal, internal-data
+        assert len(clab["topology"]["links"]) == 4
+
+    def test_enterprise_4tier_ansible_base(self, loader):
+        ansible = loader.load_ansible_base("enterprise_4tier")
+        assert "edge-router" in ansible
+        assert "app-router" in ansible
+        assert "internal-router" in ansible
+        assert "data-router" in ansible
+
+    def test_enterprise_5tier_structure(self, loader):
+        tpl = loader.load("enterprise_5tier")
+        assert tpl.name == "enterprise_5tier"
+        assert tpl.difficulty == "hard"
+        assert len(tpl.zones) == 5
+        assert ["dmz", "app", "middleware", "internal", "data"] == list(tpl.zones.keys())
+        assert len(tpl.routers) == 5
+        assert len(tpl.injection_points) == 5
+        assert len(tpl.transits) == 5
+
+    def test_enterprise_5tier_injection_zones(self, loader):
+        tpl = loader.load("enterprise_5tier")
+        zones = [ip.zone for ip in tpl.injection_points]
+        assert zones == ["dmz", "app", "middleware", "internal", "data"]
+
+    def test_enterprise_5tier_isolation(self, loader):
+        tpl = loader.load("enterprise_5tier")
+        # 15 rules: each zone denies all deeper zones except its immediate successor
+        assert len(tpl.isolation_rules) == 15
+        accept_dmz = any(
+            r.from_zone == "attacker" and r.to_zone == "dmz" and r.action == "accept"
+            for r in tpl.isolation_rules
+        )
+        assert accept_dmz
+        deny_data = any(
+            r.from_zone == "attacker" and r.to_zone == "data" and r.action == "deny"
+            for r in tpl.isolation_rules
+        )
+        assert deny_data
+        # middleware can reach internal but not data
+        mw_internal = any(
+            r.from_zone == "middleware" and r.to_zone == "internal" and r.action == "accept"
+            for r in tpl.isolation_rules
+        )
+        assert mw_internal
+        mw_data = any(
+            r.from_zone == "middleware" and r.to_zone == "data" and r.action == "deny"
+            for r in tpl.isolation_rules
+        )
+        assert mw_data
+
+    def test_enterprise_5tier_clab_base(self, loader):
+        clab = loader.load_clab_base("enterprise_5tier")
+        nodes = clab["topology"]["nodes"]
+        assert "attacker" in nodes
+        assert "edge-router" in nodes
+        assert "app-router" in nodes
+        assert "middleware-router" in nodes
+        assert "internal-router" in nodes
+        assert "data-router" in nodes
+        # 5 transit links
+        assert len(clab["topology"]["links"]) == 5
+
+    def test_enterprise_5tier_ansible_base(self, loader):
+        ansible = loader.load_ansible_base("enterprise_5tier")
+        assert "edge-router" in ansible
+        assert "app-router" in ansible
+        assert "middleware-router" in ansible
+        assert "internal-router" in ansible
         assert "data-router" in ansible
 
     def test_all_templates_have_clab_and_ansible(self, loader):
