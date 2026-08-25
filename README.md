@@ -173,6 +173,7 @@ cvelab batch dmz_simple --count 5
 | `enterprise_3tier` | 三层企业网络 DMZ → App → Data | medium |
 | `enterprise_4tier` | 四层企业网络 DMZ → App → Internal → Data | hard |
 | `enterprise_5tier` | 五层企业网络 DMZ → App → Middleware → Internal → Data | hard |
+| `enterprise_tree` | 树形企业网络，edge-router 为根分叉到 DMZ/App/Data | medium |
 
 ### Atom 库与数据集
 

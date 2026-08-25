@@ -1,0 +1,23 @@
+name: enterprise_tree_base
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+    dmz-router:
+      kind: linux
+      image: frrouting/frr:latest
+    app-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data-router:
+      kind: linux
+      image: frrouting/frr:latest
+  links:
+    - endpoints: ["attacker:eth1", "edge-router:eth1"]
+    - endpoints: ["edge-router:eth2", "dmz-router:eth1"]
+    - endpoints: ["edge-router:eth3", "app-router:eth1"]
+    - endpoints: ["edge-router:eth4", "data-router:eth1"]

@@ -224,6 +224,25 @@ class TestAssemblerDMZSimple:
         ]
         assert all(v.get("routes") for v in router_allocations)
 
+    def test_enterprise_tree_assemble(self, assembler):
+        atoms = [_make_atom(f"CVE-TEST-000{i}") for i in range(1, 4)]
+        result = assembler.assemble("enterprise_tree", atoms)
+
+        assert result["template"] == "enterprise_tree"
+        assert len(result["injections"]) == 3
+        assert len(result["ground_truth"]["attack_path"]) == 3
+        nodes = result["clab"]["topology"]["nodes"]
+        for i in range(1, 4):
+            assert f"target-{i}" in nodes
+        # zones in order
+        zones = [s["zone"] for s in result["ground_truth"]["attack_path"]]
+        assert zones == ["dmz", "app", "data"]
+        # all routers have routes
+        router_allocations = [
+            v for k, v in result["ip_allocations"].items() if k.endswith("-router")
+        ]
+        assert all(v.get("routes") for v in router_allocations)
+
     def test_pivot_metadata_does_not_generate_runtime_pivot_host(self, assembler):
         atom = _make_atom(requires_pivot_host=True)
         result = assembler.assemble("dmz_simple", [atom], scenario_name="pivot-test")

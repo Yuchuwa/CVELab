@@ -1,24 +1,27 @@
-name: enterprise_3tier
-description: "三层企业网络: DMZ → 应用层 → 数据层，attacker 从 DMZ 入口渗透"
+name: enterprise_tree
+description: "树形企业网络: edge-router 为根，分叉到 DMZ/App/Data 三个分支，物理可达但逻辑隔离"
 difficulty: medium
 
 transits:
   - subnet: "10.255.255.0/30"
     endpoints: [attacker, edge-router]
   - subnet: "10.255.255.4/30"
-    endpoints: [edge-router, app-router]
+    endpoints: [edge-router, dmz-router]
   - subnet: "10.255.255.8/30"
-    endpoints: [app-router, data-router]
+    endpoints: [edge-router, app-router]
+  - subnet: "10.255.255.12/30"
+    endpoints: [edge-router, data-router]
 
 zones:
-  dmz: {subnet: "192.168.100.0/24", type: dmz, router: edge-router}
+  dmz: {subnet: "192.168.100.0/24", type: dmz, router: dmz-router}
   app: {subnet: "10.10.1.0/24", type: internal, router: app-router}
   data: {subnet: "10.10.2.0/24", type: restricted, router: data-router}
 
 routers:
-  edge-router: {image: frrouting/frr:latest, connects: [attacker, dmz]}
-  app-router: {image: frrouting/frr:latest, connects: [dmz, app]}
-  data-router: {image: frrouting/frr:latest, connects: [app, data]}
+  edge-router: {image: frrouting/frr:latest, connects: [attacker, dmz, app, data]}
+  dmz-router: {image: frrouting/frr:latest, connects: [edge-router, dmz]}
+  app-router: {image: frrouting/frr:latest, connects: [edge-router, app]}
+  data-router: {image: frrouting/frr:latest, connects: [edge-router, data]}
 
 isolation_rules:
   - {from: attacker, to: dmz, action: accept}
@@ -31,7 +34,7 @@ isolation_rules:
 injection_points:
   - id: dmz-web
     zone: dmz
-    role_description: "面向公网的 Web 服务"
+    role_description: "面向公网的 Web 服务入口"
     required_mitre: [initial_access, execution]
     required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass]
     required_service_role: [web_application, middleware, framework]
@@ -39,7 +42,7 @@ injection_points:
 
   - id: app-service
     zone: app
-    role_description: "内部应用服务，需从 DMZ 横向移动到达"   
+    role_description: "内部应用服务，需从 DMZ 横向移动到达"
     required_mitre: [lateral_movement, execution, persistence]
     required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection]
     required_service_role: [web_application, middleware, framework]

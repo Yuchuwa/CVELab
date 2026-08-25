@@ -152,6 +152,7 @@ class TestAllTemplates:
         assert "enterprise_3tier" in templates
         assert "enterprise_4tier" in templates
         assert "enterprise_5tier" in templates
+        assert "enterprise_tree" in templates
 
     def test_dmz_dual_structure(self, loader):
         tpl = loader.load("dmz_dual")
@@ -319,6 +320,52 @@ class TestAllTemplates:
         assert "app-router" in ansible
         assert "middleware-router" in ansible
         assert "internal-router" in ansible
+        assert "data-router" in ansible
+
+    def test_enterprise_tree_structure(self, loader):
+        tpl = loader.load("enterprise_tree")
+        assert tpl.name == "enterprise_tree"
+        assert tpl.difficulty == "medium"
+        assert len(tpl.zones) == 3
+        assert ["dmz", "app", "data"] == list(tpl.zones.keys())
+        assert len(tpl.routers) == 4
+        assert len(tpl.injection_points) == 3
+        assert len(tpl.transits) == 4
+
+    def test_enterprise_tree_injection_zones(self, loader):
+        tpl = loader.load("enterprise_tree")
+        zones = [ip.zone for ip in tpl.injection_points]
+        assert zones == ["dmz", "app", "data"]
+
+    def test_enterprise_tree_isolation(self, loader):
+        tpl = loader.load("enterprise_tree")
+        assert len(tpl.isolation_rules) == 6
+        accept_dmz = any(
+            r.from_zone == "attacker" and r.to_zone == "dmz" and r.action == "accept"
+            for r in tpl.isolation_rules
+        )
+        assert accept_dmz
+        deny_data = any(
+            r.from_zone == "attacker" and r.to_zone == "data" and r.action == "deny"
+            for r in tpl.isolation_rules
+        )
+        assert deny_data
+
+    def test_enterprise_tree_clab_base(self, loader):
+        clab = loader.load_clab_base("enterprise_tree")
+        nodes = clab["topology"]["nodes"]
+        assert "attacker" in nodes
+        assert "edge-router" in nodes
+        assert "dmz-router" in nodes
+        assert "app-router" in nodes
+        assert "data-router" in nodes
+        assert len(clab["topology"]["links"]) == 4
+
+    def test_enterprise_tree_ansible_base(self, loader):
+        ansible = loader.load_ansible_base("enterprise_tree")
+        assert "edge-router" in ansible
+        assert "dmz-router" in ansible
+        assert "app-router" in ansible
         assert "data-router" in ansible
 
     def test_all_templates_have_clab_and_ansible(self, loader):

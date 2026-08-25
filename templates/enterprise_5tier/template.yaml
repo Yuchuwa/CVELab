@@ -66,15 +66,15 @@ injection_points:
     zone: middleware
     role_description: "中间件服务（消息队列、缓存、CI/CD），需从应用层继续推进到达"
     required_mitre: [lateral_movement, execution, persistence, credential_access]
-    required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection]
-    required_service_role: [middleware, system_service, framework]
+    required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection, Info_Leak]
+    required_service_role: [web_application, middleware, system_service, framework]
     count: 1
 
   - id: internal-workstation
     zone: internal
     role_description: "内部工作站/员工服务，需从中间件层继续横向移动到达"
     required_mitre: [lateral_movement, execution, privilege_escalation, credential_access]
-    required_vuln_category: [RCE, LPE, Auth_Bypass, Injection]
+    required_vuln_category: [RCE, Deserialization, LPE, Auth_Bypass, Injection]
     required_service_role: [web_application, middleware, system_service]
     count: 1
 
