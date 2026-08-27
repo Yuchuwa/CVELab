@@ -99,11 +99,13 @@ data/atoms/**/.workspace/
 data/atoms/**/node_modules/
 src/sysfield/
 data/verify_2tier*
+data/ablation
 
 # Local vulnerability/source repositories and runtime workspaces
 CVE-Factory/
 vulhub/
 db_vulns/
+trainset/
 tmp_venvs/
 .tmp/
 opencode.json
