@@ -27,10 +27,13 @@ def evaluate_atom(
     timeout: int,
     reset: Callable[[], None] | None = None,
 ) -> tuple[list[EvaluationRun], bool, bool]:
-    """Run models against a supplied target container.
+    """让四个模型连接到同一个已启动的 Atom 目标容器。
 
     A reset callback is required for strict isolation. Without one we still
     collect measurements, but mark the report as state-isolated=false.
+
+    Atom 当前没有像 Range 那样的统一 deploy/destroy wrapper，因此 CLI 要求
+    调用者提供目标容器；`reset` 用来在模型之间恢复目标状态。
     """
     root = Path(atom_dir).resolve()
     atom = yaml.safe_load((root / "atom.yaml").read_text(encoding="utf-8")) or {}
@@ -45,6 +48,7 @@ def evaluate_atom(
             break
 
     runs: list[EvaluationRun] = []
+    # Agent 容器需要加入目标所在的 Docker network，而不是加入目标容器本身。
     inspect = subprocess.run(
         ["docker", "inspect", "--format", "{{json .NetworkSettings.Networks}}", container],
         capture_output=True,
@@ -61,6 +65,7 @@ def evaluate_atom(
     workspace_root = Path(tempfile.mkdtemp(prefix="cvelab-difficulty-atom-"))
     try:
         for index, model in enumerate(models, 1):
+            # 没有 reset 时仍允许做探索性实验，但报告会明确标记隔离不完整。
             if reset:
                 reset()
             workspace = workspace_root / f"run-{index}"
