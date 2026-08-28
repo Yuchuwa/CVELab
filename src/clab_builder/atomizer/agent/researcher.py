@@ -84,9 +84,15 @@ class AgentOutput:
 class SecurityResearcherAgent:
     """Agent 容器生命周期管理器"""
 
-    def __init__(self, agent_image: str = "clab-agent:latest", max_turns: int = 80):
+    def __init__(
+        self,
+        agent_image: str = "clab-agent:latest",
+        max_turns: int = 80,
+        agent_timeout: int = 900,
+    ):
         self.agent_image = agent_image
         self.max_turns = max_turns
+        self.agent_timeout = agent_timeout
         self.container_id: str | None = None
         self.container_name = f"agent-{uuid.uuid4().hex[:8]}"
         self.model: str = ""  # set by start(); read by run() to pick the harness
@@ -333,7 +339,7 @@ class SecurityResearcherAgent:
 
             # 墙钟上限：max_turns=80 正常约 12 分钟（170 次 API 调用 × ~4s）。
             # 15 分钟足够跑满 80 turns 的慢任务，超时后 self.stop() 强制终止容器。
-            wall_timeout = 900
+            wall_timeout = self.agent_timeout
             proc.wait(timeout=wall_timeout)
             reader.join(timeout=5)
 
