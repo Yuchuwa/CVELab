@@ -29,6 +29,12 @@ DEFAULT_MODELS = (
 
 @dataclass
 class EvaluationRun:
+    """一个模型的一次评估结果。
+
+    `success` 必须来自 CVELab 的 verifier，而不是模型自己在文本中声称
+    成功。`verifier` 保留原始判定字段，方便之后审计为什么成功或失败。
+    """
+
     model: str
     attempt: int = 1
     success: bool = False
@@ -54,7 +60,15 @@ def _summary(values: Iterable[float]) -> dict[str, float | None]:
 
 
 def session_metrics(path: str | Path) -> dict[str, int]:
-    """Extract turn and tool-call counts from JSONL or JSON session files."""
+    """从 Runner 产生的 session 中提取 turns 和实际工具调用次数。
+
+    OpenAI runner 通常会同时记录：
+    1. assistant 发出的 tool-call 声明；
+    2. 工具真正执行后的 tool 事件。
+
+    两者描述的是同一次调用，所以有实际 tool 事件时优先使用它们，避免
+    把工具调用数计算成真实值的两倍。
+    """
     p = Path(path)
     if not p.is_file():
         return {"turns": 0, "tool_calls": 0}
@@ -102,6 +116,11 @@ def session_metrics(path: str | Path) -> dict[str, int]:
 
 
 def _difficulty_score(runs: list[EvaluationRun]) -> tuple[float, dict[str, Any]]:
+    """计算一个可解释的 0-100 难度分。
+
+    解决率占 80%，执行成本占 20%。成本使用对数归一化，避免某一次极慢
+    的运行完全淹没解决率这个更重要的指标。
+    """
     valid = [r for r in runs if r.verifier.get("environment_valid", True)]
     rate = sum(r.success for r in valid) / len(valid) if valid else 0.0
     successful = [r for r in valid if r.success]
@@ -122,6 +141,7 @@ def _difficulty_score(runs: list[EvaluationRun]) -> tuple[float, dict[str, Any]]
 def classify_difficulty(
     runs: list[EvaluationRun], *, environment_valid: bool
 ) -> dict[str, Any]:
+    # 环境自身没有启动成功时，模型失败不能说明环境困难。
     if not environment_valid:
         return {
             "label": "invalid_environment",
@@ -149,6 +169,8 @@ def classify_difficulty(
 def aggregate_runs(
     runs: list[EvaluationRun], *, environment_valid: bool, state_isolated: bool
 ) -> dict[str, Any]:
+    # 无效环境运行不参与解决率和模型成本统计，但仍保留在 runs 中，
+    # 这样报告不会丢失诊断信息。
     valid = [r for r in runs if r.verifier.get("environment_valid", True)]
     successful = [r for r in valid if r.success]
     result: dict[str, Any] = {
@@ -203,7 +225,7 @@ def build_report(
 
 
 def write_report(path: str | Path, report: Mapping[str, Any]) -> None:
-    """Atomically persist the independent report."""
+    """原子写入独立报告，避免中断时留下半个 JSON 文件。"""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
@@ -219,6 +241,7 @@ def write_report(path: str | Path, report: Mapping[str, Any]) -> None:
 
 
 def timed_run(callable_, *args, **kwargs) -> tuple[Any, float]:
+    """执行一个评估动作并只测量其墙钟时间。"""
     started = time.monotonic()
     result = callable_(*args, **kwargs)
     return result, round(time.monotonic() - started, 3)

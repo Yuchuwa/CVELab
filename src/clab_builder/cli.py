@@ -17,11 +17,13 @@ def main():
 
 @main.group("difficulty")
 def difficulty():
+    # 这个命令组只产生外部评估报告，不回写 Atom 或 Range。
     """Empirically evaluate Atom or Range difficulty without changing it."""
     pass
 
 
 def _difficulty_common_options(command):
+    # 四个模型使用同一套 endpoint/key 和相同预算，保证比较条件一致。
     command = click.option("--output", "-o", required=True, type=click.Path())(command)
     command = click.option("--api-key", envvar="LLM_API_KEY", required=True)(command)
     command = click.option("--base-url", envvar="LLM_BASE_URL", default="")(command)
@@ -48,6 +50,7 @@ def difficulty_range(scenario_dir, agent_context, keep_run_artifacts, output, ap
     from clab_builder.evaluation.difficulty import build_report, write_report
     from clab_builder.evaluation.range_evaluator import evaluate_range
 
+    # 默认四个 Qwen 模型；显式覆盖时仍强制要求四个，避免不完整比较。
     model_list = tuple(item.strip() for item in models.split(",") if item.strip())
     if len(model_list) != 4:
         raise click.ClickException("--models must contain exactly four models")
@@ -82,6 +85,7 @@ def difficulty_atom(atom_dir, container, target_ip, reset_command, output, api_k
     model_list = tuple(item.strip() for item in models.split(",") if item.strip())
     if len(model_list) != 4:
         raise click.ClickException("--models must contain exactly four models")
+    # reset-command 由用户提供，典型用途是重启/重建 Atom 目标容器。
     reset = (lambda: subprocess.run(reset_command, shell=True, check=True, timeout=300)) \
         if reset_command else None
     runs, valid, isolated = evaluate_atom(

@@ -22,6 +22,12 @@ def evaluate_range(
     agent_context: str,
     keep_artifacts: bool = False,
 ) -> tuple[list[EvaluationRun], bool, bool]:
+    """对同一个 Range 做四次独立部署。
+
+    关键点是每个模型都使用 scenario 的临时副本。ScenarioVerifier 会在
+    副本内完成 deploy/setup/agent/objective verification/destroy，因此前一
+    个模型不会把容器状态或运行结果写给下一个模型。
+    """
     source = Path(scenario_dir).resolve()
     runs: list[EvaluationRun] = []
     environment_valid = True
@@ -29,6 +35,7 @@ def evaluate_range(
     root = Path(tempfile.mkdtemp(prefix="cvelab-difficulty-range-"))
     try:
         for index, model in enumerate(models, 1):
+            # 不在 source 目录上直接运行，保证原始 Range artifact 只读。
             copy = root / f"run-{index}"
             shutil.copytree(source, copy)
             verifier = ScenarioVerifier(max_turns=max_turns, agent_timeout=timeout)
@@ -42,6 +49,7 @@ def evaluate_range(
                     agent_context=agent_context,
                     agent_runner="openai",
                 )
+                # environment_success 是环境正确性，不等同于 Agent 成功。
                 valid = bool(result.get("environment_success", False))
                 environment_valid = environment_valid and valid
                 success = bool(
