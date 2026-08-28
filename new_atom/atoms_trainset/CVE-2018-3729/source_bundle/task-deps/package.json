@@ -1,0 +1,27 @@
+{
+  "name": "localhost-now",
+  "version": "1.0.1",
+  "description": "Launch a local web server for static files",
+  "main": "lib/app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DCKT/localhost-now.git"
+  },
+  "bin": {
+    "localhost": "./bin/localhost"
+  },
+  "keywords": [
+    "web",
+    "server",
+    "localhost"
+  ],
+  "author": "Deconinck Thomas",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DCKT/localhost-now/issues"
+  },
+  "homepage": "https://github.com/DCKT/localhost-now"
+}
