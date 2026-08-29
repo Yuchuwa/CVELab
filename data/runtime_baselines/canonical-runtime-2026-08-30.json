@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "baseline_id": "canonical-runtime-2026-08-30",
+  "recorded_on": "2026-08-30",
+  "purpose": "Frozen runtime baseline for the static difficulty gradient validation set.",
+  "scope": {
+    "atom_count": 7,
+    "runtime_metadata_only": true,
+    "atom_source_changed": false,
+    "static_predictions_changed": false
+  },
+  "environment": {
+    "execution_host": "Ubuntu 24.04 under WSL2",
+    "docker_client": "29.1.3",
+    "docker_server": "29.1.3",
+    "docker_compose": "2.40.3+ds1-0ubuntu1~24.04.1"
+  },
+  "transfer": {
+    "source_host": "OSLab",
+    "format": "docker save archive compressed with gzip",
+    "archive_size_bytes": 642905343,
+    "archive_sha256": "44a1a50fa6389e4431045c6db63bdc8284e2d544fb2e54047515c24aa9843b46",
+    "archive_tracked": false,
+    "import_note": "Docker 29 normalized imported manifests, changing local image IDs. The transferred images retain identical ordered RootFS DiffIDs and Docker Config values."
+  },
+  "images": [
+    {
+      "cve_id": "CVE-2012-1823",
+      "image": "cvelab-runtime-2012-1823-aacd5624af4b",
+      "previous_recorded_digest": "sha256:94141c8eec5e4e8e0e8009f3a36ee327e79d31b260b9a76090cb8faf55d10021",
+      "baseline_digest": "sha256:97e16c51c82e27a2ff9c05100953f2dfb6a8ec0473f038fd200aca5cb838a78a",
+      "origin": "pre-existing native WSL image",
+      "tool_smoke": true,
+      "service_ready": true
+    },
+    {
+      "cve_id": "CVE-2017-17562",
+      "image": "cvelab-runtime-2017-17562-d2b4ad48f712",
+      "previous_recorded_digest": "sha256:1c99d1e39518856fdd12fc42561345efb55e998e181c8f09e4f7488a774c532c",
+      "baseline_digest": "sha256:41295b3286f549552599667055b06c866e9402c701bf3e692a3c76a25c90f7b0",
+      "origin": "transferred from OSLab",
+      "source_image_id": "sha256:480a01e0677b6a459f587c8bd6c9a4fc4d73793b0618e58484e58e115277079b",
+      "rootfs_diffids_equal": true,
+      "docker_config_equal": true,
+      "tool_smoke": true,
+      "service_ready": true
+    },
+    {
+      "cve_id": "CVE-2016-3088",
+      "image": "cvelab-runtime-2016-3088-aea5be6b9612",
+      "previous_recorded_digest": "sha256:363ca1b47e65e31d352ecbf20f05a91883f5781648c41f70b4f920312fc71d3a",
+      "baseline_digest": "sha256:2052766d175aefa3a72d5c42d86e0770e1dc2250b23da82e707260cc3a463538",
+      "origin": "transferred from OSLab",
+      "source_image_id": "sha256:e229a41c794514dfc7a1029237c73fc8f4a2c78d0e08b105a2531f539dfad496",
+      "rootfs_diffids_equal": true,
+      "docker_config_equal": true,
+      "tool_smoke": true,
+      "service_ready": true
+    },
+    {
+      "cve_id": "CVE-2017-15715",
+      "image": "cvelab-runtime-2017-15715-a596b82ea0f1",
+      "previous_recorded_digest": "sha256:8bfbdb7b6b698698186c6d55a5644436e51f2ce60251262c2bccf4b1ab7bbf7f",
+      "baseline_digest": "sha256:c31aed721354f4df5d23ea11286d8519c6fd73e34137ce0432182079b415b839",
+      "origin": "pre-existing native WSL image",
+      "tool_smoke": true,
+      "service_ready": true
+    },
+    {
+      "cve_id": "CVE-2014-3120",
+      "image": "cvelab-runtime-2014-3120-d4d1386bbf57",
+      "previous_recorded_digest": "sha256:6ef5a3dab5eccc64406bb6565e6d6228ba1f99750c7bf1de998731984d6dc6fa",
+      "baseline_digest": "sha256:69457cb2d8318f9eab4c0e2f923e631c4a23e9a46cbf1f9a638005f127334854",
+      "origin": "transferred from OSLab",
+      "source_image_id": "sha256:1c4062f2024281861842743fe609e318b7401f3cdd5854f6a894aff10a3bfbf9",
+      "rootfs_diffids_equal": true,
+      "docker_config_equal": true,
+      "tool_smoke": true,
+      "service_ready": true
+    },
+    {
+      "cve_id": "CVE-2019-9193",
+      "image": "cvelab-runtime-2019-9193-89d92800cbbd",
+      "previous_recorded_digest": "sha256:4b25fd1b9a032f1736dfc3536a81742a2603803804caa61c1f51bf191f1bd5ef",
+      "baseline_digest": "sha256:506d8d2d5f3a32ae11a4c2ae34ef71eb4013b45d1408978086d3246dd31fb150",
+      "origin": "pre-existing native WSL image",
+      "tool_smoke": true,
+      "service_ready": true
+    },
+    {
+      "cve_id": "CVE-2015-1427",
+      "image": "cvelab-runtime-2015-1427-bf5eb37b3c84",
+      "previous_recorded_digest": "sha256:6e6eb5ac1e9808ebbe1fe7be1828ec4b7e2e282886d6a78024e64000760628e7",
+      "baseline_digest": "sha256:d11caa9389c7421e5486c1cc362de1acbc7fa4db7840eaf4bd3ad6c8ca8d0138",
+      "origin": "transferred from OSLab",
+      "source_image_id": "sha256:7e894a085a19771ec12226206b2535149054e76d650c41ef468c78d1937cf6d0",
+      "rootfs_diffids_equal": true,
+      "docker_config_equal": true,
+      "tool_smoke": true,
+      "service_ready": true
+    }
+  ],
+  "verification": {
+    "tool_smoke_passed": 7,
+    "tool_smoke_total": 7,
+    "service_readiness_passed": 7,
+    "service_readiness_total": 7,
+    "service_timeout_seconds": 180,
+    "temporary_resources_cleaned": true
+  }
+}

@@ -7006,3 +7006,31 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
   separate exploit difficulty from path-length effects. Only after freezing
   that cross-template analysis should selected cases be measured with the
   evaluator as an external validation set.
+
+### 2026-08-30 - canonical runtime baseline for gradient validation
+
+- The historical `runtime_image_digest` values required by the selected
+  seven-Atom validation set were unavailable on both execution hosts. The
+  experiment therefore established a new baseline instead of silently
+  rebinding generated Ranges to whatever same-tag image happened to exist.
+- Four images missing from native WSL Docker were exported from OSLab and
+  transferred as one 642,905,343-byte gzip archive. Its SHA-256 is
+  `44a1a50fa6389e4431045c6db63bdc8284e2d544fb2e54047515c24aa9843b46`.
+- Docker 29 normalized manifests while loading the archive, so imported image
+  IDs differ from OSLab. For all four transferred images, the ordered RootFS
+  DiffIDs and Docker Config values match the source exactly.
+- The first service-readiness attempt failed 7/7 because native WSL Docker did
+  not have Compose v2 installed; no service had actually been started. This
+  rules out image failure. After installing Ubuntu
+  `docker-compose-v2` 2.40.3, the unchanged checks passed 7/7 tool smoke and
+  7/7 service readiness, with temporary resources cleaned.
+- Updated only
+  `verification.runtime_verification.runtime_image_digest` in the seven Atom
+  YAML files. Source bundles, runtime build hashes, vulnerability metadata,
+  and frozen static difficulty predictions were not changed.
+- Tracked provenance is in
+  `data/runtime_baselines/canonical-runtime-2026-08-30.json`; the 614 MiB
+  transfer archive and raw inspection output remain ignored local evidence.
+- Next action: freeze the exact eight-environment manifest, generate all
+  samples from this baseline, validate them deterministically, and only then
+  start the blinded four-model evaluation.
