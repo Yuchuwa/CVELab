@@ -6977,3 +6977,32 @@ Error code: 400 - ... maximum context length is 32768 tokens. However, you reque
 - The four-lane contract result remains green for internal use. The public
   export/privacy finding remains recorded and must be resolved separately if a
   public release is later requested.
+
+### 2026-08-30 - static expert-prior difficulty pilot
+
+- Added a deterministic, metadata-only difficulty pilot. It does not read
+  historical Agent outcomes, call the empirical difficulty evaluator, deploy a
+  Range, or invoke an LLM.
+- The frozen rubric scores attack method, declared exploit complexity, attack
+  path position, callback/authentication requirements, exploit materials and
+  final objective cost. Stage probabilities compose multiplicatively, and the
+  lowest conditional stage is reported as the predicted bottleneck.
+- Pilot scope: 8 representative Atoms and 12 combinations already accepted by
+  the `enterprise_3tier` matrix. Atom predictions cover 1 easy, 6 medium and 1
+  hard cases. Combination predictions cover 4 hard and 8 very-hard cases; the
+  application/pivot stage is the bottleneck in 8 of 12 combinations.
+- Interpretation: the first rubric separates exploit mechanisms and exposes
+  position-sensitive file-upload/deserialization costs, but it may
+  over-penalize chain length because even the all-single-request three-stage
+  combination scores hard. This is a model-design finding, not evidence that
+  any Range has empirical difficulty equal to its predicted label.
+- Artifacts: `scripts/analyze_static_difficulty_pilot.py`,
+  `data/static_difficulty_pilot.json`,
+  `docs/STATIC_DIFFICULTY_PILOT.md`, and
+  `tests/evaluation/test_static_difficulty_pilot.py`.
+- Validation: Ruff passed, all 4 focused tests passed, and repeated report
+  generation produced identical JSON and Markdown SHA-256 hashes.
+- Next action: run the same frozen rubric over `dmz_simple` and `dmz_dual` to
+  separate exploit difficulty from path-length effects. Only after freezing
+  that cross-template analysis should selected cases be measured with the
+  evaluator as an external validation set.
