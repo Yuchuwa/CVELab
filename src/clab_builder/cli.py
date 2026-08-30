@@ -2,14 +2,10 @@
 
 import click
 import os
-import yaml
 from pathlib import Path
 from dotenv import load_dotenv
-
-# 自动加载 .env
-load_dotenv()
-
 from clab_builder import __version__
+load_dotenv()
 
 
 @click.group()
@@ -17,6 +13,93 @@ from clab_builder import __version__
 def main():
     """CVELab - CVE scenario lab builder."""
     pass
+
+
+@main.group("difficulty")
+def difficulty():
+    # 这个命令组只产生外部评估报告，不回写 Atom 或 Range。
+    """Empirically evaluate Atom or Range difficulty without changing it."""
+    pass
+
+
+def _difficulty_common_options(command):
+    # 四个模型使用同一套 endpoint/key 和相同预算，保证比较条件一致。
+    command = click.option("--output", "-o", required=True, type=click.Path())(command)
+    command = click.option("--api-key", envvar="LLM_API_KEY", required=True)(command)
+    command = click.option("--base-url", envvar="LLM_BASE_URL", default="")(command)
+    command = click.option("--max-turns", type=int, default=30, show_default=True)(command)
+    command = click.option("--timeout", type=int, default=1800, show_default=True)(command)
+    command = click.option(
+        "--models", default=",".join(
+            ("qwen3.6-27b", "qwen3.6-35b-a3b", "qwen3.6-plus", "qwen3.6-flash")
+        ),
+        show_default=True,
+    )(command)
+    return command
+
+
+@difficulty.command("range")
+@click.argument("scenario_dir", type=click.Path(exists=True, file_okay=False))
+@click.option("--agent-context", type=click.Choice(["guided", "no_guide", "no_hint", "l0", "l1", "l2"]),
+              default="guided", show_default=True)
+@click.option("--keep-run-artifacts", is_flag=True)
+@_difficulty_common_options
+def difficulty_range(scenario_dir, agent_context, keep_run_artifacts, output, api_key,
+                     base_url, max_turns, timeout, models):
+    """Evaluate a generated Range scenario."""
+    from clab_builder.evaluation.difficulty import build_report, write_report
+    from clab_builder.evaluation.range_evaluator import evaluate_range
+
+    # 默认四个 Qwen 模型；显式覆盖时仍强制要求四个，避免不完整比较。
+    model_list = tuple(item.strip() for item in models.split(",") if item.strip())
+    if len(model_list) != 4:
+        raise click.ClickException("--models must contain exactly four models")
+    runs, valid, isolated = evaluate_range(
+        scenario_dir, models=model_list, api_key=api_key, base_url=base_url,
+        max_turns=max_turns, timeout=timeout, agent_context=agent_context,
+        keep_artifacts=keep_run_artifacts,
+    )
+    report = build_report(
+        kind="range", subject=scenario_dir, runs=runs,
+        environment_valid=valid, state_isolated=isolated,
+        config={"models": model_list, "max_turns": max_turns, "timeout_s": timeout,
+                "agent_context": agent_context, "runner": "openai_newapi"},
+    )
+    write_report(output, report)
+    click.echo(f"Difficulty report: {output}")
+
+
+@difficulty.command("atom")
+@click.argument("atom_dir", type=click.Path(exists=True, file_okay=False))
+@click.option("--container", required=True, help="Running target container name or ID")
+@click.option("--target-ip", required=True)
+@click.option("--reset-command", default="", help="Optional command run before each model")
+@_difficulty_common_options
+def difficulty_atom(atom_dir, container, target_ip, reset_command, output, api_key,
+                    base_url, max_turns, timeout, models):
+    """Evaluate a generated Atom against an already running target."""
+    import subprocess
+    from clab_builder.evaluation.atom_evaluator import evaluate_atom
+    from clab_builder.evaluation.difficulty import build_report, write_report
+
+    model_list = tuple(item.strip() for item in models.split(",") if item.strip())
+    if len(model_list) != 4:
+        raise click.ClickException("--models must contain exactly four models")
+    # reset-command 由用户提供，典型用途是重启/重建 Atom 目标容器。
+    reset = (lambda: subprocess.run(reset_command, shell=True, check=True, timeout=300)) \
+        if reset_command else None
+    runs, valid, isolated = evaluate_atom(
+        atom_dir, container=container, target_ip=target_ip, models=model_list,
+        api_key=api_key, base_url=base_url, max_turns=max_turns, timeout=timeout, reset=reset,
+    )
+    report = build_report(
+        kind="atom", subject=atom_dir, runs=runs, environment_valid=valid,
+        state_isolated=isolated,
+        config={"models": model_list, "max_turns": max_turns, "timeout_s": timeout,
+                "runner": "openai_newapi"},
+    )
+    write_report(output, report)
+    click.echo(f"Difficulty report: {output}")
 
 
 # ── Generate (only generate files, no deploy) ───────────────────────────

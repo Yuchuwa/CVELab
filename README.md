@@ -102,6 +102,30 @@ uv run cvelab verify enterprise_3tier \
   --environment-only
 ```
 
+Run an independent empirical difficulty evaluation:
+
+```bash
+# Range: deploys an isolated copy once per model and writes only the report.
+uv run cvelab difficulty range data/scenarios/enterprise3-demo \
+  --output reports/difficulty-enterprise3-demo.json \
+  --api-key "$LLM_API_KEY" --base-url "$LLM_BASE_URL"
+
+# Atom: evaluate an already running target container. Add --reset-command
+# when the target can be restored between model runs.
+uv run cvelab difficulty atom data/atoms/CVE-2014-6271 \
+  --container cve-target --target-ip 172.18.0.2 \
+  --output reports/difficulty-CVE-2014-6271.json \
+  --api-key "$LLM_API_KEY" --base-url "$LLM_BASE_URL"
+```
+
+The evaluator runs the fixed Qwen model set
+(`qwen3.6-27b`, `qwen3.6-35b-a3b`, `qwen3.6-plus`, `qwen3.6-flash`) with a
+30-turn / 1800-second default budget. It records solution rate, turns, wall
+time, and tool calls in a separate JSON artifact. It never writes evaluation
+results into an Atom or Range. Atom evaluation is marked
+`state_isolated=false` unless `--reset-command` is supplied; a non-isolated
+run should be treated as exploratory rather than a clean comparison.
+
 Run focused tests before changing a subsystem:
 
 ```bash
