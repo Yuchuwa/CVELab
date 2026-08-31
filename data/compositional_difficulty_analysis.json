@@ -1,0 +1,616 @@
+{
+  "schema_version": 1,
+  "method": "expert_prior_architecture_composition",
+  "uses_historical_agent_results": false,
+  "uses_difficulty_evaluator": false,
+  "formula": "score = 80 * (1 - composed_success_probability) + 20 * composed_cost_factor",
+  "components": {
+    "atom": [
+      "attack_method",
+      "exploit_complexity",
+      "authentication",
+      "callback",
+      "guided_step_count",
+      "guided_command_coverage",
+      "external_download",
+      "material_transfer"
+    ],
+    "architecture": [
+      "required_target_count",
+      "dependency_edges",
+      "maximum_dependency_depth",
+      "parallel_roots",
+      "business_objectives"
+    ]
+  },
+  "candidate_distributions": {
+    "dmz_simple": {
+      "candidate_count": 39,
+      "label_counts": {
+        "easy": 28,
+        "hard": 1,
+        "medium": 10
+      }
+    },
+    "dmz_dual": {
+      "candidate_count": 1178,
+      "label_counts": {
+        "easy": 517,
+        "hard": 197,
+        "medium": 458,
+        "very_hard": 6
+      }
+    },
+    "enterprise_3tier": {
+      "candidate_count": 1800,
+      "label_counts": {
+        "hard": 540,
+        "very_hard": 1260
+      }
+    }
+  },
+  "canonical_candidate_count": 67,
+  "canonical_tier_anchors": {
+    "easy": [
+      {
+        "case_id": "dmz_dual-2012-1823-2014-3120",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2014-3120"
+        ],
+        "success_probability": 0.8445,
+        "cost_factor": 0.25,
+        "score": 17.44,
+        "label": "easy",
+        "bottleneck": {
+          "cve_id": "CVE-2014-3120",
+          "slot_id": "dmz-target-2",
+          "success_probability": 0.9428
+        }
+      },
+      {
+        "case_id": "dmz_dual-2012-1823-2015-1427",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2015-1427"
+        ],
+        "success_probability": 0.8445,
+        "cost_factor": 0.25,
+        "score": 17.44,
+        "label": "easy",
+        "bottleneck": {
+          "cve_id": "CVE-2015-1427",
+          "slot_id": "dmz-target-2",
+          "success_probability": 0.9428
+        }
+      },
+      {
+        "case_id": "dmz_dual-2012-1823-2017-17562",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2017-17562"
+        ],
+        "success_probability": 0.8445,
+        "cost_factor": 0.25,
+        "score": 17.44,
+        "label": "easy",
+        "bottleneck": {
+          "cve_id": "CVE-2017-17562",
+          "slot_id": "dmz-target-2",
+          "success_probability": 0.9428
+        }
+      },
+      {
+        "case_id": "dmz_dual-2017-17562-2012-1823",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2017-17562",
+          "CVE-2012-1823"
+        ],
+        "success_probability": 0.8445,
+        "cost_factor": 0.25,
+        "score": 17.44,
+        "label": "easy",
+        "bottleneck": {
+          "cve_id": "CVE-2017-17562",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.9428
+        }
+      },
+      {
+        "case_id": "dmz_simple-2014-3120",
+        "template": "dmz_simple",
+        "cves": [
+          "CVE-2014-3120"
+        ],
+        "success_probability": 0.9428,
+        "cost_factor": 0.14,
+        "score": 7.38,
+        "label": "easy",
+        "bottleneck": {
+          "cve_id": "CVE-2014-3120",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.9428
+        }
+      },
+      {
+        "case_id": "dmz_simple-2015-1427",
+        "template": "dmz_simple",
+        "cves": [
+          "CVE-2015-1427"
+        ],
+        "success_probability": 0.9428,
+        "cost_factor": 0.14,
+        "score": 7.38,
+        "label": "easy",
+        "bottleneck": {
+          "cve_id": "CVE-2015-1427",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.9428
+        }
+      },
+      {
+        "case_id": "dmz_simple-2017-17562",
+        "template": "dmz_simple",
+        "cves": [
+          "CVE-2017-17562"
+        ],
+        "success_probability": 0.9428,
+        "cost_factor": 0.14,
+        "score": 7.38,
+        "label": "easy",
+        "bottleneck": {
+          "cve_id": "CVE-2017-17562",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.9428
+        }
+      },
+      {
+        "case_id": "dmz_dual-2017-17562-2014-3120",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2017-17562",
+          "CVE-2014-3120"
+        ],
+        "success_probability": 0.8191,
+        "cost_factor": 0.27,
+        "score": 19.87,
+        "label": "easy",
+        "bottleneck": {
+          "cve_id": "CVE-2017-17562",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.9428
+        }
+      }
+    ],
+    "medium": [
+      {
+        "case_id": "dmz_dual-2016-3088-2014-3120",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2016-3088",
+          "CVE-2014-3120"
+        ],
+        "success_probability": 0.6621,
+        "cost_factor": 0.39,
+        "score": 34.83,
+        "label": "medium",
+        "bottleneck": {
+          "cve_id": "CVE-2016-3088",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.7621
+        }
+      },
+      {
+        "case_id": "dmz_dual-2016-3088-2015-1427",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2016-3088",
+          "CVE-2015-1427"
+        ],
+        "success_probability": 0.6621,
+        "cost_factor": 0.39,
+        "score": 34.83,
+        "label": "medium",
+        "bottleneck": {
+          "cve_id": "CVE-2016-3088",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.7621
+        }
+      },
+      {
+        "case_id": "dmz_dual-2016-3088-2017-17562",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2016-3088",
+          "CVE-2017-17562"
+        ],
+        "success_probability": 0.6621,
+        "cost_factor": 0.39,
+        "score": 34.83,
+        "label": "medium",
+        "bottleneck": {
+          "cve_id": "CVE-2016-3088",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.7621
+        }
+      },
+      {
+        "case_id": "dmz_dual-2017-17562-2016-3088",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2017-17562",
+          "CVE-2016-3088"
+        ],
+        "success_probability": 0.6621,
+        "cost_factor": 0.39,
+        "score": 34.83,
+        "label": "medium",
+        "bottleneck": {
+          "cve_id": "CVE-2016-3088",
+          "slot_id": "dmz-target-2",
+          "success_probability": 0.7621
+        }
+      },
+      {
+        "case_id": "dmz_simple-2017-15715",
+        "template": "dmz_simple",
+        "cves": [
+          "CVE-2017-15715"
+        ],
+        "success_probability": 0.6097,
+        "cost_factor": 0.53,
+        "score": 41.82,
+        "label": "medium",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.6097
+        }
+      },
+      {
+        "case_id": "dmz_dual-2012-1823-2016-3088",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2016-3088"
+        ],
+        "success_probability": 0.6826,
+        "cost_factor": 0.37,
+        "score": 32.79,
+        "label": "medium",
+        "bottleneck": {
+          "cve_id": "CVE-2016-3088",
+          "slot_id": "dmz-target-2",
+          "success_probability": 0.7621
+        }
+      },
+      {
+        "case_id": "dmz_dual-2016-3088-2012-1823",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2016-3088",
+          "CVE-2012-1823"
+        ],
+        "success_probability": 0.6826,
+        "cost_factor": 0.37,
+        "score": 32.79,
+        "label": "medium",
+        "bottleneck": {
+          "cve_id": "CVE-2016-3088",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.7621
+        }
+      },
+      {
+        "case_id": "dmz_dual-2016-3088-2019-9193",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2016-3088",
+          "CVE-2019-9193"
+        ],
+        "success_probability": 0.5628,
+        "cost_factor": 0.44,
+        "score": 43.78,
+        "label": "medium",
+        "bottleneck": {
+          "cve_id": "CVE-2016-3088",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.7621
+        }
+      }
+    ],
+    "hard": [
+      {
+        "case_id": "dmz_dual-2016-3088-2017-15715",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2016-3088",
+          "CVE-2017-15715"
+        ],
+        "success_probability": 0.4282,
+        "cost_factor": 0.585,
+        "score": 57.44,
+        "label": "hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "dmz-target-2",
+          "success_probability": 0.6097
+        }
+      },
+      {
+        "case_id": "dmz_dual-2017-15715-2016-3088",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2017-15715",
+          "CVE-2016-3088"
+        ],
+        "success_probability": 0.4282,
+        "cost_factor": 0.585,
+        "score": 57.44,
+        "label": "hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.6097
+        }
+      },
+      {
+        "case_id": "matrix-2012-1823-2017-17562-2014-3120",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2017-17562",
+          "CVE-2014-3120"
+        ],
+        "success_probability": 0.3057,
+        "cost_factor": 0.75,
+        "score": 70.54,
+        "label": "hard",
+        "bottleneck": {
+          "cve_id": "CVE-2014-3120",
+          "slot_id": "data-store",
+          "success_probability": 0.6788
+        }
+      },
+      {
+        "case_id": "matrix-2012-1823-2017-17562-2015-1427",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2017-17562",
+          "CVE-2015-1427"
+        ],
+        "success_probability": 0.3057,
+        "cost_factor": 0.75,
+        "score": 70.54,
+        "label": "hard",
+        "bottleneck": {
+          "cve_id": "CVE-2015-1427",
+          "slot_id": "data-store",
+          "success_probability": 0.6788
+        }
+      },
+      {
+        "case_id": "matrix-2017-17562-2012-1823-2014-3120",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2017-17562",
+          "CVE-2012-1823",
+          "CVE-2014-3120"
+        ],
+        "success_probability": 0.3057,
+        "cost_factor": 0.75,
+        "score": 70.54,
+        "label": "hard",
+        "bottleneck": {
+          "cve_id": "CVE-2014-3120",
+          "slot_id": "data-store",
+          "success_probability": 0.6788
+        }
+      },
+      {
+        "case_id": "matrix-2017-17562-2012-1823-2015-1427",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2017-17562",
+          "CVE-2012-1823",
+          "CVE-2015-1427"
+        ],
+        "success_probability": 0.3057,
+        "cost_factor": 0.75,
+        "score": 70.54,
+        "label": "hard",
+        "bottleneck": {
+          "cve_id": "CVE-2015-1427",
+          "slot_id": "data-store",
+          "success_probability": 0.6788
+        }
+      },
+      {
+        "case_id": "dmz_dual-2017-15715-2019-9193",
+        "template": "dmz_dual",
+        "cves": [
+          "CVE-2017-15715",
+          "CVE-2019-9193"
+        ],
+        "success_probability": 0.4503,
+        "cost_factor": 0.515,
+        "score": 54.28,
+        "label": "hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "dmz-target-1",
+          "success_probability": 0.6097
+        }
+      },
+      {
+        "case_id": "matrix-2012-1823-2017-17562-2019-9193",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2017-17562",
+          "CVE-2019-9193"
+        ],
+        "success_probability": 0.2905,
+        "cost_factor": 0.783,
+        "score": 72.42,
+        "label": "hard",
+        "bottleneck": {
+          "cve_id": "CVE-2019-9193",
+          "slot_id": "data-store",
+          "success_probability": 0.6449
+        }
+      }
+    ],
+    "very_hard": [
+      {
+        "case_id": "matrix-2012-1823-2017-15715-2014-3120",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2017-15715",
+          "CVE-2014-3120"
+        ],
+        "success_probability": 0.1384,
+        "cost_factor": 0.93,
+        "score": 87.53,
+        "label": "very_hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "app-service",
+          "success_probability": 0.35
+        }
+      },
+      {
+        "case_id": "matrix-2012-1823-2017-15715-2015-1427",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2017-15715",
+          "CVE-2015-1427"
+        ],
+        "success_probability": 0.1384,
+        "cost_factor": 0.93,
+        "score": 87.53,
+        "label": "very_hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "app-service",
+          "success_probability": 0.35
+        }
+      },
+      {
+        "case_id": "matrix-2017-15715-2016-3088-2014-3120",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2017-15715",
+          "CVE-2016-3088",
+          "CVE-2014-3120"
+        ],
+        "success_probability": 0.155,
+        "cost_factor": 0.973,
+        "score": 87.06,
+        "label": "very_hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "dmz-web",
+          "success_probability": 0.6097
+        }
+      },
+      {
+        "case_id": "matrix-2017-15715-2016-3088-2015-1427",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2017-15715",
+          "CVE-2016-3088",
+          "CVE-2015-1427"
+        ],
+        "success_probability": 0.155,
+        "cost_factor": 0.973,
+        "score": 87.06,
+        "label": "very_hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "dmz-web",
+          "success_probability": 0.6097
+        }
+      },
+      {
+        "case_id": "matrix-2017-17562-2017-15715-2014-3120",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2017-17562",
+          "CVE-2017-15715",
+          "CVE-2014-3120"
+        ],
+        "success_probability": 0.1343,
+        "cost_factor": 0.943,
+        "score": 88.12,
+        "label": "very_hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "app-service",
+          "success_probability": 0.35
+        }
+      },
+      {
+        "case_id": "matrix-2017-17562-2017-15715-2015-1427",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2017-17562",
+          "CVE-2017-15715",
+          "CVE-2015-1427"
+        ],
+        "success_probability": 0.1343,
+        "cost_factor": 0.943,
+        "score": 88.12,
+        "label": "very_hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "app-service",
+          "success_probability": 0.35
+        }
+      },
+      {
+        "case_id": "matrix-2017-15715-2016-3088-2019-9193",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2017-15715",
+          "CVE-2016-3088",
+          "CVE-2019-9193"
+        ],
+        "success_probability": 0.1473,
+        "cost_factor": 1.0,
+        "score": 88.22,
+        "label": "very_hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "dmz-web",
+          "success_probability": 0.6097
+        }
+      },
+      {
+        "case_id": "matrix-2012-1823-2017-15715-2019-9193",
+        "template": "enterprise_3tier",
+        "cves": [
+          "CVE-2012-1823",
+          "CVE-2017-15715",
+          "CVE-2019-9193"
+        ],
+        "success_probability": 0.1315,
+        "cost_factor": 0.963,
+        "score": 88.74,
+        "label": "very_hard",
+        "bottleneck": {
+          "cve_id": "CVE-2017-15715",
+          "slot_id": "app-service",
+          "success_probability": 0.35
+        }
+      }
+    ]
+  }
+}
