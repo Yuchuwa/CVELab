@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-08-10T08:25:48.169003+00:00",
+  "generated_at": "2026-09-02T13:48:16.200719+00:00",
   "definitions": {
     "planned": "accepted into the Atom build queue; atom.yaml does not exist yet",
     "building": "Atom construction or verification has started but strict completion gates do not all pass",
@@ -24,10 +24,10 @@
     "orchestrated_environment_verified"
   ],
   "summary": {
-    "total": 284,
+    "total": 294,
     "planned": 0,
-    "building": 238,
-    "completed": 46
+    "building": 235,
+    "completed": 59
   },
   "atoms": [
     {
@@ -2531,6 +2531,32 @@
       ]
     },
     {
+      "cve_id": "CVE-2018-3729",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "LFI",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
+    },
+    {
       "cve_id": "CVE-2018-3760",
       "build_status": "building",
       "version": 2,
@@ -3075,44 +3101,29 @@
     },
     {
       "cve_id": "CVE-2019-20933",
-      "build_status": "building",
-      "version": 2,
+      "build_status": "completed",
+      "version": 3,
       "service_role": "database",
       "vuln_category": "Auth_Bypass",
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
-        "schema_v3": false,
-        "source_bundle_complete": false,
-        "source_bundle_material_metadata_complete": false,
-        "source_bundle_hashed": false,
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
         "self_contained_paths": true,
-        "runtime_spec_explicit": false,
-        "runtime_ready": false,
-        "runtime_build_reproducible": false,
-        "flag_contract_explicit": false,
-        "validation_contract_explicit": false,
-        "native_verified": false,
-        "service_contract_complete": false,
-        "verified_capability": false,
-        "guide_ready_valid": false,
-        "orchestrated_environment_verified": false
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
       },
-      "blockers": [
-        "schema_v3",
-        "source_bundle_complete",
-        "source_bundle_material_metadata_complete",
-        "source_bundle_hashed",
-        "runtime_spec_explicit",
-        "runtime_ready",
-        "runtime_build_reproducible",
-        "flag_contract_explicit",
-        "validation_contract_explicit",
-        "native_verified",
-        "service_contract_complete",
-        "verified_capability",
-        "guide_ready_valid",
-        "orchestrated_environment_verified"
-      ]
+      "blockers": []
     },
     {
       "cve_id": "CVE-2019-3396",
@@ -4387,7 +4398,7 @@
     },
     {
       "cve_id": "CVE-2020-35476",
-      "build_status": "building",
+      "build_status": "completed",
       "version": 3,
       "service_role": "web_application",
       "vuln_category": "RCE",
@@ -4405,13 +4416,37 @@
         "validation_contract_explicit": true,
         "native_verified": true,
         "service_contract_complete": true,
-        "verified_capability": false,
+        "verified_capability": true,
         "guide_ready_valid": true,
         "orchestrated_environment_verified": true
       },
-      "blockers": [
-        "verified_capability"
-      ]
+      "blockers": []
+    },
+    {
+      "cve_id": "CVE-2020-36651",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "LFI",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
     },
     {
       "cve_id": "CVE-2020-7012",
@@ -4485,6 +4520,32 @@
         "guide_ready_valid",
         "orchestrated_environment_verified"
       ]
+    },
+    {
+      "cve_id": "CVE-2020-7684",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "LFI",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
     },
     {
       "cve_id": "CVE-2020-7961",
@@ -5886,6 +5947,32 @@
       ]
     },
     {
+      "cve_id": "CVE-2021-40978",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "LFI",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
+    },
+    {
       "cve_id": "CVE-2021-41277",
       "build_status": "building",
       "version": 2,
@@ -6614,19 +6701,17 @@
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
         "runtime_ready": true,
-        "runtime_build_reproducible": true,
+        "runtime_build_reproducible": false,
         "flag_contract_explicit": true,
         "validation_contract_explicit": true,
-        "native_verified": false,
+        "native_verified": true,
         "service_contract_complete": true,
-        "verified_capability": false,
+        "verified_capability": true,
         "guide_ready_valid": true,
-        "orchestrated_environment_verified": false
+        "orchestrated_environment_verified": true
       },
       "blockers": [
-        "native_verified",
-        "verified_capability",
-        "orchestrated_environment_verified"
+        "runtime_build_reproducible"
       ]
     },
     {
@@ -6763,6 +6848,32 @@
         "guide_ready_valid",
         "orchestrated_environment_verified"
       ]
+    },
+    {
+      "cve_id": "CVE-2022-35918",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "LFI",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
     },
     {
       "cve_id": "CVE-2022-41678",
@@ -7575,7 +7686,7 @@
     },
     {
       "cve_id": "CVE-2023-25826",
-      "build_status": "building",
+      "build_status": "completed",
       "version": 3,
       "service_role": "web_application",
       "vuln_category": "RCE",
@@ -7593,13 +7704,11 @@
         "validation_contract_explicit": true,
         "native_verified": true,
         "service_contract_complete": true,
-        "verified_capability": false,
+        "verified_capability": true,
         "guide_ready_valid": true,
         "orchestrated_environment_verified": true
       },
-      "blockers": [
-        "verified_capability"
-      ]
+      "blockers": []
     },
     {
       "cve_id": "CVE-2023-26360",
@@ -7898,6 +8007,32 @@
         "guide_ready_valid",
         "orchestrated_environment_verified"
       ]
+    },
+    {
+      "cve_id": "CVE-2023-3852",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "RCE",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
     },
     {
       "cve_id": "CVE-2023-38633",
@@ -8602,6 +8737,58 @@
       ]
     },
     {
+      "cve_id": "CVE-2024-30265",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "LFI",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
+    },
+    {
+      "cve_id": "CVE-2024-32005",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "LFI",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
+    },
+    {
       "cve_id": "CVE-2024-32114",
       "build_status": "building",
       "version": 2,
@@ -8641,6 +8828,32 @@
         "guide_ready_valid",
         "orchestrated_environment_verified"
       ]
+    },
+    {
+      "cve_id": "CVE-2024-36361",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "RCE",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
     },
     {
       "cve_id": "CVE-2024-36401",
@@ -8909,6 +9122,32 @@
       "blockers": [
         "guide_ready_valid"
       ]
+    },
+    {
+      "cve_id": "CVE-2024-45601",
+      "build_status": "completed",
+      "version": 3,
+      "service_role": "web_application",
+      "vuln_category": "LFI",
+      "primary_mitre_phase": "initial_access",
+      "completion_checks": {
+        "schema_v3": true,
+        "source_bundle_complete": true,
+        "source_bundle_material_metadata_complete": true,
+        "source_bundle_hashed": true,
+        "self_contained_paths": true,
+        "runtime_spec_explicit": true,
+        "runtime_ready": true,
+        "runtime_build_reproducible": true,
+        "flag_contract_explicit": true,
+        "validation_contract_explicit": true,
+        "native_verified": true,
+        "service_contract_complete": true,
+        "verified_capability": true,
+        "guide_ready_valid": true,
+        "orchestrated_environment_verified": true
+      },
+      "blockers": []
     },
     {
       "cve_id": "CVE-2024-47177",
@@ -10077,5 +10316,5 @@
       ]
     }
   ],
-  "snapshot_hash": "4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd"
+  "snapshot_hash": "c004cc8c6b0019535e256d1f2b111e89064d7c53cf7ce2ba5878386dcd85e2a9"
 }

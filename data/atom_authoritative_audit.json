@@ -301,10 +301,10 @@
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 6,
+      "hash_ok": 5,
       "hash_bad": 0,
-      "hash_total": 6,
-      "poc_materials_total": 1,
+      "hash_total": 5,
+      "poc_materials_total": 2,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
     },
@@ -481,10 +481,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         80
       ],
@@ -509,7 +509,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -610,10 +609,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 9200,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         9200,
         9300
@@ -640,7 +639,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -840,10 +838,10 @@
       "present": false
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -869,7 +867,6 @@
       "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -1088,10 +1085,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -1116,7 +1113,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -1522,20 +1518,30 @@
     "cve_id": "CVE-2017-12149",
     "category": "jboss",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "web_application",
-    "vuln_category": "RCE",
+    "vuln_category": "Deserialization",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         9990,
         8080
@@ -1546,28 +1552,33 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 2,
+      "verified": [
+        "execute_command",
+        "read_file"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "no source_bundle",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2017-12615",
@@ -1695,20 +1706,30 @@
     "cve_id": "CVE-2017-12635",
     "category": "couchdb",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "database",
-    "vuln_category": "RCE",
+    "vuln_category": "Auth_Bypass",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 4,
+      "hash_bad": 0,
+      "hash_total": 4,
+      "poc_materials_total": 1,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 5984,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5984
       ],
@@ -1717,28 +1738,31 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 1,
+      "verified": [
+        "authenticate"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "application_admin"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "no source_bundle",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2017-12636",
@@ -1804,20 +1828,32 @@
     "cve_id": "CVE-2017-12794",
     "category": "django",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "Injection",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 12,
+      "hash_bad": 0,
+      "hash_total": 12,
+      "poc_materials_total": 9,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": [
+        "__init__.py"
+      ]
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8000
       ],
@@ -1826,27 +1862,33 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 1,
+      "verified": [
+        "read_credential"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "unknown"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
+      "poc_material basename collision",
+      "environment_ready=false"
     ]
   },
   {
@@ -2170,10 +2212,10 @@
     "cve_id": "CVE-2017-3066",
     "category": "coldfusion",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
@@ -2182,18 +2224,18 @@
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 6,
+      "hash_ok": 3,
       "hash_bad": 0,
-      "hash_total": 6,
+      "hash_total": 3,
       "poc_materials_total": 0,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 8500,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8500
       ],
@@ -2213,14 +2255,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -2248,10 +2288,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -2276,7 +2316,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -2355,10 +2394,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "log4j-socket",
+      "port": 4712,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         4712
       ],
@@ -2383,7 +2422,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -2671,10 +2709,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -2699,7 +2737,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -2721,9 +2758,9 @@
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 9,
+      "hash_ok": 5,
       "hash_bad": 0,
-      "hash_total": 9,
+      "hash_total": 5,
       "poc_materials_total": 2,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
@@ -2834,10 +2871,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         80
       ],
@@ -2862,7 +2899,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -3035,10 +3071,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 50000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         50000,
         8080
@@ -3065,7 +3101,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -3095,10 +3130,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080,
         5005
@@ -3125,7 +3160,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -3336,10 +3370,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -3364,7 +3398,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -3374,20 +3407,30 @@
     "cve_id": "CVE-2018-1273",
     "category": "spring",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
-    "service_role": "web_application",
+    "native_success": false,
+    "environment_ready": false,
+    "service_role": "framework",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -3407,15 +3450,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -3423,20 +3463,30 @@
     "cve_id": "CVE-2018-1297",
     "category": "jmeter",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 1099,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         1099
       ],
@@ -3456,15 +3506,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -3816,10 +3863,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -3853,9 +3900,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -3883,10 +3929,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         80
       ],
@@ -3911,7 +3957,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -4033,6 +4078,75 @@
     "reasons": []
   },
   {
+    "cve_id": "CVE-2018-3729",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "LFI",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 17,
+      "hash_bad": 0,
+      "hash_total": 17,
+      "poc_materials_total": 13,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        8080
+      ],
+      "runtime_spec_ports": [
+        8080
+      ]
+    },
+    "capability_contract": {
+      "total": 2,
+      "verified": [
+        "read_credential",
+        "read_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
+  },
+  {
     "cve_id": "CVE-2018-3760",
     "category": "rails",
     "parseable": true,
@@ -4056,10 +4170,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 3000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         3000
       ],
@@ -4084,7 +4198,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -4114,10 +4227,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -4142,7 +4255,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -4152,20 +4264,30 @@
     "cve_id": "CVE-2018-7600",
     "category": "drupal",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         80
       ],
@@ -4185,15 +4307,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -4369,11 +4488,11 @@
     "cve_id": "CVE-2019-10758",
     "category": "mongo-express",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
-    "service_role": "web_application",
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "database",
     "vuln_category": "RCE",
     "source_bundle": {
       "present": true,
@@ -4381,18 +4500,18 @@
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 4,
+      "hash_ok": 3,
       "hash_bad": 0,
-      "hash_total": 4,
+      "hash_total": 3,
       "poc_materials_total": 0,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8081,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8081
       ],
@@ -4401,27 +4520,37 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 4,
+      "verified": [
+        "execute_command",
+        "read_file",
+        "write_file",
+        "network_vantage"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2019-11043",
@@ -4609,10 +4738,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 10000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         10000
       ],
@@ -4637,7 +4766,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -4667,10 +4795,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8983,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8983,
         5005
@@ -4706,9 +4834,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -4736,10 +4863,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -4764,7 +4891,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -4774,20 +4900,30 @@
     "cve_id": "CVE-2019-20933",
     "category": "influxdb",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "database",
     "vuln_category": "Auth_Bypass",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8086,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8086
       ],
@@ -4796,28 +4932,31 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 1,
+      "verified": [
+        "authenticate"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "application_admin"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "no source_bundle",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2019-3396",
@@ -4897,10 +5036,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 3000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         3000
       ],
@@ -4925,7 +5064,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -5561,10 +5699,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 5555,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5555
       ],
@@ -5589,7 +5727,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -5619,10 +5756,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 9443,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         9443,
         8181
@@ -5649,7 +5786,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -5679,10 +5815,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 9080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         9080,
         9091,
@@ -5711,7 +5847,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -5741,10 +5876,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 7001,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         7001
       ],
@@ -5769,7 +5904,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -6134,20 +6268,30 @@
     "cve_id": "CVE-2020-35476",
     "category": "opentsdb",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 4242,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         4242
       ],
@@ -6156,28 +6300,102 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 2,
+      "verified": [
+        "execute_command",
+        "read_file"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "no source_bundle",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
+  },
+  {
+    "cve_id": "CVE-2020-36651",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "LFI",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 18,
+      "hash_bad": 0,
+      "hash_total": 18,
+      "poc_materials_total": 13,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 9999,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        9999
+      ],
+      "runtime_spec_ports": [
+        9999
+      ]
+    },
+    "capability_contract": {
+      "total": 2,
+      "verified": [
+        "read_credential",
+        "read_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2020-7012",
@@ -6228,20 +6446,30 @@
     "cve_id": "CVE-2020-7247",
     "category": "opensmtpd",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 1,
+      "hash_bad": 3,
+      "hash_total": 4,
+      "poc_materials_total": 1,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "smtp",
+      "port": 25,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         25
       ],
@@ -6263,15 +6491,80 @@
     },
     "status": "excluded",
     "reasons": [
-      "version<3",
-      "no source_bundle",
+      "bundle: 3 hash mismatch",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
+  },
+  {
+    "cve_id": "CVE-2020-7684",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "LFI",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 16,
+      "hash_bad": 0,
+      "hash_total": 16,
+      "poc_materials_total": 12,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 10001,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        10001
+      ],
+      "runtime_spec_ports": [
+        10001
+      ]
+    },
+    "capability_contract": {
+      "total": 1,
+      "verified": [
+        "read_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2020-7961",
@@ -6664,10 +6957,10 @@
     "cve_id": "CVE-2021-25646",
     "category": "apache-druid",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
@@ -6676,66 +6969,84 @@
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 4,
+      "hash_ok": 3,
       "hash_bad": 0,
-      "hash_total": 4,
+      "hash_total": 3,
       "poc_materials_total": 0,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8081,
+      "complete": true,
+      "empty": false,
       "ports_field": [
-        8888
+        8081
       ],
       "runtime_spec_ports": [
         8888
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 3,
+      "verified": [
+        "execute_command",
+        "read_file",
+        "write_file"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2021-26084",
     "category": "confluence",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 2,
+      "hash_bad": 1,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 8090,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8090
       ],
@@ -6757,13 +7068,11 @@
     },
     "status": "excluded",
     "reasons": [
-      "version<3",
-      "no source_bundle",
+      "bundle: 1 hash mismatch",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -7303,10 +7612,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         80
       ],
@@ -7340,9 +7649,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -7552,44 +7860,58 @@
     "cve_id": "CVE-2021-40438",
     "category": "httpd",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
-    "service_role": "middleware",
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
     "vuln_category": "SSRF",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 4,
+      "hash_bad": 0,
+      "hash_total": 4,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [],
       "runtime_spec_ports": []
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 1,
+      "verified": [
+        "network_vantage"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "unknown"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "template_candidate",
     "reasons": [
-      "version<3",
-      "no source_bundle",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
       "guide not ready"
     ]
   },
@@ -7645,6 +7967,75 @@
     ]
   },
   {
+    "cve_id": "CVE-2021-40978",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "LFI",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 13,
+      "hash_bad": 0,
+      "hash_total": 13,
+      "poc_materials_total": 9,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 8000,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        8000
+      ],
+      "runtime_spec_ports": [
+        8000
+      ]
+    },
+    "capability_contract": {
+      "total": 2,
+      "verified": [
+        "read_credential",
+        "read_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
+  },
+  {
     "cve_id": "CVE-2021-41277",
     "category": "metabase",
     "parseable": true,
@@ -7658,10 +8049,10 @@
       "present": false
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 3000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         3000
       ],
@@ -7687,7 +8078,6 @@
       "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -7771,10 +8161,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         80
       ],
@@ -7808,9 +8198,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -7838,10 +8227,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         80
       ],
@@ -7866,7 +8255,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -7876,20 +8264,30 @@
     "cve_id": "CVE-2021-42392",
     "category": "h2database",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "framework",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080,
         5005
@@ -7911,15 +8309,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -7947,10 +8342,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         80
       ],
@@ -7975,7 +8370,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -8005,10 +8399,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 3000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         3000
       ],
@@ -8033,7 +8427,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -8214,10 +8607,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "redis",
+      "port": 6379,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         6379
       ],
@@ -8251,9 +8644,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -8377,10 +8769,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -8405,7 +8797,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -8435,10 +8826,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -8474,9 +8865,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -8553,10 +8943,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080,
         5005
@@ -8583,7 +8973,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -8593,10 +8982,10 @@
     "cve_id": "CVE-2022-24706",
     "category": "couchdb",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "database",
     "vuln_category": "RCE",
     "source_bundle": {
@@ -8605,18 +8994,18 @@
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 5,
+      "hash_ok": 4,
       "hash_bad": 0,
-      "hash_total": 5,
+      "hash_total": 4,
       "poc_materials_total": 1,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 4369,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5984,
         4369,
@@ -8629,27 +9018,35 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 3,
+      "verified": [
+        "execute_command",
+        "read_file",
+        "write_file"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2022-24816",
@@ -8675,10 +9072,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080,
         5005
@@ -8714,9 +9111,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -8724,20 +9120,30 @@
     "cve_id": "CVE-2022-26134",
     "category": "confluence",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 2,
+      "hash_bad": 1,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 8090,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8090
       ],
@@ -8759,13 +9165,11 @@
     },
     "status": "excluded",
     "reasons": [
-      "version<3",
-      "no source_bundle",
+      "bundle: 1 hash mismatch",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -8819,6 +9223,75 @@
     ]
   },
   {
+    "cve_id": "CVE-2022-35918",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "LFI",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 13,
+      "hash_bad": 0,
+      "hash_total": 13,
+      "poc_materials_total": 9,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 8501,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        8501
+      ],
+      "runtime_spec_ports": [
+        8501
+      ]
+    },
+    "capability_contract": {
+      "total": 2,
+      "verified": [
+        "read_credential",
+        "read_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
+  },
+  {
     "cve_id": "CVE-2022-41678",
     "category": "activemq",
     "parseable": true,
@@ -8842,10 +9315,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8161,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         61616,
         8161,
@@ -8883,9 +9356,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -8913,10 +9385,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 5050,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5050
       ],
@@ -8941,7 +9413,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -8971,10 +9442,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -8999,7 +9470,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -9204,20 +9674,30 @@
     "cve_id": "CVE-2023-22515",
     "category": "confluence",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
-    "vuln_category": "RCE",
+    "vuln_category": "Auth_Bypass",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 2,
+      "hash_bad": 1,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8090,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8090
       ],
@@ -9226,27 +9706,32 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
+      "total": 1,
       "verified": [],
-      "inferred": [],
+      "inferred": [
+        "authenticate"
+      ],
       "verified_principals": [],
       "resolvable_evidence_refs": [],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
     "status": "excluded",
     "reasons": [
-      "version<3",
-      "no source_bundle",
+      "bundle: 1 hash mismatch",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
+      "environment_ready=false"
     ]
   },
   {
@@ -9449,20 +9934,30 @@
     "cve_id": "CVE-2023-25826",
     "category": "opentsdb",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 4242,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         4242
       ],
@@ -9471,28 +9966,33 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 2,
+      "verified": [
+        "execute_command",
+        "read_file"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "no source_bundle",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2023-26360",
@@ -9707,20 +10207,30 @@
     "cve_id": "CVE-2023-32315",
     "category": "openfire",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 9090,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         9090
       ],
@@ -9740,15 +10250,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -9827,10 +10334,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "rocketmq",
+      "port": 10911,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         10911
       ],
@@ -9855,7 +10362,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -9909,6 +10415,77 @@
       "environment_ready missing (legacy)",
       "guide not ready"
     ]
+  },
+  {
+    "cve_id": "CVE-2023-3852",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "RCE",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 133,
+      "hash_bad": 0,
+      "hash_total": 133,
+      "poc_materials_total": 114,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        80
+      ],
+      "runtime_spec_ports": [
+        80
+      ]
+    },
+    "capability_contract": {
+      "total": 3,
+      "verified": [
+        "execute_command",
+        "read_file",
+        "write_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "service_user"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2023-38633",
@@ -9983,10 +10560,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 3000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         3000
       ],
@@ -10011,7 +10588,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -10070,20 +10646,30 @@
     "cve_id": "CVE-2023-41892",
     "category": "craftcms",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 80,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         80
       ],
@@ -10092,28 +10678,35 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 3,
+      "verified": [
+        "execute_command",
+        "read_file",
+        "write_file"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "service_user"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "no source_bundle",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2023-42793",
@@ -10250,10 +10843,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8085,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8085,
         5005
@@ -10289,9 +10882,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -10530,10 +11122,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 7860,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         7860
       ],
@@ -10558,7 +11150,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -10588,10 +11179,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "https",
+      "port": 8443,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8443,
         5005
@@ -10627,9 +11218,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -10637,30 +11227,30 @@
     "cve_id": "CVE-2024-1561",
     "category": "gradio",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "web_application",
-    "vuln_category": "RCE",
+    "vuln_category": "LFI",
     "source_bundle": {
       "present": true,
       "compose_file": true,
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 6,
+      "hash_ok": 3,
       "hash_bad": 0,
-      "hash_total": 6,
+      "hash_total": 3,
       "poc_materials_total": 0,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 7860,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         7860
       ],
@@ -10669,27 +11259,31 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 1,
+      "verified": [
+        "read_file"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2024-23897",
@@ -10715,10 +11309,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 50000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         50000,
         8080,
@@ -10747,7 +11341,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -10757,20 +11350,30 @@
     "cve_id": "CVE-2024-27198",
     "category": "teamcity",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 8111,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8111,
         5005
@@ -10792,15 +11395,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -10828,10 +11428,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080,
         5005
@@ -10867,9 +11467,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -10972,6 +11571,144 @@
     ]
   },
   {
+    "cve_id": "CVE-2024-30265",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "LFI",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 12,
+      "hash_bad": 0,
+      "hash_total": 12,
+      "poc_materials_total": 8,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 8866,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        8866
+      ],
+      "runtime_spec_ports": [
+        8866
+      ]
+    },
+    "capability_contract": {
+      "total": 2,
+      "verified": [
+        "read_credential",
+        "read_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
+  },
+  {
+    "cve_id": "CVE-2024-32005",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "LFI",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 13,
+      "hash_bad": 0,
+      "hash_total": 13,
+      "poc_materials_total": 9,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        8080
+      ],
+      "runtime_spec_ports": [
+        8080
+      ]
+    },
+    "capability_contract": {
+      "total": 2,
+      "verified": [
+        "read_credential",
+        "read_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
+  },
+  {
     "cve_id": "CVE-2024-32114",
     "category": "activemq",
     "parseable": true,
@@ -11025,6 +11762,77 @@
     ]
   },
   {
+    "cve_id": "CVE-2024-36361",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "RCE",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 14,
+      "hash_bad": 0,
+      "hash_total": 14,
+      "poc_materials_total": 10,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 3000,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        3000
+      ],
+      "runtime_spec_ports": [
+        3000
+      ]
+    },
+    "capability_contract": {
+      "total": 3,
+      "verified": [
+        "execute_command",
+        "read_file",
+        "write_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
+  },
+  {
     "cve_id": "CVE-2024-36401",
     "category": "geoserver",
     "parseable": true,
@@ -11048,10 +11856,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080,
         5005
@@ -11078,7 +11886,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -11108,10 +11915,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "https",
+      "port": 8443,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8443,
         5005
@@ -11147,9 +11954,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -11157,20 +11963,30 @@
     "cve_id": "CVE-2024-39907",
     "category": "1panel",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 10086,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         10086
       ],
@@ -11190,15 +12006,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -11377,10 +12190,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "https",
+      "port": 8443,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8443,
         5005
@@ -11416,9 +12229,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -11426,10 +12238,10 @@
     "cve_id": "CVE-2024-45507",
     "category": "ofbiz",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
@@ -11438,18 +12250,18 @@
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 5,
+      "hash_ok": 3,
       "hash_bad": 0,
-      "hash_total": 5,
+      "hash_total": 3,
       "poc_materials_total": 0,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "https",
+      "port": 8443,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8443,
         5005
@@ -11460,46 +12272,129 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 4,
+      "verified": [
+        "execute_command",
+        "read_file",
+        "write_file",
+        "network_vantage"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "template_candidate",
     "reasons": [
-      "version<3",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
       "guide not ready"
     ]
+  },
+  {
+    "cve_id": "CVE-2024-45601",
+    "category": "cve_factory_wave1",
+    "parseable": true,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "web_application",
+    "vuln_category": "LFI",
+    "source_bundle": {
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [
+        {
+          "path": "source_bundle/Dockerfile",
+          "exists": true
+        }
+      ],
+      "init_files": [],
+      "hash_ok": 13,
+      "hash_bad": 0,
+      "hash_total": 13,
+      "poc_materials_total": 9,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
+    },
+    "service_contract": {
+      "protocol": "http",
+      "port": 32123,
+      "complete": true,
+      "empty": false,
+      "ports_field": [
+        32123
+      ],
+      "runtime_spec_ports": [
+        32123
+      ]
+    },
+    "capability_contract": {
+      "total": 1,
+      "verified": [
+        "read_file"
+      ],
+      "inferred": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence"
+      ],
+      "unresolvable_evidence_refs": []
+    },
+    "guide": {
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
+    },
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2024-47177",
     "category": "cups-browsed",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 631,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         631,
         631
@@ -11521,15 +12416,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -11666,10 +12558,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 3000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         3000
       ],
@@ -11703,9 +12595,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -11838,10 +12729,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080
       ],
@@ -11866,7 +12757,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -11896,10 +12786,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 5050,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5050
       ],
@@ -11924,7 +12814,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -12003,10 +12892,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 5173,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5173
       ],
@@ -12031,7 +12920,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -12061,10 +12949,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 5173,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5173
       ],
@@ -12089,7 +12977,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -12099,11 +12986,11 @@
     "cve_id": "CVE-2025-32433",
     "category": "erlang",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
-    "service_role": "middleware",
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
+    "service_role": "system_service",
     "vuln_category": "RCE",
     "source_bundle": {
       "present": true,
@@ -12111,18 +12998,18 @@
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 6,
+      "hash_ok": 4,
       "hash_bad": 0,
-      "hash_total": 6,
+      "hash_total": 4,
       "poc_materials_total": 1,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "ssh",
+      "port": 2222,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         2222
       ],
@@ -12131,27 +13018,35 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 3,
+      "verified": [
+        "execute_command",
+        "read_file",
+        "network_vantage"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "unknown"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2025-3248",
@@ -12177,10 +13072,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 7860,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         7860
       ],
@@ -12205,7 +13100,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -12235,10 +13129,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8080,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8080,
         5005
@@ -12265,7 +13159,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -12275,20 +13168,30 @@
     "cve_id": "CVE-2025-49001",
     "category": "dataease",
     "parseable": true,
-    "version": 2,
+    "version": 3,
     "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "native_success": false,
+    "environment_ready": false,
     "service_role": "web_application",
     "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "tcp",
+      "port": 8100,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8100,
         5005
@@ -12310,15 +13213,12 @@
       "present": false,
       "ready": false
     },
-    "status": "excluded",
+    "status": "review_required",
     "reasons": [
-      "version<3",
-      "no source_bundle",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
-      "environment_ready missing (legacy)",
+      "environment_ready=false",
       "guide not ready"
     ]
   },
@@ -12395,10 +13295,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 3000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         3000
       ],
@@ -12432,9 +13332,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -12462,10 +13361,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8188,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8188
       ],
@@ -12490,7 +13389,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -12520,10 +13418,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 5678,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5678
       ],
@@ -12557,9 +13455,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -12567,10 +13464,10 @@
     "cve_id": "CVE-2026-21858",
     "category": "n8n",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "web_application",
     "vuln_category": "LFI",
     "source_bundle": {
@@ -12579,18 +13476,18 @@
       "readme_file": true,
       "dockerfiles": [],
       "init_files": [],
-      "hash_ok": 5,
+      "hash_ok": 3,
       "hash_bad": 0,
-      "hash_total": 5,
+      "hash_total": 3,
       "poc_materials_total": 0,
       "poc_materials_missing": [],
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 5678,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5678
       ],
@@ -12599,27 +13496,31 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 1,
+      "verified": [
+        "read_file"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "service_user"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2026-22777",
@@ -12674,20 +13575,30 @@
     "cve_id": "CVE-2026-24061",
     "category": "inetutils",
     "parseable": true,
-    "version": 2,
-    "verified": false,
-    "native_success": null,
-    "environment_ready": null,
+    "version": 3,
+    "verified": true,
+    "native_success": true,
+    "environment_ready": true,
     "service_role": "system_service",
-    "vuln_category": "Auth_Bypass",
+    "vuln_category": "RCE",
     "source_bundle": {
-      "present": false
+      "present": true,
+      "compose_file": true,
+      "readme_file": true,
+      "dockerfiles": [],
+      "init_files": [],
+      "hash_ok": 3,
+      "hash_bad": 0,
+      "hash_total": 3,
+      "poc_materials_total": 0,
+      "poc_materials_missing": [],
+      "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "telnet",
+      "port": 23,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         23
       ],
@@ -12696,28 +13607,39 @@
       ]
     },
     "capability_contract": {
-      "total": 0,
-      "verified": [],
+      "total": 5,
+      "verified": [
+        "execute_command",
+        "read_file",
+        "write_file",
+        "read_credential",
+        "network_vantage"
+      ],
       "inferred": [],
-      "verified_principals": [],
-      "resolvable_evidence_refs": [],
+      "verified_principals": [
+        "root"
+      ],
+      "resolvable_evidence_refs": [
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence",
+        "verification.native_verification.evidence"
+      ],
       "unresolvable_evidence_refs": []
     },
     "guide": {
-      "present": false,
-      "ready": false
+      "present": true,
+      "ready": true,
+      "format_version": 2,
+      "file_exists": true,
+      "cve_match": true,
+      "version_match": true,
+      "integrity_ok": true,
+      "advisory_reasons": []
     },
-    "status": "excluded",
-    "reasons": [
-      "version<3",
-      "no source_bundle",
-      "not verified",
-      "native not success",
-      "required_service empty",
-      "no verified capability grants",
-      "environment_ready missing (legacy)",
-      "guide not ready"
-    ]
+    "status": "template_anchor",
+    "reasons": []
   },
   {
     "cve_id": "CVE-2026-25253",
@@ -12743,10 +13665,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 18789,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         18789
       ],
@@ -12771,7 +13693,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -12801,10 +13722,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 4018,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         4018,
         4019
@@ -12840,9 +13761,8 @@
       "integrity_ok": true,
       "advisory_reasons": []
     },
-    "status": "review_required",
+    "status": "template_candidate",
     "reasons": [
-      "required_service empty",
       "environment_ready missing (legacy)"
     ]
   },
@@ -12968,10 +13888,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "openwire",
+      "port": 61616,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         61616,
         8161,
@@ -13000,7 +13920,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -13083,10 +14002,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 5173,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         5173
       ],
@@ -13111,7 +14030,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"
@@ -13141,10 +14059,10 @@
       "poc_materials_basename_collisions": []
     },
     "service_contract": {
-      "protocol": "",
-      "port": null,
-      "complete": false,
-      "empty": true,
+      "protocol": "http",
+      "port": 8000,
+      "complete": true,
+      "empty": false,
       "ports_field": [
         8000
       ],
@@ -13169,7 +14087,6 @@
       "version<3",
       "not verified",
       "native not success",
-      "required_service empty",
       "no verified capability grants",
       "environment_ready missing (legacy)",
       "guide not ready"

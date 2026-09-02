@@ -328,7 +328,7 @@ def main() -> int:
         "reasons",
     ]
     with out_csv.open("w", newline="") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(fields)
         for r in rows:
             if not r.get("parseable"):
@@ -391,7 +391,8 @@ def main() -> int:
     lines.append(f"- no source_bundle ({len(no_bundle)}): {', '.join(no_bundle)}")
     lines.append(f"- environment_ready=false ({len(env_false)}): {', '.join(env_false)}")
     lines.append(f"- unresolvable verified evidence_ref ({len(unresolvable)}): {', '.join(unresolvable)}")
-    lines.append(f"- ready guide integrity fail ({len(guide_integrity_fail)}): {', '.join(guide_integrity_fail)}")
+    guide_integrity_text = ", ".join(guide_integrity_fail) or "none"
+    lines.append(f"- ready guide integrity fail ({len(guide_integrity_fail)}): {guide_integrity_text}")
     (ROOT / "data" / "atom_authoritative_audit.md").write_text("\n".join(lines) + "\n")
 
     print(f"audited {len(rows)} atoms")

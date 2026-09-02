@@ -2,9 +2,9 @@
 
 Status: generated snapshot
 
-Generated at: `2026-08-10T08:25:48.169003+00:00`
+Generated at: `2026-09-02T13:48:16.200719+00:00`
 
-Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd`
+Snapshot hash: `c004cc8c6b0019535e256d1f2b111e89064d7c53cf7ce2ba5878386dcd85e2a9`
 
 ## Lifecycle Definitions
 
@@ -32,10 +32,10 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 
 ## Summary
 
-- `total`: 284
+- `total`: 294
 - `planned`: 0
-- `building`: 238
-- `completed`: 46
+- `building`: 235
+- `completed`: 59
 
 ## Atoms
 
@@ -113,6 +113,7 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 - `CVE-2018-19518` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2018-2628` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2018-2894` — `building`; blockers: runtime_ready, runtime_build_reproducible
+- `CVE-2018-3729` — `completed`; blockers: none
 - `CVE-2018-3760` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2018-7490` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2018-7600` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
@@ -129,7 +130,7 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 - `CVE-2019-16792` — `building`; blockers: atom_yaml_missing
 - `CVE-2019-17558` — `completed`; blockers: none
 - `CVE-2019-17564` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
-- `CVE-2019-20933` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2019-20933` — `completed`; blockers: none
 - `CVE-2019-3396` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2019-5418` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2019-6116` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
@@ -164,9 +165,11 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 - `CVE-2020-26232` — `building`; blockers: atom_yaml_missing
 - `CVE-2020-26236` — `building`; blockers: atom_yaml_missing
 - `CVE-2020-29599` — `building`; blockers: atom_yaml_missing
-- `CVE-2020-35476` — `building`; blockers: verified_capability
+- `CVE-2020-35476` — `completed`; blockers: none
+- `CVE-2020-36651` — `completed`; blockers: none
 - `CVE-2020-7012` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2020-7247` — `building`; blockers: source_bundle_complete, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2020-7684` — `completed`; blockers: none
 - `CVE-2020-7961` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2020-9402` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2020-9496` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
@@ -204,6 +207,7 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 - `CVE-2021-4034` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2021-40438` — `building`; blockers: runtime_ready, runtime_build_reproducible, guide_ready_valid
 - `CVE-2021-40822` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2021-40978` — `completed`; blockers: none
 - `CVE-2021-41277` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2021-41773` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2021-42013` — `completed`; blockers: none
@@ -224,11 +228,12 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 - `CVE-2022-22965` — `completed`; blockers: none
 - `CVE-2022-22978` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2022-23221` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
-- `CVE-2022-24706` — `building`; blockers: native_verified, verified_capability, orchestrated_environment_verified
+- `CVE-2022-24706` — `building`; blockers: runtime_build_reproducible
 - `CVE-2022-24757` — `building`; blockers: atom_yaml_missing
 - `CVE-2022-24816` — `completed`; blockers: none
 - `CVE-2022-26134` — `building`; blockers: source_bundle_complete, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2022-34265` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2022-35918` — `completed`; blockers: none
 - `CVE-2022-41678` — `completed`; blockers: none
 - `CVE-2022-4223` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2022-44216` — `building`; blockers: atom_yaml_missing
@@ -251,7 +256,7 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 - `CVE-2023-23752` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2023-25157` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2023-25194` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
-- `CVE-2023-25826` — `building`; blockers: verified_capability
+- `CVE-2023-25826` — `completed`; blockers: none
 - `CVE-2023-26360` — `completed`; blockers: none
 - `CVE-2023-27524` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2023-28432` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
@@ -260,6 +265,7 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 - `CVE-2023-33246` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2023-37582` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2023-37941` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2023-3852` — `completed`; blockers: none
 - `CVE-2023-38633` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2023-38646` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2023-39361` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
@@ -280,7 +286,10 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 - `CVE-2024-27348` — `completed`; blockers: none
 - `CVE-2024-28752` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2024-2961` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-30265` — `completed`; blockers: none
+- `CVE-2024-32005` — `completed`; blockers: none
 - `CVE-2024-32114` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
+- `CVE-2024-36361` — `completed`; blockers: none
 - `CVE-2024-36401` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2024-38856` — `completed`; blockers: none
 - `CVE-2024-39907` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
@@ -289,6 +298,7 @@ Snapshot hash: `4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd
 - `CVE-2024-4367` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2024-45195` — `completed`; blockers: none
 - `CVE-2024-45507` — `building`; blockers: guide_ready_valid
+- `CVE-2024-45601` — `completed`; blockers: none
 - `CVE-2024-47177` — `building`; blockers: native_verified, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2024-4956` — `building`; blockers: schema_v3, runtime_ready, runtime_build_reproducible, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
 - `CVE-2024-56145` — `building`; blockers: schema_v3, source_bundle_complete, source_bundle_material_metadata_complete, source_bundle_hashed, runtime_spec_explicit, runtime_ready, runtime_build_reproducible, flag_contract_explicit, validation_contract_explicit, native_verified, service_contract_complete, verified_capability, guide_ready_valid, orchestrated_environment_verified
