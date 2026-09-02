@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-09-02T13:48:16.200719+00:00",
+  "generated_at": "2026-09-02T13:54:33.084884+00:00",
   "definitions": {
     "planned": "accepted into the Atom build queue; atom.yaml does not exist yet",
     "building": "Atom construction or verification has started but strict completion gates do not all pass",
@@ -26,8 +26,8 @@
   "summary": {
     "total": 294,
     "planned": 0,
-    "building": 235,
-    "completed": 59
+    "building": 234,
+    "completed": 60
   },
   "atoms": [
     {
@@ -6688,7 +6688,7 @@
     },
     {
       "cve_id": "CVE-2022-24706",
-      "build_status": "building",
+      "build_status": "completed",
       "version": 3,
       "service_role": "database",
       "vuln_category": "RCE",
@@ -6701,7 +6701,7 @@
         "self_contained_paths": true,
         "runtime_spec_explicit": true,
         "runtime_ready": true,
-        "runtime_build_reproducible": false,
+        "runtime_build_reproducible": true,
         "flag_contract_explicit": true,
         "validation_contract_explicit": true,
         "native_verified": true,
@@ -6710,9 +6710,7 @@
         "guide_ready_valid": true,
         "orchestrated_environment_verified": true
       },
-      "blockers": [
-        "runtime_build_reproducible"
-      ]
+      "blockers": []
     },
     {
       "cve_id": "CVE-2022-24757",
@@ -10316,5 +10314,5 @@
       ]
     }
   ],
-  "snapshot_hash": "c004cc8c6b0019535e256d1f2b111e89064d7c53cf7ce2ba5878386dcd85e2a9"
+  "snapshot_hash": "48d7c81d7ba478b8d8da361460adc8650f15342c697850dc9fd3ed0e7453df2e"
 }
