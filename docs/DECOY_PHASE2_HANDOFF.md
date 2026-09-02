@@ -115,7 +115,9 @@ hygiene 不误杀。接口 3 无需特殊处理。
 
 **答案**：
 
-- 任务 A 的 `AGENT_CONTEXTS = (guided, no_guide, no_hint, l0, l1, l2)`。
+- 任务 A 的 `AGENT_CONTEXTS = (guided, no_guide, no_hint, l0, l1,
+  l1_entry_discovery, l2)`；其中 `l1_entry_discovery` 是版本化的 L1 入口候选
+  协议，不是新的难度等级。
   `no_hint` 是 l2 的 legacy alias。
 - 你的 `--noise-level` 参数（`none` / `baseline`）与 `agent_context` **正交**：
   同一 `agent_context` 下可有/无 decoy。实验单元为：

@@ -73,6 +73,69 @@ class TestToolEnvironment:
 
 
 class TestFinalReportRecovery:
+    def test_finalization_prompt_is_compact_and_schema_explicit(self, runner):
+        prompt = runner._finalization_prompt(1, "length")
+
+        assert "single line" in prompt
+        assert "Markdown fences" in prompt
+        for field in (
+            "success",
+            "verified_flags",
+            "objective_results",
+            "attack_log",
+            "evidence",
+            "failed_targets",
+        ):
+            assert field in prompt
+
+    def test_extract_json_skips_truncated_report_and_reads_later_complete_report(self, runner):
+        from clab_builder.orchestrator.composer.scenario_runner import extract_json
+
+        text = (
+            "The first report was cut off:\n"
+            "```json\n"
+            '{"success": true, "verified_flags": '
+            '{"target-1": "flag{old}"}, "target'
+            "\n```\n"
+            "Retry:\n"
+            "```JSON\n"
+            '{"success": true, "verified_flags": '
+            '{"target-1": "flag{new}"}, '
+            '"objective_results": {"read-customer-records": '
+            '{"achieved": true, "evidence": "CVELAB-CANARY"}}, '
+            '"attack_log": [{"actions": ["value with } brace"]}], '
+            '"evidence": [], "failed_targets": []}'
+            "\n```"
+        )
+
+        result = extract_json(text)
+
+        assert result is not None
+        assert result["verified_flags"]["target-1"] == "flag{new}"
+        assert result["objective_results"]["read-customer-records"]["achieved"] is True
+
+    def test_extract_json_does_not_promote_nested_payload_to_report(self, runner):
+        from clab_builder.orchestrator.composer.scenario_runner import extract_json
+
+        # The outer report is truncated after a complete objective payload.
+        # The nested object must not satisfy the final-report contract on its
+        # own; otherwise the runner would mark a malformed report structured.
+        text = (
+            "```json\n"
+            '{"success": true, "objective_results": '
+            '{"read-customer-records": {"evidence": "partial"}'
+            "\n```\n"
+        )
+
+        assert extract_json(text) is None
+
+    def test_extract_json_rejects_invalid_report_field_shapes(self, runner):
+        from clab_builder.orchestrator.composer.scenario_runner import extract_json
+
+        text = '{"success": true, "verified_flags": ["flag{not-a-map}"]}'
+
+        assert extract_json(text) is None
+
     def test_agent_report_cannot_overwrite_runner_audit_fields(self, runner, tmp_path, monkeypatch):
         import openai
 
@@ -161,12 +224,25 @@ class TestFinalReportRecovery:
                         item.get("reasoning_content") == "reasoning-before-tool"
                         for item in kwargs["messages"]
                     )
+                    # A reasoning-only completion must not be replayed as an
+                    # assistant message with neither content nor tool_calls.
+                    assert not any(
+                        item.get("role") == "assistant"
+                        and item.get("content") is None
+                        and not item.get("tool_calls")
+                        for item in kwargs["messages"]
+                    )
                     return iter([SimpleNamespace(
                         choices=[SimpleNamespace(
-                            delta=SimpleNamespace(content=None, tool_calls=None),
+                            delta=SimpleNamespace(
+                                content=None,
+                                reasoning_content="reasoning-only-after-tool",
+                                tool_calls=None,
+                            ),
                             finish_reason="stop",
                         )]
                     )])
+                assert not kwargs.get("tools")
                 return iter([SimpleNamespace(
                     choices=[SimpleNamespace(
                         delta=SimpleNamespace(

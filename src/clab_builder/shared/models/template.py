@@ -132,6 +132,8 @@ class NoiseService(BaseModel):
     surface_profile: str = ""
     surface_banner: str = ""
     entrypoint: str = ""
+    service_family: str = ""
+    fidelity: str = "legacy"
 
     @field_validator("ports")
     @classmethod

@@ -5,6 +5,7 @@ project-directory, target-service selection, unsupported on no target,
 resolved-user via inspect, smoke-all gate, digest via inspect.
 """
 from pathlib import Path
+import importlib.util
 import subprocess
 from unittest.mock import patch, MagicMock
 
@@ -12,7 +13,7 @@ import yaml
 
 from clab_builder.shared.models.atom import AtomConfig, SourceBundle, RuntimeStatus
 from clab_builder.atomizer.runtime_builder import (
-    build_runtime_image, _smoke_service_via_compose, _inspect_digest, _inspect_user,
+    RuntimeBuildResult, build_runtime_image, _smoke_service_via_compose, _inspect_digest, _inspect_user,
     _readiness_port, _detect_image_package_manager,
 )
 
@@ -76,6 +77,28 @@ def test_smoke_compose_uses_project_directory_and_override_in_runtime(tmp_path):
     assert "source_bundle" not in override_arg.rsplit("/", 1)[-1]
     # override file removed after
     assert not (atom_dir / "runtime" / "smoke-override.yml").exists()
+
+
+def test_smoke_compose_surfaces_up_failure_instead_of_reporting_a_port_timeout(tmp_path):
+    """A compose startup error is construction evidence, not a fake readiness wait."""
+    atom_dir = tmp_path / "CVE-RT-UP-FAIL"
+    atom_dir.mkdir()
+    atom = _atom(
+        atom_dir,
+        compose_body="services:\n  web:\n    image: vulhub/test:1\n    ports: ['80:80']\n",
+    )
+
+    def fake_run(cmd, **_kw):
+        if cmd[:3] == ["docker", "compose", "-p"] and "up" in cmd:
+            return _cp(1, stderr="network runtime-smoke_default not found")
+        return _cp(0)
+
+    with patch("clab_builder.atomizer.runtime_builder._run", side_effect=fake_run):
+        ok, detail = _smoke_service_via_compose("rt:1", atom_dir, atom, 80, 4)
+
+    assert ok is False
+    assert "compose up failed" in detail
+    assert "network runtime-smoke_default not found" in detail
 
 
 def test_smoke_override_resets_host_port_mappings(tmp_path):
@@ -243,6 +266,50 @@ def test_digests_via_inspect_not_image_id(tmp_path):
     assert res.status == RuntimeStatus.READY
     assert res.base_image_digest == "sha:base"
     assert res.runtime_image_digest == "sha:rt"
+
+
+def test_runtime_migration_persists_the_final_provenance_recipe(tmp_path):
+    """Migration must not write its provisional pre-base recipe back to Atom."""
+    from clab_builder.atomizer.runtime_generator import generate_runtime_artifacts
+
+    atom_dir = tmp_path / "CVE-RT-X"
+    atom_dir.mkdir()
+    atom = _atom(
+        atom_dir,
+        compose_body="services:\n  web:\n    image: vulhub/test:1\n    ports: ['80:80']\n",
+    )
+    (atom_dir / "atom.yaml").write_text(yaml.safe_dump(
+        atom.model_dump(mode="json", exclude_none=True), sort_keys=False,
+    ))
+    base_digest = "vulhub/test@sha256:" + "a" * 64
+    final = generate_runtime_artifacts(
+        atom, atom.docker_image, atom_dir=atom_dir,
+        base_image_digest=base_digest,
+    )
+    result = RuntimeBuildResult(
+        status=RuntimeStatus.READY,
+        runtime_image="cvelab-runtime-test-final",
+        runtime_image_digest="sha256:rebuilt-local-id",
+        base_image_digest=base_digest,
+        artifacts=final,
+    )
+    script = Path(__file__).parents[2] / "scripts" / "migrate_runtime_tools.py"
+    spec = importlib.util.spec_from_file_location("runtime_migration_test", script)
+    assert spec and spec.loader
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    with patch(
+        "clab_builder.atomizer.runtime_builder.build_runtime_image",
+        return_value=result,
+    ):
+        status = migration.migrate_one(atom_dir, build=True, force=True)
+
+    raw = yaml.safe_load((atom_dir / "atom.yaml").read_text())
+    assert status == "ready"
+    assert raw["runtime_spec"]["runtime_build"]["generated_hash"] == final.manifest["generated_hash"]
+    assert raw["runtime_spec"]["runtime_build"]["base_image_digest"] == base_digest
+    assert raw["verification"]["runtime_verification"]["runtime_image_digest"] == "sha256:rebuilt-local-id"
 
 
 def test_generated_hash_changes_with_original_dockerfile(tmp_path):

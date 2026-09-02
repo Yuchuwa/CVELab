@@ -7,6 +7,7 @@
 import copy
 import hashlib
 import ipaddress
+import json
 import random
 import re
 import secrets
@@ -20,8 +21,10 @@ import yaml
 from clab_builder.shared.models.atom import AtomConfig
 from clab_builder.shared.models.artifact_contracts import (
     AgentExposureProfile,
+    NoiseActivityConfigV1,
     ScenarioManifestV1,
     normalize_agent_context,
+    normalize_noise_activity_config,
     normalize_ground_truth,
 )
 from clab_builder.shared.models.template import TopologyTemplate, InjectionPoint
@@ -35,11 +38,24 @@ from clab_builder.orchestrator.composer.cve_matcher import (
     effective_service_role,
     service_access_matches,
 )
-from clab_builder.shared.service_resolver import protocol_for_port, resolve_service_family
+from clab_builder.shared.service_resolver import protocol_for_port
 from clab_builder.shared.source_bundle import (
     is_credential_material,
     select_agent_materials,
     verify_material_hash,
+)
+from clab_builder.orchestrator.noise.profiles import (
+    NOISE_PROFILE_VERSION,
+    PYTHON_IMAGE,
+    http_surface_command as _http_surface_command,
+    matched_noise_services as _matched_noise_services,
+    profile_admission,
+    profile_coverage,
+    surface_spec as _surface_spec,
+)
+from clab_builder.orchestrator.noise.workloads import (
+    NOISE_ACTIVITY_VERSION,
+    workload_command,
 )
 
 
@@ -71,10 +87,14 @@ def _agent_context_level(agent_context: str) -> Optional[str]:
     """Map agent_context to a difficulty level (l0/l1/l2) or None.
 
     None identifies the guided/no_guide profiles.
+    ``l1_entry_discovery`` reuses L1's material/topology restrictions while
+    keeping its versioned candidate-entry exposure semantics.
     "no_hint" is a legacy alias mapping to l2 (credential-only mount).
     """
     if agent_context in ("l0", "l1", "l2"):
         return agent_context
+    if agent_context == "l1_entry_discovery":
+        return "l1"
     if agent_context == "no_hint":
         return "l2"
     return None
@@ -84,181 +104,6 @@ def _generate_scenario_hash(scenario_name: str, cve_ids: list[str]) -> str:
     """场景去重 hash"""
     payload = f"{scenario_name}:{','.join(sorted(cve_ids))}"
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
-
-
-def _http_surface_command(
-    port: int,
-    banner: str,
-    routes: dict[str, dict[str, str]],
-    http_version: str = "1.1",
-    include_server_header: bool = True,
-) -> str:
-    default = routes.get("/", {})
-    body = default.get("body", "")
-    body_literal = body.replace("'", "'\"'\"'")
-    extra_headers = default.get("extra_headers", "")
-    extra_header_block = f"{extra_headers}\\r\\n" if extra_headers else ""
-    server_header = f"Server: {banner}\\r\\n" if include_server_header else ""
-    script = (
-        "while true; do "
-        f"{{ printf 'HTTP/{http_version} {default.get('status', '200 OK')}\\r\\n"
-        f"{server_header}Content-Type: {default.get('content_type', 'text/html')}\\r\\n"
-        f"Content-Length: {len(body.encode())}\\r\\n"
-        f"Connection: close\\r\\n{extra_header_block}\\r\\n'; "
-        f"printf '%s' '{body_literal}'; }} "
-        f"| nc -l -p {port}; done"
-    )
-    return f"sh -c {shlex.quote(script)}"
-
-
-def _surface_spec(injection: dict) -> dict[str, str]:
-    """Derive a safe protocol facade from runtime metadata, not a CVE ID."""
-    source_image = str(injection.get("source_image", "") or "")
-    image_name = source_image.rsplit("/", 1)[-1]
-    product, _, version = image_name.partition(":")
-    product = product.lower()
-    version = version or "unknown"
-    port = int(injection.get("exploit_port") or (injection.get("ports") or [0])[0])
-    family = str(injection.get("service_family", "") or "").lower()
-    protocol = str(
-        injection.get("service_protocol") or protocol_for_port(port)
-    ).lower()
-    family = family if family and family != "unknown" else resolve_service_family(
-        source_image, "", injection.get("ports", [])
-    )
-
-    if family == "elasticsearch" or product in {"elasticsearch", "opensearch"} or port == 9200:
-        root = (
-            '{"status":200,"name":"decoy-node","version":'
-            f'{{"number":"{version}","build_hash":"f1585f096d3f3985e73456debdc1a0745f512bbc",'
-            '"build_snapshot":false,"lucene_version":"4.7"},'
-            '"tagline":"You Know, for Search"}'
-        )
-        health = (
-            '{"cluster_name":"elasticsearch","status":"green",'
-            '"number_of_nodes":1,"active_primary_shards":1}'
-        )
-        return {
-            "profile": "elasticsearch-http",
-            "protocol": "http",
-            "banner": f"Elasticsearch/{version}",
-            "command": _http_surface_command(port, f"Elasticsearch/{version}", {
-                "/": {"body": root, "content_type": "application/json; charset=UTF-8"},
-                "/_cluster/health": {
-                    "body": health,
-                    "content_type": "application/json; charset=UTF-8",
-                },
-            }, http_version="1.0", include_server_header=False),
-        }
-
-    if product == "solr" or port == 8983:
-        admin = (
-            '<html ng-app="solrAdminApp"><head><title>Solr Admin</title></head>'
-            '<body>Solr Admin Dashboard</body></html>'
-        )
-        api = (
-            '{"responseHeader":{"status":0,"QTime":1},'
-            '"response":{"numFound":0,"start":0,"docs":[]}}'
-        )
-        return {
-            "profile": "solr-http",
-            "protocol": "http",
-            "banner": f"Apache Solr/{version}",
-            "real_image": "vulhub/solr:8.2.0",
-            "real_entrypoint": "solr",
-            "real_command": f"-f -force -p {port}",
-            "real_environment": {"SOLR_HEAP": "128m"},
-            "command": _http_surface_command(port, f"Apache Solr/{version}", {
-                "/": {
-                    "status": "302 Found",
-                    "content_type": "text/html",
-                    "extra_headers": "Location: /solr/",
-                    "body": "",
-                },
-                "/solr/": {"content_type": "text/html", "body": admin},
-                "/solr/select": {"body": api},
-            }),
-        }
-
-    if protocol in {"http", "https"} or port in {80, 443, 8080, 8443, 8888}:
-        if product == "php":
-            banner = "Apache/2.4.10"
-            extra = f"X-Powered-By: PHP/{version}"
-        else:
-            banner = product or "Apache"
-            extra = ""
-        body = "<html><title>Service</title><body>OK</body></html>"
-        return {
-            "profile": "http-web",
-            "protocol": "http",
-            "banner": banner,
-            "command": _http_surface_command(port, banner, {
-                "/": {
-                    "content_type": "text/html",
-                    "extra_headers": extra,
-                    "body": body,
-                },
-            }),
-        }
-
-    return {
-        "profile": f"tcp-{protocol or 'generic'}",
-        "protocol": protocol or "tcp",
-        "banner": "",
-        "command": "",
-    }
-
-
-def _matched_noise_services(noise_services, injections):
-    """Build high-density decoys with target-like, non-exploitable surfaces."""
-    ports_by_zone: dict[str, list[int]] = defaultdict(list)
-    for injection in injections:
-        port = injection.get("exploit_port")
-        if port is None:
-            ports = injection.get("ports", []) or []
-            port = ports[0] if ports else None
-        if port is not None:
-            ports_by_zone[injection["zone"]].append(int(port))
-
-    matched = []
-    for index, service in enumerate(noise_services):
-        candidates = ports_by_zone.get(service.zone, [])
-        if not candidates:
-            matched.append(service)
-            continue
-        port = candidates[index % len(candidates)]
-        injection = next(
-            item for item in injections
-            if item.get("zone") == service.zone
-            and int(item.get("exploit_port") or (item.get("ports") or [0])[0]) == port
-        )
-        surface = _surface_spec(injection)
-        if surface["profile"] == "solr-http":
-            image = surface["real_image"]
-            command = surface["real_command"]
-            environment = surface.get("real_environment", {})
-        elif surface["profile"] in {"http-web", "elasticsearch-http"}:
-            image, command = "alpine:latest", surface["command"]
-            environment = {}
-        elif port == 6379:
-            image, command = "redis:7.4-alpine", ""
-            environment = {}
-        elif port in {22, 3306, 5432}:
-            image, command = "alpine:latest", f"nc -lk -p {port} -e /bin/true"
-            environment = {}
-        else:
-            image, command = "busybox:latest", f"httpd -f -p {port}"
-            environment = {}
-        matched.append(service.model_copy(update={
-            "image": image,
-            "ports": [port],
-            "command": command,
-            "surface_profile": surface["profile"],
-            "surface_banner": surface["banner"],
-            "entrypoint": surface.get("real_entrypoint", ""),
-            "environment": environment,
-        }))
-    return matched
 
 
 def _parse_interface_map(clab: dict) -> dict[str, dict[str, str]]:
@@ -585,6 +430,9 @@ class ScenarioAssembler:
         resolved_asset_bindings: Optional[dict[str, dict]] = None,
         agent_context: str = "guided",
         noise_level: str = "none",
+        noise_activity: str | None = None,
+        noise_seed: int = 0,
+        noise_activity_config: NoiseActivityConfigV1 | dict[str, Any] | None = None,
     ) -> dict:
         """组装完整场景
 
@@ -599,6 +447,19 @@ class ScenarioAssembler:
         attacker container through the shared source-bundle visibility policy.
         """
         agent_context = normalize_agent_context(agent_context)
+        if noise_activity not in {None, "off", "normal"}:
+            raise ValueError("noise_activity must be off, normal, or omitted")
+        if noise_activity is not None and noise_level != "high":
+            raise ValueError("noise_activity requires noise_level='high'")
+        activity_config = normalize_noise_activity_config(
+            noise_activity_config,
+            mode=noise_activity or "off",
+            seed=noise_seed,
+            profile_version=NOISE_PROFILE_VERSION,
+            activity_version=(
+                NOISE_ACTIVITY_VERSION if noise_activity is not None else ""
+            ),
+        )
         agent_exposure_profile = AgentExposureProfile.from_context(agent_context)
         template = self.template_loader.load(template_name)
         clab_base = self.template_loader.load_clab_base(template_name)
@@ -851,6 +712,7 @@ class ScenarioAssembler:
         # closure. They only raise Agent target-identification difficulty by
         # mixing benign services into the zone subnet (paper §A.3).
         noise_nodes_meta: list[dict] = []
+        noise_clients_meta: list[dict] = []
         # ``high`` is the target-surface-matched high-density arm.  Keep the
         # public noise vocabulary at none/low/medium/high; matched-high was a
         # temporary experiment label and is intentionally not a separate arm.
@@ -860,9 +722,43 @@ class ScenarioAssembler:
             noise_services = _matched_noise_services(
                 template.noise_levels.get("high", []) or [],
                 injections,
+                real_services=noise_activity is not None,
             )
         else:
             noise_services = list(template.noise_levels.get(noise_level, []) or [])
+
+        # New passive/active experiments reserve one client in every populated
+        # zone in both high/off and high/normal.  The enterprise_3tier profile
+        # therefore uses three clients; templates with more zones are covered
+        # without a hard-coded cap. Legacy calls that omit noise_activity retain
+        # the historical 43-service topology exactly.
+        if noise_level == "high" and noise_activity is not None:
+            selected_client_zones: list[str] = []
+            for zone in template.zones:
+                if any(service.zone == zone for service in noise_services):
+                    selected_client_zones.append(zone)
+            remove_indexes = {
+                next(
+                    index
+                    for index in range(len(noise_services) - 1, -1, -1)
+                    if noise_services[index].zone == zone
+                )
+                for zone in selected_client_zones
+            }
+            noise_services = [
+                service for index, service in enumerate(noise_services)
+                if index not in remove_indexes
+            ]
+            noise_clients_meta = [
+                {
+                    "name": f"noise-client-{zone}",
+                    "zone": zone,
+                    "image": PYTHON_IMAGE,
+                    "activity": noise_activity,
+                    "targets": [],
+                }
+                for zone in selected_client_zones
+            ]
         for svc in noise_services:
             if not svc.ports:
                 raise ValueError(f"noise service {svc.name!r} must declare at least one port")
@@ -942,7 +838,29 @@ class ScenarioAssembler:
                 "command": svc.command,
                 "surface_profile": svc.surface_profile,
                 "surface_banner": svc.surface_banner,
+                "service_family": svc.service_family,
+                "fidelity": svc.fidelity,
             })
+
+        for client in noise_clients_meta:
+            name = client["name"]
+            if name in clab["topology"]["nodes"]:
+                raise ValueError(f"noise client name collides with clab node: {name}")
+            clab["topology"]["nodes"][name] = {
+                "kind": "linux",
+                "image": _mirror(client["image"]),
+                "cmd": "sleep infinity",
+            }
+            zone_router = template.zones[client["zone"]].router
+            if not zone_router:
+                zone_router = next(iter(template.routers), "edge-router")
+            router_eth = _next_eth(iface_map.get(zone_router, {}))
+            clab["topology"]["links"].append({
+                "endpoints": [f"{name}:eth1", f"{zone_router}:{router_eth}"]
+            })
+            iface_map.setdefault(zone_router, {})[router_eth] = name
+            iface_map.setdefault(name, {})["eth1"] = zone_router
+            zone_targets[client["zone"]].append(name)
 
         injection_by_slot = {item["ip_id"]: item for item in injections}
         for injection in injections:
@@ -982,6 +900,19 @@ class ScenarioAssembler:
             ],
             "network_policy_checks": [],
             "noise_nodes": [],
+            "noise_clients": [],
+            "noise_activity": noise_activity or "off",
+            "noise_profile_version": NOISE_PROFILE_VERSION,
+            "noise_activity_version": (
+                NOISE_ACTIVITY_VERSION if noise_activity is not None else ""
+            ),
+            "noise_profile_coverage": profile_coverage(
+                injections, real_services=noise_activity is not None
+            ),
+            "noise_profile_admission": profile_admission(
+                injections, activity=noise_activity
+            ),
+            "noise_activity_config": activity_config.model_dump(mode="json"),
         }
         for inj in injections:
             node_ip = ip_alloc.get(inj["node_name"], {})
@@ -1077,6 +1008,43 @@ class ScenarioAssembler:
             meta["ip"] = node_ip.split("/", 1)[0] if node_ip else ""
             ground_truth["noise_nodes"].append(meta)
 
+        # Resolve client targets only after data-plane IP allocation.  The
+        # target set is private evidence and is never inserted into Agent
+        # input; the client itself receives the same allow-list at runtime.
+        noise_by_zone: dict[str, list[dict]] = defaultdict(list)
+        for meta in noise_nodes_meta:
+            if meta.get("ip"):
+                for port in meta.get("ports", []):
+                    noise_by_zone[meta["zone"]].append({
+                        "ip": meta["ip"],
+                        "port": int(port),
+                        "zone": meta["zone"],
+                        "family": meta.get("surface_profile", ""),
+                        "protocol": "http" if "http" in str(meta.get("surface_profile", "")) else "tcp",
+                    })
+        for client in noise_clients_meta:
+            client["ip"] = ip_alloc.get(client["name"], {}).get("eth1", "").split("/", 1)[0]
+            client["targets"] = noise_by_zone.get(client["zone"], [])
+            client_node = clab["topology"]["nodes"][client["name"]]
+            client_node["env"] = {
+                "NOISE_TARGETS": json.dumps(client["targets"], sort_keys=True),
+                "NOISE_EXPECTED_SOURCE_IP": client["ip"],
+                "NOISE_SEED": str(int(hashlib.sha256(
+                    f"{noise_seed}:{template_name}:{'|'.join(used_cves)}:{client['zone']}".encode()
+                ).hexdigest()[:8], 16)),
+            }
+            client_node["cmd"] = workload_command(
+                client["targets"],
+                allowed_subnets=[template.zones[client["zone"]].subnet],
+                expected_source_ip=client["ip"],
+                seed=int(client_node["env"]["NOISE_SEED"]),
+                active=noise_activity == "normal",
+                activity_config=activity_config,
+            )
+            client["target_count"] = len(client["targets"])
+            client.pop("targets", None)
+            ground_truth["noise_clients"].append(client)
+
         return {
             "name": scenario_name,
             "hash": _generate_scenario_hash(scenario_name, used_cves),
@@ -1115,6 +1083,10 @@ class ScenarioAssembler:
             "runtime_images": runtime_image_selections,
             "agent_context": agent_context,
             "agent_exposure_profile": agent_exposure_profile.model_dump(mode="json"),
+            "noise_activity": noise_activity or "off",
+            "noise_activity_config": {
+                **activity_config.model_dump(mode="json"),
+            },
         }
 
     @staticmethod
@@ -1668,6 +1640,16 @@ command -v ip >/dev/null 2>&1
             "iptables -P FORWARD DROP",
             "iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
         ]
+        # Zone members share a router-side L2 bridge.  On hosts where
+        # ``bridge-nf-call-iptables`` is enabled, their otherwise-local
+        # traffic still traverses the router's FORWARD chain.  Preserve the
+        # intended LAN semantics before applying inter-zone isolation rules;
+        # without this, benign same-zone clients (and any legitimate service
+        # peer) are silently dropped by the default FORWARD policy.
+        for subnet in sorted({zone.subnet for zone in template.zones.values()}):
+            isolation_commands.append(
+                f"iptables -A FORWARD -s {subnet} -d {subnet} -j ACCEPT"
+            )
         for rule in template.isolation_rules:
             source = zone_networks.get(rule.from_zone)
             target = zone_networks.get(rule.to_zone)
@@ -1837,6 +1819,7 @@ command -v ip >/dev/null 2>&1
                     scenario.get("agent_context", "guided")
                 ).model_dump(mode="json"),
             ),
+            "noise_activity": scenario.get("noise_activity_config", {}),
         }).model_dump(mode="json")
         (out / "scenario.yaml").write_text(
             yaml.dump(meta, default_flow_style=False, sort_keys=False)

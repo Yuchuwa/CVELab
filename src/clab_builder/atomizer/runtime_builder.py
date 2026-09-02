@@ -142,6 +142,9 @@ def build_runtime_image(
     image_pm = None
     if not (atom.source_bundle and atom.source_bundle.dockerfiles):
         image_pm = _detect_image_package_manager(src)
+    # The first generation is only used to discover whether this Atom needs a
+    # custom-Dockerfile intermediate.  The final recipe is generated below
+    # after the actual base identity has been resolved and can be pinned.
     arts = generate_runtime_artifacts(atom, src, atom_dir=atom_dir,
                                       package_manager=image_pm)
     if arts.unsupported_reason:
@@ -170,20 +173,32 @@ def build_runtime_image(
             )
         base_ref = inter
 
+    base_digest = _inspect_digest(base_ref)
+    if not base_digest:
+        return RuntimeBuildResult(
+            status=RuntimeStatus.FAILED,
+            failure_reason="could not resolve base image digest for runtime provenance",
+            artifacts=arts,
+        )
+
     if not resolved_user:
         try:
             resolved_user = _inspect_user(base_ref)
         except Exception:
             resolved_user = ""
-    # Re-generate artifacts with the resolved user so the Dockerfile restores it.
+    # Re-generate with the resolved user and immutable base identity.  The
+    # generated recipe embeds provenance labels so Range can distinguish a
+    # legitimate local rebuild from an unrelated tag reuse.
     if resolved_user and resolved_user != atom.runtime_spec.user:
         atom.runtime_spec.user = resolved_user
-        arts = generate_runtime_artifacts(atom, src, atom_dir=atom_dir,
-                                          package_manager=image_pm)
-        if arts.unsupported_reason:
-            return RuntimeBuildResult(
-                status=RuntimeStatus.UNSUPPORTED,
-                failure_reason=arts.unsupported_reason, artifacts=arts)
+    arts = generate_runtime_artifacts(
+        atom, src, atom_dir=atom_dir, package_manager=image_pm,
+        base_image_digest=base_digest,
+    )
+    if arts.unsupported_reason:
+        return RuntimeBuildResult(
+            status=RuntimeStatus.UNSUPPORTED,
+            failure_reason=arts.unsupported_reason, artifacts=arts)
 
     write_runtime_dir(atom_dir, arts)
     image = _runtime_image_name(atom.cve_id, arts.manifest["generated_hash"])
@@ -197,7 +212,6 @@ def build_runtime_image(
             artifacts=arts,
         )
 
-    base_digest = _inspect_digest(base_ref)
     rt_digest = _inspect_digest(image)
     res = RuntimeBuildResult(
         status=RuntimeStatus.PENDING,
@@ -323,10 +337,13 @@ def _smoke_service_via_compose(
     project = f"rtsmoke-{atom.cve_id.lower()}"
     container = f"{project}-{target_name}-1"
     try:
-        _run(["docker", "compose", "-p", project,
-              "--project-directory", str(project_dir),
-              "-f", str(compose_path), "-f", str(override_path),
-              "up", "-d"], timeout=120)
+        up = _run(["docker", "compose", "-p", project,
+                   "--project-directory", str(project_dir),
+                   "-f", str(compose_path), "-f", str(override_path),
+                   "up", "-d"], timeout=120)
+        if up.returncode != 0:
+            detail = (up.stderr or up.stdout or "docker compose up failed").strip()
+            return False, f"compose up failed: {detail[-500:]}"
         # Wait for declared depends_on services to be reachable before probing
         # the target port; multi-service compose (e.g. mongo-express + mongo)
         # needs the dependency up first or the target crashes on boot.

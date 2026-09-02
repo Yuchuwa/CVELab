@@ -82,7 +82,23 @@ runtime_spec:
 `base_image_digest` is the digest of the image the runtime Dockerfile FROMs
 (the intermediate image for custom-Dockerfile atoms, the source image for
 image-only atoms). `runtime_image_digest` (in runtime_verification) is the
-final runtime image id. They are distinct.
+local Docker image ID observed when that runtime was built. They are distinct.
+
+Docker image IDs include build-time configuration metadata, so a locally
+rebuilt derived image can legitimately receive a different ID even when its
+recipe is unchanged. New runtime Dockerfiles therefore pin a registry base
+digest where available and carry these labels:
+
+```text
+org.cvelab.runtime.provenance-version=1
+org.cvelab.runtime.generated-hash=<runtime_build.generated_hash>
+org.cvelab.runtime.base-image-digest=<runtime_build.base_image_digest>
+org.cvelab.runtime.source-image=<runtime_spec.source_image>
+```
+
+Range accepts either the exact recorded local ID (legacy-compatible fast path)
+or an exact match of all four provenance labels. A mismatched image ID without
+matching provenance labels remains a hard pre-deploy failure.
 
 `intermediate_image` + `source_dockerfile` let a future Range rebuild
 reproduce the full two-stage build for custom-Dockerfile atoms.
@@ -129,7 +145,10 @@ When assembling a Range, `runtime_image` is selected only if both
 Otherwise Range falls back to `source_image` (or `docker_image`) and records
 the selected image, both runtime states, digests, and fallback reason in
 `scenario.yaml`. A selected runtime image must exist locally before deploy;
-Range never silently substitutes another image at verification time.
+Range never silently substitutes another image at verification time. The
+no-Agent `--generate-only` batch gate includes this local runtime preflight;
+it cannot report a generated scenario successful when image materialization
+fails.
 
 ## 8. Verification separation
 

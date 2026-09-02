@@ -100,6 +100,10 @@ def test_diagnoser_routes_execution_and_composition_failures():
     assert diagnosis.failure_class == FailureClass.ATTACK_EXECUTION
     assert diagnosis.retryable
 
+    diagnosis = Diagnoser().diagnose({"failure_stage": "agent_runner_failed"})
+    assert diagnosis.failure_class == FailureClass.ATTACK_EXECUTION
+    assert diagnosis.retryable
+
     diagnosis = Diagnoser().diagnose(
         {"runtime_conflict": "callback route blocked", "source_slot": "dmz", "target_slot": "app", "evidence_refs": ["edge:1"]},
         template="fixture",

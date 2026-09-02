@@ -31,6 +31,7 @@ this registry in the same change.
 | Scenario manifest v1 | Scenario assembler | Verifier, batch runner, exporters | `shared/models/artifact_contracts.py` | versioned |
 | Ground Truth v1 | Scenario assembler | Verifier only | `GroundTruthV1` in `artifact_contracts.py` | private, versioned |
 | Agent input v1 | Verifier | Agent runner | `AgentInputV1` in `artifact_contracts.py` | sanitized, versioned |
+| L1 entry-discovery input v1 | Verifier | Agent runner, batch preflight | `AgentInputV1.entry_points` + `l1_entry_discovery` profile | unlabeled candidates; legacy `l1` not reusable |
 | Agent output v1 | Agent runner/Verifier boundary | Verifier and analysis | `AgentOutputV1` in `artifact_contracts.py` | runner-owned envelope, versioned |
 | AgentExposureProfile v1 | Scenario/verification normalization and batch runner | Scenario, verifier, Agent runner, experiment analysis | `shared/models/artifact_contracts.py` | versioned |
 | Verification result v1 | Verifier | Batch runner, analysis, SFT | `shared/models/artifact_contracts.py` | versioned |
@@ -54,10 +55,13 @@ the producer, consumer and contract tests together.
 
 `AgentExposureProfile` is the immutable description of the information boundary
 for one generated scenario or trial. It records `schema_version: 1`, the
-normalized context (`guided`, `no_guide`, `no_hint`, `l0`, `l1` or `l2`) and the
-derived profile/hint labels. Scenario manifests and verification results carry
-the profile; batch summaries copy it for analysis. A requested context/profile
-mismatch is a pre-LLM contract failure, not an Agent result.
+normalized context (`guided`, `no_guide`, `no_hint`, `l0`, `l1`,
+`l1_entry_discovery` or `l2`) and the derived profile/hint labels. Scenario
+manifests and verification results carry the profile; batch summaries copy it
+for analysis. A requested context/profile mismatch is a pre-LLM contract
+failure, not an Agent result. `l1_entry_discovery` is a versioned L1 entry
+exposure protocol, not a fourth difficulty level; its typed Agent input uses
+an unlabeled `entry_points: ["IP:port", ...]` list and an empty `targets` list.
 
 Authority/tests: `AgentExposureProfile` in
 `shared/models/artifact_contracts.py`; round-trip and mismatch coverage is in
@@ -274,8 +278,11 @@ version are read as legacy version 0; new writers must not emit version 0.
 ## Agent Input Profiles
 
 Supported contexts are `guided`, `no_guide`, legacy `no_hint`, and explicit
-`l0`, `l1`, `l2`. CLI spelling uses underscores; the batch CLI accepts hyphenated
-values and normalizes them for persistence.
+`l0`, `l1`, `l1_entry_discovery`, `l2`. CLI spelling uses underscores; the
+batch CLI accepts hyphenated values and normalizes them for persistence. The
+legacy `l1` context remains the historical known-entry protocol. New entry
+discovery experiments use `l1-entry-discovery` and never reuse a legacy `l1`
+fixture.
 
 The exact information boundary is maintained in
 [`AGENT_INPUT_LEVEL_INTERFACE.md`](AGENT_INPUT_LEVEL_INTERFACE.md). Regardless

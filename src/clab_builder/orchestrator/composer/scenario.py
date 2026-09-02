@@ -16,6 +16,7 @@ from clab_builder.atomizer.output.sysfield_playbook import SysFieldPlaybookGener
 from clab_builder.shared.models.atom import CapabilityType
 from clab_builder.shared.models.artifact_contracts import (
     ScenarioManifestV1,
+    NoiseActivityConfigV1,
     normalize_agent_context,
 )
 from clab_builder.shared.models.exploit_guide import ExploitGuide, validate_exploit_guide
@@ -61,6 +62,8 @@ class ScenarioPipeline:
         validation_mode: Optional[str] = None,
         agent_context: str = "guided",
         noise_level: str = "none",
+        noise_activity: str | None = None,
+        noise_activity_config: NoiseActivityConfigV1 | dict | None = None,
         composition_mode: str = "legacy",
     ) -> dict:
         """生成完整场景
@@ -71,10 +74,16 @@ class ScenarioPipeline:
             scenario_name: 场景名
             output_dir: 输出目录
             seed: 随机种子 (用于可复现)
-            agent_context: Agent 上下文 (guided/no_guide/no_hint/l0/l1/l2)，
-                控制 clab.yaml 中 attacker 的 PoC 材料挂载策略
+            agent_context: Agent 上下文。除历史 profile 外，
+                ``l1-entry-discovery`` 发布无标签的入口候选集合，并沿用
+                L1 的 PoC 材料挂载策略。
             noise_level: 噪音档位 (模板 ``noise_levels`` 的 key，默认 none)，
                 控制是否在 zone LAN 内插入良性 decoy 节点。正交于 agent_context。
+            noise_activity: 可选的本地正常业务流量模式（off/normal）。省略时
+                保留历史 noise 拓扑；显式传入 off/normal 时为 high 实验预留
+                相同的业务客户端节点。
+            noise_activity_config: 可选的 NoiseActivityConfigV1 覆盖项；不传时
+                使用版本化默认值。
 
         Returns:
             assembled scenario dict (同 ScenarioAssembler.assemble 的返回值)
@@ -282,6 +291,9 @@ class ScenarioPipeline:
             resolved_asset_bindings=resolved_asset_bindings,
             agent_context=agent_context,
             noise_level=noise_level,
+            noise_activity=noise_activity,
+            noise_activity_config=noise_activity_config,
+            noise_seed=seed or 0,
         )
 
         # Write output
@@ -312,6 +324,8 @@ class ScenarioPipeline:
         scenario_meta_path = Path(scenario_dir) / "scenario.yaml"
         scenario_meta = yaml.safe_load(scenario_meta_path.read_text()) or {}
         scenario_meta["validation_mode"] = validation_mode
+        if scenario.get("noise_activity_config"):
+            scenario_meta["noise_activity"] = scenario["noise_activity_config"]
         if scenario.get("exploit_guides"):
             scenario_meta["exploit_guides"] = scenario["exploit_guides"]
         if scenario.get("guide_compatibility"):

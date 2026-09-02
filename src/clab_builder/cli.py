@@ -122,10 +122,13 @@ def difficulty_atom(atom_dir, container, target_ip, reset_command, output, api_k
               help="Range validation artifact to generate")
 @click.option(
     "--agent-context",
-    type=click.Choice(["guided", "no_guide", "no_hint", "l0", "l1", "l2"]),
+    type=click.Choice([
+        "guided", "no_guide", "no_hint", "l0", "l1", "l1-entry-discovery", "l2"
+    ]),
     default="guided", show_default=True,
     help="Agent context: difficulty level l0/l1/l2 (l0=entry IP only, "
-         "l1=+topology, l2=+CVE+credentials) or legacy guided/no_guide/no_hint",
+         "l1=+topology, l1-entry-discovery=unlabeled entry candidates, "
+         "l2=+CVE+credentials) or legacy guided/no_guide/no_hint",
 )
 @click.option("--composition-mode", type=click.Choice(["legacy", "paper"]),
               default="legacy", show_default=True,
@@ -199,10 +202,13 @@ def generate(template_name, cve, name, output, seed, templates_dir, atoms_dir,
               help="Reference validation mode")
 @click.option(
     "--agent-context",
-    type=click.Choice(["guided", "no_guide", "no_hint", "l0", "l1", "l2"]),
+    type=click.Choice([
+        "guided", "no_guide", "no_hint", "l0", "l1", "l1-entry-discovery", "l2"
+    ]),
     default="guided", show_default=True,
     help="Agent context: difficulty level l0/l1/l2 (l0=entry IP only, "
-         "l1=+topology, l2=+CVE+credentials) or legacy guided/no_guide/no_hint",
+         "l1=+topology, l1-entry-discovery=unlabeled entry candidates, "
+         "l2=+CVE+credentials) or legacy guided/no_guide/no_hint",
 )
 @click.option("--composition-mode", type=click.Choice(["legacy", "paper"]),
               default="legacy", show_default=True,

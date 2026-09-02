@@ -210,6 +210,7 @@ def test_select_agent_materials_applies_visibility_and_profile_restrictions():
     ]
     assert select_agent_materials(bundle, "l0") == []
     assert select_agent_materials(bundle, "l1") == []
+    assert select_agent_materials(bundle, "l1-entry-discovery") == []
     assert select_agent_materials(bundle, "l2") == [
         "source_bundle/always.key",
         "source_bundle/legacy.key",

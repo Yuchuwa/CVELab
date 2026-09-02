@@ -14,6 +14,7 @@ avoids the random combinations produced by the generic ``cvelab batch`` command.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import hashlib
 import ipaddress
 import json
@@ -21,6 +22,7 @@ import os
 import re
 import secrets
 import signal
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -47,15 +49,20 @@ except ImportError:  # The caller may provide all settings through the environme
 
 from clab_builder.orchestrator.composer.scenario import ScenarioPipeline
 from clab_builder.orchestrator.composer.sysfield_exporter import SysFieldExporter
-from clab_builder.orchestrator.composer.verifier import ScenarioVerifier
+from clab_builder.orchestrator.composer.verifier import (
+    ScenarioVerifier,
+    build_entry_discovery_points,
+)
 from clab_builder.shared.models.artifact_contracts import (
     AgentExposureProfile,
+    load_ground_truth,
     load_scenario_manifest,
     load_verification_result,
     normalize_agent_context,
     normalize_agent_exposure_profile,
     normalize_batch_state,
     normalize_batch_summary,
+    normalize_noise_activity_config,
 )
 
 
@@ -205,6 +212,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="data/scenarios_guided_batch",
         help="Root directory for generated scenarios and summary.json.",
     )
+    parser.add_argument(
+        "--reuse-scenarios-from",
+        default="",
+        help=(
+            "Copy fixed fixtures from a completed batch instead of generating "
+            "scenarios again. Historical results are left untouched."
+        ),
+    )
     parser.add_argument("--templates-dir", default="templates")
     parser.add_argument("--atoms-dir", default="data/atoms")
     parser.add_argument("--max-turns", type=int, default=300)
@@ -226,6 +241,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="N",
         help="Maximum number of independent Range worker processes (default: 4).",
     )
+    parser.add_argument(
+        "--resume-parallel",
+        type=int,
+        default=0,
+        metavar="N",
+        help=(
+            "Worker concurrency for unfinished cases during --resume. This "
+            "does not alter the initial batch fingerprint."
+        ),
+    )
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--api-key", default=os.getenv("LLM_API_KEY", ""))
     parser.add_argument("--base-url", default=os.getenv("LLM_BASE_URL", ""))
@@ -240,10 +265,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--agent-context",
-        choices=("guided", "no-guide", "no-hint", "l0", "l1", "l2"),
+        choices=(
+            "guided", "no-guide", "no-hint", "l0", "l1",
+            "l1-entry-discovery", "l2",
+        ),
         default="guided",
         help="Agent context: guided, no-guide, no-hint (legacy alias), or "
              "difficulty level l0/l1/l2 (l0=entry IP only, l1=+topology, "
+             "l1-entry-discovery=unlabeled entry candidates, "
              "l2=+CVE+credentials). Default: guided.",
     )
     parser.add_argument(
@@ -257,6 +286,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Deploy and verify environment/attack graph without calling the Agent.",
     )
     parser.add_argument("--resume", action="store_true", help="Resume an interrupted batch in the same output directory.")
+    parser.add_argument(
+        "--cleanup-only", action="store_true",
+        help="Clean this batch's recorded and run-labeled resources without generating or running cases.",
+    )
     parser.add_argument(
         "--case-timeout", type=int, default=0,
         help="Worker wall-clock timeout; default is max(1800, agent_timeout + 1800).",
@@ -273,6 +306,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--noise-level", default="none",
         help="Noise level key from the template's noise_levels (none/low/medium/high). "
              "Inserts benign decoy nodes into zone LANs; orthogonal to --agent-context.",
+    )
+    parser.add_argument(
+        "--noise-activity", choices=("off", "normal"), default=None,
+        help="Optional local benign workload mode. Explicitly passing off/normal "
+        "uses the versioned high-noise topology with idle/active clients; "
+        "omitting it preserves legacy topology generation.",
+    )
+    parser.add_argument(
+        "--noise-interval-min", type=float, default=2.0,
+        help="Minimum seconds between benign workload rounds (default: 2).",
+    )
+    parser.add_argument(
+        "--noise-interval-max", type=float, default=5.0,
+        help="Maximum seconds between benign workload rounds (default: 5).",
+    )
+    parser.add_argument(
+        "--noise-duration", type=float, default=0.0,
+        help="Benign workload duration in seconds; zero runs until cleanup.",
+    )
+    parser.add_argument(
+        "--noise-max-failures", type=int, default=0,
+        help="Maximum failed workload operations per client before invalidating activity.",
     )
     parser.add_argument(
         "--sysarmor",
@@ -292,6 +347,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--worker-spec", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     return parser.parse_args(argv)
+
+
+def noise_activity_config(args: argparse.Namespace) -> dict[str, Any]:
+    """Return the canonical public activity config used by every batch arm."""
+    mode = getattr(args, "noise_activity", None) or "off"
+    config = normalize_noise_activity_config(
+        {
+            "mode": mode,
+            "profile_version": "passive-v2",
+            "activity_version": "activity-v3" if getattr(args, "noise_activity", None) is not None else "",
+            "interval_min_seconds": getattr(args, "noise_interval_min", 2.0),
+            "interval_max_seconds": getattr(args, "noise_interval_max", 5.0),
+            "duration_seconds": getattr(args, "noise_duration", 0.0),
+            "max_failed_requests": getattr(args, "noise_max_failures", 0),
+            "require_data_plane_ready": True,
+        },
+        mode=mode,
+        seed=int(getattr(args, "seed", 0) or 0),
+    )
+    return config.model_dump(mode="json")
 
 
 def select_cases(value: str, cases: tuple[dict[str, object], ...]) -> list[dict[str, object]]:
@@ -356,6 +431,172 @@ def validate_cases(cases: list[dict[str, object]]) -> None:
         physical.add(digest)
 
 
+def _reuse_source_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        path = ROOT / path
+    path = path.resolve()
+    if not (path / "batch_state.json").is_file():
+        raise SystemExit(
+            "--reuse-scenarios-from requires a completed batch directory with "
+            f"batch_state.json: {path}"
+        )
+    return path
+
+
+def _load_reuse_source(
+    source_root: Path,
+    selected: list[dict[str, object]],
+    *, agent_context: str,
+    noise_level: str,
+) -> dict[str, Any]:
+    """Validate fixed fixtures before copying them into a new batch output."""
+    try:
+        source = json.loads((source_root / "batch_state.json").read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Cannot read reusable batch state: {exc}") from exc
+    cases = source.get("cases")
+    if not isinstance(cases, dict):
+        raise SystemExit("Reusable batch state has no case map")
+
+    import yaml
+
+    for case in selected:
+        case_id = str(case["id"])
+        item = cases.get(case_id)
+        if not isinstance(item, dict):
+            raise SystemExit(f"Reusable batch is missing case {case_id}")
+        source_case = item.get("case") or {}
+        if list(source_case.get("cves") or []) != list(case.get("cves") or []):
+            raise SystemExit(f"Reusable fixture CVEs differ for {case_id}")
+        scenario_dir = Path(str(item.get("scenario_dir") or ""))
+        required = ("scenario.yaml", "ground_truth.json", "clab.yaml", "ansible")
+        if not scenario_dir.is_dir() or any(not (scenario_dir / name).exists() for name in required):
+            raise SystemExit(f"Reusable fixture is incomplete for {case_id}: {scenario_dir}")
+        try:
+            manifest = yaml.safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+            ground_truth = json.loads((scenario_dir / "ground_truth.json").read_text())
+            topology = yaml.safe_load((scenario_dir / "clab.yaml").read_text()) or {}
+            fixture_context = normalize_agent_context(manifest.get("agent_context", "guided"))
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Cannot validate reusable fixture {case_id}: {exc}") from exc
+        if (
+            not isinstance(topology, dict)
+            or topology.get("name") != item.get("lab_name")
+            or not isinstance(topology.get("topology"), dict)
+        ):
+            raise SystemExit(f"Reusable fixture topology is invalid for {case_id}")
+        if fixture_context != agent_context:
+            raise SystemExit(
+                f"Reusable fixture context differs for {case_id}: "
+                f"{fixture_context} != {agent_context}"
+            )
+        if noise_level == "none" and ground_truth.get("noise_nodes"):
+            raise SystemExit(f"Reusable fixture has noise nodes but this run requests none: {case_id}")
+    return source
+
+
+def _copy_reused_scenario(source_dir: Path, target_dir: Path, lab_name: str) -> dict[str, str]:
+    """Copy one immutable fixture while discarding prior execution evidence."""
+    import yaml
+
+    if target_dir.exists():
+        raise SystemExit(f"Refusing to overwrite reusable scenario target: {target_dir}")
+    try:
+        source_clab = yaml.safe_load((source_dir / "clab.yaml").read_text()) or {}
+        source_lab_name = str(source_clab.get("name") or source_dir.name)
+    except OSError as exc:
+        raise SystemExit(f"Cannot read reusable topology {source_dir}: {exc}") from exc
+
+    def ignore_runtime_artifacts(_path: str, names: list[str]) -> set[str]:
+        return {
+            name for name in names
+            if name in {"agent_workspace", "verify_result.json"}
+            or name.startswith("clab-")
+        }
+
+    try:
+        shutil.copytree(source_dir, target_dir, ignore=ignore_runtime_artifacts)
+        old = source_lab_name.encode()
+        new = lab_name.encode()
+        for artifact in target_dir.rglob("*"):
+            if artifact.is_file():
+                payload = artifact.read_bytes()
+                if old in payload:
+                    artifact.write_bytes(payload.replace(old, new))
+    except Exception:
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        raise
+
+    try:
+        copied_clab = yaml.safe_load((target_dir / "clab.yaml").read_text()) or {}
+        copied_truth = json.loads((target_dir / "ground_truth.json").read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Copied reusable fixture is unreadable: {exc}") from exc
+    if copied_clab.get("name") != lab_name or copied_truth.get("scenario") != lab_name:
+        raise SystemExit(f"Copied reusable fixture did not receive lab name {lab_name}")
+    return {
+        "source_scenario_dir": str(source_dir),
+        "source_lab_name": source_lab_name,
+    }
+
+
+def _prepare_reused_scenarios(
+    state: dict[str, Any], source: dict[str, Any], output_dir: Path,
+) -> None:
+    """Populate a new batch with copied fixtures so _generate_cases is skipped."""
+    source_cases = source["cases"]
+    for case_id in state["selected_case_ids"]:
+        item = state["cases"][case_id]
+        source_item = source_cases[case_id]
+        target_dir = Path(item["scenario_dir"])
+        copied = _copy_reused_scenario(
+            Path(source_item["scenario_dir"]), target_dir, item["lab_name"]
+        )
+        item["status"] = "generated"
+        item["scenario_reuse"] = copied
+    state["scenario_reuse"] = {
+        "source_batch": str(source.get("_source_root", "")),
+        "source_run_id": str(source.get("run_id", "")),
+        "mode": "copied_fixed_fixture",
+    }
+
+
+def _resume_contract_matches(
+    state: dict[str, Any], selected: list[dict[str, object]], args: argparse.Namespace,
+) -> bool:
+    """Allow a scheduler-only resume across a runner fingerprint revision."""
+    options = state.get("options") or {}
+    expected = {
+        "environment_only": bool(args.environment_only),
+        "generate_only": bool(args.generate_only),
+        "agent_timeout": int(args.agent_timeout),
+        "max_turns": int(args.max_turns),
+        "seed": int(args.seed),
+        "case_timeout": int(args.case_timeout),
+        "agent_context": args.agent_context,
+        "noise_level": str(getattr(args, "noise_level", "none")),
+        "noise_activity": getattr(args, "noise_activity", None),
+        "noise_activity_config": noise_activity_config(args),
+        "model": args.model,
+        "agent_runner": args.agent_runner,
+        "reuse_scenarios_from": str(getattr(args, "reuse_scenarios_from", "")),
+    }
+    if any(options.get(key) != value for key, value in expected.items()):
+        return False
+    if state.get("selected_case_ids") != [str(case["id"]) for case in selected]:
+        return False
+    for case in selected:
+        item = (state.get("cases") or {}).get(str(case["id"]))
+        if not isinstance(item, dict) or list((item.get("case") or {}).get("cves") or []) != list(case.get("cves") or []):
+            return False
+        scenario_dir = Path(str(item.get("scenario_dir") or ""))
+        if any(not (scenario_dir / name).is_file() for name in ("scenario.yaml", "ground_truth.json", "clab.yaml")):
+            return False
+    return True
+
+
 def summarize(case: dict[str, object], scenario_dir: Path, result: dict) -> dict:
     agent_result = result.get("agent_result") or {}
     raw_context = result.get("agent_context")
@@ -412,7 +653,13 @@ def summarize(case: dict[str, object], scenario_dir: Path, result: dict) -> dict
         "agent_structured_result": bool(agent_result.get("structured_result", False)),
         "agent_partial_result": bool(agent_result.get("partial_result", False)),
         "observed_progress": agent_result.get("observed_progress", {}),
+        "agent_runner_diagnostic": agent_result.get("runner_diagnostic", {}),
         "decoy_interactions": result.get("decoy_interactions", {}),
+        "noise_activity": result.get("noise_activity", {}),
+        "noise_activity_config": result.get("noise_activity_config", {}),
+        "noise_profile_coverage": result.get("noise_profile_coverage", []),
+        "noise_profile_admission": result.get("noise_profile_admission", {}),
+        "entry_discovery_preflight": result.get("entry_discovery_preflight", {}),
         "sysarmor": result.get("sysarmor", {}),
         "error": result.get("error", ""),
     }
@@ -458,6 +705,9 @@ def _digest_inputs(selected: list[dict[str, object]], args: argparse.Namespace) 
         "agent_context": context,
         "agent_exposure_profile": profile,
         "noise_level": str(getattr(args, "noise_level", "none")),
+        "noise_activity": getattr(args, "noise_activity", None),
+        "noise_activity_config": noise_activity_config(args),
+        "reuse_scenarios_from": str(getattr(args, "reuse_scenarios_from", "")),
         "agent_runner": args.agent_runner,
         "model": args.model,
         "base_url": args.base_url,
@@ -476,6 +726,7 @@ def _digest_inputs(selected: list[dict[str, object]], args: argparse.Namespace) 
              ROOT / "src/clab_builder/orchestrator/composer/verifier.py",
              ROOT / "src/clab_builder/orchestrator/composer/scenario.py",
              ROOT / "src/clab_builder/orchestrator/composer/scenario_assembler.py",
+             ROOT / "src/clab_builder/orchestrator/noise",
              ROOT / "src/clab_builder/orchestrator/composer/scenario_runner.py",
              ROOT / "src/clab_builder/orchestrator/composer/openai_scenario_runner.py",
              ROOT / "src/clab_builder/orchestrator/composer/sysfield_exporter.py",
@@ -597,10 +848,80 @@ def control_lease(run_id: str, case_id: str, reserved_subnets: list[str]) -> dic
     raise RuntimeError("no disjoint Agent control subnet lease is available")
 
 
-def release_control_lease(lease: dict[str, Any] | None) -> None:
-    if lease and lease.get("network_name"):
-        subprocess.run(["docker", "network", "rm", str(lease["network_name"])],
-                       capture_output=True, text=True, stdin=subprocess.DEVNULL)
+def release_control_lease(lease: dict[str, Any] | None) -> dict[str, Any]:
+    """Disconnect every endpoint and remove one known Agent-control network.
+
+    A coordinator can be interrupted after the Agent container is gone but
+    before Docker removes the bridge.  ``docker network rm`` then fails with
+    ``active endpoints``; silently ignoring that failure was the source of
+    residual per-case networks.  The lease is narrowly scoped by name, so it
+    is safe to disconnect all endpoints found on this one network.
+    """
+    network = str((lease or {}).get("network_name") or "")
+    if not network:
+        return {"ok": True, "skipped": True}
+
+    def _missing(output: str) -> bool:
+        lowered = output.lower()
+        return ("no such network" in lowered
+                or ("network" in lowered and "not found" in lowered))
+
+    errors: list[str] = []
+    disconnected: list[str] = []
+    for _attempt in range(2):
+        inspected = subprocess.run(
+            ["docker", "network", "inspect", network],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+        )
+        if inspected.returncode != 0:
+            output = f"{inspected.stdout}\n{inspected.stderr}".strip()
+            if _missing(output):
+                return {"ok": True, "network_name": network, "already_absent": True}
+            errors.append(output[-1000:] or "network inspect failed")
+            return {"ok": False, "network_name": network, "errors": errors}
+        try:
+            inspected_data = json.loads(inspected.stdout)
+            containers = (inspected_data[0].get("Containers") or {}) if inspected_data else {}
+        except (json.JSONDecodeError, IndexError, AttributeError, TypeError) as exc:
+            return {
+                "ok": False, "network_name": network,
+                "errors": [f"network inspect parse failed: {exc}"],
+            }
+
+        for container_id in containers:
+            disconnected_result = subprocess.run(
+                ["docker", "network", "disconnect", "-f", network, str(container_id)],
+                capture_output=True, text=True, stdin=subprocess.DEVNULL,
+            )
+            output = f"{disconnected_result.stdout}\n{disconnected_result.stderr}".strip()
+            if disconnected_result.returncode == 0:
+                disconnected.append(str(container_id))
+            elif not (
+                "not connected" in output.lower()
+                or "no such container" in output.lower()
+                or _missing(output)
+            ):
+                errors.append(output[-1000:] or "network disconnect failed")
+
+        removed = subprocess.run(
+            ["docker", "network", "rm", network],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+        )
+        output = f"{removed.stdout}\n{removed.stderr}".strip()
+        if removed.returncode == 0 or _missing(output):
+            return {
+                "ok": True, "network_name": network,
+                "disconnected": disconnected,
+                "errors": errors,
+            }
+        if output:
+            errors.append(output[-1000:])
+
+    return {
+        "ok": False, "network_name": network,
+        "disconnected": disconnected,
+        "errors": errors or ["network rm failed"],
+    }
 
 
 def _runner_base_url(agent_runner: str, base_url: str) -> str:
@@ -642,10 +963,199 @@ def lab_lock(path: Path):
     return _Lock()
 
 
+def _proc_start_ticks(pid: int) -> str:
+    """Return Linux process start ticks for PID, or an empty string."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+        # ``comm`` (field 2) may contain spaces; split only after its closing
+        # parenthesis.  The remaining list starts at field 3, so field 22
+        # (starttime) is index 19.
+        fields = stat.rsplit(")", 1)[1].split()
+        return str(fields[19])
+    except (OSError, IndexError):
+        return ""
+
+
+def _find_worker_pid(worker_spec_path: str) -> int | None:
+    """Find a worker during the launch window before its PID was persisted."""
+    target = str(Path(worker_spec_path).resolve()) if worker_spec_path else ""
+    if not target:
+        return None
+    for entry in Path("/proc").glob("[0-9]*"):
+        try:
+            pid = int(entry.name)
+            command_line = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(
+                errors="replace"
+            )
+        except (OSError, ValueError):
+            continue
+        if (
+            "verify_enterprise3_guided_batch.py" in command_line
+            and "--worker-spec" in command_line
+            and target in command_line
+        ):
+            return pid
+    return None
+
+
+def _process_group_exists(pgid: int) -> bool:
+    if pgid <= 1:
+        return False
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    # ``killpg(..., 0)`` also succeeds while the group contains only zombie
+    # processes.  A worker leader can briefly be a zombie until the original
+    # coordinator reaps its Popen handle; zombies cannot execute Docker work
+    # or publish a result, so they must not keep cleanup in a false failure
+    # state.  Inspect the process-group field and count only live members.
+    for entry in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            fields = entry.read_text(encoding="utf-8").rsplit(")", 1)[1].split()
+            state = fields[0]
+            process_group = int(fields[2])
+        except (OSError, ValueError, IndexError):
+            continue
+        if process_group == pgid and state not in {"Z", "X"}:
+            return True
+    return False
+
+
+def _wait_process_group_exit(pgid: int, timeout: float) -> bool:
+    """Wait until a worker process group has no remaining members."""
+    deadline = time.monotonic() + max(0.0, timeout)
+    while _process_group_exists(pgid):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.05)
+    return True
+
+
+def _terminate_process_group(
+    pid: int,
+    pgid: int | None = None,
+    *,
+    first_signal: signal.Signals = signal.SIGTERM,
+    grace_seconds: float = 30.0,
+    kill_grace_seconds: float = 5.0,
+) -> dict[str, Any]:
+    """Stop a worker and wait for its entire process group, not only its PID."""
+    group = int(pgid or pid)
+    if not _process_group_exists(group):
+        return {"ok": True, "pgid": group, "already_absent": True}
+    try:
+        os.killpg(group, first_signal)
+    except ProcessLookupError:
+        return {"ok": True, "pgid": group, "already_absent": True}
+    if _wait_process_group_exit(group, grace_seconds):
+        return {"ok": True, "pgid": group, "signal": first_signal.name}
+    try:
+        os.killpg(group, signal.SIGKILL)
+    except ProcessLookupError:
+        return {"ok": True, "pgid": group, "forced": True}
+    gone = _wait_process_group_exit(group, kill_grace_seconds)
+    return {
+        "ok": gone,
+        "pgid": group,
+        "signal": first_signal.name,
+        "forced": True,
+        "error": "worker process group did not exit" if not gone else "",
+    }
+
+
+def _attempt_result_path(case_state: dict[str, Any]) -> Path:
+    """Return the attempt-isolated result path, with legacy fallback."""
+    return Path(case_state.get("worker_result_path") or case_state["result_path"])
+
+
+def _revoke_attempt_fence(case_state: dict[str, Any]) -> None:
+    case_state["attempt_fence_revoked_at_ns"] = time.time_ns()
+    fence = str(case_state.get("attempt_fence_path") or "")
+    if not fence:
+        return
+    try:
+        Path(fence).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _attempt_fence_is_valid(spec: dict[str, Any]) -> bool:
+    """Check that this worker still owns the attempt before writing results."""
+    fence_path = str(spec.get("attempt_fence_path") or "")
+    token = str(spec.get("attempt_token") or "")
+    if not fence_path or not token:
+        # Legacy worker specs predate result fencing; new launches always set
+        # both fields.  Keeping this fallback makes old cleanup-only specs
+        # readable without weakening new attempts.
+        return not fence_path and not token
+    try:
+        payload = json.loads(Path(fence_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if payload.get("token") != token:
+        return False
+    if payload.get("run_id") != spec.get("run_id"):
+        return False
+    if payload.get("case_id") != spec.get("case", {}).get("id"):
+        return False
+    if int(payload.get("attempt", -1)) != int(spec.get("attempt", -2)):
+        return False
+    coordinator_pid = int(payload.get("coordinator_pid") or 0)
+    if coordinator_pid:
+        if os.getppid() != coordinator_pid:
+            return False
+        expected_ticks = str(payload.get("coordinator_start_ticks") or "")
+        if expected_ticks and _proc_start_ticks(coordinator_pid) != expected_ticks:
+            return False
+    return True
+
+
+def _write_worker_result(spec: dict[str, Any], result: dict[str, Any]) -> int:
+    """Write only to the attempt file while its coordinator fence is valid."""
+    if not _attempt_fence_is_valid(spec):
+        print("[Worker] result fence revoked; discarding late result", flush=True)
+        return 125
+    payload = dict(result)
+    payload["worker_attempt"] = {
+        "run_id": spec.get("run_id", ""),
+        "case_id": spec.get("case", {}).get("id", ""),
+        "attempt": int(spec.get("attempt", 0) or 0),
+    }
+    atomic_json(Path(spec.get("worker_result_path") or spec["result_path"]), payload)
+    return 0
+
+
+def _load_attempt_result(case_state: dict[str, Any]) -> dict[str, Any] | None:
+    """Load a result only if it belongs to the current run/case/attempt."""
+    path = _attempt_result_path(case_state)
+    try:
+        result = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    revoked_at_ns = int(case_state.get("attempt_fence_revoked_at_ns") or 0)
+    if revoked_at_ns:
+        try:
+            if path.stat().st_mtime_ns > revoked_at_ns:
+                return None
+        except OSError:
+            return None
+    marker = result.get("worker_attempt")
+    if case_state.get("worker_result_path"):
+        if not isinstance(marker, dict):
+            return None
+        if marker.get("case_id") != case_state.get("case", {}).get("id"):
+            return None
+        if int(marker.get("attempt", -1)) != int(case_state.get("attempts", -2)):
+            return None
+    return result
+
+
 def run_worker(spec_path: Path) -> int:
     """Hidden worker entrypoint; spec contains no secret/API key."""
     spec = json.loads(spec_path.read_text())
-    result_path = Path(spec["result_path"])
     started = utcnow()
     context = normalize_agent_context(spec.get("agent_context", "guided"))
     profile = normalize_agent_exposure_profile(
@@ -668,9 +1178,12 @@ def run_worker(spec_path: Path) -> int:
                 runtime_policy="verify_only", execution_context={
                     "run_id": spec["run_id"], "case_id": spec["case"]["id"],
                     "worker_id": spec["worker_id"], "lab_name": spec["lab_name"],
+                    "seed": spec.get("seed", 0),
                     "ansible_paths": spec["ansible_paths"], "mgmt_network": spec.get("mgmt_network") or {},
                     "control_network_lease": spec.get("control_network_lease") or {},
                     "noise_level": spec.get("noise_level", "none"),
+                    "noise_activity": spec.get("noise_activity"),
+                    "noise_activity_config": spec.get("noise_activity_config", {}),
                     "batch_fingerprint": spec.get("batch_fingerprint", ""),
                 },
                 agent_context=context,
@@ -711,8 +1224,7 @@ def run_worker(spec_path: Path) -> int:
                   "agent_exposure_profile": profile.model_dump(mode="json"),
                   "success": False, "failure_stage": "worker_failed", "error": repr(exc),
                   "execution_complete": False}
-    atomic_json(result_path, result)
-    return 0
+    return _write_worker_result(spec, result)
 
 
 def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
@@ -736,6 +1248,10 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
         "agent_context": context,
         "agent_exposure_profile": profile.model_dump(mode="json"),
         "noise_level": state["options"].get("noise_level", "none"),
+        "noise_activity": state["options"].get("noise_activity"),
+        "noise_activity_config": state["options"].get("noise_activity_config", {}),
+        "scenario_reuse": state.get("scenario_reuse", {}),
+        "parallel_history": state.get("parallel_history", []),
         "model": state["options"].get("model", ""),
         "agent_runner": state["options"].get("agent_runner", "claude"),
         # Top-level validation-round tag: identifies which batch this summary
@@ -747,6 +1263,10 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
             "agent_context": context,
             "agent_exposure_profile": profile.model_dump(mode="json"),
             "noise_level": state["options"].get("noise_level", "none"),
+            "noise_activity": state["options"].get("noise_activity"),
+            "noise_activity_config": state["options"].get("noise_activity_config", {}),
+            "scenario_reuse": state.get("scenario_reuse", {}),
+            "parallel_history": state.get("parallel_history", []),
             "model": state["options"].get("model", ""),
             "agent_runner": state["options"].get("agent_runner", "claude"),
             "environment_only": state["options"]["environment_only"],
@@ -765,7 +1285,21 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
 
 def _persist(output_dir: Path, state: dict[str, Any]) -> None:
     state["updated_at"] = utcnow()
+    existing_cases = state.get("cases")
     normalized = normalize_batch_state(state)
+    # Keep case-dict identity stable across persistence.  The coordinator and
+    # cleanup loops hold short-lived references to case entries; replacing
+    # every nested dict here makes those references stale immediately after a
+    # write, which can drop worker PID/PGID updates from durable state.
+    if isinstance(existing_cases, dict) and isinstance(normalized.get("cases"), dict):
+        for case_id, normalized_case in normalized["cases"].items():
+            current_case = existing_cases.get(case_id)
+            if isinstance(current_case, dict):
+                current_case.clear()
+                current_case.update(normalized_case)
+            else:
+                existing_cases[case_id] = normalized_case
+        normalized["cases"] = existing_cases
     state.clear()
     state.update(normalized)
     atomic_json(output_dir / "batch_state.json", state)
@@ -791,33 +1325,116 @@ def _save_case_result(case_state: dict[str, Any], result: dict[str, Any]) -> Non
     atomic_json(Path(case_state["result_path"]), result)
 
 
-def _generate_cases(state: dict[str, Any], args: argparse.Namespace, output_dir: Path) -> None:
-    pipeline = ScenarioPipeline(
-        templates_dir=args.templates_dir, atoms_dir=args.atoms_dir,
-        default_validation_mode="guided_agent",
-    )
-    sysfield_exporter = SysFieldExporter(atoms_dir=args.atoms_dir)
-    scenarios_root = output_dir / "scenarios"
-    for case_id in state["selected_case_ids"]:
-        item = state["cases"][case_id]
-        if item["status"] not in {"pending", "generation_failed"}:
-            continue
-        try:
-            pipeline.generate(
-                template_name="enterprise_3tier", cve_ids=list(item["case"]["cves"]),
-                scenario_name=item["lab_name"], output_dir=str(scenarios_root), seed=args.seed,
-                validation_mode="guided_agent",
-                agent_context=str(getattr(args, "agent_context", "guided")),
-                noise_level=str(getattr(args, "noise_level", "none")),
+def _current_attempt_record(case_state: dict[str, Any]) -> dict[str, Any]:
+    """Return a mutable current-attempt record, repairing legacy state.
+
+    Older or interrupted batch states can contain a running/cleaning case
+    without ``attempt_records``. Cleanup must preserve the failure evidence,
+    not crash while trying to annotate that missing history.
+    """
+    records = case_state.get("attempt_records")
+    if not isinstance(records, list):
+        records = []
+        case_state["attempt_records"] = records
+    if not records or not isinstance(records[-1], dict):
+        records.append({
+            "attempt": int(case_state.get("attempts", 0) or 0),
+            "started_at": "",
+            "log_path": "",
+        })
+    return records[-1]
+
+
+def _update_current_attempt_record(case_state: dict[str, Any], **updates: Any) -> None:
+    _current_attempt_record(case_state).update(updates)
+
+
+def _generate_one_case(payload: dict[str, Any]) -> dict[str, Any]:
+    """Generate one isolated scenario in a worker process.
+
+    Scenario generation is independent per case, but it is CPU-heavy enough
+    that threads do not provide useful parallelism.  The worker constructs its
+    own Pipeline so template/Atom caches and Python's random state cannot be
+    shared across cases.
+    """
+    try:
+        pipeline = ScenarioPipeline(
+            templates_dir=payload["templates_dir"],
+            atoms_dir=payload["atoms_dir"],
+            default_validation_mode="guided_agent",
+        )
+        pipeline.generate(
+            template_name="enterprise_3tier",
+            cve_ids=list(payload["cves"]),
+            scenario_name=payload["lab_name"],
+            output_dir=payload["scenarios_root"],
+            seed=payload["seed"],
+            validation_mode="guided_agent",
+            agent_context=payload["agent_context"],
+            noise_level=payload["noise_level"],
+            noise_activity=payload["noise_activity"],
+            noise_activity_config=payload["noise_activity_config"],
+        )
+        if payload["sysarmor_detection"] and payload["environment_only"]:
+            SysFieldExporter(atoms_dir=payload["atoms_dir"]).export(
+                str(Path(payload["scenarios_root"]) / payload["lab_name"])
             )
-            if bool(getattr(args, "sysarmor_detection", False)) and bool(getattr(args, "environment_only", False)):
-                sysfield_exporter.export(str(scenarios_root / item["lab_name"]))
-            item["status"] = "generated"
-            item["scenario_dir"] = str(scenarios_root / item["lab_name"])
-        except Exception as exc:
-            item["status"] = "completed"
-            _save_case_result(item, _result_for_infra(item, "generation", repr(exc)))
-        _persist(output_dir, state)
+        return {"ok": True, "scenario_dir": str(Path(payload["scenarios_root"]) / payload["lab_name"])}
+    except Exception as exc:
+        return {"ok": False, "failure_stage": "generation", "error": repr(exc)}
+
+
+def _generate_cases(state: dict[str, Any], args: argparse.Namespace, output_dir: Path) -> None:
+    scenarios_root = output_dir / "scenarios"
+    pending = [
+        state["cases"][case_id]
+        for case_id in state["selected_case_ids"]
+        if state["cases"][case_id]["status"] in {"pending", "generation_failed"}
+    ]
+    if not pending:
+        return
+    worker_count = max(1, min(int(getattr(args, "parallel", 1)), len(pending)))
+    common = {
+        "templates_dir": args.templates_dir,
+        "atoms_dir": args.atoms_dir,
+        "scenarios_root": str(scenarios_root),
+        "seed": args.seed,
+        "agent_context": str(getattr(args, "agent_context", "guided")),
+        "noise_level": str(getattr(args, "noise_level", "none")),
+        "noise_activity": getattr(args, "noise_activity", None),
+        "noise_activity_config": noise_activity_config(args),
+        "sysarmor_detection": bool(getattr(args, "sysarmor_detection", False)),
+        "environment_only": bool(getattr(args, "environment_only", False)),
+    }
+    payloads = {
+        item["case"]["id"]: {
+            **common,
+            "cves": list(item["case"]["cves"]),
+            "lab_name": item["lab_name"],
+        }
+        for item in pending
+    }
+    with ProcessPoolExecutor(max_workers=worker_count) as executor:
+        futures = {
+            executor.submit(_generate_one_case, payload): case_id
+            for case_id, payload in payloads.items()
+        }
+        for future in as_completed(futures):
+            case_id = futures[future]
+            item = state["cases"][case_id]
+            outcome = future.result()
+            if outcome.get("ok"):
+                item["status"] = "generated"
+                item["scenario_dir"] = outcome["scenario_dir"]
+            else:
+                item["status"] = "completed"
+                _save_case_result(
+                    item,
+                    _result_for_infra(
+                        item, outcome.get("failure_stage", "generation"), outcome.get("error", "")
+                    ),
+                )
+            _persist(output_dir, state)
 
 
 def _prewarm_cases(state: dict[str, Any], args: argparse.Namespace, output_dir: Path) -> None:
@@ -855,17 +1472,326 @@ def _prewarm_cases(state: dict[str, Any], args: argparse.Namespace, output_dir: 
         _persist(output_dir, state)
 
 
+def _complete_generate_only_preflight(
+    state: dict[str, Any],
+    args: argparse.Namespace,
+    output_dir: Path,
+    agent_exposure_profile: dict[str, Any],
+) -> bool:
+    """Finish a no-deploy batch only after runtime materialization preflight.
+
+    ``--generate-only`` is the user-facing no-Agent readiness gate.  It must
+    not report a generated Range as successful when its selected runtime image
+    is missing or has drifted from the Atom handoff contract.
+    """
+    _prewarm_cases(state, args, output_dir)
+    all_preflighted = True
+    strict_normal = getattr(args, "noise_activity", None) == "normal"
+    for case_id in state["selected_case_ids"]:
+        item = state["cases"][case_id]
+        if item["status"] != "runtime_prepared":
+            all_preflighted = False
+            continue
+        scenario_dir = Path(item["scenario_dir"])
+        try:
+            ground_truth = load_ground_truth(
+                json.loads((scenario_dir / "ground_truth.json").read_text())
+            ).model_dump(mode="json")
+            coverage = list(ground_truth.get("noise_profile_coverage") or [])
+            admission = dict(ground_truth.get("noise_profile_admission") or {})
+            fallback_profiles = [
+                row for row in coverage
+                if row.get("profile_id") == "tcp-generic" or row.get("status") == "fallback"
+            ]
+            manifest = load_scenario_manifest(
+                __import__("yaml").safe_load((scenario_dir / "scenario.yaml").read_text()) or {}
+            ).model_dump(mode="json")
+            atom_images = {
+                str(item.get(key, "")).split("@", 1)[0]
+                for item in manifest.get("injections", [])
+                for key in ("source_image", "runtime_image")
+                if item.get(key)
+            }
+            noise_images = {
+                str(item.get("image", "")).split("@", 1)[0]
+                for item in ground_truth.get("noise_nodes", [])
+                if item.get("image")
+            }
+            reused_images = sorted(atom_images & noise_images)
+            public_text = (scenario_dir / "scenario.yaml").read_text()
+            target_leak = "NOISE_TARGETS" in public_text or "targets:" in public_text
+            entry_gate = {
+                "evaluated": args.agent_context == "l1_entry_discovery",
+                "ok": True,
+                "entry_points": [],
+            }
+            if args.agent_context == "l1_entry_discovery":
+                try:
+                    entry_points = build_entry_discovery_points(
+                        ground_truth,
+                        manifest.get("ip_allocations") or {},
+                        case_key=case_id,
+                        seed=args.seed,
+                    )
+                    real_entry_points = build_entry_discovery_points(
+                        {**ground_truth, "noise_nodes": []},
+                        manifest.get("ip_allocations") or {},
+                        case_key=case_id,
+                        seed=args.seed,
+                    )
+                    decoy_entry_points = [
+                        endpoint for endpoint in entry_points
+                        if endpoint not in set(real_entry_points)
+                    ]
+                    entry_gate["entry_points"] = entry_points
+                    entry_gate["real_entry_points"] = real_entry_points
+                    entry_gate["first_layer_decoy_points"] = decoy_entry_points
+                    entry_gate["ok"] = bool(entry_points)
+                    requested_noise_level = str(getattr(args, "noise_level", "none"))
+                    if requested_noise_level == "none" and ground_truth.get("noise_nodes"):
+                        entry_gate.update({
+                            "ok": False,
+                            "error": "none protocol fixture contains noise nodes",
+                        })
+                    elif requested_noise_level == "high" and not decoy_entry_points:
+                        entry_gate.update({
+                            "ok": False,
+                            "error": "high protocol fixture has no first-layer decoy entry",
+                        })
+                except ValueError as exc:
+                    entry_gate.update({"ok": False, "error": str(exc)})
+            gate = {
+                "profile_admission_eligible": admission.get("eligible"),
+                "fallback_profiles": fallback_profiles,
+                "vulnerable_image_reuse": reused_images,
+                "agent_input_target_list_leak": target_leak,
+                "entry_discovery_preflight": entry_gate,
+            }
+            gate_failed = bool(
+                (
+                    args.agent_context == "l1_entry_discovery"
+                    and not entry_gate["ok"]
+                )
+                or (
+                    strict_normal
+                    and (
+                        admission.get("eligible") is not True
+                        or fallback_profiles
+                        or reused_images
+                        or target_leak
+                    )
+                )
+            )
+        except Exception as exc:
+            gate = {"error": repr(exc)}
+            coverage, admission = [], {}
+            gate_failed = strict_normal or args.agent_context == "l1_entry_discovery"
+        if gate_failed:
+            all_preflighted = False
+            item["status"] = "completed"
+            _save_case_result(item, {
+                "case_id": case_id, "purpose": item["case"]["purpose"],
+                "cves": item["case"]["cves"], "scenario_dir": item["scenario_dir"],
+                "generated": True, "preflight": False, "success": False,
+                "failure_stage": (
+                    "agent_entry_discovery_preflight"
+                    if not gate.get("entry_discovery_preflight", {}).get("ok", True)
+                    else "noise_profile_admission"
+                ),
+                "agent_context": args.agent_context,
+                "agent_exposure_profile": agent_exposure_profile,
+                "noise_activity_config": noise_activity_config(args),
+                "noise_profile_coverage": coverage,
+                "noise_profile_admission": admission,
+                "entry_discovery_preflight": gate.get("entry_discovery_preflight", {}),
+                "noise_profile_gate": gate,
+                "execution_complete": True,
+            })
+            continue
+        item["status"] = "completed"
+        _save_case_result(item, {
+            "case_id": case_id, "purpose": item["case"]["purpose"],
+            "cves": item["case"]["cves"], "scenario_dir": item["scenario_dir"],
+            "generated": True, "preflight": True, "success": True,
+            "agent_context": args.agent_context,
+            "agent_exposure_profile": agent_exposure_profile,
+            "noise_level": str(getattr(args, "noise_level", "none")),
+            "noise_activity": getattr(args, "noise_activity", None),
+            "noise_activity_config": noise_activity_config(args),
+            "noise_profile_coverage": coverage,
+            "noise_profile_admission": admission,
+            "entry_discovery_preflight": gate.get("entry_discovery_preflight", {}),
+            "noise_profile_gate": gate,
+            "sysarmor": {
+                "enabled": bool(getattr(args, "sysarmor", False)),
+                "detection": bool(getattr(args, "sysarmor_detection", False)),
+                "signal_window": int(getattr(args, "sysarmor_signal_window", 30)),
+            },
+            "execution_complete": True,
+        })
+    _persist(output_dir, state)
+    return all_preflighted
+
+
 def _janitor(case_state: dict[str, Any], management: dict[str, Any]) -> dict[str, Any]:
     """Precise cleanup only for resources belonging to one known lab/lease."""
     topology = Path(case_state["scenario_dir"]) / "clab.yaml"
-    command = ["clab", "destroy", "-t", str(topology), "--cleanup"]
-    if management.get("name"):
-        command.append("--keep-mgmt-net")
-    destroy = subprocess.run(command, capture_output=True, text=True, stdin=subprocess.DEVNULL)
-    release_control_lease(case_state.get("control_network_lease"))
-    output = f"{destroy.stdout}\n{destroy.stderr}".lower()
-    absent = "no containerlab containers found" in output
-    return {"ok": destroy.returncode == 0 or absent, "stdout": destroy.stdout[-1000:], "stderr": destroy.stderr[-1000:]}
+    if topology.exists():
+        command = ["clab", "destroy", "-t", str(topology), "--cleanup"]
+        if management.get("name"):
+            command.append("--keep-mgmt-net")
+        try:
+            destroy = subprocess.run(
+                command, capture_output=True, text=True, stdin=subprocess.DEVNULL,
+            )
+            destroy_output = f"{destroy.stdout}\n{destroy.stderr}"
+            absent = "no containerlab containers found" in destroy_output.lower()
+            destroy_cleanup = {
+                "ok": destroy.returncode == 0 or absent,
+                "returncode": destroy.returncode,
+                "stdout": destroy.stdout[-1000:],
+                "stderr": destroy.stderr[-1000:],
+            }
+        except OSError as exc:
+            destroy_cleanup = {"ok": False, "stage": "destroy", "error": str(exc)}
+    else:
+        destroy_cleanup = {"ok": True, "skipped": True, "reason": "missing topology"}
+    control_cleanup = release_control_lease(case_state.get("control_network_lease"))
+    return {
+        "ok": bool(destroy_cleanup.get("ok") and control_cleanup.get("ok")),
+        "destroy": destroy_cleanup,
+        "control_network": control_cleanup,
+    }
+
+
+def _terminate_recorded_worker(case_state: dict[str, Any]) -> dict[str, Any]:
+    """Stop one persisted worker process group after checking ownership."""
+    raw_pid = case_state.get("worker_pid")
+    try:
+        pid = int(raw_pid)
+    except (TypeError, ValueError):
+        pid = _find_worker_pid(str(case_state.get("worker_spec_path") or ""))
+        if pid is None:
+            return {"ok": True, "skipped": True, "reason": "missing worker pid"}
+    if pid <= 1:
+        return {"ok": True, "skipped": True, "reason": "invalid worker pid"}
+    try:
+        command_line = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode(
+            errors="replace"
+        )
+    except OSError:
+        command_line = ""
+    expected_ticks = str(case_state.get("worker_start_ticks") or "")
+    actual_ticks = _proc_start_ticks(pid)
+    if expected_ticks and actual_ticks and expected_ticks != actual_ticks:
+        return {"ok": False, "skipped": True, "reason": "worker pid was reused"}
+    command_matches = (
+        "verify_enterprise3_guided_batch.py" in command_line
+        and "--worker-spec" in command_line
+    )
+    # New state records persist the process group explicitly.  This allows us
+    # to reap a surviving child even when the worker leader has already
+    # exited, while legacy state still requires the command-line ownership
+    # check above.
+    if not command_matches and not case_state.get("worker_pgid"):
+        return {"ok": False, "skipped": True, "reason": "worker identity not confirmed"}
+    return _terminate_process_group(
+        pid, int(case_state.get("worker_pgid") or pid),
+        first_signal=signal.SIGTERM,
+    )
+
+
+def _cleanup_incomplete_cases(
+    state: dict[str, Any], output_dir: Path, management: dict[str, Any],
+    *, case_ids: set[str] | None = None, reason: str = "interrupted",
+    include_prepared: bool = False,
+) -> None:
+    """Make coordinator shutdown/recovery clean all known case resources."""
+    targets: list[str] = []
+    for case_id in state.get("selected_case_ids", []):
+        if case_ids is not None and case_id not in case_ids:
+            continue
+        item = state["cases"][case_id]
+        has_resources = (
+            Path(item.get("scenario_dir", ""), "clab.yaml").exists()
+            or item.get("control_network_lease")
+        )
+        if not include_prepared and not (
+            item.get("status") in {"running", "leased", "cleaning"}
+            or item.get("control_network_lease")
+        ):
+            continue
+        if include_prepared and not has_resources:
+            continue
+        targets.append(case_id)
+
+    # Revoke every attempt before stopping workers.  A worker that survives
+    # the first signal can then never publish into the coordinator's canonical
+    # result view.  Stop all process groups before any Docker destroy operation
+    # so cleanup cannot race a still-running verifier.
+    for case_id in targets:
+        item = state["cases"][case_id]
+        _revoke_attempt_fence(item)
+        _terminate_recorded_worker(item)
+
+    for case_id in targets:
+        item = state["cases"][case_id]
+        result = _load_attempt_result(item)
+        cleanup = _janitor(item, management)
+        if result is None:
+            result = _result_for_infra(
+                item, "interrupted", f"coordinator cleanup during {reason}"
+            )
+        result["coordinator_cleanup"] = cleanup
+        if not cleanup.get("ok"):
+            result["cleanup_failed"] = True
+        _save_case_result(item, result)
+        item.pop("worker_pid", None)
+        item.pop("worker_pgid", None)
+        item.pop("worker_start_ticks", None)
+        item.pop("worker_spec_path", None)
+        if cleanup.get("ok"):
+            item["control_network_lease"] = None
+            item["status"] = "runtime_prepared" if reason == "resume" else "interrupted"
+        else:
+            item["status"] = "cleaning"
+        _update_current_attempt_record(
+            item,
+            finished_at=utcnow(),
+            failure_stage=result.get("failure_stage", "interrupted"),
+            success=bool(result.get("success", False)),
+            cleanup_failed=not cleanup.get("ok"),
+            cleanup=cleanup,
+        )
+        item["last_failure_stage"] = result.get("failure_stage", "interrupted")
+        _persist(output_dir, state)
+
+
+def _cleanup_run_control_networks(run_id: str) -> dict[str, Any]:
+    """Sweep control networks labeled for one batch run, including unpersisted leases."""
+    listed = subprocess.run(
+        [
+            "docker", "network", "ls",
+            "--filter", "label=cvelab.role=agent-control",
+            "--filter", f"label=cvelab.run={run_id}",
+            "--format", "{{.Name}}",
+        ],
+        capture_output=True, text=True, stdin=subprocess.DEVNULL,
+    )
+    if listed.returncode != 0:
+        return {
+            "ok": False,
+            "run_id": run_id,
+            "errors": [listed.stderr.strip()[-1000:] or "network list failed"],
+        }
+    networks = [line.strip() for line in listed.stdout.splitlines() if line.strip()]
+    results = [release_control_lease({"network_name": name}) for name in networks]
+    return {
+        "ok": all(item.get("ok") for item in results),
+        "run_id": run_id,
+        "networks": networks,
+        "results": results,
+    }
 
 
 def _worker_spec(state: dict[str, Any], case_state: dict[str, Any], args: argparse.Namespace,
@@ -878,11 +1804,19 @@ def _worker_spec(state: dict[str, Any], case_state: dict[str, Any], args: argpar
         "batch_fingerprint": state.get("fingerprint", ""),
         "lab_name": case_state["lab_name"], "scenario_dir": case_state["scenario_dir"],
         "result_path": case_state["result_path"], "lab_lock_path": str(work_dir / "lab.lock"),
+        "worker_result_path": case_state.get("worker_result_path") or case_state["result_path"],
+        "attempt_fence_path": case_state.get("attempt_fence_path", ""),
+        "attempt_token": case_state.get("attempt_token", ""),
+        "attempt": int(case_state.get("attempts", 0) or 0),
+        "coordinator_pid": os.getpid(),
+        "coordinator_start_ticks": _proc_start_ticks(os.getpid()),
         "atoms_dir": args.atoms_dir, "max_turns": args.max_turns, "agent_timeout": args.agent_timeout,
         "environment_only": args.environment_only,
         "agent_context": context,
         "agent_exposure_profile": profile,
         "noise_level": str(getattr(args, "noise_level", "none")),
+        "noise_activity": getattr(args, "noise_activity", None),
+        "noise_activity_config": noise_activity_config(args),
         "agent_runner": str(getattr(args, "agent_runner", "claude")),
         "strict_guide_compatibility": args.strict_guide_compatibility,
         "sysarmor": {
@@ -940,17 +1874,23 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
     fatal_stop = False
     case_timeout = args.case_timeout or max(1800, args.agent_timeout + 1800)
     while True:
-        ready = [state["cases"][case_id] for case_id in state["selected_case_ids"]
+        # Keep IDs rather than dict references: _persist normalizes case
+        # entries and may replace their contents while this loop is running.
+        ready = [case_id for case_id in state["selected_case_ids"]
                  if state["cases"][case_id]["status"] in {"runtime_prepared", "leased"}]
         while ready and len(active) < args.parallel and not interrupted and not fatal_stop:
-            item = ready.pop(0)
-            case_id = item["case"]["id"]
+            case_id = ready.pop(0)
+            item = state["cases"][case_id]
             if not args.environment_only and not args.generate_only and not item.get("control_network_lease"):
                 try:
                     item["control_network_lease"] = control_lease(
                         state["run_id"], case_id, scenario_reserved_subnets(Path(item["scenario_dir"]))
                     )
                     item["status"] = "leased"
+                    # Persist the lease before launching the worker.  If the
+                    # coordinator is interrupted in the launch window, resume
+                    # can still disconnect this exact network.
+                    _persist(output_dir, state)
                 except Exception as exc:
                     item["attempts"] += 1
                     _save_case_result(item, _result_for_infra(item, "agent_transport", repr(exc)))
@@ -961,12 +1901,43 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
             item["status"] = "running"
             # A retry must never consume the previous attempt's result.
             Path(item["result_path"]).unlink(missing_ok=True)
+            attempt_id = int(item["attempts"])
+            attempt_token = secrets.token_hex(16)
+            attempt_results_dir = output_dir / ".batch" / "attempt-results"
+            attempt_fences_dir = output_dir / ".batch" / "attempt-fences"
+            attempt_results_dir.mkdir(parents=True, exist_ok=True)
+            attempt_fences_dir.mkdir(parents=True, exist_ok=True)
+            item["worker_result_path"] = str(
+                attempt_results_dir / f"{case_id}-a{attempt_id}.json"
+            )
+            item["attempt_fence_path"] = str(
+                attempt_fences_dir / f"{case_id}-a{attempt_id}.json"
+            )
+            item["attempt_fence_revoked_at_ns"] = None
+            item["attempt_token"] = attempt_token
+            Path(item["worker_result_path"]).unlink(missing_ok=True)
+            atomic_json(Path(item["attempt_fence_path"]), {
+                "token": attempt_token,
+                "run_id": state["run_id"],
+                "case_id": case_id,
+                "attempt": attempt_id,
+                "coordinator_pid": os.getpid(),
+                "coordinator_start_ticks": _proc_start_ticks(os.getpid()),
+            })
             spec_path = _worker_spec(state, item, args, output_dir, len(active) + 1, management)
             log_path = output_dir / ".batch" / "logs" / f"{case_id}-a{item['attempts']}.log"
             item.setdefault("attempt_records", []).append({
                 "attempt": item["attempts"], "started_at": utcnow(), "log_path": str(log_path),
+                "parallel": args.parallel,
+                "worker_result_path": item["worker_result_path"],
+                "attempt_fence_path": item["attempt_fence_path"],
             })
             log_handle = log_path.open("w", encoding="utf-8")
+            # Persist the spec/fence before Popen.  If the coordinator dies in
+            # the tiny launch window before it can persist the worker PID,
+            # recovery can still locate the worker by its unique spec path.
+            item["worker_spec_path"] = str(spec_path)
+            _persist(output_dir, state)
             try:
                 worker_env = os.environ.copy()
                 # Secrets remain process environment only: never in a spec,
@@ -987,13 +1958,22 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 log_handle.close()
                 launch_result = _result_for_infra(item, "worker_launch", repr(exc))
                 _save_case_result(item, launch_result)
-                item["attempt_records"][-1].update({
-                    "finished_at": utcnow(), "failure_stage": "worker_launch", "success": False,
-                })
+                _update_current_attempt_record(
+                    item,
+                    finished_at=utcnow(),
+                    failure_stage="worker_launch",
+                    success=False,
+                )
+                _revoke_attempt_fence(item)
+                item.pop("attempt_token", None)
                 item["status"] = "runtime_prepared" if item["attempts"] < 2 else "completed"
                 _persist(output_dir, state)
                 continue
             log_handle.close()
+            item["worker_pid"] = process.pid
+            item["worker_pgid"] = process.pid
+            item["worker_start_ticks"] = _proc_start_ticks(process.pid)
+            item.pop("attempt_token", None)
             active[case_id] = (process, time.monotonic(), log_path)
             if args.live_output:
                 log_positions[case_id] = 0
@@ -1013,6 +1993,8 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
             print("[Fatal] batch stopped due to API quota exhaustion", flush=True)
             return False
         if not active:
+            if interrupted:
+                return False
             # Re-queue a paused (rate-limited) case once its cooldown elapsed,
             # so it is picked up in the next loop iteration's `ready` list.
             if not any(state["cases"][case_id]["status"] in {"runtime_prepared", "leased", "running"}
@@ -1038,53 +2020,72 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
             time.sleep(0.2)
         except KeyboardInterrupt:
             interrupted = True
+        if interrupted:
+            # Revoke all result fences before signalling any worker.  This
+            # closes the parent-state/late-write window even if a worker is
+            # stuck in a child subprocess for a short period.
+            for _case_id, (_process, _started, _log_path) in active.items():
+                _revoke_attempt_fence(state["cases"][_case_id])
         if args.live_output:
             _stream_log_updates(active, log_positions, log_pending)
         for case_id, (process, started, _log_path) in list(active.items()):
             item = state["cases"][case_id]
             timed_out = time.monotonic() - started > case_timeout
-            if interrupted or timed_out:
+            fatal_worker_stop = fatal_stop and item.get("status") == "running"
+            if interrupted or timed_out or fatal_worker_stop:
                 signal_to_send = signal.SIGINT if interrupted else signal.SIGTERM
-                try:
-                    os.killpg(process.pid, signal_to_send)
-                except ProcessLookupError:
-                    pass
-                if timed_out:
-                    _save_case_result(item, _result_for_infra(item, "worker_timeout", "worker wall-clock timeout"))
-            if process.poll() is None and not (interrupted or timed_out):
+                _revoke_attempt_fence(item)
+                _terminate_process_group(
+                    process.pid, int(item.get("worker_pgid") or process.pid),
+                    first_signal=signal_to_send,
+                )
+            if process.poll() is None and not (interrupted or timed_out or fatal_worker_stop):
                 continue
             if process.poll() is None:
-                try:
-                    process.wait(timeout=30)
-                except subprocess.TimeoutExpired:
-                    try:
-                        os.killpg(process.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
+                _terminate_process_group(
+                    process.pid, int(item.get("worker_pgid") or process.pid),
+                    first_signal=signal.SIGTERM,
+                )
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                _terminate_process_group(
+                    process.pid, int(item.get("worker_pgid") or process.pid),
+                    first_signal=signal.SIGKILL, grace_seconds=0,
+                )
+            if _process_group_exists(int(item.get("worker_pgid") or process.pid)):
+                _terminate_process_group(
+                    process.pid, int(item.get("worker_pgid") or process.pid),
+                    first_signal=signal.SIGTERM, grace_seconds=5,
+                )
             if args.live_output:
                 _stream_log_updates(active, log_positions, log_pending)
-            result_path = Path(item["result_path"])
-            if not result_path.exists():
-                stage = FATAL_API_STAGE if fatal_stop else ("interrupted" if interrupted else "worker_failed")
-                error = (
-                    "skipped: API quota exhausted, batch stopped"
-                    if fatal_stop else "worker exited without a result"
+            if interrupted or timed_out:
+                stage = "interrupted" if interrupted else "worker_timeout"
+                result = _result_for_infra(item, stage, "worker stopped before result commit")
+            elif fatal_worker_stop:
+                result = _result_for_infra(
+                    item, FATAL_API_STAGE, "skipped: API quota exhausted, batch stopped"
                 )
-                _save_case_result(item, _result_for_infra(item, stage, error))
-            try:
-                result = json.loads(result_path.read_text())
-            except (OSError, json.JSONDecodeError):
-                result = _result_for_infra(item, "worker_failed", "worker produced invalid result JSON")
-                _save_case_result(item, result)
+            else:
+                result = _load_attempt_result(item)
+                if result is None:
+                    stage = FATAL_API_STAGE if fatal_stop else "worker_failed"
+                    error = (
+                        "skipped: API quota exhausted, batch stopped"
+                        if fatal_stop else "worker exited without a fenced result"
+                    )
+                    result = _result_for_infra(item, stage, error)
             item["status"] = "cleaning"
             _persist(output_dir, state)
             cleanup = _janitor(item, management)
             if not cleanup["ok"]:
                 result["cleanup_error"] = cleanup
                 result["cleanup_failed"] = True
-                _save_case_result(item, result)
-            release_control_lease(item.get("control_network_lease"))
-            item["control_network_lease"] = None
+            _save_case_result(item, result)
+            _revoke_attempt_fence(item)
+            if cleanup.get("ok"):
+                item["control_network_lease"] = None
             failure_stage = result.get("failure_stage", "")
             retry = _should_retry(result, item["attempts"], interrupted)
             # --- API error triage (2026-07-25) -------------------------------
@@ -1101,10 +2102,12 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                 for rid, (rproc, _rstart, _rlog) in list(active.items()):
                     if rid == case_id:
                         continue
-                    try:
-                        os.killpg(rproc.pid, signal.SIGTERM)
-                    except ProcessLookupError:
-                        pass
+                    other = state["cases"][rid]
+                    _revoke_attempt_fence(other)
+                    _terminate_process_group(
+                        rproc.pid, int(other.get("worker_pgid") or rproc.pid),
+                        first_signal=signal.SIGTERM,
+                    )
                 # Preserve this case as resumable after quota is restored.
                 item["status"] = "quota_skipped"
             # Persistent rate limit: pause this case (do NOT count as a
@@ -1126,17 +2129,28 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                     # Roll back the attempts increment so a rate-limit pause
                     # does not eat into the infra-retry budget.
                     item["attempts"] = max(0, item["attempts"] - 1)
+            elif not cleanup.get("ok"):
+                # Do not mark a case complete while its scoped control bridge
+                # or ContainerLab resources are still present.  Resume will
+                # retry cleanup before considering another Agent attempt.
+                item["status"] = "cleaning"
             elif interrupted:
                 item["status"] = "interrupted"
             else:
                 item["status"] = "runtime_prepared" if retry else "completed"
             # ----------------------------------------------------------------
-            item["attempt_records"][-1].update({
-                "finished_at": utcnow(), "failure_stage": failure_stage,
-                "success": bool(result.get("success", False)),
-                "cleanup_failed": bool(result.get("cleanup_failed", False)),
-                "cleanup": cleanup,
-            })
+            _update_current_attempt_record(
+                item,
+                finished_at=utcnow(),
+                failure_stage=failure_stage,
+                success=bool(result.get("success", False)),
+                cleanup_failed=bool(result.get("cleanup_failed", False)),
+                cleanup=cleanup,
+            )
+            item.pop("worker_pid", None)
+            item.pop("worker_pgid", None)
+            item.pop("worker_start_ticks", None)
+            item.pop("worker_spec_path", None)
             item["last_failure_stage"] = failure_stage
             active.pop(case_id)
             if args.live_output:
@@ -1145,6 +2159,42 @@ def _launch_workers(state: dict[str, Any], args: argparse.Namespace, output_dir:
                     print(f"[{case_id}] {pending_line}", flush=True)
                 log_positions.pop(case_id, None)
             _persist(output_dir, state)
+
+
+def _run_cleanup_only(output_dir: Path) -> int:
+    """Recover one existing batch without touching its Agent/experiment flow."""
+    state_path = output_dir / "batch_state.json"
+    if not state_path.exists():
+        raise SystemExit(f"cleanup-only requires an existing batch_state.json: {state_path}")
+    batch_dir = output_dir / ".batch"
+    lock_path = batch_dir / "coordinator.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_handle = lock_path.open("a+")
+    try:
+        if fcntl is not None:
+            try:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise SystemExit(f"another coordinator owns {output_dir}") from exc
+        state = json.loads(state_path.read_text())
+        management = select_management_network()
+        _cleanup_incomplete_cases(
+            state, output_dir, management, reason="cleanup_only",
+            include_prepared=True,
+        )
+        run_cleanup = _cleanup_run_control_networks(str(state.get("run_id", "")))
+        state["last_cleanup_sweep"] = {
+            "finished_at": utcnow(),
+            "mode": "cleanup_only",
+            "run_control_networks": run_cleanup,
+        }
+        _persist(output_dir, state)
+        print(json.dumps(run_cleanup, ensure_ascii=False, indent=2))
+        return 0 if run_cleanup.get("ok", False) else 2
+    finally:
+        if fcntl is not None:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+        lock_handle.close()
 
 
 def main() -> int:
@@ -1156,6 +2206,10 @@ def main() -> int:
     os.chdir(ROOT)
     if hasattr(args, "worker_spec"):
         return run_worker(Path(args.worker_spec))
+    if args.cleanup_only:
+        return _run_cleanup_only(ROOT / args.output)
+    if args.noise_activity is not None and args.noise_level != "high":
+        raise SystemExit("--noise-activity requires --noise-level high")
     if load_dotenv is not None:
         load_dotenv(ROOT / ".env")
         args.api_key = args.api_key or os.getenv("LLM_API_KEY", "")
@@ -1166,6 +2220,10 @@ def main() -> int:
         validate_parallelism(args.parallel)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
+    if args.resume_parallel < 0:
+        raise SystemExit("--resume-parallel must be zero or greater")
+    if args.resume_parallel and not args.resume:
+        raise SystemExit("--resume-parallel requires --resume")
     if not args.generate_only and not args.environment_only and not args.api_key:
         raise SystemExit("LLM API key is required. Set LLM_API_KEY or pass --api-key. Use --generate-only for a no-Agent preflight.")
     if not args.environment_only and not args.generate_only and args.parallel > len(CONTROL_SUBNETS):
@@ -1193,15 +2251,92 @@ def main() -> int:
         except BlockingIOError as exc:
             raise SystemExit(f"another coordinator owns {output_dir}") from exc
     state_path = output_dir / "batch_state.json"
+    resume_state_hint: dict[str, Any] | None = None
+    if args.resume and state_path.exists():
+        try:
+            resume_state_hint = json.loads(state_path.read_text())
+        except (OSError, json.JSONDecodeError):
+            pass
+    if args.resume and not args.reuse_scenarios_from and state_path.exists():
+        try:
+            prior_options = (resume_state_hint or {}).get("options") or {}
+            args.reuse_scenarios_from = str(prior_options.get("reuse_scenarios_from") or "")
+        except AttributeError:
+            pass
+    if args.resume_parallel:
+        prior_parallel = (resume_state_hint or {}).get("options", {}).get("parallel")
+        if not isinstance(prior_parallel, int) or prior_parallel < 1:
+            raise SystemExit("--resume-parallel requires a resumable batch with a valid initial parallel value")
+        # The immutable fingerprint remains tied to the original run inputs;
+        # only the unfinished worker launch concurrency changes after it matches.
+        args.parallel = prior_parallel
+    reuse_source: dict[str, Any] | None = None
+    if args.reuse_scenarios_from:
+        source_root = _reuse_source_path(args.reuse_scenarios_from)
+        args.reuse_scenarios_from = str(source_root)
+        reuse_source = _load_reuse_source(
+            source_root,
+            selected,
+            agent_context=args.agent_context,
+            noise_level=str(getattr(args, "noise_level", "none")),
+        )
+        reuse_source["_source_root"] = str(source_root)
     fingerprint = _digest_inputs(selected, args)
+    state: dict[str, Any] | None = None
+    management: dict[str, Any] = {"name": MGMT_NETWORK_NAME}
+    resume_cleanup_ids: set[str] = set()
     if args.resume:
         if not state_path.exists():
             raise SystemExit("--resume requires an existing batch_state.json")
         state = json.loads(state_path.read_text())
-        if state.get("fingerprint") != fingerprint:
-            raise SystemExit("batch fingerprint differs; use a new output directory")
+        known_fingerprints = {
+            str(state.get("fingerprint", "")),
+            str(state.get("resume_fingerprint", "")),
+        }
+        if fingerprint not in known_fingerprints:
+            if not args.resume_parallel or not _resume_contract_matches(state, selected, args):
+                raise SystemExit("batch fingerprint differs; use a new output directory")
+            # The runner source is part of the normal fingerprint.  Permit a
+            # narrowly-scoped migration only for a scheduler-only resume when
+            # every experiment input and fixture still matches the old state.
+            migrations = state.setdefault("resume_migrations", [])
+            if not any(
+                isinstance(entry, dict) and entry.get("to_fingerprint") == fingerprint
+                for entry in migrations
+            ):
+                migrations.append({
+                    "at": utcnow(),
+                    "reason": "runner_fingerprint_revision",
+                    "from_fingerprint": state.get("fingerprint", ""),
+                    "to_fingerprint": fingerprint,
+                })
+            state["resume_fingerprint"] = fingerprint
+        if args.resume_parallel:
+            state.setdefault("parallel_history", [{
+                "parallel": state["options"].get("parallel"),
+                "kind": "initial",
+                "at": state.get("created_at", ""),
+            }])
+            history = state["parallel_history"]
+            if not history or history[-1].get("parallel") != args.resume_parallel:
+                history.append({
+                    "parallel": args.resume_parallel,
+                    "kind": "resume",
+                    "at": utcnow(),
+                })
+            args.parallel = args.resume_parallel
+            try:
+                validate_parallelism(args.parallel)
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+            if not args.environment_only and not args.generate_only and args.parallel > len(CONTROL_SUBNETS):
+                raise SystemExit(f"--resume-parallel exceeds the {len(CONTROL_SUBNETS)} available Agent control-network leases")
         # Completed research outcomes are immutable.  Only interrupted or
         # unfinished infrastructure work is eligible to resume.
+        resume_cleanup_ids = {
+            case_id for case_id, item in state.get("cases", {}).items()
+            if item.get("status") in {"running", "leased", "cleaning"}
+        }
         for item in state.get("cases", {}).values():
             if item.get("status") in {"interrupted", "quota_skipped"}:
                 item["status"] = (
@@ -1209,13 +2344,9 @@ def main() -> int:
                     if Path(item.get("scenario_dir", "")).is_dir()
                     else "pending"
                 )
-        for item in state.get("cases", {}).values():
-            if item.get("status") in {
-                "interrupted", "quota_skipped", "running", "leased", "cleaning",
-            }:
-                release_control_lease(item.get("control_network_lease"))
-                item["control_network_lease"] = None
-                item["status"] = "runtime_prepared" if Path(item.get("scenario_dir", "")).is_dir() else "pending"
+        for case_id, item in state.get("cases", {}).items():
+            if case_id in resume_cleanup_ids:
+                item["status"] = "cleaning"
     else:
         if state_path.exists():
             raise SystemExit("output already contains a batch state; use --resume or a new output directory")
@@ -1224,12 +2355,17 @@ def main() -> int:
             "schema_version": 1, "created_at": utcnow(), "run_id": run_id, "fingerprint": fingerprint,
             "agent_context": args.agent_context,
             "agent_exposure_profile": agent_exposure_profile,
+            "parallel_history": [{"parallel": args.parallel, "kind": "initial", "at": utcnow()}],
             "options": {"environment_only": args.environment_only, "generate_only": args.generate_only,
                         "parallel": args.parallel, "agent_timeout": args.agent_timeout, "max_turns": args.max_turns,
                         "seed": args.seed, "case_timeout": args.case_timeout,
                         "agent_context": args.agent_context,
                         "agent_exposure_profile": agent_exposure_profile,
                         "noise_level": str(getattr(args, "noise_level", "none")),
+                        "noise_activity": getattr(args, "noise_activity", None),
+                        "noise_activity_config": noise_activity_config(args),
+                        "reuse_scenarios_from": str(getattr(args, "reuse_scenarios_from", "")),
+                        "reuse_source_run_id": str((reuse_source or {}).get("run_id", "")),
                         "model": args.model, "agent_runner": args.agent_runner},
             "selected_case_ids": [str(case["id"]) for case in selected], "cases": {},
         }
@@ -1243,30 +2379,33 @@ def main() -> int:
                 "scenario_dir": str(output_dir / "scenarios" / lab_name),
                 "result_path": str(batch_dir / "results" / f"{case_id}.json"),
             }
+        if reuse_source is not None:
+            _prepare_reused_scenarios(state, reuse_source, output_dir)
+    if state is None:
+        raise RuntimeError("batch state was not initialized")
     _persist(output_dir, state)
+    previous_signal_handlers = {
+        signum: signal.getsignal(signum) for signum in (signal.SIGINT, signal.SIGTERM)
+    }
+
+    def _handle_shutdown(signum, _frame):
+        raise KeyboardInterrupt(f"received signal {signum}")
+
+    signal.signal(signal.SIGINT, _handle_shutdown)
+    signal.signal(signal.SIGTERM, _handle_shutdown)
     try:
         _generate_cases(state, args, output_dir)
         if args.generate_only:
-            for case_id in state["selected_case_ids"]:
-                item = state["cases"][case_id]
-                if item["status"] == "generated":
-                    item["status"] = "completed"
-                    _save_case_result(item, {"case_id": case_id, "purpose": item["case"]["purpose"],
-                        "cves": item["case"]["cves"], "scenario_dir": item["scenario_dir"],
-                        "generated": True, "preflight": True, "success": True,
-                        "agent_context": args.agent_context,
-                        "agent_exposure_profile": agent_exposure_profile,
-                        "noise_level": str(getattr(args, "noise_level", "none")),
-                        "sysarmor": {
-                            "enabled": bool(getattr(args, "sysarmor", False)),
-                            "detection": bool(getattr(args, "sysarmor_detection", False)),
-                            "signal_window": int(getattr(args, "sysarmor_signal_window", 30)),
-                        },
-                        "execution_complete": True})
-            _persist(output_dir, state)
-            return 0
+            return 0 if _complete_generate_only_preflight(
+                state, args, output_dir, agent_exposure_profile,
+            ) else 2
         _prewarm_cases(state, args, output_dir)
         management = select_management_network()
+        if resume_cleanup_ids:
+            _cleanup_incomplete_cases(
+                state, output_dir, management,
+                case_ids=resume_cleanup_ids, reason="resume",
+            )
         node_count = max((len((__import__("yaml").safe_load((Path(item["scenario_dir"]) / "clab.yaml").read_text()) or {}).get("topology", {}).get("nodes", {}))
                           for item in state["cases"].values() if item["status"] == "runtime_prepared"), default=0)
         if node_count * args.parallel + int(management.get("endpoints", "0")) > MGMT_CAPACITY:
@@ -1284,6 +2423,22 @@ def main() -> int:
             return 1
         return 0
     finally:
+        try:
+            _cleanup_incomplete_cases(
+                state, output_dir, management, reason="coordinator_exit",
+            )
+            run_cleanup = _cleanup_run_control_networks(str(state.get("run_id", "")))
+            if not run_cleanup.get("ok"):
+                print(
+                    f"[Cleanup] run-labeled network sweep incomplete: {run_cleanup}",
+                    file=sys.stderr, flush=True,
+                )
+        except Exception as exc:
+            # Preserve the original exit/error while leaving an explicit
+            # diagnostic in the terminal; a later --resume can retry cleanup.
+            print(f"[Cleanup] coordinator sweep failed: {exc}", file=sys.stderr, flush=True)
+        for signum, handler in previous_signal_handlers.items():
+            signal.signal(signum, handler)
         if fcntl is not None:
             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
         lock_handle.close()

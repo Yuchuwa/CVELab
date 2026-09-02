@@ -15,6 +15,7 @@ AGENT_EXPOSURE_CONTEXTS = (
     "no_hint",
     "l0",
     "l1",
+    "l1_entry_discovery",
     "l2",
 )
 
@@ -24,8 +25,110 @@ _AGENT_EXPOSURE_PROFILE_NAMES = {
     "no_hint": "exploit_hints_removed",
     "l0": "level_l0_hints_removed",
     "l1": "level_l1_hints_removed",
+    "l1_entry_discovery": "level_l1_entry_discovery_hints_removed",
     "l2": "level_l2_hints_removed",
 }
+
+
+DEFAULT_NOISE_OPERATION_MIX: dict[str, list[str]] = {
+    "http": ["http_get"],
+    "redis": ["redis_ping_set_get"],
+    "postgres": ["postgres_startup"],
+    "tcp": ["tcp_connect"],
+}
+
+
+class NoiseActivityConfigV1(_ArtifactModel):
+    """Explicit, versioned configuration for benign client traffic.
+
+    The configuration deliberately describes the activity contract rather
+    than individual targets.  Target lists remain verifier-private evidence
+    and are never part of this public model.
+    """
+
+    schema_version: Literal[1] = 1
+    mode: Literal["off", "normal"] = "off"
+    profile_version: str = ""
+    activity_version: str = ""
+    seed: int = 0
+    interval_min_seconds: float = 2.0
+    interval_max_seconds: float = 5.0
+    duration_seconds: float = 0.0
+    max_failed_requests: int = 0
+    require_data_plane_ready: bool = True
+    operation_mix: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            key: list(value) for key, value in DEFAULT_NOISE_OPERATION_MIX.items()
+        }
+    )
+
+    @model_validator(mode="after")
+    def _validate_activity_bounds(self):
+        if self.interval_min_seconds <= 0:
+            raise ValueError("interval_min_seconds must be greater than zero")
+        if self.interval_max_seconds < self.interval_min_seconds:
+            raise ValueError("interval_min_seconds must not exceed interval_max_seconds")
+        if self.duration_seconds < 0:
+            raise ValueError("duration_seconds must be zero or greater")
+        if self.max_failed_requests < 0:
+            raise ValueError("max_failed_requests must be zero or greater")
+        unknown = set(self.operation_mix) - set(DEFAULT_NOISE_OPERATION_MIX)
+        if unknown:
+            raise ValueError(
+                "operation_mix contains unsupported protocol groups: "
+                + ", ".join(sorted(unknown))
+            )
+        if any(not operations for operations in self.operation_mix.values()):
+            raise ValueError("operation_mix entries must contain at least one operation")
+        if any(
+            not isinstance(operation, str) or not operation.strip()
+            for operations in self.operation_mix.values()
+            for operation in operations
+        ):
+            raise ValueError("operation_mix operations must be non-empty strings")
+        unsupported_operations = {
+            operation
+            for kind, operations in self.operation_mix.items()
+            for operation in operations
+            if operation not in DEFAULT_NOISE_OPERATION_MIX[kind]
+        }
+        if unsupported_operations:
+            raise ValueError(
+                "operation_mix contains unsupported operations: "
+                + ", ".join(sorted(unsupported_operations))
+            )
+        return self
+
+
+def normalize_noise_activity_config(
+    value: NoiseActivityConfigV1 | Mapping[str, Any] | None = None,
+    *,
+    mode: str | None = None,
+    seed: int = 0,
+    profile_version: str = "",
+    activity_version: str = "",
+) -> NoiseActivityConfigV1:
+    """Normalize legacy activity arguments into the v1 config contract."""
+    if value is None:
+        data: dict[str, Any] = {}
+    elif isinstance(value, NoiseActivityConfigV1):
+        data = value.model_dump(mode="json")
+    else:
+        data = dict(value)
+    if mode is not None:
+        supplied_mode = data.get("mode")
+        if supplied_mode is not None and str(supplied_mode) != str(mode):
+            raise ValueError(
+                f"noise activity config mode {supplied_mode!r} does not match {mode!r}"
+            )
+        data["mode"] = mode
+    data.setdefault("mode", "off")
+    data.setdefault("seed", seed)
+    if profile_version and not data.get("profile_version"):
+        data["profile_version"] = profile_version
+    if activity_version and not data.get("activity_version"):
+        data["activity_version"] = activity_version
+    return NoiseActivityConfigV1.model_validate(data)
 
 
 def normalize_agent_context(value: str | None) -> str:
@@ -43,7 +146,15 @@ class AgentExposureProfile(_ArtifactModel):
     """Versioned, immutable description of what an Agent may see."""
 
     schema_version: Literal[1] = 1
-    context: Literal["guided", "no_guide", "no_hint", "l0", "l1", "l2"] = "guided"
+    context: Literal[
+        "guided",
+        "no_guide",
+        "no_hint",
+        "l0",
+        "l1",
+        "l1_entry_discovery",
+        "l2",
+    ] = "guided"
     profile: str = ""
     hint_profile: str = ""
 
@@ -132,6 +243,11 @@ class GroundTruthV1(_ArtifactModel):
     template: str = ""
     attack_path: list[dict[str, Any]] = Field(default_factory=list)
     objectives: list[dict[str, Any]] = Field(default_factory=list)
+    # Range-owned benign-noise admission evidence; these fields remain
+    # verifier-private and are never copied into AgentInputV1.
+    noise_profile_coverage: list[dict[str, Any]] = Field(default_factory=list)
+    noise_profile_admission: dict[str, Any] = Field(default_factory=dict)
+    noise_activity_config: NoiseActivityConfigV1 | None = None
 
 
 class MaterialAuditItemV1(_ArtifactModel):
@@ -177,6 +293,10 @@ class AgentInputV1(_ArtifactModel):
     scenario_name: str = ""
     attacker_ip: str = ""
     targets: list[dict[str, Any]] = Field(default_factory=list)
+    # ``l1_entry_discovery`` publishes an unlabeled candidate endpoint list
+    # instead of a real ``target-1`` payload.  Keep the field explicit so the
+    # persisted input contract is visible to readers and schema tooling.
+    entry_points: list[str] = Field(default_factory=list)
     objectives: list[dict[str, Any]] = Field(default_factory=list)
     agent_context: str = "guided"
     agent_exposure_profile: AgentExposureProfile = Field(
@@ -234,6 +354,18 @@ class BatchCaseStateV1(_ArtifactModel):
     attempts: int = 0
     scenario_dir: str = ""
     result_path: str = ""
+    # Coordinator-owned runtime fields. Keep them explicit so normalization
+    # cannot erase attempt history between a worker launch and its cleanup.
+    attempt_records: list[dict[str, Any]] = Field(default_factory=list)
+    control_network_lease: dict[str, Any] | None = None
+    worker_pid: int | None = None
+    worker_pgid: int | None = None
+    worker_start_ticks: str = ""
+    worker_spec_path: str = ""
+    worker_result_path: str = ""
+    attempt_fence_path: str = ""
+    attempt_fence_revoked_at_ns: int | None = None
+    last_failure_stage: str = ""
 
 
 class BatchStateV1(_ArtifactModel):
@@ -352,6 +484,7 @@ class ScenarioManifestV1(_ArtifactModel):
     exploit_guides: list[Any] = Field(default_factory=list)
     guide_compatibility: dict[str, Any] = Field(default_factory=dict)
     guide_advisories: dict[str, Any] = Field(default_factory=dict)
+    noise_activity: NoiseActivityConfigV1 = Field(default_factory=NoiseActivityConfigV1)
 
     @model_validator(mode="before")
     @classmethod
@@ -394,6 +527,8 @@ class VerificationResultV1(_ArtifactModel):
     agent_exposure_profile: AgentExposureProfile = Field(
         default_factory=AgentExposureProfile.from_context
     )
+    entry_discovery_preflight: dict[str, Any] = Field(default_factory=dict)
+    noise_activity: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod

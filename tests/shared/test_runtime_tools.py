@@ -282,3 +282,29 @@ def test_runtime_verification_record_has_both_digests():
     rec = runtime_verification_record(res)
     assert rec["base_image_digest"] == "sha:base"
     assert rec["runtime_image_digest"] == "sha:rt"
+
+
+def test_runtime_recipe_pins_registry_base_and_embeds_provenance_labels():
+    """A locally rebuilt runtime has a portable recipe proof, not just an ID."""
+    from clab_builder.shared.runtime_provenance import (
+        RUNTIME_BASE_IMAGE_DIGEST_LABEL,
+        RUNTIME_GENERATED_HASH_LABEL,
+        RUNTIME_PROVENANCE_SCHEMA_LABEL,
+        RUNTIME_SOURCE_IMAGE_LABEL,
+        RUNTIME_PROVENANCE_VERSION,
+    )
+
+    atom = _atom(cve_id="CVE-PROVENANCE")
+    base_digest = "vulhub/test@sha256:" + "a" * 64
+    arts = generate_runtime_artifacts(
+        atom, atom.docker_image, base_image_digest=base_digest,
+    )
+
+    assert arts.dockerfile.startswith(f"FROM {base_digest}\n")
+    assert f'{RUNTIME_PROVENANCE_SCHEMA_LABEL}="{RUNTIME_PROVENANCE_VERSION}"' in arts.dockerfile
+    assert f'{RUNTIME_GENERATED_HASH_LABEL}="{arts.manifest["generated_hash"]}"' in arts.dockerfile
+    assert f'{RUNTIME_BASE_IMAGE_DIGEST_LABEL}="{base_digest}"' in arts.dockerfile
+    assert f'{RUNTIME_SOURCE_IMAGE_LABEL}="{atom.docker_image}"' in arts.dockerfile
+    assert arts.manifest["base_image_digest"] == base_digest
+    assert arts.manifest["pinned_base_image"] == base_digest
+    assert not arts.dockerfile.endswith("\n\n")

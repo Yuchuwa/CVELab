@@ -400,7 +400,10 @@ class Diagnoser:
             )
             return Diagnosis(FailureClass.CHAIN_COMPOSITION, target_slot,
                              record.condition, False, record, evidence)
-        if stage in {"agent", "objective", "agent_timeout", "agent_turn_limit"}:
+        if stage in {
+            "agent", "objective", "agent_runner_failed", "agent_timeout",
+            "agent_turn_limit",
+        }:
             return Diagnosis(FailureClass.ATTACK_EXECUTION, reason=stage,
                              retryable=True, evidence_refs=evidence)
         return Diagnosis(FailureClass.UNRESOLVED, reason=stage or "insufficient evidence",

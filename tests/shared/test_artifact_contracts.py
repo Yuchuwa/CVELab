@@ -50,6 +50,22 @@ def test_agent_exposure_profile_normalizes_context_and_is_versioned():
     assert profile.hint_profile == "guide_removed"
 
 
+def test_entry_discovery_profile_and_input_are_versioned():
+    profile = AgentExposureProfile.model_validate({"context": "l1-entry-discovery"})
+    model = normalize_agent_input({
+        "scenario_name": "entry-discovery",
+        "agent_context": "l1-entry-discovery",
+        "entry_points": ["192.168.100.2:80"],
+        "targets": [],
+    })
+
+    assert profile.context == "l1_entry_discovery"
+    assert profile.profile == "level_l1_entry_discovery_hints_removed"
+    assert model["agent_context"] == "l1_entry_discovery"
+    assert model["entry_points"] == ["192.168.100.2:80"]
+    assert model["targets"] == []
+
+
 def test_agent_exposure_profile_rejects_context_label_mismatch():
     with pytest.raises(ValidationError, match="does not match context"):
         AgentExposureProfile.model_validate({

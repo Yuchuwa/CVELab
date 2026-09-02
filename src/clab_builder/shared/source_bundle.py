@@ -39,6 +39,7 @@ from clab_builder.shared.models.atom import (
     MaterialVisibility,
     MaterialMetadata,
 )
+from clab_builder.shared.models.artifact_contracts import normalize_agent_context
 
 # Files/dirs never copied into source_bundle regardless of source kind.
 # These are build/runtime noise or private ground-truth artifacts.
@@ -198,6 +199,7 @@ def select_agent_materials(atom_or_bundle, agent_context: str = "guided") -> lis
     always wins, while assisted material is limited to the guided and no-guide
     profiles. Level restrictions are applied after visibility.
     """
+    agent_context = normalize_agent_context(agent_context)
     bundle = getattr(atom_or_bundle, "source_bundle", atom_or_bundle)
     if isinstance(atom_or_bundle, dict) and "source_bundle" in atom_or_bundle:
         bundle = atom_or_bundle.get("source_bundle")
@@ -218,7 +220,7 @@ def select_agent_materials(atom_or_bundle, agent_context: str = "guided") -> lis
     )
 
     level = "l2" if agent_context in {"l2", "no_hint"} else ""
-    if agent_context in {"l0", "l1"}:
+    if agent_context in {"l0", "l1", "l1_entry_discovery"}:
         return []
 
     selected: list[str] = []

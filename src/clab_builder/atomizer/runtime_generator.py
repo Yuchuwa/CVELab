@@ -28,6 +28,7 @@ Two cases:
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -42,6 +43,13 @@ from clab_builder.shared.runtime_tools import (
     resolve_packages,
     select_profiles,
 )
+from clab_builder.shared.runtime_provenance import (
+    pinned_runtime_base_reference,
+    runtime_provenance_labels,
+)
+
+
+_GENERATED_HASH_PLACEHOLDER = "__CVELAB_RUNTIME_GENERATED_HASH__"
 
 
 @dataclass
@@ -66,6 +74,11 @@ def _shell_quote(s: str) -> str:
     return '"' + s.replace('"', '\\"') + '"' if s else s
 
 
+def _docker_label_quote(value: str) -> str:
+    """Render one Docker LABEL value without allowing Dockerfile syntax."""
+    return json.dumps(str(value))
+
+
 def _read_source_dockerfile(atom: AtomConfig, atom_dir: Path) -> tuple[str, str]:
     """Return (dockerfile_rel, dockerfile_text) from source_bundle, or ('','')."""
     bundle = atom.source_bundle
@@ -83,6 +96,7 @@ def generate_runtime_artifacts(
     source_image: str,
     atom_dir: Optional[Path] = None,
     package_manager: Optional[str] = None,
+    base_image_digest: str = "",
 ) -> RuntimeArtifacts:
     """Generate runtime/Dockerfile + install-tools.sh + manifest for an atom.
 
@@ -150,12 +164,20 @@ def generate_runtime_artifacts(
         from_image = base_for_runtime
     else:
         base_for_runtime = ""
-        from_image = source_image
+        from_image = pinned_runtime_base_reference(source_image, base_image_digest)
 
-    lines = [f"FROM {from_image}", "", "USER root", "",
+    provenance = runtime_provenance_labels(
+        _GENERATED_HASH_PLACEHOLDER, base_image_digest, source_image,
+    )
+    lines = [f"FROM {from_image}", ""]
+    lines.extend(
+        f"LABEL {key}={_docker_label_quote(value)}"
+        for key, value in provenance.items()
+    )
+    lines.extend(["", "USER root", "",
              "COPY install-tools.sh /opt/cvelab/runtime/",
              "RUN chmod +x /opt/cvelab/runtime/install-tools.sh && "
-             "/opt/cvelab/runtime/install-tools.sh", ""]
+             "/opt/cvelab/runtime/install-tools.sh", ""])
 
     rs = atom.runtime_spec
     env = rs.environment or {}
@@ -173,10 +195,19 @@ def generate_runtime_artifacts(
     if rs.user:
         lines.append(f"USER {rs.user}")
 
-    dockerfile = "\n".join(lines) + "\n"
+    dockerfile_template = "\n".join(lines).rstrip() + "\n"
+
+    generated_hash = hashlib.sha256(
+        (dockerfile_template + "\n" + install_script + "\n"
+         + "source=" + (source_image or "") + "\n"
+         + "orig_df=" + df_text).encode()
+    ).hexdigest()
+    dockerfile = dockerfile_template.replace(_GENERATED_HASH_PLACEHOLDER, generated_hash)
 
     manifest = {
         "source_image": source_image,
+        "base_image_digest": base_image_digest,
+        "pinned_base_image": from_image,
         "tool_profiles": profile_names,
         "logical_tools": logical_tools,
         "package_manager": pm,
@@ -189,11 +220,7 @@ def generate_runtime_artifacts(
         "source_dockerfile": df_rel,
         "intermediate_image": base_for_runtime,
     }
-    manifest["generated_hash"] = hashlib.sha256(
-        (dockerfile + "\n" + install_script + "\n"
-         + "source=" + (source_image or "") + "\n"
-         + "orig_df=" + df_text).encode()
-    ).hexdigest()
+    manifest["generated_hash"] = generated_hash
 
     return RuntimeArtifacts(
         dockerfile=dockerfile,

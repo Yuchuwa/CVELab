@@ -189,6 +189,11 @@ class TestAssemblerDMZSimple:
         ) < normalized_base.index(f"ip addr replace {bridge['address']} dev {bridge['name']}")
         assert f"ip addr replace {bridge['address']} dev eth2" not in normalized_base
         assert f"ip addr replace {bridge['address']} dev eth3" not in normalized_base
+        same_zone_rule = "iptables -A FORWARD -s 192.168.100.0/24 -d 192.168.100.0/24 -j ACCEPT"
+        assert same_zone_rule in base
+        assert base.index(same_zone_rule) < base.index(
+            "iptables -A FORWARD -s 10.255.255.1/32 -d 192.168.100.0/24 -j ACCEPT"
+        )
 
     def test_single_target_zone_keeps_point_to_point_gateway(self, assembler):
         result = assembler.assemble("dmz_simple", [_make_atom()], scenario_name="bridge-single")
@@ -220,7 +225,7 @@ class TestAssemblerDMZSimple:
         assert target["env"]["DB_PASSWORD"] == "postgres"
         assert target["env"]["FLAG"].startswith("flag{")
 
-    @pytest.mark.parametrize("agent_context", ["l0", "l1"])
+    @pytest.mark.parametrize("agent_context", ["l0", "l1", "l1-entry-discovery"])
     def test_level_attacker_has_no_source_bundle_mounts(self, assembler, agent_context):
         atom = _make_atom()
         atom.source_bundle = SourceBundle(poc_materials=["poc.py", "id_rsa"])
@@ -230,7 +235,9 @@ class TestAssemblerDMZSimple:
 
         assert not any("/vulhub/" in bind for bind in attacker.get("binds", []))
 
-    @pytest.mark.parametrize("agent_context", ["guided", "no_guide", "l2", "no_hint"])
+    @pytest.mark.parametrize(
+        "agent_context", ["guided", "no_guide", "l2", "no_hint", "l1-entry-discovery"]
+    )
     def test_attacker_mounts_follow_material_visibility(self, assembler, tmp_path, agent_context):
         atom = _make_atom("CVE-MATERIAL-0001")
         materials = [
@@ -263,8 +270,15 @@ class TestAssemblerDMZSimple:
             assert any("assisted.py" in bind for bind in binds)
         else:
             assert not any("assisted.py" in bind for bind in binds)
-        assert any("always.key" in bind for bind in binds)
-        assert any("legacy.key" in bind for bind in binds)
+        if agent_context in {"l2", "no_hint"}:
+            assert any("always.key" in bind for bind in binds)
+            assert any("legacy.key" in bind for bind in binds)
+        elif agent_context in {"guided", "no_guide"}:
+            assert any("always.key" in bind for bind in binds)
+            assert any("legacy.key" in bind for bind in binds)
+        else:
+            assert not any("always.key" in bind for bind in binds)
+            assert not any("legacy.key" in bind for bind in binds)
 
     def test_declared_dockerfile_becomes_runtime_build_manifest(self, assembler, tmp_path):
         atom = _make_atom("CVE-BUILD-0001")
