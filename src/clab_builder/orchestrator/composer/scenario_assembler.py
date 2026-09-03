@@ -361,18 +361,15 @@ class ScenarioAssembler:
         """生成完整的 base.yaml：用 nsenter 配置所有节点（不依赖容器内工具）"""
         tasks = []
 
-        def nsenter_cmd(node: str, cmd: str) -> dict:
-            """用 sudo nsenter 从宿主机进入容器网络命名空间执行命令
+        def nsenter_cmd(node: str, cmd: str, as_root: bool = False) -> dict:
+            """用 docker exec 在容器内执行网络配置命令
 
-            多命令用 sh -c 包裹，确保都在命名空间内执行。
+            无需 sudo 权限（只要用户在 docker 组）。
+            as_root=True 时用 --user root 执行（attacker 容器默认非 root）。
             """
             container = f"clab-{scenario_name}-{node}"
-            # 用 sh -c 包裹命令，避免分号导致部分命令在宿主机执行
-            shell_cmd = (
-                "sudo nsenter -t $(docker inspect -f '{{.State.Pid}}' "
-                + container
-                + ") -n sh -c '" + cmd + "'"
-            )
+            user_flag = " --user root" if as_root else ""
+            shell_cmd = f"docker exec{user_flag} {container} sh -c '{cmd}'"
             return {
                 "name": f"Configure {node}: {cmd[:60]}",
                 "ansible.builtin.shell": "{% raw %}" + shell_cmd + "{% endraw %}",
@@ -387,6 +384,14 @@ class ScenarioAssembler:
                 break
 
         # 1. Routers: 接口 IP + ip_forward + iptables + static routes
+        # Build zone→subnet map for isolation rules
+        zone_subnets = {name: z.subnet for name, z in template.zones.items()}
+        # Attacker subnet: from transit connecting attacker
+        for transit in template.transits:
+            if "attacker" in transit.endpoints:
+                zone_subnets["attacker"] = transit.subnet
+                break
+
         for router_name in template.routers:
             router_config = ip_alloc.get(router_name, {})
             routes = router_config.get("routes", [])
@@ -400,7 +405,21 @@ class ScenarioAssembler:
                 ))
 
             tasks.append(nsenter_cmd(router_name, "sysctl -w net.ipv4.ip_forward=1"))
-            tasks.append(nsenter_cmd(router_name, "iptables -P FORWARD ACCEPT"))
+
+            # iptables: default DROP, then apply isolation_rules
+            tasks.append(nsenter_cmd(router_name, "iptables -P FORWARD DROP"))
+            tasks.append(nsenter_cmd(router_name, "iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT"))
+            for rule in template.isolation_rules:
+                src = zone_subnets.get(rule.from_zone, "")
+                dst = zone_subnets.get(rule.to_zone, "")
+                if not src or not dst:
+                    continue
+                action = "ACCEPT" if rule.action == "accept" else "DROP"
+                tasks.append(nsenter_cmd(
+                    router_name,
+                    f"iptables -A FORWARD -s {src} -d {dst} -j {action}"
+                ))
+
             if router_name == attacker_router:
                 tasks.append(nsenter_cmd(router_name, "iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"))
 
@@ -429,13 +448,15 @@ class ScenarioAssembler:
         if attacker_config:
             tasks.append(nsenter_cmd(
                 "attacker",
-                f"ip addr replace {attacker_config['eth1']} dev eth1 2>/dev/null; ip link set eth1 up"
+                f"ip addr replace {attacker_config['eth1']} dev eth1 2>/dev/null; ip link set eth1 up",
+                as_root=True,
             ))
             tasks.append(nsenter_cmd(
                 "attacker",
-                f"ip route replace default via {attacker_config['gateway']}"
+                f"ip route replace default via {attacker_config['gateway']}",
+                as_root=True,
             ))
-            tasks.append(nsenter_cmd("attacker", "ip addr flush dev eth0"))
+            tasks.append(nsenter_cmd("attacker", "ip addr flush dev eth0", as_root=True))
 
         playbook = [{
             "name": "Configure data plane network",

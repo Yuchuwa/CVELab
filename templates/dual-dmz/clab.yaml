@@ -1,4 +1,4 @@
-name: dmz_dual_base
+name: dual-dmz_base
 mgmt:
   network: my-mgmt-net
   ipv4-subnet: 10.255.1.0/24
@@ -10,5 +10,13 @@ topology:
     edge-router:
       kind: linux
       image: frrouting/frr:latest
+    gw-router:
+      kind: linux
+      image: frrouting/frr:latest
+    app-router:
+      kind: linux
+      image: frrouting/frr:latest
   links:
     - endpoints: ["attacker:eth1", "edge-router:eth1"]
+    - endpoints: ["edge-router:eth2", "gw-router:eth1"]
+    - endpoints: ["gw-router:eth2", "app-router:eth1"]

@@ -1,6 +1,6 @@
 name: enterprise_tree
-description: "树形企业网络: edge-router 为根，分叉到 DMZ/App/Data 三个分支，物理可达但逻辑隔离"
-difficulty: medium
+description: "树形企业网络: edge-router 为根，三分支各两层深，attacker 需逐层横向移动到达核心数据"
+difficulty: hard
 
 transits:
   - subnet: "10.255.255.0/30"
@@ -11,30 +11,60 @@ transits:
     endpoints: [edge-router, app-router]
   - subnet: "10.255.255.12/30"
     endpoints: [edge-router, data-router]
+  - subnet: "10.255.255.16/30"
+    endpoints: [dmz-router, dmz2-router]
+  - subnet: "10.255.255.20/30"
+    endpoints: [app-router, app2-router]
+  - subnet: "10.255.255.24/30"
+    endpoints: [data-router, data2-router]
 
 zones:
   dmz: {subnet: "192.168.100.0/24", type: dmz, router: dmz-router}
   app: {subnet: "10.10.1.0/24", type: internal, router: app-router}
   data: {subnet: "10.10.2.0/24", type: restricted, router: data-router}
+  dmz2: {subnet: "192.168.200.0/24", type: internal, router: dmz2-router}
+  app2: {subnet: "10.20.1.0/24", type: internal, router: app2-router}
+  data2: {subnet: "10.20.2.0/24", type: restricted, router: data2-router}
 
 routers:
   edge-router: {image: frrouting/frr:latest, connects: [attacker, dmz, app, data]}
-  dmz-router: {image: frrouting/frr:latest, connects: [edge-router, dmz]}
-  app-router: {image: frrouting/frr:latest, connects: [edge-router, app]}
-  data-router: {image: frrouting/frr:latest, connects: [edge-router, data]}
+  dmz-router: {image: frrouting/frr:latest, connects: [edge-router, dmz, dmz2]}
+  app-router: {image: frrouting/frr:latest, connects: [edge-router, app, app2]}
+  data-router: {image: frrouting/frr:latest, connects: [edge-router, data, data2]}
+  dmz2-router: {image: frrouting/frr:latest, connects: [dmz-router, dmz2]}
+  app2-router: {image: frrouting/frr:latest, connects: [app-router, app2]}
+  data2-router: {image: frrouting/frr:latest, connects: [data-router, data2]}
 
 isolation_rules:
+  # Layer 0: attacker 只能到 dmz
   - {from: attacker, to: dmz, action: accept}
   - {from: attacker, to: app, action: deny}
   - {from: attacker, to: data, action: deny}
+  - {from: attacker, to: dmz2, action: deny}
+  - {from: attacker, to: app2, action: deny}
+  - {from: attacker, to: data2, action: deny}
+  # Layer 1: 同分支可下钻，跨分支禁止
   - {from: dmz, to: app, action: accept}
-  - {from: app, to: data, action: accept}
   - {from: dmz, to: data, action: deny}
+  - {from: dmz, to: dmz2, action: accept}
+  - {from: dmz, to: app2, action: deny}
+  - {from: dmz, to: data2, action: deny}
+  - {from: app, to: data, action: accept}
+  - {from: app, to: app2, action: accept}
+  - {from: app, to: dmz2, action: deny}
+  - {from: app, to: data2, action: deny}
+  - {from: data, to: data2, action: accept}
+  - {from: data, to: dmz2, action: deny}
+  - {from: data, to: app2, action: deny}
+  # Layer 2: 第二层叶子之间互不可达
+  - {from: dmz2, to: app2, action: deny}
+  - {from: dmz2, to: data2, action: deny}
+  - {from: app2, to: data2, action: deny}
 
 injection_points:
   - id: dmz-web
     zone: dmz
-    role_description: "面向公网的 Web 服务入口"
+    role_description: "DMZ 分支第一层 Web 服务入口"
     required_mitre: [initial_access, execution]
     required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass]
     required_service_role: [web_application, middleware, framework]
@@ -42,7 +72,7 @@ injection_points:
 
   - id: app-service
     zone: app
-    role_description: "内部应用服务，需从 DMZ 横向移动到达"
+    role_description: "App 分支第一层应用服务"
     required_mitre: [lateral_movement, execution, persistence]
     required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection]
     required_service_role: [web_application, middleware, framework]
@@ -50,7 +80,31 @@ injection_points:
 
   - id: data-store
     zone: data
-    role_description: "核心数据存储，最深层的靶标"
+    role_description: "Data 分支第一层数据服务"
+    required_mitre: [initial_access, execution, privilege_escalation]
+    required_vuln_category: [RCE, LPE, Auth_Bypass, Info_Leak, Injection]
+    required_service_role: [database, file_service, system_service]
+    count: 1
+
+  - id: dmz2-web
+    zone: dmz2
+    role_description: "DMZ 分支第二层深部服务，需从 dmz 层下钻"
+    required_mitre: [lateral_movement, execution, privilege_escalation]
+    required_vuln_category: [RCE, LPE, Auth_Bypass, Injection, Info_Leak]
+    required_service_role: [web_application, middleware, system_service]
+    count: 1
+
+  - id: app2-service
+    zone: app2
+    role_description: "App 分支第二层深部应用，需从 app 层下钻"
+    required_mitre: [lateral_movement, execution, privilege_escalation, credential_access]
+    required_vuln_category: [RCE, LPE, Auth_Bypass, Injection, Info_Leak]
+    required_service_role: [web_application, middleware, system_service]
+    count: 1
+
+  - id: data2-store
+    zone: data2
+    role_description: "Data 分支第二层核心数据，最深处的靶标"
     required_mitre: [initial_access, execution, privilege_escalation]
     required_vuln_category: [RCE, LPE, Auth_Bypass, Info_Leak, Injection]
     required_service_role: [database, file_service, system_service]

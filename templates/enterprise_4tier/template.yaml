@@ -61,6 +61,7 @@ injection_points:
     required_service_role: [web_application, middleware, system_service]
     count: 1
 
+    加访问限制
   - id: data-store
     zone: data
     role_description: "核心数据存储，最深层的靶标"

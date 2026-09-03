@@ -1,4 +1,7 @@
 name: enterprise_3tier_base
+mgmt:
+  network: my-mgmt-net
+  ipv4-subnet: 10.255.1.0/24
 topology:
   nodes:
     attacker:

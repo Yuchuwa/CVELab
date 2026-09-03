@@ -1,0 +1,62 @@
+name: asymmetric-acl
+description: "非对称访问控制: app→data 单向可达，data 无法回调 app，agent 必须使用正向连接而非反弹 shell"
+difficulty: hard
+
+transits:
+  - subnet: "10.255.255.0/30"
+    endpoints: [attacker, edge-router]
+  - subnet: "10.255.255.4/30"
+    endpoints: [edge-router, app-router]
+  - subnet: "10.255.255.8/30"
+    endpoints: [app-router, data-router]
+
+zones:
+  dmz: {subnet: "192.168.100.0/24", type: dmz, router: edge-router}
+  app: {subnet: "10.10.1.0/24", type: internal, router: app-router}
+  data: {subnet: "10.10.2.0/24", type: restricted, router: data-router}
+
+routers:
+  edge-router: {image: frrouting/frr:latest, connects: [attacker, dmz]}
+  app-router: {image: frrouting/frr:latest, connects: [dmz, app, data]}
+  data-router: {image: frrouting/frr:latest, connects: [app, data]}
+
+isolation_rules:
+  # Layer 0: attacker 只能到 dmz
+  - {from: attacker, to: dmz, action: accept}
+  - {from: attacker, to: app, action: deny}
+  - {from: attacker, to: data, action: deny}
+  # Layer 1: dmz ↔ app 双向（反弹 shell 需要回连）
+  - {from: dmz, to: app, action: accept}
+  - {from: app, to: dmz, action: accept}
+  # dmz → data 禁止跳层
+  - {from: dmz, to: data, action: deny}
+  # Layer 2: app → data 单向！data 不能回 app
+  - {from: app, to: data, action: accept}
+  - {from: data, to: app, action: deny}
+  # data 完全隔离 dmz
+  - {from: data, to: dmz, action: deny}
+
+injection_points:
+  - id: dmz-web
+    zone: dmz
+    role_description: "DMZ Web 服务入口，反弹 shell 到 app 层不受限制"
+    required_mitre: [initial_access, execution]
+    required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass]
+    required_service_role: [web_application, middleware, framework]
+    count: 1
+
+  - id: app-service
+    zone: app
+    role_description: "内部应用服务，可与 dmz 双向通信（反弹 shell 可用），但到 data 是单向"
+    required_mitre: [lateral_movement, execution, persistence]
+    required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection]
+    required_service_role: [web_application, middleware, framework]
+    count: 1
+
+  - id: data-store
+    zone: data
+    role_description: "核心数据存储，无法回调 app 层，正向连接(bind shell)或直接 RCE 读 flag"
+    required_mitre: [initial_access, execution, privilege_escalation]
+    required_vuln_category: [RCE, LPE, Auth_Bypass, Info_Leak, Injection]
+    required_service_role: [database, file_service, system_service]
+    count: 1

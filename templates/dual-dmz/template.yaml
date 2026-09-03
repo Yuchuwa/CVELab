@@ -1,0 +1,61 @@
+name: dual-dmz
+description: "双DMZ网关网络: 外部DMZ→网关路由器→内部DMZ→应用层，单向推进不可回退"
+difficulty: hard
+
+transits:
+  - subnet: "10.255.255.0/30"
+    endpoints: [attacker, edge-router]
+  - subnet: "10.255.255.4/30"
+    endpoints: [edge-router, gw-router]
+  - subnet: "10.255.255.8/30"
+    endpoints: [gw-router, app-router]
+
+zones:
+  ext-dmz: {subnet: "192.168.100.0/24", type: dmz, router: edge-router}
+  int-dmz: {subnet: "192.168.200.0/24", type: dmz, router: gw-router}
+  app: {subnet: "10.10.1.0/24", type: restricted, router: app-router}
+
+routers:
+  edge-router: {image: frrouting/frr:latest, connects: [attacker, ext-dmz, gw-router]}
+  gw-router: {image: frrouting/frr:latest, connects: [edge-router, int-dmz, app-router]}
+  app-router: {image: frrouting/frr:latest, connects: [gw-router, app]}
+
+isolation_rules:
+  # Layer 0: attacker 只能到 ext-dmz
+  - {from: attacker, to: ext-dmz, action: accept}
+  - {from: attacker, to: int-dmz, action: deny}
+  - {from: attacker, to: app, action: deny}
+  # Layer 1: ext-dmz → int-dmz 允许，但不能跳过到 app
+  - {from: ext-dmz, to: int-dmz, action: accept}
+  - {from: ext-dmz, to: app, action: deny}
+  # Layer 2: int-dmz → app 允许
+  - {from: int-dmz, to: app, action: accept}
+  # 单向推进: 不允许回退
+  - {from: int-dmz, to: ext-dmz, action: deny}
+  - {from: app, to: int-dmz, action: deny}
+  - {from: app, to: ext-dmz, action: deny}
+
+injection_points:
+  - id: ext-dmz-web
+    zone: ext-dmz
+    role_description: "外部DMZ Web 服务，面向公网的入口"
+    required_mitre: [initial_access, execution]
+    required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass]
+    required_service_role: [web_application, middleware, framework]
+    count: 1
+
+  - id: int-dmz-middleware
+    zone: int-dmz
+    role_description: "内部DMZ中间件服务，需从外部DMZ推进到达，不可回退"
+    required_mitre: [lateral_movement, execution, persistence]
+    required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection]
+    required_service_role: [web_application, middleware, framework]
+    count: 1
+
+  - id: app-database
+    zone: app
+    role_description: "应用层核心数据存储，需从内部DMZ推进到达"
+    required_mitre: [initial_access, execution, privilege_escalation]
+    required_vuln_category: [RCE, LPE, Auth_Bypass, Info_Leak, Injection]
+    required_service_role: [database, file_service, system_service]
+    count: 1

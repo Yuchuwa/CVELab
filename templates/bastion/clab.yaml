@@ -1,4 +1,4 @@
-name: enterprise_4tier_base
+name: bastion_base
 mgmt:
   network: my-mgmt-net
   ipv4-subnet: 10.255.1.0/24
@@ -10,17 +10,17 @@ topology:
     edge-router:
       kind: linux
       image: frrouting/frr:latest
-    app-router:
+    zone-a-router:
       kind: linux
       image: frrouting/frr:latest
-    internal-router:
+    zone-b-router:
       kind: linux
       image: frrouting/frr:latest
-    data-router:
+    zone-c-router:
       kind: linux
       image: frrouting/frr:latest
   links:
     - endpoints: ["attacker:eth1", "edge-router:eth1"]
-    - endpoints: ["edge-router:eth2", "app-router:eth1"]
-    - endpoints: ["app-router:eth2", "internal-router:eth1"]
-    - endpoints: ["internal-router:eth2", "data-router:eth1"]
+    - endpoints: ["edge-router:eth2", "zone-a-router:eth1"]
+    - endpoints: ["edge-router:eth3", "zone-b-router:eth1"]
+    - endpoints: ["edge-router:eth4", "zone-c-router:eth1"]

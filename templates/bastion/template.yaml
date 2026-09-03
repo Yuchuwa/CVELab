@@ -1,0 +1,80 @@
+name: bastion
+description: "堡垒机跳板: 所有内网区域只能通过堡垒机访问，三zone互相完全隔离，可按任意顺序打"
+difficulty: hard
+
+transits:
+  - subnet: "10.255.255.0/30"
+    endpoints: [attacker, edge-router]
+  - subnet: "10.255.255.4/30"
+    endpoints: [edge-router, zone-a-router]
+  - subnet: "10.255.255.8/30"
+    endpoints: [edge-router, zone-b-router]
+  - subnet: "10.255.255.12/30"
+    endpoints: [edge-router, zone-c-router]
+
+zones:
+  dmz: {subnet: "192.168.100.0/24", type: dmz, router: edge-router}
+  zone-a: {subnet: "10.10.1.0/24", type: internal, router: zone-a-router}
+  zone-b: {subnet: "10.10.2.0/24", type: internal, router: zone-b-router}
+  zone-c: {subnet: "10.10.3.0/24", type: restricted, router: zone-c-router}
+
+routers:
+  edge-router: {image: frrouting/frr:latest, connects: [attacker, dmz, zone-a, zone-b, zone-c]}
+  zone-a-router: {image: frrouting/frr:latest, connects: [edge-router, zone-a]}
+  zone-b-router: {image: frrouting/frr:latest, connects: [edge-router, zone-b]}
+  zone-c-router: {image: frrouting/frr:latest, connects: [edge-router, zone-c]}
+
+isolation_rules:
+  # attacker 只能到 dmz
+  - {from: attacker, to: dmz, action: accept}
+  - {from: attacker, to: zone-a, action: deny}
+  - {from: attacker, to: zone-b, action: deny}
+  - {from: attacker, to: zone-c, action: deny}
+  # dmz(堡垒机) 能到三个 zone
+  - {from: dmz, to: zone-a, action: accept}
+  - {from: dmz, to: zone-b, action: accept}
+  - {from: dmz, to: zone-c, action: accept}
+  # 三个 zone 互相完全隔离
+  - {from: zone-a, to: zone-b, action: deny}
+  - {from: zone-a, to: zone-c, action: deny}
+  - {from: zone-b, to: zone-a, action: deny}
+  - {from: zone-b, to: zone-c, action: deny}
+  - {from: zone-c, to: zone-a, action: deny}
+  - {from: zone-c, to: zone-b, action: deny}
+  # zone 可回退到 dmz（方便折返打其他 zone）
+  - {from: zone-a, to: dmz, action: accept}
+  - {from: zone-b, to: dmz, action: accept}
+  - {from: zone-c, to: dmz, action: accept}
+
+injection_points:
+  - id: dmz-bastion
+    zone: dmz
+    role_description: "堡垒机节点，打穿后可访问三个隔离 zone，需自行决定攻击顺序"
+    required_mitre: [initial_access, execution]
+    required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass]
+    required_service_role: [web_application, middleware, framework]
+    count: 1
+
+  - id: zone-a-web
+    zone: zone-a
+    role_description: "Zone-A Web 应用服务"
+    required_mitre: [lateral_movement, execution, persistence]
+    required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection]
+    required_service_role: [web_application, middleware, framework]
+    count: 1
+
+  - id: zone-b-middleware
+    zone: zone-b
+    role_description: "Zone-B 中间件服务"
+    required_mitre: [lateral_movement, execution, privilege_escalation, credential_access]
+    required_vuln_category: [RCE, LPE, Auth_Bypass, Injection, Info_Leak]
+    required_service_role: [web_application, middleware, system_service]
+    count: 1
+
+  - id: zone-c-data
+    zone: zone-c
+    role_description: "Zone-C 核心数据存储"
+    required_mitre: [initial_access, execution, privilege_escalation]
+    required_vuln_category: [RCE, LPE, Auth_Bypass, Info_Leak, Injection]
+    required_service_role: [database, file_service, system_service]
+    count: 1

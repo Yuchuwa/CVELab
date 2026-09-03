@@ -1,4 +1,7 @@
 name: dmz_simple_base
+mgmt:
+  network: my-mgmt-net 
+  ipv4-subnet: 192.168.100.0/24
 topology:
   nodes:
     attacker:

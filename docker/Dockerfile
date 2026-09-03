@@ -4,12 +4,12 @@
 FROM kalilinux/kali-rolling
 
 LABEL description="clab-agent - CVE reproduction with Claude Agent SDK (Kali-based)"
-LABEL version="3.0.0"
+LABEL version="3.1.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Use stable mirror (tsinghua, HTTP)
-RUN sed -i 's|http://http.kali.org/kali|http://mirrors.tuna.tsinghua.edu.cn/kali|g' /etc/apt/sources.list
+RUN sed -i 's|http://http.kali.org/kali|http://mirrors.tuna.tsinghua.edu.cn/kali|g' /etc/apt/sources.list.d/kali.sources
 
 # System deps first
 RUN apt-get update && \
@@ -34,7 +34,7 @@ RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
 
 # Install Python packages - Claude Agent SDK provides built-in tools (Bash, Read, Write)
 RUN pip3 install --no-cache-dir \
-    claude-agent-sdk>=0.2.87 \
+    claude-agent-sdk==0.2.87 \
     requests \
     pexpect \
     paramiko \

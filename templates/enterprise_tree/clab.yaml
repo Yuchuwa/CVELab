@@ -1,4 +1,7 @@
 name: enterprise_tree_base
+mgmt:
+  network: my-mgmt-net
+  ipv4-subnet: 10.255.1.0/24
 topology:
   nodes:
     attacker:
@@ -16,8 +19,20 @@ topology:
     data-router:
       kind: linux
       image: frrouting/frr:latest
+    dmz2-router:
+      kind: linux
+      image: frrouting/frr:latest
+    app2-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data2-router:
+      kind: linux
+      image: frrouting/frr:latest
   links:
     - endpoints: ["attacker:eth1", "edge-router:eth1"]
     - endpoints: ["edge-router:eth2", "dmz-router:eth1"]
     - endpoints: ["edge-router:eth3", "app-router:eth1"]
     - endpoints: ["edge-router:eth4", "data-router:eth1"]
+    - endpoints: ["dmz-router:eth2", "dmz2-router:eth1"]
+    - endpoints: ["app-router:eth2", "app2-router:eth1"]
+    - endpoints: ["data-router:eth2", "data2-router:eth1"]
