@@ -123,3 +123,6 @@ data/p0_probe_results.json
 data/revalidate_existing_atoms_wave1.txt
 src/sysfield/
 data/experiments/stratified-50/runs/
+
+# Weekly reports and rendered books are local working artifacts.
+/weekly-report-*/
