@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from clab_builder import __version__
+from clab_builder.evaluation.constants import DEFAULT_MODELS
 load_dotenv()
 
 
@@ -23,16 +24,17 @@ def difficulty():
 
 
 def _difficulty_common_options(command):
-    # 四个模型使用同一套 endpoint/key 和相同预算，保证比较条件一致。
+    # 所有模型与重复运行使用同一套 endpoint/key 和相同预算。
     command = click.option("--output", "-o", required=True, type=click.Path())(command)
     command = click.option("--api-key", envvar="LLM_API_KEY", required=True)(command)
     command = click.option("--base-url", envvar="LLM_BASE_URL", default="")(command)
     command = click.option("--max-turns", type=int, default=30, show_default=True)(command)
     command = click.option("--timeout", type=int, default=1800, show_default=True)(command)
     command = click.option(
-        "--models", default=",".join(
-            ("qwen3.6-27b", "qwen3.6-35b-a3b", "qwen3.6-plus", "qwen3.6-flash")
-        ),
+        "--attempts-per-model", type=click.IntRange(min=1), default=1, show_default=True
+    )(command)
+    command = click.option(
+        "--models", default=",".join(DEFAULT_MODELS),
         show_default=True,
     )(command)
     return command
@@ -45,24 +47,25 @@ def _difficulty_common_options(command):
 @click.option("--keep-run-artifacts", is_flag=True)
 @_difficulty_common_options
 def difficulty_range(scenario_dir, agent_context, keep_run_artifacts, output, api_key,
-                     base_url, max_turns, timeout, models):
+                     base_url, max_turns, timeout, attempts_per_model, models):
     """Evaluate a generated Range scenario."""
     from clab_builder.evaluation.difficulty import build_report, write_report
     from clab_builder.evaluation.range_evaluator import evaluate_range
 
-    # 默认四个 Qwen 模型；显式覆盖时仍强制要求四个，避免不完整比较。
     model_list = tuple(item.strip() for item in models.split(",") if item.strip())
-    if len(model_list) != 4:
-        raise click.ClickException("--models must contain exactly four models")
+    if not model_list:
+        raise click.ClickException("--models must contain at least one model")
     runs, valid, isolated = evaluate_range(
         scenario_dir, models=model_list, api_key=api_key, base_url=base_url,
         max_turns=max_turns, timeout=timeout, agent_context=agent_context,
+        attempts_per_model=attempts_per_model,
         keep_artifacts=keep_run_artifacts,
     )
     report = build_report(
         kind="range", subject=scenario_dir, runs=runs,
         environment_valid=valid, state_isolated=isolated,
         config={"models": model_list, "max_turns": max_turns, "timeout_s": timeout,
+                "attempts_per_model": attempts_per_model,
                 "agent_context": agent_context, "runner": "openai_newapi"},
     )
     write_report(output, report)
@@ -76,26 +79,28 @@ def difficulty_range(scenario_dir, agent_context, keep_run_artifacts, output, ap
 @click.option("--reset-command", default="", help="Optional command run before each model")
 @_difficulty_common_options
 def difficulty_atom(atom_dir, container, target_ip, reset_command, output, api_key,
-                    base_url, max_turns, timeout, models):
+                    base_url, max_turns, timeout, attempts_per_model, models):
     """Evaluate a generated Atom against an already running target."""
     import subprocess
     from clab_builder.evaluation.atom_evaluator import evaluate_atom
     from clab_builder.evaluation.difficulty import build_report, write_report
 
     model_list = tuple(item.strip() for item in models.split(",") if item.strip())
-    if len(model_list) != 4:
-        raise click.ClickException("--models must contain exactly four models")
+    if not model_list:
+        raise click.ClickException("--models must contain at least one model")
     # reset-command 由用户提供，典型用途是重启/重建 Atom 目标容器。
     reset = (lambda: subprocess.run(reset_command, shell=True, check=True, timeout=300)) \
         if reset_command else None
     runs, valid, isolated = evaluate_atom(
         atom_dir, container=container, target_ip=target_ip, models=model_list,
-        api_key=api_key, base_url=base_url, max_turns=max_turns, timeout=timeout, reset=reset,
+        api_key=api_key, base_url=base_url, max_turns=max_turns, timeout=timeout,
+        attempts_per_model=attempts_per_model, reset=reset,
     )
     report = build_report(
         kind="atom", subject=atom_dir, runs=runs, environment_valid=valid,
         state_isolated=isolated,
         config={"models": model_list, "max_turns": max_turns, "timeout_s": timeout,
+                "attempts_per_model": attempts_per_model,
                 "runner": "openai_newapi"},
     )
     write_report(output, report)
