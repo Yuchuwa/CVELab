@@ -63,7 +63,6 @@ import json
 import sys
 import os
 import re
-from pathlib import Path
 from types import SimpleNamespace
 
 DEFAULT_MAX_TURNS = 80
@@ -558,6 +557,8 @@ def build_prompt(input_data: dict) -> str:
             f"- IP: {t['ip']}\n"
             f"- Ports: {t['ports']}\n"
             f"- Zone: {t['zone']}\n"
+            f"- Target toolbox: /opt/toolbox "
+            "(use /opt/toolbox/busybox or /opt/toolbox/socat if the shell lacks tools)\n"
         )
         if not no_hint:
             desc += f"- Flag location: {t.get('flag_hint', 'env:FLAG')}\n"

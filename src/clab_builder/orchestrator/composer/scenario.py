@@ -5,7 +5,10 @@ from pathlib import Path
 
 from clab_builder.orchestrator.composer.template_loader import TemplateLoader
 from clab_builder.orchestrator.composer.atom_loader import AtomLoader
-from clab_builder.orchestrator.composer.cve_matcher import match_kill_chain, pick_random
+from clab_builder.orchestrator.composer.cve_matcher import (
+    match_kill_chain,
+    pick_orchestrated,
+)
 from clab_builder.orchestrator.composer.capability_closure import (
     close_capabilities,
     seed_capabilities,
@@ -157,7 +160,11 @@ class ScenarioPipeline:
                 resolved_closures[slot.id] = closure
                 available_assets.update(closure.assets)
 
-        for ip in ([] if composition_mode == "paper" else template.injection_points):
+        selection_points = (
+            [] if composition_mode == "paper" else template.injection_points
+        )
+        total_injections = len(selection_points)
+        for index, ip in enumerate(selection_points):
             missing_dependencies = [
                 dependency for dependency in ip.depends_on
                 if dependency not in resolved_upstream
@@ -254,7 +261,13 @@ class ScenarioPipeline:
                         f"vuln_category={ip.required_vuln_category}, "
                         f"service_access={ip.required_service_access})"
                     )
-                picked = pick_random(matched, count=1)
+                picked = pick_orchestrated(
+                    matched,
+                    injection_point=ip,
+                    index=index,
+                    total=total_injections,
+                    count=1,
+                )
                 selected_atoms.append(picked[0])
                 used_cves.append(picked[0].cve_id)
 

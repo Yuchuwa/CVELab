@@ -24,7 +24,7 @@ from clab_builder.shared.models.artifact_contracts import (
     normalize_agent_context,
     normalize_ground_truth,
 )
-from clab_builder.shared.models.template import TopologyTemplate, InjectionPoint
+from clab_builder.shared.models.template import TopologyTemplate
 from clab_builder.orchestrator.composer.template_loader import TemplateLoader
 from clab_builder.orchestrator.composer.capability_closure import (
     close_capabilities,
@@ -585,6 +585,7 @@ class ScenarioAssembler:
         resolved_asset_bindings: Optional[dict[str, dict]] = None,
         agent_context: str = "guided",
         noise_level: str = "none",
+        toolbox_dir: str = "assets/toolbox",
     ) -> dict:
         """组装完整场景
 
@@ -659,10 +660,7 @@ class ScenarioAssembler:
         for i, (ip, atom) in enumerate(zip(template.injection_points, atoms)):
             flag = _generate_flag()
             node_name = f"target-{i+1}"
-            service_node_name = node_name
             flag_file_name = f"flag-{node_name}.txt"
-            is_intermediate = i < min(len(template.injection_points), len(atoms)) - 1
-            requires_pivot_host = _needs_runtime_pivot_host(atom, is_intermediate)
 
             # CVE 容器节点
             node_def = {
@@ -680,7 +678,7 @@ class ScenarioAssembler:
             if command:
                 node_def["cmd"] = command
 
-            # CLab binds: init files (absolute path) + FLAG file
+            # CLab binds: init files (absolute path) + FLAG file + static toolbox
             binds = []
             atoms_path = Path(atoms_dir).resolve()
             for init_file in atom.service_startup.init_files:
@@ -700,6 +698,7 @@ class ScenarioAssembler:
                     f"Atom {atom.cve_id} declares a non-absolute flag path: {flag_path}"
                 )
             binds.append(f"{flag_file_name}:{flag_path}")
+            binds.append(f"{Path(toolbox_dir).resolve()}:/opt/toolbox:ro")
             node_def["binds"] = binds
 
             flag_method = getattr(atom.flag_injection.method, "value", atom.flag_injection.method)
@@ -710,17 +709,10 @@ class ScenarioAssembler:
             else:
                 flag_hint = f"file:{flag_path}"
 
-            if requires_pivot_host:
-                service_node_name = f"{node_name}-service"
-                clab["topology"]["nodes"][node_name] = {
-                    "kind": "linux",
-                    "image": _mirror(atom.post_exploit.pivot_host_image),
-                    "cmd": "sleep infinity",
-                }
-                node_def["network-mode"] = f"container:clab-{scenario_name}-{node_name}"
-                clab["topology"]["nodes"][service_node_name] = node_def
-            else:
-                clab["topology"]["nodes"][node_name] = node_def
+
+            # Master runtime contract: the target itself is the toolbox-capable foothold.
+            service_node_name = node_name
+            clab["topology"]["nodes"][node_name] = node_def
 
             # 找到该 zone 对应的 router
             zone_router = template.zones[ip.zone].router
@@ -780,7 +772,7 @@ class ScenarioAssembler:
                     "delay": 10,
                 })
             cve_setup_tasks.append({
-                "name": f"Wait for {atom.cve_id} on {service_node_name}",
+                "name": f"Wait for {atom.cve_id} on {node_name}",
                 "hosts": "localhost",
                 "gather_facts": False,
                 "tasks": setup_tasks,
@@ -804,8 +796,6 @@ class ScenarioAssembler:
                 "zone": ip.zone,
                 "flag_hint": flag_hint,
                 "flag_file": flag_file_name,
-                "service_node": service_node_name,
-                "requires_pivot_host": requires_pivot_host,
                 "depends_on": list(ip.depends_on),
                 "kill_chain_phase": ip.kill_chain_phase,
                 "execution_host": ip.depends_on[-1] if ip.depends_on else "attacker",
@@ -996,8 +986,6 @@ class ScenarioAssembler:
                 "target_ip": node_ip.get("eth1", "").split("/")[0],
                 "ports": list(inj.get("ports", [])),
                 "exploit_port": inj.get("exploit_port"),
-                "service_node": inj.get("service_node", inj["node_name"]),
-                "requires_pivot_host": inj.get("requires_pivot_host", False),
                 "depends_on": list(inj.get("depends_on", [])),
                 "depends_on_nodes": [
                     slot_to_node[dependency]

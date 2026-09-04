@@ -7568,3 +7568,49 @@ LLM evaluation budget.
 - Non-isolated empirical runs are explicitly `not_evaluable`. Difficulty
   aggregation now requires an explicit per-run environment-valid verifier
   field rather than treating omission as success.
+
+
+## 2026-09-04: Difficulty research branch rebased onto upstream master
+
+### Scope and history
+
+- Fetched `origin/master` at `b42cc59` and rebased the 138-commit
+  `research/static-difficulty-pilot` history with merge topology preserved.
+- The Windows worktree could not read three quarantined PoC/source-bundle paths,
+  so the history rewrite was completed in an isolated WSL clone. The original
+  tip remains available at local backup branch
+  `backup/research-static-difficulty-pilot-pre-master-rebase-20260904`.
+- Six replay conflict groups were recorded. Historical research commits were
+  retained during replay, followed by a final semantic integration of the
+  master-only chain-contract, toolbox, benchmark, and single-runtime-node
+  behavior.
+
+### Conflict integration
+
+- Atom construction now keeps the existing runtime/readiness/verification
+  pipeline and also persists master `chain_contract` inference.
+- Scenario selection keeps dependency/capability/asset constraints and adds
+  master chain-position scoring through `pick_orchestrated`.
+- Range assembly keeps Atom-specific flag paths and current ground-truth
+  metadata, mounts `/opt/toolbox`, and uses one target runtime node instead of
+  the removed pivot sidecar model.
+- No-hint prompts expose the toolbox path without reintroducing flag-location
+  hints.
+- Both research-line and master-line matcher/assembler regression cases were
+  retained where their contracts are compatible.
+
+### Validation
+
+- Focused post-rebase suite covering evaluation, matcher, assembler, scenario
+  pipeline, benchmark, and Atom pipeline integration: **166 passed, 5 skipped**.
+- Fatal/undefined/unused lint on all semantically integrated matcher, scenario,
+  assembler, runner, and test files: **all checks passed**.
+- Python compilation and conflict-marker checks passed. Full-branch
+  `git diff --check` still reports historical whitespace in retained CVE source
+  bundles and reports; no new integration whitespace errors were introduced.
+
+### Next action
+
+- Run the broader repository suite in the normal project environment before any
+  remote push. The branch has not been pushed; compare and review the rewritten
+  138-commit history relative to `origin/master` first.

@@ -35,6 +35,8 @@ from clab_builder.shared.models.atom import RuntimeSpec
 from clab_builder.shared.atom_build_ledger import finish_attempt, start_attempt
 from clab_builder.shared.service_resolver import resolve_service_family, service_role_for_family
 
+from clab_builder.shared.chain_contract import infer_chain_contract
+
 
 @dataclass
 class AtomMeta:
@@ -1662,6 +1664,21 @@ class AtomizerPipeline:
             from clab_builder.shared.models.atom import RuntimeStatus as _RS
             runtime_spec.runtime_status = _RS.NOT_REQUESTED
 
+        chain_contract = infer_chain_contract(
+            ports=self.env.main_ports,
+            requirements=requirements,
+            network_requirements=net_reqs,
+            vuln_category=vuln_category,
+            attack_method=attack_method,
+            vulnerability_type=vuln_type,
+            flag_verify_command=flag_cmd,
+            evidence=agent_output.evidence if agent_output else (),
+            exploit_steps=agent_output.exploit_steps if agent_output else (),
+            verified=evaluation.verified,
+            flag_matched=evaluation.flag_matched,
+            flag_value=ground_truth,
+        )
+
         config = AtomConfig(
             version=3,
             cve_id=self.env.cve_id,
@@ -1688,6 +1705,8 @@ class AtomizerPipeline:
             runtime_spec=runtime_spec,
             service_startup=startup,
             validation_spec=validation_spec,
+
+            chain_contract=chain_contract,
             verified=verified,
             requirements=requirements,
             evidence=evidence[:5],
