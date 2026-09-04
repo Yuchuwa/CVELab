@@ -7614,3 +7614,27 @@ LLM evaluation budget.
 - Run the broader repository suite in the normal project environment before any
   remote push. The branch has not been pushed; compare and review the rewritten
   138-commit history relative to `origin/master` first.
+
+### Post-import validation and manifest refresh
+
+- The first Windows validation command ran outside the repository root, so five
+  assembler tests could not resolve relative `templates/` paths. Rerunning the
+  identical selection from `E:\remote_project\CVELab` passed:
+  **166 passed, 5 skipped**.
+- The master chain-contract metadata changed selected Atom YAML content, causing
+  the pre-rebase pilot dependency hashes to fail closed as designed.
+- Regenerated
+  `data/difficulty_credibility_pilot_manifest_2026-09-03.json` twice from the
+  rebased tree. Both outputs had file SHA-256
+  `b08a8c06dc6ba981802c852d3bc486c5639bde97babdfb2dcb573764b719b75c`.
+- The refreshed draft still contains 12 calibration and 12 held-out cases,
+  preserves zero Atom overlap, has a valid internal seal, and passes all frozen
+  dependency hash checks.
+
+### Current status
+
+- Blocker: no rebase or framework blocker remains. Real KAT evidence and three
+  model families are still required before formal difficulty execution.
+- Next action: review the 140-commit branch delta against `origin/master`, then
+  push only after explicit approval because the remote branch requires a
+  history rewrite.
