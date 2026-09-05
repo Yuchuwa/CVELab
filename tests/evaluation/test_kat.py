@@ -1,6 +1,5 @@
 from clab_builder.evaluation.kat import assess_case_kat
 
-
 HASH = "a" * 64
 
 
@@ -22,6 +21,7 @@ def _complete_evidence():
             "environment_success": True,
             "attack_graph_valid": True,
             "attack_path_reachable": True,
+            "execution_complete": True,
         }),
         "oracle": _control(_result(success=True)),
         "no_op": _control(_result(success=False)),

@@ -7594,3 +7594,29 @@ LLM evaluation budget.
 ### PR hygiene follow-up
 
 - Removed the local weekly-report-2026-08-24/ mdBook source from the replacement PR and added /weekly-report-*/ to .gitignore, so weekly reports and rendered books do not enter the remote repository. The canonical protocol and runbook remain under docs/.
+
+
+## 2026-09-05: Calibration KAT runner implemented; live smoke blocked by runtime reproducibility
+
+### Implementation
+
+- Confirmed PR #5 merged into `origin/dev` at `a277647f` with all GitHub checks passing.
+- Added `scripts/run_difficulty_kat.py`. It generates frozen cases, runs `ScenarioVerifier.run_full(..., environment_only=True)` with an empty API key, and writes artifact-bound qualification, oracle, no-op, partial-solution, wrong-evidence, pre-Agent, and repeat-verdict controls.
+- Runtime rebuilding is disabled by default. The explicit `--rebuild-missing-runtime-images` option copies the selected Atoms to an isolated per-case workspace before using the existing preparation path; production verification still uses `verify_only` and enforces frozen image identity.
+- KAT qualification now requires successful cleanup (`execution_complete=true`). Incomplete cleanup retains the scenario and `clab.yaml` for explicit recovery; pre-verifier generation failures remove partial artifacts.
+- Every control artifact is bound to the manifest seal, case-dependency seal, ground-truth hash, and scenario hash. Wrong-evidence keeps valid flags so objective rejection is tested independently, while objective-free cases mark that check not applicable and still require wrong flags to fail.
+- Added public `ScenarioVerifier.verify_objectives` and `load_agent_execution_witness` wrappers. Environment-only verification records the production pre-Agent objective verdict, and KAT witness controls use the production transcript parser.
+
+### Validation and live smoke
+
+- Evaluation tests: **48 passed**, including seven runner tests for binding tamper rejection, transcript parsing, objective-free cases, cleanup retention, partial-generation cleanup, and isolated runtime workspaces.
+- Verifier regressions: **120 passed**. Focused Ruff checks and fatal/undefined-name checks over the historically noisy verifier file passed.
+- Calibration inventory: 16 distinct Atoms across 12 cases; only 3/16 frozen runtime images were present locally. No calibration case had a complete local image set.
+- Non-root smoke for `dmz_simple-2021-42013` failed closed before deploy because its pinned runtime image was missing; Containerlab cleanup also required root. No container or network remained.
+- Root retry used the explicit rebuild path. Direct Docker Hub access timed out over the daemon's unreachable IPv6 route, while the project-documented `docker.1ms.run` mirror was reachable. After pre-pulling the same source image through that mirror, the runtime rebuilt but its base digest differed from the frozen Atom contract. Verification rejected it at `runtime_materialization`; cleanup passed. The invalid derived and intermediate images were removed.
+- No LLM API was called, no Agent trial started, and no smoke result entered an Agent denominator.
+
+### Blocker and next action
+
+- Blocker: exact pinned runtime images are unavailable for 13/16 calibration Atoms, and the first reproducible rebuild check produced a base-digest mismatch. Running all 12 cases now would only produce infrastructure failures.
+- Next action: recover the exact pinned runtime images or reproduce them under the original frozen build inputs/toolchain without changing Atom hashes. Then rerun the one-case KAT smoke; expand to the remaining calibration cases only after it qualifies.

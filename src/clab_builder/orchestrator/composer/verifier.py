@@ -1595,6 +1595,19 @@ class ScenarioVerifier:
             # 4. In guided mode the Agent supplies a stochastic executable
             # witness; environment correctness remains a separate result.
             # SysField remains an explicit compatibility mode.
+            identity_map = self._load_private_node_identity_map(scenario_path)
+            objective_target_ips = {
+                step.get("target_node", ""): step.get("target_ip", "")
+                for step in ground_truth.get("attack_path", [])
+                if step.get("target_node")
+            }
+            pre_agent_objective_result = self._verify_objectives(
+                {},
+                _meta.get("objectives", []),
+                objective_target_ips,
+                identity_map,
+                execution_witness={},
+            )
             agent_result = {}
             flag_result = {"all_captured": False, "per_target": {}}
             objective_result = {"all_satisfied": not bool(_meta.get("objectives")), "per_objective": {}}
@@ -1727,15 +1740,9 @@ class ScenarioVerifier:
                             self.validation_mode == "guided_agent" and agent_evaluated
                         )
                         print("[5/5] Verifying results...")
-                        identity_map = self._load_private_node_identity_map(scenario_path)
                         flag_result = self._verify_flags(
                             agent_result, ground_truth, identity_map
                         )
-                        objective_target_ips = {
-                            step.get("target_node", ""): step.get("target_ip", "")
-                            for step in ground_truth.get("attack_path", [])
-                            if step.get("target_node")
-                        }
                         objective_result = self._verify_objectives(
                             agent_result,
                             _meta.get("objectives", []),
@@ -1843,6 +1850,7 @@ class ScenarioVerifier:
                 "agent_result": agent_result,
                 "flag_verification": flag_result,
                 "objective_verification": objective_result,
+                "pre_agent_objective_verification": pre_agent_objective_result,
                 "decoy_interactions": self._compute_decoy_interactions(agent_result, ground_truth),
                 "success": (
                     range_build_verified
@@ -4040,6 +4048,29 @@ class ScenarioVerifier:
             else True,
             "per_objective": per_objective,
         }
+
+    @staticmethod
+    def verify_objectives(
+        agent_result: dict,
+        objectives: list[dict],
+        target_ips: dict[str, str] | None = None,
+        identity_map: dict[str, dict[str, str]] | None = None,
+        execution_witness: dict[str, bool] | None = None,
+    ) -> dict:
+        """Public wrapper for objective verification."""
+        return ScenarioVerifier._verify_objectives(
+            agent_result, objectives, target_ips, identity_map, execution_witness
+        )
+
+    @staticmethod
+    def load_agent_execution_witness(
+        scenario_path: str | Path,
+        objectives: list[dict],
+    ) -> dict[str, bool]:
+        """Load execution witnesses using the production transcript parser."""
+        return ScenarioVerifier._load_agent_execution_witness(
+            Path(scenario_path), objectives
+        )
 
     @staticmethod
     def _load_agent_execution_witness(

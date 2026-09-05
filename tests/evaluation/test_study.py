@@ -70,12 +70,21 @@ def _manifest(tmp_path):
     return manifest, path
 
 
-def _case_evidence(evidence_dir, case_id):
+def _case_evidence(evidence_dir, case, manifest_sha256):
+    case_id = case["id"]
+    bindings = {
+        "manifest_sha256": manifest_sha256,
+        "case_dependency_sha256": _seal(case["dependency_hashes"]),
+        "ground_truth_sha256": "c" * 64,
+        "scenario_manifest_sha256": "d" * 64,
+    }
+
     def control(name, result):
         path = evidence_dir / f"{case_id}-{name}.json"
         artifact = {
             "case_id": case_id,
             "control": name,
+            "bindings": bindings,
             "result": result,
         }
         path.write_text(json.dumps(artifact), encoding="utf-8")
@@ -100,6 +109,7 @@ def _case_evidence(evidence_dir, case_id):
             "environment_success": True,
             "attack_graph_valid": True,
             "attack_path_reachable": True,
+            "execution_complete": True,
         }),
         "oracle": control("oracle", accepted),
         "no_op": control("no_op", rejected),
@@ -116,6 +126,7 @@ def _case_evidence(evidence_dir, case_id):
         artifact = {
             "case_id": case_id,
             "control": "repeat_verdicts",
+            "bindings": bindings,
             "terminal_state_sha256": "b" * 64,
             "verdict": True,
         }
@@ -128,7 +139,9 @@ def _case_evidence(evidence_dir, case_id):
         })
     controls["repeat_verdicts"] = repeats
     evidence_path = evidence_dir / f"{case_id}.json"
-    evidence_path.write_text(json.dumps({"controls": controls}), encoding="utf-8")
+    evidence_path.write_text(
+        json.dumps({"bindings": bindings, "controls": controls}), encoding="utf-8"
+    )
 
 
 def _qualified_study(tmp_path):
@@ -136,7 +149,7 @@ def _qualified_study(tmp_path):
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
     for case in manifest["cases"]:
-        _case_evidence(evidence_dir, case["id"])
+        _case_evidence(evidence_dir, case, manifest["manifest_sha256"])
     qualification = assess_manifest_qualification(
         manifest,
         manifest_path=manifest_path,

@@ -7,14 +7,15 @@ import json
 import random
 import re
 from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from .difficulty import sha256_file, verifier_backed_success
 from .kat import assess_case_kat
 
 
-def _canonical_sha256(payload: Mapping[str, Any]) -> str:
+def canonical_sha256(payload: Mapping[str, Any]) -> str:
     encoded = json.dumps(
         payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode()
@@ -26,7 +27,7 @@ def manifest_integrity(manifest: Mapping[str, Any], repo_root: str | Path) -> di
     body = dict(manifest)
     claimed = str(body.pop("manifest_sha256", ""))
     failures: list[str] = []
-    if not claimed or _canonical_sha256(body) != claimed:
+    if not claimed or canonical_sha256(body) != claimed:
         failures.append("manifest_sha256")
 
     root = Path(repo_root).resolve()
@@ -102,6 +103,12 @@ def assess_manifest_qualification(
             }
             evidence_hash = None
         else:
+            expected_bindings = {
+                "manifest_sha256": manifest.get("manifest_sha256"),
+                "case_dependency_sha256": canonical_sha256(
+                    case.get("dependency_hashes") or {}
+                ),
+            }
             try:
                 payload = json.loads(
                     evidence_path.read_text(encoding="utf-8-sig")
@@ -115,6 +122,7 @@ def assess_manifest_qualification(
                 controls,
                 artifact_root=evidence_path.parent,
                 case_id=case_id,
+                expected_bindings=expected_bindings,
             )
             evidence_hash = sha256_file(evidence_path)
         assessments.append({
@@ -142,7 +150,7 @@ def assess_manifest_qualification(
         },
         "cases": assessments,
     }
-    report["qualification_sha256"] = _canonical_sha256(report)
+    report["qualification_sha256"] = canonical_sha256(report)
     return report
 
 
@@ -183,7 +191,7 @@ def build_frozen_run_plan(
         raise ValueError("all cases must pass qualification before freezing")
     qualification_body = dict(qualification)
     qualification_seal = qualification_body.pop("qualification_sha256", "")
-    if _canonical_sha256(qualification_body) != qualification_seal:
+    if canonical_sha256(qualification_body) != qualification_seal:
         raise ValueError("qualification report hash is invalid")
     if not manifest_integrity(manifest, repo_root)["valid"]:
         raise ValueError("manifest dependencies changed after qualification")
@@ -200,6 +208,15 @@ def build_frozen_run_plan(
     cases = list(manifest.get("cases") or [])
     if any(not eligibility.get(case.get("id")) for case in cases):
         raise ValueError("qualification does not approve every selected case")
+    case_bindings = {
+        str(case.get("id") or ""): {
+            "manifest_sha256": manifest.get("manifest_sha256"),
+            "case_dependency_sha256": canonical_sha256(
+                case.get("dependency_hashes") or {}
+            ),
+        }
+        for case in cases
+    }
     for item in qualification.get("cases") or []:
         evidence_path = Path(item["evidence_path"])
         if (
@@ -213,6 +230,7 @@ def build_frozen_run_plan(
             controls if isinstance(controls, Mapping) else {},
             artifact_root=evidence_path.parent,
             case_id=str(item.get("case_id") or ""),
+            expected_bindings=case_bindings.get(str(item.get("case_id") or "")),
         )
         if not reassessed["eligible"]:
             raise ValueError("KAT artifacts changed after qualification")
@@ -248,7 +266,7 @@ def build_frozen_run_plan(
                         "timeout_seconds": manifest.get("protocol", {}).get(
                             "timeout_seconds"
                         ),
-                        "case_dependency_sha256": _canonical_sha256(
+                        "case_dependency_sha256": canonical_sha256(
                             case.get("dependency_hashes") or {}
                         ),
                     })
@@ -330,7 +348,7 @@ def build_frozen_run_plan(
         },
         "trials": trials,
     }
-    plan["plan_sha256"] = _canonical_sha256(plan)
+    plan["plan_sha256"] = canonical_sha256(plan)
     return plan
 
 
@@ -345,7 +363,7 @@ def collect_trial_outcomes(
         raise ValueError("split must be calibration or test")
     body = dict(plan)
     claimed = body.pop("plan_sha256", "")
-    if _canonical_sha256(body) != claimed:
+    if canonical_sha256(body) != claimed:
         raise ValueError("run plan hash is invalid")
     root = Path(results_dir).resolve()
     selected = [trial for trial in plan.get("trials") or [] if trial.get("split") == split]

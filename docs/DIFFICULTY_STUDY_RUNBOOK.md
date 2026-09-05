@@ -58,6 +58,34 @@ The framework recomputes hashes and reads the result from that artifact. A
 declared hash without its artifact, or an artifact whose case/control identity
 does not match, cannot qualify a case.
 
+### Execute the controls
+
+Generate live KAT evidence without invoking an LLM:
+
+```powershell
+python scripts/run_difficulty_kat.py `
+  --manifest data/difficulty_credibility_pilot_manifest_2026-09-03.json `
+  --evidence-dir data/experiments/difficulty-pilot/evidence `
+  --work-dir data/experiments/difficulty-pilot/kat-work `
+  --split calibration
+```
+
+The runner generates each frozen Range, executes `environment_only` verification,
+then exercises the production flag, objective, and execution-witness parsers with
+oracle, no-op, partial, and wrong evidence. It records the production verifier's
+pre-Agent objective state and repeats the oracle verdict against one hashed
+terminal state. Every control is bound to the frozen manifest, case dependencies,
+ground truth, and generated scenario. The runner passes an empty API key and never
+starts an Agent.
+
+Containerlab must run with the privileges required by the local installation.
+Missing pinned runtime images remain a hard failure. An operator may explicitly
+add `--rebuild-missing-runtime-images`; rebuild inputs are copied to a per-case
+workspace so canonical Atom files are not modified. Rebuilt images still must
+match the frozen base and runtime digests. Do not update frozen hashes merely
+because a rebuild differs. A scenario is retained when verification cleanup does
+not complete, preserving `clab.yaml` and logs for explicit recovery.
+
 ## 3. Assess qualification
 
 ```powershell
