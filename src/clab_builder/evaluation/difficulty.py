@@ -7,24 +7,20 @@ report artifact.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import statistics
 import tempfile
 import time
 import uuid
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-
-DEFAULT_MODELS = (
-    "qwen3.6-27b",
-    "qwen3.6-35b-a3b",
-    "qwen3.6-plus",
-    "qwen3.6-flash",
-)
+from .constants import DIFFICULTY_THRESHOLDS
 
 
 @dataclass
@@ -42,7 +38,9 @@ class EvaluationRun:
     tool_calls: int = 0
     wall_time_s: float = 0.0
     termination_reason: str = ""
+    status: str = "valid"
     verifier: dict[str, Any] = field(default_factory=dict)
+    artifacts: dict[str, Any] = field(default_factory=dict)
     error: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -57,6 +55,113 @@ def _summary(values: Iterable[float]) -> dict[str, float | None]:
         "mean": round(statistics.fmean(values), 3),
         "median": round(statistics.median(values), 3),
     }
+
+
+def _valid_runs(runs: Iterable[EvaluationRun]) -> list[EvaluationRun]:
+    return [
+        run
+        for run in runs
+        if run.status == "valid"
+        and run.verifier.get("environment_valid") is True
+    ]
+
+
+def verifier_backed_success(result: Mapping[str, Any]) -> bool:
+    """Return only an explicit three-gate verifier success."""
+    return bool(
+        result.get("environment_success") is True
+        and result.get("agent_success") is True
+        and result.get("objective_achieved") is True
+    )
+
+
+def trial_specs(
+    models: Iterable[str], attempts_per_model: int
+) -> list[tuple[str, int]]:
+    if attempts_per_model < 1:
+        raise ValueError("attempts_per_model must be positive")
+    model_list = list(models)
+    if not model_list:
+        raise ValueError("at least one model is required")
+    return [
+        (model, attempt)
+        for model in model_list
+        for attempt in range(1, attempts_per_model + 1)
+    ]
+
+
+def sha256_file(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def wilson_interval(
+    successes: int, total: int, *, z: float = 1.959963984540054
+) -> dict[str, float | int | None]:
+    """Return a two-sided Wilson interval for a binomial success probability."""
+    if successes < 0 or total < 0 or successes > total:
+        raise ValueError("successes must satisfy 0 <= successes <= total")
+    if total == 0:
+        return {
+            "method": "wilson",
+            "confidence_level": 0.95,
+            "successes": successes,
+            "total": total,
+            "lower": None,
+            "upper": None,
+        }
+    rate = successes / total
+    z2 = z * z
+    denominator = 1.0 + z2 / total
+    center = (rate + z2 / (2.0 * total)) / denominator
+    half_width = (
+        z
+        * math.sqrt(rate * (1.0 - rate) / total + z2 / (4.0 * total * total))
+        / denominator
+    )
+    return {
+        "method": "wilson",
+        "confidence_level": 0.95,
+        "successes": successes,
+        "total": total,
+        "lower": round(max(0.0, center - half_width), 4),
+        "upper": round(min(1.0, center + half_width), 4),
+    }
+
+
+def _normalized_cost(run: EvaluationRun) -> float:
+    components = (
+        math.log1p(max(run.turns, 0)) / math.log1p(30),
+        math.log1p(max(run.wall_time_s, 0)) / math.log1p(1800),
+        math.log1p(max(run.tool_calls, 0)) / math.log1p(60),
+    )
+    return min(1.0, statistics.fmean(components))
+
+
+def _label_for_score(score: float) -> str:
+    if score < DIFFICULTY_THRESHOLDS[0]:
+        return "easy"
+    if score < DIFFICULTY_THRESHOLDS[1]:
+        return "medium"
+    if score < DIFFICULTY_THRESHOLDS[2]:
+        return "hard"
+    return "very_hard"
+
+
+def _labels_for_score_interval(lower: float, upper: float) -> list[str]:
+    labels = []
+    for label, start, end in (
+        ("easy", 0.0, 25.0),
+        ("medium", 25.0, 50.0),
+        ("hard", 50.0, 75.0),
+        ("very_hard", 75.0, 100.0),
+    ):
+        if lower <= end and upper >= start:
+            labels.append(label)
+    return labels
 
 
 def session_metrics(path: str | Path) -> dict[str, int]:
@@ -97,8 +202,13 @@ def session_metrics(path: str | Path) -> dict[str, int]:
         if isinstance(event.get("turn"), int):
             turns.add(event["turn"])
         kind = str(event.get("type") or "").lower()
-        if kind == "tool":
+        role = str(event.get("role") or "").lower()
+        if kind == "tool" or role == "tool":
             explicit_tools += 1
+        if role == "assistant" and isinstance(event.get("turn"), int):
+            turns.add(event["turn"])
+        if isinstance(event.get("tool_calls"), list):
+            declared_tools += len(event["tool_calls"])
         message = event.get("message")
         if isinstance(message, Mapping):
             if isinstance(message.get("tool_calls"), list):
@@ -121,27 +231,63 @@ def _difficulty_score(runs: list[EvaluationRun]) -> tuple[float, dict[str, Any]]
     解决率占 80%，执行成本占 20%。成本使用对数归一化，避免某一次极慢
     的运行完全淹没解决率这个更重要的指标。
     """
-    valid = [r for r in runs if r.verifier.get("environment_valid", True)]
+    valid = _valid_runs(runs)
     rate = sum(r.success for r in valid) / len(valid) if valid else 0.0
     successful = [r for r in valid if r.success]
+    failed = [r for r in valid if not r.success]
     # Cost is intentionally secondary to solution rate.  Log scaling prevents
     # one unusually slow run from dominating the result.
-    costs = []
-    for r in successful:
-        costs.append(
-            (math.log1p(max(r.turns, 0)) / math.log1p(30))
-            + (math.log1p(max(r.wall_time_s, 0)) / math.log1p(1800))
-            + (math.log1p(max(r.tool_calls, 0)) / math.log1p(60))
-        )
-    cost = min(1.0, statistics.fmean(costs) / 3.0) if costs else 0.0
-    score = round((1.0 - rate) * 80.0 + cost * 20.0, 2)
-    return score, {"solution_rate": round(rate, 3), "success_cost_factor": round(cost, 3)}
+    success_cost = (
+        statistics.fmean(_normalized_cost(run) for run in successful)
+        if successful
+        else None
+    )
+    failure_cost = (
+        statistics.fmean(_normalized_cost(run) for run in failed)
+        if failed
+        else None
+    )
+    # Preserve the frozen v1 score for comparability. Failure cost is reported
+    # separately rather than silently changing historical 80/20 semantics.
+    score_cost = success_cost or 0.0
+    score = round((1.0 - rate) * 80.0 + score_cost * 20.0, 2)
+    interval = wilson_interval(sum(run.success for run in valid), len(valid))
+    lower_rate = interval["lower"]
+    upper_rate = interval["upper"]
+    score_interval = {
+        "lower": (
+            round((1.0 - float(upper_rate)) * 80.0 + score_cost * 20.0, 2)
+            if upper_rate is not None
+            else None
+        ),
+        "upper": (
+            round((1.0 - float(lower_rate)) * 80.0 + score_cost * 20.0, 2)
+            if lower_rate is not None
+            else None
+        ),
+        "method": "wilson_solution_rate_with_fixed_v1_success_cost",
+    }
+    return score, {
+        "solution_rate": round(rate, 3),
+        "solution_rate_interval": interval,
+        "success_cost_factor": (
+            round(success_cost, 3) if success_cost is not None else None
+        ),
+        "failure_cost_factor": (
+            round(failure_cost, 3) if failure_cost is not None else None
+        ),
+        "score_interval": score_interval,
+    }
 
 
 def classify_difficulty(
-    runs: list[EvaluationRun], *, environment_valid: bool
+    runs: list[EvaluationRun],
+    *,
+    environment_valid: bool,
+    state_isolated: bool = True,
 ) -> dict[str, Any]:
     # 环境自身没有启动成功时，模型失败不能说明环境困难。
+    valid = _valid_runs(runs)
     if not environment_valid:
         return {
             "label": "invalid_environment",
@@ -149,19 +295,36 @@ def classify_difficulty(
             "confidence": "not_evaluable",
             "evidence": {"reason": "deterministic environment validation failed"},
         }
+    if not state_isolated:
+        return {
+            "label": "not_evaluable",
+            "score": None,
+            "confidence": "not_evaluable",
+            "evidence": {"reason": "trial state was not isolated"},
+        }
+    if not valid:
+        return {
+            "label": "not_evaluable",
+            "score": None,
+            "confidence": "not_evaluable",
+            "evidence": {"reason": "no valid Agent runs"},
+        }
     score, evidence = _difficulty_score(runs)
-    if score < 25:
-        label = "easy"
-    elif score < 50:
-        label = "medium"
-    elif score < 75:
-        label = "hard"
-    else:
-        label = "very_hard"
+    label = _label_for_score(score)
+    score_interval = evidence["score_interval"]
+    plausible_labels = _labels_for_score_interval(
+        score_interval["lower"], score_interval["upper"]
+    )
+    confidence = (
+        "tier_resolved"
+        if plausible_labels == [label]
+        else "tier_uncertain"
+    )
     return {
         "label": label,
         "score": score,
-        "confidence": "limited_single_trial",
+        "confidence": confidence,
+        "plausible_labels": plausible_labels,
         "evidence": evidence,
     }
 
@@ -171,23 +334,59 @@ def aggregate_runs(
 ) -> dict[str, Any]:
     # 无效环境运行不参与解决率和模型成本统计，但仍保留在 runs 中，
     # 这样报告不会丢失诊断信息。
-    valid = [r for r in runs if r.verifier.get("environment_valid", True)]
+    valid = _valid_runs(runs)
     successful = [r for r in valid if r.success]
+    failed = [r for r in valid if not r.success]
+    invalid = [
+        run
+        for run in runs
+        if not (
+            run.status == "valid"
+            and run.verifier.get("environment_valid") is True
+        )
+    ]
+    successes = sum(r.success for r in valid)
+    invalid_reasons = Counter(
+        run.status or run.termination_reason or "invalid" for run in invalid
+    )
+    per_model = {}
+    for model in sorted({run.model for run in valid}):
+        model_runs = [run for run in valid if run.model == model]
+        model_successes = sum(run.success for run in model_runs)
+        per_model[model] = {
+            "successful_runs": model_successes,
+            "valid_runs": len(model_runs),
+            "solution_rate": round(model_successes / len(model_runs), 3),
+            "solution_rate_interval": wilson_interval(
+                model_successes, len(model_runs)
+            ),
+        }
     result: dict[str, Any] = {
-        "solution_rate": round(sum(r.success for r in valid) / len(valid), 3) if valid else 0.0,
+        "solution_rate": round(successes / len(valid), 3) if valid else None,
+        "solution_rate_interval": wilson_interval(successes, len(valid)),
         "valid_runs": len(valid),
+        "invalid_runs": len(invalid),
         "total_runs": len(runs),
         "turns": _summary(r.turns for r in valid),
         "wall_time_s": _summary(r.wall_time_s for r in valid),
         "tool_calls": _summary(r.tool_calls for r in valid),
         "successful_runs": {
+            "count": len(successful),
             "turns": _summary(r.turns for r in successful),
             "wall_time_s": _summary(r.wall_time_s for r in successful),
             "tool_calls": _summary(r.tool_calls for r in successful),
         },
+        "failed_runs": {
+            "count": len(failed),
+            "turns": _summary(r.turns for r in failed),
+            "wall_time_s": _summary(r.wall_time_s for r in failed),
+            "tool_calls": _summary(r.tool_calls for r in failed),
+        },
+        "invalid_run_reasons": dict(sorted(invalid_reasons.items())),
+        "per_model": per_model,
         "per_model_rank": [
             r.model
-            for r in sorted(runs, key=lambda item: (not item.success, item.wall_time_s))
+            for r in sorted(valid, key=lambda item: (not item.success, item.wall_time_s))
         ],
         "environment_valid": environment_valid,
         "state_isolated": state_isolated,
@@ -206,7 +405,7 @@ def build_report(
 ) -> dict[str, Any]:
     subject_path = Path(subject).resolve()
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "evaluation_id": uuid.uuid4().hex,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "subject": {
@@ -220,7 +419,11 @@ def build_report(
         "aggregate": aggregate_runs(
             runs, environment_valid=environment_valid, state_isolated=state_isolated
         ),
-        "difficulty": classify_difficulty(runs, environment_valid=environment_valid),
+        "difficulty": classify_difficulty(
+            runs,
+            environment_valid=environment_valid,
+            state_isolated=state_isolated,
+        ),
     }
 
 
