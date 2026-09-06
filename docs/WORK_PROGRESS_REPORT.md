@@ -7620,3 +7620,75 @@ LLM evaluation budget.
 
 - Blocker: exact pinned runtime images are unavailable for 13/16 calibration Atoms, and the first reproducible rebuild check produced a base-digest mismatch. Running all 12 cases now would only produce infrastructure failures.
 - Next action: recover the exact pinned runtime images or reproduce them under the original frozen build inputs/toolchain without changing Atom hashes. Then rerun the one-case KAT smoke; expand to the remaining calibration cases only after it qualifies.
+
+## 2026-09-06: First calibration KAT qualified after sealed runtime recovery
+
+### Current status
+
+- Blocker: 12/16 calibration Atom runtime images remain missing locally. The
+  recovered `CVE-2021-42013` case is qualified; the other 11 calibration cases
+  remain unexecuted.
+- Last action: qualified `dmz_simple-2021-42013` with all seven KAT controls,
+  environment-only execution, and successful Containerlab cleanup.
+- Next action: recover and seal the remaining exact runtime images in the same
+  lock before expanding calibration execution.
+
+### Decision log
+
+- Do not accept an arbitrary rebuild under an old digest. Two no-cache builds of
+  the same `CVE-2021-42013` source Dockerfile produced image IDs `45961aafd009...`
+  and `beeeda3c9ca1...`, with different final RootFS layer hashes.
+- Because no KAT had qualified and no formal Agent trial had begun, record a
+  transparent prequalification runtime amendment rather than weakening identity
+  checks. Preserve the 24 frozen cases and update only dependency hashes.
+- Keep large Docker archives outside Git. Bind them through a tracked, internally
+  sealed lock containing archive size, SHA-256, image ID, old digests, toolchain,
+  and validation results.
+
+### Experiment log
+
+#### Sealed runtime recovery and round trip: PASS
+
+- Command/script: legacy Docker build from the recorded source/runtime
+  Dockerfiles; `docker save | gzip`; `restore_difficulty_runtime_images.py`.
+- Config: source image `vulhub/httpd:2.4.50` at `a3b2cc5641f4...`; Docker Engine
+  29.1.3; Linux/amd64; archive stored outside the repository.
+- Evidence: runtime image `65a8b0fa935a...`; archive SHA-256
+  `376d367a43eed3a37b6f74b05b2db3c6aa1c3927b574078781ac1282451a03c9`;
+  archive size 69,090,340 bytes. Removing and loading the image preserved the
+  exact image ID. Required tools and Apache readiness passed without publishing
+  a host port.
+
+#### First recovery smoke: FAIL (infrastructure)
+
+- Command/script: one-case root KAT without the user-local Containerlab path.
+- Result: runtime materialization passed, then deploy failed because `clab` was
+  absent from root's `PATH`. Cleanup reported the same missing executable; no
+  containers or non-default networks existed.
+- Hypothesis: WSL root used a restricted PATH while Containerlab 0.74.0 was
+  installed at `/home/aeoluswu/.local/bin/clab`.
+
+#### Second recovery smoke: PASS
+
+- Command/script: one-case root KAT with the installed Containerlab directory in
+  `PATH`, empty API key, and `environment_only=True`.
+- Result: deploy, Ansible base/CVE setup, runtime identity, attack reachability,
+  cleanup, oracle, no-op, partial, wrong-evidence, pre-Agent, and repeated-verdict
+  checks all passed. The Agent was not started.
+- Evidence: manifest seal `575bc19ba6718fa3ffc2ee641958e9807a3ea223f0e1550c0bb13e823a43d134`;
+  case evidence SHA-256 `82e3a5e9ef5ef7165cd6f236693def04c386b083943678adda60c78a97b3db94`;
+  persisted under `E:/remote_project/CVELab-study-artifacts/difficulty-pilot-2026-09-06/evidence`.
+
+### Post-recovery hardening review
+
+- Reused shared canonical sealing and added one-snapshot sealed JSON loading.
+- The amendment CLI now verifies its input manifest, authorizes changes only for
+  lock-listed runtime Atoms, cross-checks Atom recovery metadata, caches hashes,
+  and rejects unrelated dependency drift.
+- The restore CLI now validates archives even for already-present images, stages
+  verified bytes privately, and rejects extra tags/images or a mismatched OCI
+  digest before Docker load. The real 69,090,340-byte archive passed this
+  preflight and the hardened end-to-end restore returned `already_present` with
+  the exact locked image ID.
+- Final evaluation regression: **54 passed**. Focused Ruff, compilation, and
+  whitespace checks passed.

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import importlib.util
 import json
 import random
@@ -12,12 +11,29 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from clab_builder.evaluation.difficulty import sha256_file, write_report
 from clab_builder.evaluation.kat import REQUIRED_KAT_CONTROLS
+from clab_builder.evaluation.study import canonical_sha256, load_sealed_json
 
 ROOT = Path(__file__).resolve().parents[1]
 TIERS = ("easy", "medium", "hard", "very_hard")
 TEMPLATE_NAMES = ("dmz_simple", "dmz_dual", "enterprise_3tier")
+
+def _load_runtime_lock(
+    root: Path, path: Path
+) -> tuple[dict[str, str], dict[str, Any]]:
+    resolved = path.resolve()
+    relative = resolved.relative_to(root)
+    payload, file_hash = load_sealed_json(
+        resolved, seal_field="lock_sha256"
+    )
+    images = payload.get("images")
+    if not isinstance(images, dict) or not images:
+        raise ValueError("runtime image lock has no images")
+    return {"path": relative.as_posix(), "sha256": file_hash}, payload
+
 
 def _load_compositional_module(root: Path):
     path = root / "scripts" / "analyze_compositional_difficulty.py"
@@ -253,6 +269,7 @@ def build_manifest(
     test_size: int,
     seed: int,
     max_atom_reuse: int,
+    runtime_image_lock_path: Path | None = None,
 ) -> dict[str, Any]:
     scorer = _load_compositional_module(root)
     candidates = scorer.enumerate_candidates(
@@ -283,6 +300,12 @@ def build_manifest(
             for candidate in test
         ),
     ]
+    runtime_lock = None
+    runtime_lock_payload = None
+    if runtime_image_lock_path is not None:
+        runtime_lock, runtime_lock_payload = _load_runtime_lock(
+            root, runtime_image_lock_path
+        )
     manifest: dict[str, Any] = {
         "schema_version": 1,
         "status": "draft_prequalification",
@@ -304,6 +327,7 @@ def build_manifest(
             },
             "uses_agent_results_for_selection": False,
             "uses_threshold_margin_for_selection": False,
+            **({"runtime_image_lock": runtime_lock} if runtime_lock else {}),
         },
         "selection": {
             "strategy": "tier_stratified_random_atom_partition",
@@ -331,6 +355,17 @@ def build_manifest(
             "max_turns": 30,
             "timeout_seconds": 1800,
             "test_outcomes_must_remain_unobserved_during_calibration": True,
+            **(
+                {
+                    "prequalification_runtime_amendment": {
+                        "lock_sha256": runtime_lock_payload.get("lock_sha256"),
+                        "timing": "before_first_qualified_kat",
+                        "agent_outcomes_observed": False,
+                    }
+                }
+                if runtime_lock
+                else {}
+            ),
         },
         "baseline_availability": {
             "features_available": [
@@ -354,11 +389,131 @@ def build_manifest(
         },
         "cases": cases,
     }
-    canonical = json.dumps(
-        manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode()
-    manifest["manifest_sha256"] = hashlib.sha256(canonical).hexdigest()
+    manifest["manifest_sha256"] = canonical_sha256(manifest)
     return manifest
+
+
+def _assert_recovery_matches_lock(
+    *, cve_id: str, atom_path: Path, lock_record: dict[str, Any], lock: dict[str, Any]
+) -> None:
+    atom = yaml.safe_load(atom_path.read_text(encoding="utf-8-sig"))
+    runtime = ((atom or {}).get("verification") or {}).get(
+        "runtime_verification"
+    ) or {}
+    recovery = runtime.get("recovery") or {}
+    expected = {
+        "runtime_image_digest": lock_record.get("image_id"),
+        "base_image_digest": lock_record.get("intermediate_image_id"),
+        "recovery.lock_sha256": lock.get("lock_sha256"),
+        "recovery.archive_file": lock_record.get("archive_file"),
+        "recovery.archive_sha256": lock_record.get("archive_sha256"),
+        "recovery.previous_base_image_digest": lock_record.get(
+            "previous_base_image_digest"
+        ),
+        "recovery.previous_runtime_image_digest": lock_record.get(
+            "previous_runtime_image_digest"
+        ),
+    }
+    actual = {
+        "runtime_image_digest": runtime.get("runtime_image_digest"),
+        "base_image_digest": runtime.get("base_image_digest"),
+        "recovery.lock_sha256": recovery.get("lock_sha256"),
+        "recovery.archive_file": recovery.get("archive_file"),
+        "recovery.archive_sha256": recovery.get("archive_sha256"),
+        "recovery.previous_base_image_digest": recovery.get(
+            "previous_base_image_digest"
+        ),
+        "recovery.previous_runtime_image_digest": recovery.get(
+            "previous_runtime_image_digest"
+        ),
+    }
+    mismatches = sorted(key for key, value in expected.items() if actual[key] != value)
+    runtime_image = str(runtime.get("runtime_image") or "").removesuffix(":latest")
+    lock_image = str(lock_record.get("image") or "").removesuffix(":latest")
+    if runtime_image != lock_image:
+        mismatches.append("runtime_image")
+    if recovery.get("status") != "amended_prequalification":
+        mismatches.append("recovery.status")
+    if mismatches:
+        raise ValueError(
+            f"runtime recovery metadata mismatch for {cve_id}: "
+            + ", ".join(mismatches)
+        )
+
+
+def amend_manifest_dependencies(
+    manifest: dict[str, Any],
+    *,
+    root: Path,
+    runtime_image_lock_path: Path,
+) -> dict[str, Any]:
+    """Reseal authorized runtime Atom changes without rerunning selection."""
+    amended = json.loads(json.dumps(manifest))
+    current_seal = str(amended.pop("manifest_sha256", ""))
+    if not current_seal or canonical_sha256(amended) != current_seal:
+        raise ValueError("existing manifest seal is invalid")
+    existing_amendment = (
+        (amended.get("protocol") or {}).get(
+            "prequalification_runtime_amendment"
+        )
+        or {}
+    )
+    previous_seal = str(
+        existing_amendment.get("amended_from_manifest_sha256") or current_seal
+    )
+    runtime_lock_record, runtime_lock = _load_runtime_lock(
+        root, runtime_image_lock_path
+    )
+    authorized = runtime_lock["images"]
+    source = amended.setdefault("source", {})
+    source["runtime_image_lock"] = runtime_lock_record
+    protocol = amended.setdefault("protocol", {})
+    protocol["prequalification_runtime_amendment"] = {
+        "lock_sha256": runtime_lock.get("lock_sha256"),
+        "timing": "before_first_qualified_kat",
+        "agent_outcomes_observed": False,
+        "amended_from_manifest_sha256": previous_seal,
+        "selection_preserved": True,
+    }
+    hash_cache: dict[Path, str] = {}
+
+    def current_hash(path: Path) -> str:
+        resolved = path.resolve()
+        if resolved not in hash_cache:
+            resolved.relative_to(root)
+            hash_cache[resolved] = sha256_file(resolved)
+        return hash_cache[resolved]
+
+    for case in amended.get("cases") or []:
+        dependencies = case.get("dependency_hashes") or {}
+        template = dependencies.get("template") or {}
+        template_path = root / str(template.get("path") or "")
+        if current_hash(template_path) != template.get("sha256"):
+            raise ValueError("unrelated template drift during runtime amendment")
+        for cve_id, atom in (dependencies.get("atoms") or {}).items():
+            atom_dir = root / "data" / "atoms" / cve_id
+            atom_path = atom_dir / "atom.yaml"
+            atom_hash = current_hash(atom_path)
+            guide_path = atom_dir / "exploit_guide.yaml"
+            guide_hash = current_hash(guide_path) if guide_path.is_file() else None
+            if guide_hash != atom.get("guide_sha256"):
+                raise ValueError(
+                    f"unrelated guide drift during runtime amendment: {cve_id}"
+                )
+            if cve_id in authorized:
+                _assert_recovery_matches_lock(
+                    cve_id=cve_id,
+                    atom_path=atom_path,
+                    lock_record=authorized[cve_id],
+                    lock=runtime_lock,
+                )
+                atom["atom_yaml_sha256"] = atom_hash
+            elif atom_hash != atom.get("atom_yaml_sha256"):
+                raise ValueError(
+                    f"unrelated Atom drift during runtime amendment: {cve_id}"
+                )
+    amended["manifest_sha256"] = canonical_sha256(amended)
+    return amended
 
 
 def main() -> int:
@@ -377,15 +532,36 @@ def main() -> int:
     parser.add_argument("--test-size", type=int, default=12)
     parser.add_argument("--seed", type=int, default=20260903)
     parser.add_argument("--max-atom-reuse", type=int, default=2)
-    args = parser.parse_args()
-    manifest = build_manifest(
-        root=ROOT,
-        matrix_path=args.matrix.resolve(),
-        calibration_size=args.calibration_size,
-        test_size=args.test_size,
-        seed=args.seed,
-        max_atom_reuse=args.max_atom_reuse,
+    parser.add_argument(
+        "--runtime-image-lock",
+        type=Path,
+        default=ROOT / "data" / "difficulty_runtime_image_lock_2026-09-06.json",
     )
+    parser.add_argument(
+        "--amend-existing-manifest",
+        type=Path,
+        help="preserve frozen cases and refresh dependency hashes only",
+    )
+    args = parser.parse_args()
+    if args.amend_existing_manifest:
+        existing = json.loads(
+            args.amend_existing_manifest.read_text(encoding="utf-8-sig")
+        )
+        manifest = amend_manifest_dependencies(
+            existing,
+            root=ROOT,
+            runtime_image_lock_path=args.runtime_image_lock,
+        )
+    else:
+        manifest = build_manifest(
+            root=ROOT,
+            matrix_path=args.matrix.resolve(),
+            calibration_size=args.calibration_size,
+            test_size=args.test_size,
+            seed=args.seed,
+            max_atom_reuse=args.max_atom_reuse,
+            runtime_image_lock_path=args.runtime_image_lock,
+        )
     write_report(args.output, manifest)
     print(args.output)
     return 0

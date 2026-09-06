@@ -22,6 +22,21 @@ def canonical_sha256(payload: Mapping[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def load_sealed_json(
+    path: str | Path, *, seal_field: str
+) -> tuple[dict[str, Any], str]:
+    """Read, hash, and verify one internally sealed JSON file from one byte snapshot."""
+    raw = Path(path).read_bytes()
+    payload = json.loads(raw.decode("utf-8-sig"))
+    if not isinstance(payload, dict):
+        raise TypeError("sealed JSON payload must be an object")
+    body = dict(payload)
+    claimed = str(body.pop(seal_field, ""))
+    if not claimed or canonical_sha256(body) != claimed:
+        raise ValueError(f"sealed JSON field is invalid: {seal_field}")
+    return payload, hashlib.sha256(raw).hexdigest()
+
+
 def manifest_integrity(manifest: Mapping[str, Any], repo_root: str | Path) -> dict[str, Any]:
     """Verify the manifest seal and every dependency hash it freezes."""
     body = dict(manifest)
@@ -49,6 +64,30 @@ def manifest_integrity(manifest: Mapping[str, Any], repo_root: str | Path) -> di
     for name in ("matrix", "scorer"):
         record = source.get(name) or {}
         check(record.get("path"), record.get("sha256"), f"source.{name}")
+    runtime_lock = source.get("runtime_image_lock")
+    if runtime_lock is not None:
+        record = runtime_lock if isinstance(runtime_lock, Mapping) else {}
+        relative = record.get("path")
+        expected_file_hash = record.get("sha256")
+        lock_path = (root / str(relative or "")).resolve()
+        try:
+            lock_path.relative_to(root)
+            lock_payload, lock_file_hash = load_sealed_json(
+                lock_path, seal_field="lock_sha256"
+            )
+            if (
+                not isinstance(relative, str)
+                or not isinstance(expected_file_hash, str)
+                or lock_file_hash != expected_file_hash.lower()
+            ):
+                failures.append("source.runtime_image_lock")
+            amendment = (manifest.get("protocol") or {}).get(
+                "prequalification_runtime_amendment"
+            ) or {}
+            if amendment.get("lock_sha256") != lock_payload.get("lock_sha256"):
+                failures.append("source.runtime_image_lock.protocol_seal")
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            failures.append("source.runtime_image_lock.seal")
     for case in manifest.get("cases") or []:
         case_id = str(case.get("id") or "")
         dependencies = case.get("dependency_hashes") or {}

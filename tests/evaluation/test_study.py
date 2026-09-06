@@ -9,6 +9,7 @@ from clab_builder.evaluation.study import (
     assess_manifest_qualification,
     build_frozen_run_plan,
     collect_trial_outcomes,
+    manifest_integrity,
 )
 
 
@@ -315,3 +316,40 @@ def test_collect_is_fail_closed_and_excludes_invalid_trials(tmp_path):
         "invalid_result_contract": 1,
     }
     assert len(collected["cases"][0]["outcomes"]) == 1
+
+
+def test_manifest_integrity_checks_optional_runtime_lock(tmp_path):
+    manifest, _ = _manifest(tmp_path)
+    lock = tmp_path / "runtime-lock.json"
+    lock_body = {"schema_version": 1, "images": {"CVE-A": {"image_id": "a" * 64}}}
+    lock_payload = {**lock_body, "lock_sha256": _seal(lock_body)}
+    lock.write_text(json.dumps(lock_payload))
+    manifest["source"]["runtime_image_lock"] = {
+        "path": "runtime-lock.json",
+        "sha256": sha256_file(lock),
+    }
+    manifest["protocol"]["prequalification_runtime_amendment"] = {
+        "lock_sha256": lock_payload["lock_sha256"]
+    }
+    manifest["manifest_sha256"] = _seal(
+        {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    )
+    assert manifest_integrity(manifest, tmp_path)["valid"] is True
+
+    amendment = manifest["protocol"]["prequalification_runtime_amendment"]
+    amendment["lock_sha256"] = "wrong"
+    manifest["manifest_sha256"] = _seal(
+        {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    )
+    result = manifest_integrity(manifest, tmp_path)
+    assert "source.runtime_image_lock.protocol_seal" in result["failed_dependencies"]
+
+    amendment["lock_sha256"] = lock_payload["lock_sha256"]
+    manifest["manifest_sha256"] = _seal(
+        {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    )
+    lock_payload["images"]["CVE-A"]["image_id"] = "b" * 64
+    lock.write_text(json.dumps(lock_payload))
+    result = manifest_integrity(manifest, tmp_path)
+    assert result["valid"] is False
+    assert "source.runtime_image_lock.seal" in result["failed_dependencies"]

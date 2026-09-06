@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "prequalification_runtime_recovery",
+  "created_at": "2026-09-06T01:05:47Z",
+  "reason": "The original runtime image was not archived and recorded Dockerfile rebuilds are nondeterministic; no qualified KAT or formal Agent trial had started.",
+  "images": {
+    "CVE-2021-42013": {
+      "image": "cvelab-runtime-2021-42013-7fc67655f87b:latest",
+      "image_id": "sha256:65a8b0fa935a128e5e841bf42c828f11217a14899317ed920ae69319dfa0481f",
+      "archive_file": "cvelab-runtime-2021-42013-65a8b0fa935a.tar.gz",
+      "archive_sha256": "376d367a43eed3a37b6f74b05b2db3c6aa1c3927b574078781ac1282451a03c9",
+      "archive_size_bytes": 69090340,
+      "source_image": "vulhub/httpd:2.4.50",
+      "source_image_id": "sha256:a3b2cc5641f44caa573de3e56f9ee9979fde082af0ab44e057bac81fe0081ab6",
+      "intermediate_image_id": "sha256:beeeda3c9ca1cd60db8de7ad88ed54c0c2b2d1ee3d72dad092e01b36d8d6cc4d",
+      "previous_base_image_digest": "sha256:337801b7d0c971218232fefd62632fb4f626c5fbe91f6ed43b753925dce7d9ee",
+      "previous_runtime_image_digest": "sha256:2942badc46b24f6bb80610397f5b3cdbbf97ef11b2bd9f4ba9fd5d6e5b4305ec",
+      "docker_engine_version": "29.1.3",
+      "builder": "legacy",
+      "platform": "linux/amd64",
+      "validation": {
+        "archive_round_trip": true,
+        "required_tools": true,
+        "service_ready": true,
+        "published_ports": false
+      }
+    }
+  },
+  "lock_sha256": "4391f9c464eb20c5bc139fce23bfecee3d92415eac6f0384c65fd947dbbd5f6c"
+}

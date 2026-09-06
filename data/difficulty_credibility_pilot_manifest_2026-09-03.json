@@ -12,7 +12,11 @@
       "sha256": "b9cd5d502b4732369fc4413cd309524aa1e74368a19849c4ad80ea48c7b9f8d0"
     },
     "uses_agent_results_for_selection": false,
-    "uses_threshold_margin_for_selection": false
+    "uses_threshold_margin_for_selection": false,
+    "runtime_image_lock": {
+      "path": "data/difficulty_runtime_image_lock_2026-09-06.json",
+      "sha256": "59b72667053d5d7d3be1df5a35dd2ff978c629920a7bf3e4a723b5207f93db02"
+    }
   },
   "selection": {
     "strategy": "tier_stratified_random_atom_partition",
@@ -92,7 +96,14 @@
     "agent_context": "guided",
     "max_turns": 30,
     "timeout_seconds": 1800,
-    "test_outcomes_must_remain_unobserved_during_calibration": true
+    "test_outcomes_must_remain_unobserved_during_calibration": true,
+    "prequalification_runtime_amendment": {
+      "lock_sha256": "4391f9c464eb20c5bc139fce23bfecee3d92415eac6f0384c65fd947dbbd5f6c",
+      "timing": "before_first_qualified_kat",
+      "agent_outcomes_observed": false,
+      "amended_from_manifest_sha256": "ce61eab61615852d14c44f633cb0363fd0b4f4c0e862df3a6c323a294aa532fd",
+      "selection_preserved": true
+    }
   },
   "baseline_availability": {
     "features_available": [
@@ -278,7 +289,7 @@
         },
         "atoms": {
           "CVE-2021-42013": {
-            "atom_yaml_sha256": "1a66887308b87ecac075731a3cabe5bf3854115c91b21f0556c27f7ed8d3f63f",
+            "atom_yaml_sha256": "2a486092d1d680cdc679c65d5a6a72ed3c7b7ef443e2021301a98eec7bd04340",
             "guide_sha256": "539b9160ebbf0c04bcaa068d14c81b448aa81a3beb896cb892183e8cd57d24a7"
           }
         }
@@ -1529,5 +1540,5 @@
       }
     }
   ],
-  "manifest_sha256": "ce61eab61615852d14c44f633cb0363fd0b4f4c0e862df3a6c323a294aa532fd"
+  "manifest_sha256": "575bc19ba6718fa3ffc2ee641958e9807a3ea223f0e1550c0bb13e823a43d134"
 }

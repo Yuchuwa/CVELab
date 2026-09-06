@@ -58,6 +58,42 @@ The framework recomputes hashes and reads the result from that artifact. A
 declared hash without its artifact, or an artifact whose case/control identity
 does not match, cannot qualify a case.
 
+### Restore sealed runtime images
+
+Runtime rebuilds are not accepted as substitutes for frozen images because a
+Dockerfile can produce different image IDs across otherwise identical builds.
+Restore exact local images from the tracked lock and separately distributed
+archives before KAT execution:
+
+```powershell
+python scripts/restore_difficulty_runtime_images.py `
+  --archive-dir E:\remote_project\CVELab-runtime-images\2026-09-06
+```
+
+The restore command verifies the lock seal, archive path confinement, archive
+size and SHA-256, and the loaded Docker image ID. It copies verified bytes to a
+private temporary file and preflights that the archive contains exactly the
+locked tag and OCI image digest before invoking Docker. It validates the archive
+even when the exact image is already present and refuses to overwrite a tag that
+points at a different image.
+
+If a frozen runtime cannot be recovered before the first qualified KAT, record a
+prequalification amendment in the runtime lock, validate and export one exact
+replacement image, then refresh only dependency hashes without reselecting cases:
+
+```powershell
+python scripts/prepare_difficulty_credibility_pilot.py `
+  --amend-existing-manifest data/difficulty_credibility_pilot_manifest_2026-09-03.json `
+  --runtime-image-lock data/difficulty_runtime_image_lock_2026-09-06.json `
+  --output data/difficulty_credibility_pilot_manifest_2026-09-03.json
+```
+
+The amendment must preserve case IDs, splits, predictions, tiers, and Atom
+partitions. It verifies the existing manifest seal, permits Atom hash changes
+only for CVEs named in the sealed lock, checks their recovery metadata against
+the lock, and rejects all template, guide, or unrelated Atom drift. Never use
+the normal full-generation mode to amend a frozen study.
+
 ### Execute the controls
 
 Generate live KAT evidence without invoking an LLM:
@@ -79,7 +115,9 @@ ground truth, and generated scenario. The runner passes an empty API key and nev
 starts an Agent.
 
 Containerlab must run with the privileges required by the local installation.
-Missing pinned runtime images remain a hard failure. An operator may explicitly
+When running through a root shell, ensure the installed `clab` binary is present
+in root's `PATH`; a missing executable is an infrastructure failure. Missing
+pinned runtime images remain a hard failure. An operator may explicitly
 add `--rebuild-missing-runtime-images`; rebuild inputs are copied to a per-case
 workspace so canonical Atom files are not modified. Rebuilt images still must
 match the frozen base and runtime digests. Do not update frozen hashes merely
