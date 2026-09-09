@@ -1,0 +1,26 @@
+name: multi-path_base
+mgmt:
+  network: my-mgmt-net
+  ipv4-subnet: 10.255.1.0/24
+topology:
+  nodes:
+    attacker:
+      kind: linux
+      image: clab-agent:latest
+    edge-router:
+      kind: linux
+      image: frrouting/frr:latest
+    app-a-router:
+      kind: linux
+      image: frrouting/frr:latest
+    app-b-router:
+      kind: linux
+      image: frrouting/frr:latest
+    data-router:
+      kind: linux
+      image: frrouting/frr:latest
+  links:
+    - endpoints: ["attacker:eth1", "edge-router:eth1"]
+    - endpoints: ["edge-router:eth2", "app-a-router:eth1"]
+    - endpoints: ["edge-router:eth3", "app-b-router:eth1"]
+    - endpoints: ["app-a-router:eth2", "data-router:eth1"]

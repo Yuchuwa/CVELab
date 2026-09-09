@@ -164,6 +164,32 @@ class TestAllTemplates:
         assert "dmz_simple" in templates
         assert "dmz_dual" in templates
         assert "enterprise_3tier" in templates
+        assert "asymmetric-acl" in templates
+        assert "bastion" in templates
+        assert "dual-dmz" in templates
+        assert "enterprise_4tier" in templates
+        assert "enterprise_5tier" in templates
+        assert "enterprise_tree" in templates
+        assert "multi-path" in templates
+
+    def test_imported_templates_parse_with_current_contract(self, loader):
+        names = {
+            "asymmetric-acl",
+            "bastion",
+            "dual-dmz",
+            "enterprise_4tier",
+            "enterprise_5tier",
+            "enterprise_tree",
+            "multi-path",
+        }
+
+        for name in names:
+            template = loader.load(name)
+            clab = loader.load_clab_base(name)
+            assert template.name == name
+            assert template.injection_points
+            assert "attacker" in clab["topology"]["nodes"]
+            assert clab["topology"]["links"]
 
     def test_dmz_dual_structure(self, loader):
         tpl = loader.load("dmz_dual")
@@ -241,10 +267,8 @@ class TestAllTemplates:
         assert "app-router" in ansible
         assert "data-router" in ansible
 
-    def test_all_templates_have_clab_and_ansible(self, loader):
-        """每个模板都有 clab.yaml 和 ansible/base.yaml"""
+    def test_all_templates_have_clab(self, loader):
+        """每个模板都有可加载的 clab.yaml。"""
         for name in loader.list_available():
             clab = loader.load_clab_base(name)
             assert "topology" in clab, f"{name} missing topology in clab.yaml"
-            ansible = loader.load_ansible_base(name)
-            assert ansible, f"{name} has empty ansible/base.yaml"

@@ -99,6 +99,34 @@ class TestAssemblerDMZSimple:
         assert result["injections"][0]["cve_id"] == "CVE-TEST-0001"
         assert result["injections"][0]["flag"].startswith("flag{")
 
+    @pytest.mark.parametrize(
+        "template_name",
+        [
+            "asymmetric-acl",
+            "bastion",
+            "dual-dmz",
+            "enterprise_4tier",
+            "enterprise_5tier",
+            "enterprise_tree",
+            "multi-path",
+        ],
+    )
+    def test_imported_templates_assemble(self, assembler, template_name):
+        template = assembler.template_loader.load(template_name)
+        atoms = [
+            _make_atom(f"CVE-TEST-{index:04d}")
+            for index in range(1, len(template.injection_points) + 1)
+        ]
+
+        result = assembler.assemble(template_name, atoms, scenario_name=f"{template_name}-test")
+
+        assert result["template"] == template_name
+        assert len(result["injections"]) == len(template.injection_points)
+        assert all(
+            f"target-{index}" in result["clab"]["topology"]["nodes"]
+            for index in range(1, len(template.injection_points) + 1)
+        )
+
     def test_objectives_have_private_and_agent_views(self, assembler):
         atoms = [
             _make_atom("CVE-1", ports=[80]),
