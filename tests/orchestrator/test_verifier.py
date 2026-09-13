@@ -5,6 +5,7 @@ import builtins
 import importlib.util
 import os
 import subprocess
+import time
 from types import SimpleNamespace
 import pytest
 import yaml
@@ -13,6 +14,7 @@ from unittest.mock import patch, MagicMock
 
 from clab_builder.orchestrator.composer.verifier import (
     ScenarioVerifier,
+    _terminate_proc_with_grace,
     build_entry_discovery_points,
 )
 from clab_builder.shared.models.artifact_contracts import AgentExposureProfile
@@ -423,6 +425,45 @@ class TestObjectiveVerification:
 
 
 class TestGuidedObjectivePrompt:
+    def test_guide_and_playbook_stay_mutually_exclusive_with_discipline(self):
+        base = {
+            "scenario_name": "guide-playbook-exclusion",
+            "agent_context": "guided",
+            "attacker_ip": "10.0.0.2",
+            "targets": [{
+                "node_name": "target-1",
+                "cve_id": "CVE-TEST",
+                "ip": "10.0.0.3",
+                "ports": [80],
+                "zone": "dmz",
+                "exploit_guide": "GUIDE-TEXT",
+                "playbook": "PLAYBOOK-TEXT",
+            }],
+        }
+        # No discipline: the legacy guide/playbook pairing must stay intact —
+        # a target with both renders only the guide.
+        prompt = build_prompt(base)
+        assert "GUIDE-TEXT" in prompt
+        assert "PLAYBOOK-TEXT" not in prompt
+        # With discipline declared, guide and discipline render; the playbook
+        # stays suppressed.
+        prompt = build_prompt({
+            **base,
+            "targets": [{**base["targets"][0], "channel_discipline": "DISCIPLINE"}],
+        })
+        assert "GUIDE-TEXT" in prompt
+        assert "DISCIPLINE" in prompt
+        assert "PLAYBOOK-TEXT" not in prompt
+        # A playbook-only target still renders its legacy playbook.
+        playbook_only = {
+            **base,
+            "targets": [{
+                k: v for k, v in base["targets"][0].items() if k != "exploit_guide"
+            }],
+        }
+        prompt = build_prompt(playbook_only)
+        assert "PLAYBOOK-TEXT" in prompt
+
     def test_prompt_contains_execution_context(self):
         prompt = build_prompt({
             "scenario_name": "context-contract",
@@ -841,10 +882,104 @@ class TestDifficultyLevels:
         assert command[:2] == ["docker", "run"]
         assert "--rm" in command
         assert f"--network=container:clab-claude-runner-attacker" in command
-        assert "clab-agent:latest" in command
+        assert "clab-agent:v2" in command
         assert "-e" in command
         assert "ANTHROPIC_API_KEY=test" in command
         assert "ANTHROPIC_AUTH_TOKEN=test" in command
+
+    def test_guided_agent_input_contains_channel_discipline(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: guided-discipline\n")
+        guide_yaml = (
+            "version: 2\ncve_id: CVE-A\nsummary: t\n"
+            "steps:\n- id: exploit\n  action: run\n  procedure: run\n  depends_on: []\n"
+            "  success_signal: ok\n  execution:\n    scope: actor\n    tools: []\n"
+            "    materials: []\n"
+            "post_exploit:\n  capabilities: [execute_command]\n  command_channel:\n"
+            "    type: webshell\n    established_by: [exploit]\n    reusable: true\n"
+            "    invocation_hint: replace the body\n"
+        )
+        verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"))
+        with patch.object(verifier, "_load_scenario_guide", return_value=guide_yaml), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=self._atom_with([])), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run", return_value=
+                   subprocess.CompletedProcess(["docker", "cp"], 1, "", "copy failed")):
+            verifier._run_agent(
+                str(scenario_dir), self._ground_truth(), self._ip_alloc(),
+                api_key="test", agent_context="guided",
+            )
+
+        payload = json.loads((scenario_dir / "agent_workspace" / "input.json").read_text())
+        discipline = payload["targets"][0].get("channel_discipline", "")
+        assert "webshell" in discipline
+        assert "MUST" in discipline
+
+    def test_no_guide_agent_input_omits_channel_discipline(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: no-guide-discipline\n")
+        verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"))
+        with patch.object(verifier, "_load_scenario_guide", return_value="SECRET GUIDE"), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=self._atom_with([])), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run", return_value=
+                   subprocess.CompletedProcess(["docker", "cp"], 1, "", "copy failed")):
+            verifier._run_agent(
+                str(scenario_dir), self._ground_truth(), self._ip_alloc(),
+                api_key="test", agent_context="no_guide",
+            )
+
+        payload = json.loads((scenario_dir / "agent_workspace" / "input.json").read_text())
+        assert "channel_discipline" not in payload["targets"][0]
+
+    def test_openai_runner_receives_deadline_env(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "clab.yaml").write_text("name: openai-deadline\n")
+        verifier = ScenarioVerifier(atoms_dir=str(tmp_path / "atoms"), agent_timeout=600)
+        popen_commands = []
+
+        class FakeProcess:
+            returncode = 1
+            stderr = iter(())
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def kill(self):
+                self.returncode = -9
+
+        def fake_popen(command, *args, **kwargs):
+            popen_commands.append(command)
+            return FakeProcess()
+
+        with patch.object(verifier, "_load_scenario_guide", return_value=""), \
+             patch.object(verifier, "_load_atom_playbook", return_value=""), \
+             patch.object(verifier, "_load_atom_flag_command", return_value="cat /flag"), \
+             patch.object(verifier, "_load_atom_config", return_value=self._atom_with([])), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.run",
+                   return_value=subprocess.CompletedProcess(["noop"], 0, "", "")), \
+             patch("clab_builder.orchestrator.composer.verifier.subprocess.Popen", side_effect=fake_popen):
+            verifier._run_agent(
+                str(scenario_dir), self._ground_truth(), self._ip_alloc(),
+                api_key="test", agent_context="guided", agent_runner="openai",
+            )
+
+        assert popen_commands
+        command = popen_commands[0]
+        assert command[:2] == ["docker", "exec"]
+        deadline_flags = [
+            item for item in command if item.startswith("AGENT_DEADLINE_EPOCH=")
+        ]
+        assert len(deadline_flags) == 1
+        assert float(deadline_flags[0].split("=", 1)[1]) > time.time()
 
     def test_openai_helper_copy_failure_is_reported(self, tmp_path):
         scenario_dir = tmp_path / "scenario"
@@ -2560,6 +2695,61 @@ class TestGuideRuntimePreflight:
         assert result["integrity_valid"] is True
         assert result["entries"][0]["adaptations"][0]["strategy"] == "channel_transfer_material"
 
+    def test_middle_hop_without_channel_constraints_gets_advisory(self, tmp_path):
+        scenario_dir = tmp_path / "scenario"
+        guide_dir = scenario_dir / "exploit_guides"
+        guide_dir.mkdir(parents=True)
+        (scenario_dir / "clab.yaml").write_text("name: preflight-mid\n")
+
+        def write_guide(path, cve_id, channel):
+            path.write_text(yaml.safe_dump({
+                "version": 2,
+                "cve_id": cve_id,
+                "steps": [{
+                    "id": "exploit", "action": "trigger", "procedure": "run",
+                    "depends_on": [], "success_signal": "ok",
+                    "execution": {"scope": "actor", "tools": [], "materials": []},
+                }],
+                "post_exploit": {
+                    "capabilities": ["execute_command"],
+                    "command_channel": channel,
+                },
+            }))
+
+        write_guide(guide_dir / "dmz-target-1.yaml", "CVE-TEST", {
+            "type": "webshell", "established_by": ["exploit"], "reusable": True,
+        })
+        write_guide(guide_dir / "app-target-2.yaml", "CVE-TEST-2", {
+            "type": "webshell", "established_by": ["exploit"], "reusable": True,
+            "constraints": {"no_pipelines": True},
+        })
+        ground_truth = {"attack_path": [
+            {"injection_point": "dmz-target-1", "target_node": "target-1",
+             "cve_id": "CVE-TEST", "execution_host_node": "attacker",
+             "depends_on_nodes": []},
+            {"injection_point": "app-target-2", "target_node": "target-2",
+             "cve_id": "CVE-TEST-2", "execution_host_node": "target-1",
+             "depends_on_nodes": ["target-1"]},
+        ]}
+
+        verifier = ScenarioVerifier(strict_guide_compatibility=True)
+        result = verifier._run_guide_runtime_preflight(str(scenario_dir), ground_truth)
+
+        mid, leaf = result["entries"]
+        assert any(
+            check.get("kind") == "channel_constraints"
+            and check.get("status") == "warning"
+            for check in mid["checks"]
+        )
+        assert mid["status"] == "warnings"
+        assert not any(
+            check.get("kind") == "channel_constraints" for check in leaf["checks"]
+        )
+        assert leaf["status"] == "compatible"
+        # Advisory only: startup is governed by integrity, not this warning.
+        assert result["integrity_valid"] is True
+        assert result["agent_allowed"] is True
+
 
 class TestAgentArtifactRecovery:
     def test_stale_artifacts_are_removed_before_trial(self, tmp_path):
@@ -2980,7 +3170,7 @@ class TestVerifierDefaults:
 
     def test_default_agent_image(self):
         verifier = ScenarioVerifier()
-        assert verifier.agent_image == "clab-agent:latest"
+        assert verifier.agent_image == "clab-agent:v2"
 
     def test_ansible_timeout_is_reported_as_setup_failure(self, tmp_path):
         (tmp_path / "clab.yaml").write_text("name: timeout-test\n")
@@ -3182,3 +3372,33 @@ class TestLifecycleLock:
                 lock = verifier._lifecycle_lock()
                 with lock:
                     pass
+
+
+class TestTerminateProcWithGrace:
+    """Timeout must give the runner a SIGTERM grace window before SIGKILL."""
+
+    def test_sigterm_exits_within_grace(self):
+        proc = subprocess.Popen(["sleep", "60"])
+        try:
+            started = time.monotonic()
+            _terminate_proc_with_grace(proc, grace_seconds=5)
+            assert proc.poll() is not None
+            assert time.monotonic() - started < 5
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+
+    def test_sigterm_ignoring_process_escalates_to_kill(self):
+        # Ignored signal dispositions survive exec, so this sleep ignores TERM.
+        proc = subprocess.Popen(["bash", "-c", "trap '' TERM; exec sleep 60"])
+        try:
+            time.sleep(0.3)  # let the shell install the trap before TERM
+            started = time.monotonic()
+            _terminate_proc_with_grace(proc, grace_seconds=0.5)
+            assert proc.poll() is not None
+            assert time.monotonic() - started < 10
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)

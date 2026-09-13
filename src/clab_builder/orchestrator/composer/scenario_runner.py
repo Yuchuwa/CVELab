@@ -641,6 +641,11 @@ def build_prompt(input_data: dict) -> str:
             desc += f"\n#### Exploit Guide for {t['cve_id']}:\n{t['exploit_guide']}\n"
         elif guided and t.get("playbook"):
             desc += f"\n#### Legacy SysField Playbook for {t['cve_id']}:\n{t['playbook']}\n"
+        if guided and t.get("channel_discipline"):
+            desc += (
+                f"\n#### Channel discipline for {t['node_name']} "
+                f"(MANDATORY — constrained channel):\n{t['channel_discipline']}\n"
+            )
         if t.get("depends_on_nodes"):
             desc += f"- Must be reached through foothold nodes: {t['depends_on_nodes']}\n"
         if t.get("execution_host"):

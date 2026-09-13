@@ -87,9 +87,17 @@ def _bundle_check(atom: AtomConfig, atom_dir: Optional[Path]) -> dict:
                 "ok": not missing_metadata,
                 "missing": missing_metadata,
             },
-        }
+            "compose_volumes": {
+                "evaluated": False,
+                "ok": True,
+                "missing": [],
+                "external": [],
+                "reasons": [],
+            },
+    }
     # compose or dockerfile must exist to rebuild
-    compose_ok = bool(bundle.compose_file and (atom_dir / bundle.compose_file).is_file())
+    compose_path = atom_dir / bundle.compose_file if bundle.compose_file else None
+    compose_ok = bool(compose_path and compose_path.is_file())
     df_ok = any((atom_dir / df).is_file() for df in (bundle.dockerfiles or []))
     if not (compose_ok or df_ok):
         reasons.append("no build source (compose/dockerfile) on disk")
@@ -122,6 +130,8 @@ def _bundle_check(atom: AtomConfig, atom_dir: Optional[Path]) -> dict:
             hash_bad += 1
     if hash_bad:
         reasons.append(f"{hash_bad} hash mismatch")
+    compose_volume_check = _compose_volume_check(compose_path if compose_ok else None)
+    reasons.extend(compose_volume_check["reasons"])
     missing_metadata = missing_material_metadata(bundle)
     return {
         "present": True,
@@ -131,7 +141,71 @@ def _bundle_check(atom: AtomConfig, atom_dir: Optional[Path]) -> dict:
             "ok": not missing_metadata,
             "missing": missing_metadata,
         },
+        "compose_volumes": compose_volume_check,
     }
+
+
+def _compose_volume_check(compose_path: Optional[Path]) -> dict:
+    """Check that relative bind sources are present in the self-contained bundle.
+
+    Named Docker volumes do not refer to files in the bundle and are ignored.
+    Relative bind mounts, however, are part of the runtime contract: allowing a
+    missing source makes Compose create an empty directory or mount a broken
+    file, which can leave a service listening while its application is unusable.
+    """
+    result = {
+        "evaluated": False,
+        "ok": True,
+        "missing": [],
+        "external": [],
+        "reasons": [],
+    }
+    if compose_path is None or not compose_path.is_file():
+        return result
+    result["evaluated"] = True
+    try:
+        compose = yaml.safe_load(compose_path.read_text()) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        result["ok"] = False
+        result["reasons"] = [f"compose parse failed: {exc}"]
+        return result
+    if not isinstance(compose, dict):
+        result["evaluated"] = False
+        return result
+
+    bundle_root = compose_path.parent.resolve()
+    for service in (compose.get("services") or {}).values():
+        if not isinstance(service, dict):
+            continue
+        for volume in service.get("volumes") or []:
+            if isinstance(volume, dict):
+                if volume.get("type", "bind") != "bind":
+                    continue
+                source = str(volume.get("source") or "").strip()
+            elif isinstance(volume, str) and ":" in volume:
+                source = volume.split(":", 1)[0].strip()
+            else:
+                continue
+            # Compose distinguishes named volumes from host paths by requiring
+            # a relative path prefix (./ or ../) or a path separator.
+            if not source or (
+                not source.startswith((".", "/")) and "/" not in source
+            ):
+                continue
+            candidate = (compose_path.parent / source).resolve()
+            if not candidate.is_relative_to(bundle_root):
+                result["external"].append(source)
+                result["reasons"].append(
+                    f"compose bind source outside source_bundle: {source}"
+                )
+            elif not candidate.exists() or candidate.is_symlink():
+                result["missing"].append(source)
+                result["reasons"].append(
+                    f"compose bind source missing: {source}"
+                )
+
+    result["ok"] = not result["reasons"]
+    return result
 
 
 def _guide_materials(guide: ExploitGuide) -> set[str]:

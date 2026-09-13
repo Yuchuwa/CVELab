@@ -215,6 +215,33 @@ def _agent_reported(result: dict | None) -> dict:
     return reported if isinstance(reported, dict) else result
 
 
+def _terminate_proc_with_grace(proc, grace_seconds: float = 20.0) -> None:
+    """SIGTERM a runner subprocess first; SIGKILL only after the grace window.
+
+    ``docker exec`` forwards SIGTERM to the in-container runner, which persists
+    partial output/session on SIGTERM. A hard SIGKILL previously discarded all
+    Agent progress on timeout, so the kill is now only the fallback when the
+    process does not exit within the grace window.
+    """
+    try:
+        proc.terminate()
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=grace_seconds)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        pass
+
+
 class ScenarioVerifier:
     """场景验证器：一条命令完成全流程"""
 
@@ -236,7 +263,10 @@ class ScenarioVerifier:
         self.require_agent_success = require_agent_success
         self.atoms_dir = Path(atoms_dir)
         self.sysfield_runner = SysFieldRunner(binary=sysfield_bin)
-        self.agent_image = "clab-agent:latest"
+        # clab-agent:v2 = baseline switch 2026-09-12 (adds ysoserial.jar +
+        # pyyso for Java-deserialization payload generation; see
+        # WORK_PROGRESS_REPORT P4).  :latest is the pre-P4 baseline.
+        self.agent_image = "clab-agent:v2"
         self.validation_mode = validation_mode
         self.base_timeout = base_timeout
         # Kept as a compatibility parameter for existing callers.  Guide
@@ -3039,6 +3069,11 @@ class ScenarioVerifier:
             }
 
         entries = []
+        depended_nodes = {
+            str(node)
+            for s in ground_truth.get("attack_path", [])
+            for node in (s.get("depends_on_nodes") or [])
+        }
         for step in ground_truth.get("attack_path", []):
             injection_point = str(step.get("injection_point", step.get("target_node", "")))
             guide_path = scenario_path / "exploit_guides" / f"{injection_point}.yaml"
@@ -3238,6 +3273,24 @@ class ScenarioVerifier:
                                 "artifact": artifact,
                                 "actor_node": check_node,
                             })
+
+            # Advisory: a middle hop whose reusable channel has no declared
+            # constraints leaves silent channel failures (mangled payloads,
+            # wedged services, unverified deferred execution) undetected
+            # for every downstream hop.  Advisory only — never blocks startup.
+            channel = (guide_data.get("post_exploit") or {}).get("command_channel") or {}
+            if (
+                target_node in depended_nodes
+                and channel.get("reusable")
+                and not channel.get("constraints")
+            ):
+                entry["checks"].append({
+                    "kind": "channel_constraints",
+                    "status": "warning",
+                    "ok": False,
+                    "required": False,
+                    "error": "middle-hop reusable channel has no declared constraints",
+                })
 
             if not entry["integrity_valid"]:
                 entry["status"] = "invalid"
@@ -3795,6 +3848,9 @@ class ScenarioVerifier:
                         "execution_adapter": step.get("execution_adapter"),
                         "material_paths": materials,
                         "guide_suggested_tools": guide_suggested_tools,
+                        "channel_discipline": self._channel_discipline_for_guide(
+                            guide_text
+                        ),
                     })
                 elif agent_context == "no_guide":
                     target_payload.update({
@@ -4037,6 +4093,19 @@ class ScenarioVerifier:
             # inside the runner when unset.
             if os.environ.get("LLM_TEMPERATURE"):
                 env_flags.append(f"LLM_TEMPERATURE={os.environ['LLM_TEMPERATURE']}")
+            # MAX_TOKENS pass-through (runner default 16000).  Reasoning
+            # models burn completion budget on reasoning_content; deep-chain
+            # planning turns can overflow a 16k cap and end the turn empty
+            # (r15/r17 canonical), so batches may raise it via env.
+            if os.environ.get("MAX_TOKENS"):
+                env_flags.append(f"MAX_TOKENS={os.environ['MAX_TOKENS']}")
+            if self.agent_timeout > 0:
+                # Let the in-container runner stop exploring early enough to
+                # finalize and persist partial results before the external
+                # hard timeout below terminates the process.
+                env_flags.append(
+                    f"AGENT_DEADLINE_EPOCH={time.time() + self.agent_timeout:.0f}"
+                )
             full_cmd = ["docker", "exec"]
             for ef in env_flags:
                 full_cmd.extend(["-e", ef])
@@ -4129,8 +4198,10 @@ class ScenarioVerifier:
             process_returncode = proc.returncode
             reader.join(timeout=5)
         except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=10)
+            # Grace before the hard kill: docker exec forwards SIGTERM to the
+            # in-container runner, which persists partial output/session on
+            # SIGTERM. Escalate to SIGKILL only when the grace window expires.
+            _terminate_proc_with_grace(proc, grace_seconds=20)
             reader.join(timeout=5)
             termination_reason = "agent_timeout"
             timeout_message = f"Agent timed out after {self.agent_timeout}s\n"
@@ -4845,6 +4916,28 @@ class ScenarioVerifier:
         if not playbook.exists():
             return ""
         return playbook.read_text()
+
+    @staticmethod
+    def _channel_discipline_for_guide(guide_text: str) -> str:
+        """Compute the constrained-channel discipline block for a guided target.
+
+        Parsed host-side (PyYAML available); the runner only renders the
+        resulting string, keeping the attacker's stdlib fallback intact.
+        Malformed guides degrade to no block — guide integrity is reported
+        by the preflight path, not here.
+        """
+        if not guide_text.strip():
+            return ""
+        import yaml
+        from clab_builder.shared.models.exploit_guide import (
+            ExploitGuide,
+            channel_discipline_block,
+        )
+        try:
+            guide = ExploitGuide.model_validate(yaml.safe_load(guide_text) or {})
+        except Exception:
+            return ""
+        return channel_discipline_block(guide)
 
     @staticmethod
     def _load_scenario_guide(scenario_path: Path, injection_point: str) -> str:

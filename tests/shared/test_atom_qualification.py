@@ -81,6 +81,32 @@ def test_full_qualified_atom_is_anchor(tmp_path):
     assert r.template_candidate
 
 
+def test_missing_compose_bind_source_blocks_structure(tmp_path):
+    atom_dir = tmp_path / "CVE-BIND"
+    bundle_dir = atom_dir / "source_bundle"
+    bundle_dir.mkdir(parents=True)
+    (bundle_dir / "docker-compose.yml").write_text(
+        "services:\n  web:\n    image: test:latest\n"
+        "    volumes:\n      - ./index.php:/var/www/html/index.php\n"
+    )
+    (bundle_dir / "README.md").write_text("ok")
+    atom = _base_atom(source_bundle={
+        "compose_file": "source_bundle/docker-compose.yml",
+        "readme_file": "source_bundle/README.md",
+        "dockerfiles": [],
+        "init_files": [],
+        "poc_materials": [],
+        "hashes": {},
+    })
+
+    result = qualify_atom(atom, atom_dir)
+
+    assert not result.structure_healthy
+    assert not result.template_candidate
+    assert result.checks["source_bundle"]["compose_volumes"]["missing"] == ["./index.php"]
+    assert "compose bind source missing: ./index.php" in result.reasons
+
+
 def test_native_verified_but_bundle_missing_not_candidate(tmp_path):
     atom = _base_atom()
     r = qualify_atom(atom, tmp_path / "missing")
