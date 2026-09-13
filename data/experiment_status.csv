@@ -226,5 +226,5 @@ data/scenarios_parallel_smoke2/summary.json,2026-07-18T13:03:39.920046+00:00,ent
 data/scenarios_parallel_smoke3/summary.json,2026-07-18T13:10:15.359806+00:00,enterprise_3tier,unknown_not_recorded,unknown_not_recorded,unknown,unknown,,,2,2,0,0,0,0,0
 data/scenarios_tree_env/summary.json,2026-09-13T10:37:06.607626+00:00,enterprise_tree,kimi-k3,openai,guided,none,300,3600,4,4,0,0,0,0,4
 data/scenarios_tree_guided/summary.json,2026-09-13T12:13:04.195145+00:00,enterprise_tree,kimi-k3,openai,guided,none,300,3600,4,4,0,0,4,0,4
-data/scenarios_tree_guided_r2/summary.json,2026-09-13T13:18:09.937404+00:00,enterprise_tree,kimi-k3,openai,guided,none,300,3600,2,2,0,0,2,1,2
+data/scenarios_tree_guided_r2/summary.json,2026-09-13T13:18:09.937404+00:00,enterprise_tree,kimi-k3,openai,guided,none,300,3600,2,2,0,0,2,2,2
 data/scenarios_tree_preflight/summary.json,2026-09-13T09:54:11.233793+00:00,enterprise_tree,kimi-k3,openai,guided,none,300,3600,4,0,0,4,0,0,0

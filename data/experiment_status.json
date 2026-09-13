@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-13T16:34:09.355417+00:00",
-  "source_range_snapshot_hash": "94d0bf6edb4fc7ad11ca6a6538a4d33c407ca5ef3dada731e07edef0f9faac05",
+  "generated_at": "2026-09-13T16:48:48.553144+00:00",
+  "source_range_snapshot_hash": "67b4552bb4e972e30845eab62715ad98fd15924f4616bf210519b36a53a374cd",
   "owner": "B. Range and evaluation",
   "summary": {
     "batches": 229,
     "result_records": 5272,
     "batches_with_recorded_model": 93,
     "agent_evaluated": 2062,
-    "agent_succeeded": 515,
+    "agent_succeeded": 516,
     "objective_succeeded": 553
   },
   "batches": [
@@ -5025,7 +5025,7 @@
       "build_failed": 0,
       "build_incomplete": 0,
       "agent_evaluated": 2,
-      "agent_succeeded": 1,
+      "agent_succeeded": 2,
       "objective_succeeded": 2
     },
     {
