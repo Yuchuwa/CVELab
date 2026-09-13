@@ -11321,3 +11321,19 @@ case-4（t3=libssh）三案，3600s/300 turns、clab-agent:v2、重建后 footho
 - 下一步候选（按既有规划）：Phase 3 配对消融重跑（基线已冻结）/
   EOL apt 腐坏专项 / 池多样性扩展。
 - 本轮未 commit/push。
+
+### 2026-09-13 — 提交推送 + Range/实验状态看板刷新 + 合作者分享包
+
+- 6 个主题 commit 推上 dev（rebase 整合远程 difficulty-study 分支；6 处
+  atom.yaml 冲突取 P5 镜像、台账按时间序并集；合并后全仓 **957 passed**）。
+- 追加 `984ff4e`：`scripts/generate_range_progress.py` 重新生成
+  `data/range_build_status.*`（enterprise_5tier 入板：unique=6，succeeded=5）
+  与 `data/experiment_status.*`（agent 列记录全通：p5v1 3/3、r5 case-1）。
+  读数注意：objective 列对无目标案例为虚真（r13 已记录），看 agent 列。
+- 合作者分享包：`/tmp/opencode/cvelab-5tier-share/`（+`.tar.gz` 1.7M）——
+  5 个场景目录（4 个 5/5 + canonical，全部按当前镜像 tag 重新生成或取自
+  p5v1）、12 个 Atom、`docker/Dockerfile`、`fix-paths.sh`（绝对路径改写，
+  已验证）、英文 README（链表/快速部署/注意事项）。不含实验运行产物
+  （agent_workspace 已剔除）与 .workspace 缓存。
+- 待办不变：Phase 3 配对消融 / EOL apt 专项 / 池扩展；A 方案暂缓（已记）。
+- 本轮 commit+push 已完成。
