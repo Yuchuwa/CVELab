@@ -212,6 +212,8 @@ data/scenarios_enterprise5_kimi_guide_smoke_r8/summary.json,2026-09-11T09:39:32.
 data/scenarios_enterprise5_kimi_guide_smoke_r8_preflight/summary.json,2026-09-11T09:03:57.455484+00:00,enterprise_5tier,kimi-k3,openai,guided,none,220,5400,1,0,0,1,0,0,0
 data/scenarios_enterprise5_kimi_guide_smoke_r9/summary.json,2026-09-11T10:49:40.042903+00:00,enterprise_5tier,kimi-k3,openai,guided,none,220,5400,1,1,0,0,1,0,1
 data/scenarios_enterprise5_kimi_guide_smoke_r9_preflight/summary.json,2026-09-11T10:26:14.485155+00:00,enterprise_5tier,kimi-k3,openai,guided,none,220,5400,1,0,0,1,0,0,0
+data/scenarios_enterprise5_share_pack_canonical/summary.json,2026-09-13T09:01:44.502722+00:00,enterprise_5tier,kimi-k3,openai,guided,none,300,3600,1,0,0,1,0,0,0
+data/scenarios_enterprise5_share_pack_case1/summary.json,2026-09-13T09:01:16.845834+00:00,enterprise_5tier,kimi-k3,openai,guided,none,300,3600,1,0,0,1,0,0,0
 data/scenarios_guided_batch/summary.json,2026-07-15T14:51:30.119950+00:00,enterprise_3tier,unknown_not_recorded,unknown_not_recorded,unknown,unknown,,,6,6,0,0,6,1,1
 data/scenarios_guided_batch_next/summary.json,2026-07-17T06:40:19.904228+00:00,enterprise_3tier,unknown_not_recorded,unknown_not_recorded,unknown,unknown,,,6,6,0,0,6,4,4
 data/scenarios_guided_batch_rerun/summary.json,2026-07-15T15:25:59.356093+00:00,enterprise_3tier,unknown_not_recorded,unknown_not_recorded,unknown,unknown,,,1,0,0,1,0,0,0
@@ -222,3 +224,7 @@ data/scenarios_guided_preflight/summary.json,2026-07-17T04:22:25.866800+00:00,en
 data/scenarios_parallel_env4/summary.json,2026-07-18T13:37:03.544760+00:00,enterprise_3tier,unknown_not_recorded,unknown_not_recorded,unknown,unknown,,,4,2,2,0,0,0,0
 data/scenarios_parallel_smoke2/summary.json,2026-07-18T13:03:39.920046+00:00,enterprise_3tier,unknown_not_recorded,unknown_not_recorded,unknown,unknown,,,2,2,0,0,0,0,0
 data/scenarios_parallel_smoke3/summary.json,2026-07-18T13:10:15.359806+00:00,enterprise_3tier,unknown_not_recorded,unknown_not_recorded,unknown,unknown,,,2,2,0,0,0,0,0
+data/scenarios_tree_env/summary.json,2026-09-13T10:37:06.607626+00:00,enterprise_tree,kimi-k3,openai,guided,none,300,3600,4,4,0,0,0,0,4
+data/scenarios_tree_guided/summary.json,2026-09-13T12:13:04.195145+00:00,enterprise_tree,kimi-k3,openai,guided,none,300,3600,4,4,0,0,4,0,4
+data/scenarios_tree_guided_r2/summary.json,2026-09-13T13:18:09.937404+00:00,enterprise_tree,kimi-k3,openai,guided,none,300,3600,2,2,0,0,2,1,2
+data/scenarios_tree_preflight/summary.json,2026-09-13T09:54:11.233793+00:00,enterprise_tree,kimi-k3,openai,guided,none,300,3600,4,0,0,4,0,0,0

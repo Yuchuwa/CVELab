@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-13T08:44:51.004932+00:00",
-  "snapshot_hash": "e9f40c9e024b67bbe2eacf968f5ae5058707e5995680df2e63f0ff46b9339afb",
+  "generated_at": "2026-09-13T16:34:09.355417+00:00",
+  "snapshot_hash": "94d0bf6edb4fc7ad11ca6a6538a4d33c407ca5ef3dada731e07edef0f9faac05",
   "definitions": {
     "range_identity": "template + case_id + ordered CVEs + asset variants + noise level",
     "build_succeeded": "generation, environment, Range build, attack graph and attack path all passed",
@@ -9,12 +9,12 @@
     "build_incomplete": "no deterministic failure, but at least one required stage was not evaluated"
   },
   "summary": {
-    "summary_files": 223,
-    "attempt_records": 5256,
-    "unique_ranges": 2406,
-    "latest_build_succeeded": 588,
+    "summary_files": 229,
+    "attempt_records": 5272,
+    "unique_ranges": 2411,
+    "latest_build_succeeded": 591,
     "latest_build_failed": 35,
-    "latest_build_incomplete": 1783
+    "latest_build_incomplete": 1785
   },
   "templates": {
     "enterprise_3tier": {
@@ -25,9 +25,15 @@
     },
     "enterprise_5tier": {
       "unique_ranges": 6,
+      "latest_build_succeeded": 3,
+      "latest_build_failed": 0,
+      "latest_build_incomplete": 3
+    },
+    "enterprise_tree": {
+      "unique_ranges": 5,
       "latest_build_succeeded": 5,
       "latest_build_failed": 0,
-      "latest_build_incomplete": 1
+      "latest_build_incomplete": 0
     }
   },
   "ranges": [
@@ -4360,6 +4366,63 @@
       "latest_source_summary": "data/scenarios_enterprise3_wave002_preflight_shard003/summary.json",
       "attempt_count": 1,
       "successful_attempts": 0,
+      "failed_attempts": 0,
+      "incomplete_attempts": 1
+    },
+    {
+      "range_key": "0993369a0158229d",
+      "case_id": "matrix-2016-3714-2017-11610-2018-10933-2012-1823-2016-3088-2019-9193",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2018-10933",
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "noise_level": "none",
+      "latest_build_outcome": "succeeded",
+      "latest_attempt_id": "871a635324b91ba7f792",
+      "latest_stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "failed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      },
+      "latest_failure_stage": "agent",
+      "latest_source_summary": "data/scenarios_tree_guided/summary.json",
+      "attempt_count": 3,
+      "successful_attempts": 2,
       "failed_attempts": 0,
       "incomplete_attempts": 1
     },
@@ -24072,6 +24135,63 @@
       "successful_attempts": 0,
       "failed_attempts": 0,
       "incomplete_attempts": 6
+    },
+    {
+      "range_key": "2dd0366ebb63fdd7",
+      "case_id": "matrix-2017-15715-2018-16509-2025-32433-2017-12615-2018-19475-2026-24061",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2017-15715",
+        "CVE-2018-16509",
+        "CVE-2025-32433",
+        "CVE-2017-12615",
+        "CVE-2018-19475",
+        "CVE-2026-24061"
+      ],
+      "asset_variants": {},
+      "noise_level": "none",
+      "latest_build_outcome": "succeeded",
+      "latest_attempt_id": "f4d3d4e2cba0199b65c7",
+      "latest_stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "failed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      },
+      "latest_failure_stage": "agent_timeout",
+      "latest_source_summary": "data/scenarios_tree_guided/summary.json",
+      "attempt_count": 3,
+      "successful_attempts": 2,
+      "failed_attempts": 0,
+      "incomplete_attempts": 1
     },
     {
       "range_key": "2dfd57a4df1dc848",
@@ -50131,6 +50251,63 @@
       "successful_attempts": 2,
       "failed_attempts": 0,
       "incomplete_attempts": 0
+    },
+    {
+      "range_key": "5fc4afa4e90b7ccc",
+      "case_id": "matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2014-3120",
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {},
+      "noise_level": "none",
+      "latest_build_outcome": "succeeded",
+      "latest_attempt_id": "cbae0ed1509a6cb210b4",
+      "latest_stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "passed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      },
+      "latest_failure_stage": "",
+      "latest_source_summary": "data/scenarios_tree_guided_r2/summary.json",
+      "attempt_count": 4,
+      "successful_attempts": 3,
+      "failed_attempts": 0,
+      "incomplete_attempts": 1
     },
     {
       "range_key": "5fc86aefba455b12",
@@ -84461,48 +84638,48 @@
       ],
       "asset_variants": {},
       "noise_level": "none",
-      "latest_build_outcome": "succeeded",
-      "latest_attempt_id": "34861ef0a263696efb51",
+      "latest_build_outcome": "incomplete",
+      "latest_attempt_id": "9aaf37c2b3a01ead2aeb",
       "latest_stages": {
         "generation": {
           "status": "passed",
-          "source": "legacy_inference"
+          "source": "generated"
         },
         "environment": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "environment_success"
         },
         "range_build": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "range_build_verified"
         },
         "attack_graph": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "attack_graph_valid"
         },
         "attack_path": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "attack_path_reachable"
         },
         "cleanup": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "cleanup_failed"
         },
         "agent": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "agent_success"
         },
         "objective": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "objective_achieved"
         }
       },
       "latest_failure_stage": "",
-      "latest_source_summary": "data/scenarios_enterprise5_kimi_guide_diverse_r5/summary.json",
-      "attempt_count": 7,
+      "latest_source_summary": "data/scenarios_enterprise5_share_pack_case1/summary.json",
+      "attempt_count": 8,
       "successful_attempts": 6,
       "failed_attempts": 0,
-      "incomplete_attempts": 1
+      "incomplete_attempts": 2
     },
     {
       "range_key": "a4a5e7b82f582fae",
@@ -95891,6 +96068,63 @@
       "successful_attempts": 0,
       "failed_attempts": 0,
       "incomplete_attempts": 1
+    },
+    {
+      "range_key": "bbe0eee7f0076c8c",
+      "case_id": "matrix-2016-3088-2012-1823-2015-1427-2017-11610-2016-3714-2014-3120",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2012-1823",
+        "CVE-2015-1427",
+        "CVE-2017-11610",
+        "CVE-2016-3714",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {},
+      "noise_level": "none",
+      "latest_build_outcome": "succeeded",
+      "latest_attempt_id": "706747bbc4f77c070d2a",
+      "latest_stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "failed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      },
+      "latest_failure_stage": "agent",
+      "latest_source_summary": "data/scenarios_tree_guided_r2/summary.json",
+      "attempt_count": 1,
+      "successful_attempts": 1,
+      "failed_attempts": 0,
+      "incomplete_attempts": 0
     },
     {
       "range_key": "bbecda1a9d56a774",
@@ -118221,48 +118455,48 @@
       ],
       "asset_variants": {},
       "noise_level": "none",
-      "latest_build_outcome": "succeeded",
-      "latest_attempt_id": "da7a63ca4205b7f74766",
+      "latest_build_outcome": "incomplete",
+      "latest_attempt_id": "e947d729bd21245cba71",
       "latest_stages": {
         "generation": {
           "status": "passed",
-          "source": "legacy_inference"
+          "source": "generated"
         },
         "environment": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "environment_success"
         },
         "range_build": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "range_build_verified"
         },
         "attack_graph": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "attack_graph_valid"
         },
         "attack_path": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "attack_path_reachable"
         },
         "cleanup": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "cleanup_failed"
         },
         "agent": {
-          "status": "failed",
+          "status": "not_evaluated",
           "source": "agent_success"
         },
         "objective": {
-          "status": "passed",
+          "status": "not_evaluated",
           "source": "objective_achieved"
         }
       },
-      "latest_failure_stage": "agent",
-      "latest_source_summary": "data/scenarios_enterprise5_kimi_guide_smoke_r18/summary.json",
-      "attempt_count": 28,
+      "latest_failure_stage": "",
+      "latest_source_summary": "data/scenarios_enterprise5_share_pack_canonical/summary.json",
+      "attempt_count": 29,
       "successful_attempts": 18,
       "failed_attempts": 0,
-      "incomplete_attempts": 10
+      "incomplete_attempts": 11
     },
     {
       "range_key": "e573a7e51a8c737a",
@@ -130897,6 +131131,63 @@
       "latest_source_summary": "data/scenarios_enterprise3_wave002_preflight_shard000/summary.json",
       "attempt_count": 1,
       "successful_attempts": 0,
+      "failed_attempts": 0,
+      "incomplete_attempts": 1
+    },
+    {
+      "range_key": "fdfbf2e529dbd879",
+      "case_id": "matrix-2017-12149-2017-12615-2022-0543-2017-15715-2018-10933-2022-24706",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2017-12149",
+        "CVE-2017-12615",
+        "CVE-2022-0543",
+        "CVE-2017-15715",
+        "CVE-2018-10933",
+        "CVE-2022-24706"
+      ],
+      "asset_variants": {},
+      "noise_level": "none",
+      "latest_build_outcome": "succeeded",
+      "latest_attempt_id": "82d3a431de991e540a3a",
+      "latest_stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "failed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      },
+      "latest_failure_stage": "agent",
+      "latest_source_summary": "data/scenarios_tree_guided/summary.json",
+      "attempt_count": 3,
+      "successful_attempts": 2,
       "failed_attempts": 0,
       "incomplete_attempts": 1
     },
@@ -452943,6 +453234,130 @@
       }
     },
     {
+      "attempt_id": "e947d729bd21245cba71",
+      "range_key": "e555fb697f920587",
+      "case_id": "matrix-2012-1823-2016-3088-2016-3714-2017-11610-2014-3120",
+      "template": "enterprise_5tier",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_enterprise5_share_pack_canonical/summary.json",
+      "run_id": "059f7d5b6c20a7a2ab0178b0",
+      "created_at": "2026-09-13T09:01:44.502722+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "incomplete",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "generated"
+        },
+        "environment": {
+          "status": "not_evaluated",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "not_evaluated",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "not_evaluated",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "not_evaluated",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "not_evaluated",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "not_evaluated",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "9aaf37c2b3a01ead2aeb",
+      "range_key": "a486a2ca9a32aa76",
+      "case_id": "matrix-2016-3088-2012-1823-2017-11610-2016-3714-2015-1427",
+      "template": "enterprise_5tier",
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2012-1823",
+        "CVE-2017-11610",
+        "CVE-2016-3714",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_enterprise5_share_pack_case1/summary.json",
+      "run_id": "8b45621b9a11123de702543f",
+      "created_at": "2026-09-13T09:01:16.845834+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "incomplete",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "generated"
+        },
+        "environment": {
+          "status": "not_evaluated",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "not_evaluated",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "not_evaluated",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "not_evaluated",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "not_evaluated",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "not_evaluated",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
       "attempt_id": "f4ae7a07bcaf4a8ae06f",
       "range_key": "ff8793da12f8f2d3",
       "case_id": "b00-baseline",
@@ -455218,6 +455633,888 @@
         },
         "attack_path": {
           "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "not_evaluated",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "not_evaluated",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "85e1de9a6346b36cf797",
+      "range_key": "5fc4afa4e90b7ccc",
+      "case_id": "matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2014-3120",
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_env/summary.json",
+      "run_id": "3bdaf0a3f694c8df48c304c5",
+      "created_at": "2026-09-13T10:37:06.607626+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": true,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "803cfb71c9ea931ff4ea",
+      "range_key": "0993369a0158229d",
+      "case_id": "matrix-2016-3714-2017-11610-2018-10933-2012-1823-2016-3088-2019-9193",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2018-10933",
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_env/summary.json",
+      "run_id": "3bdaf0a3f694c8df48c304c5",
+      "created_at": "2026-09-13T10:37:06.607626+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": true,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "cca778fbe70be9306c2a",
+      "range_key": "fdfbf2e529dbd879",
+      "case_id": "matrix-2017-12149-2017-12615-2022-0543-2017-15715-2018-10933-2022-24706",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2017-12149",
+        "CVE-2017-12615",
+        "CVE-2022-0543",
+        "CVE-2017-15715",
+        "CVE-2018-10933",
+        "CVE-2022-24706"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_env/summary.json",
+      "run_id": "3bdaf0a3f694c8df48c304c5",
+      "created_at": "2026-09-13T10:37:06.607626+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": true,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "7ef253b65f956d1f8a8a",
+      "range_key": "2dd0366ebb63fdd7",
+      "case_id": "matrix-2017-15715-2018-16509-2025-32433-2017-12615-2018-19475-2026-24061",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2017-15715",
+        "CVE-2018-16509",
+        "CVE-2025-32433",
+        "CVE-2017-12615",
+        "CVE-2018-19475",
+        "CVE-2026-24061"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_env/summary.json",
+      "run_id": "3bdaf0a3f694c8df48c304c5",
+      "created_at": "2026-09-13T10:37:06.607626+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": true,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "fd409523e0415888890b",
+      "range_key": "5fc4afa4e90b7ccc",
+      "case_id": "matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2014-3120",
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_guided/summary.json",
+      "run_id": "3d963e8b3a9a331cf4422d4c",
+      "created_at": "2026-09-13T12:13:04.195145+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "agent",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "failed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "871a635324b91ba7f792",
+      "range_key": "0993369a0158229d",
+      "case_id": "matrix-2016-3714-2017-11610-2018-10933-2012-1823-2016-3088-2019-9193",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2018-10933",
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_guided/summary.json",
+      "run_id": "3d963e8b3a9a331cf4422d4c",
+      "created_at": "2026-09-13T12:13:04.195145+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "agent",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "failed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "82d3a431de991e540a3a",
+      "range_key": "fdfbf2e529dbd879",
+      "case_id": "matrix-2017-12149-2017-12615-2022-0543-2017-15715-2018-10933-2022-24706",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2017-12149",
+        "CVE-2017-12615",
+        "CVE-2022-0543",
+        "CVE-2017-15715",
+        "CVE-2018-10933",
+        "CVE-2022-24706"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_guided/summary.json",
+      "run_id": "3d963e8b3a9a331cf4422d4c",
+      "created_at": "2026-09-13T12:13:04.195145+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "agent",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "failed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "f4d3d4e2cba0199b65c7",
+      "range_key": "2dd0366ebb63fdd7",
+      "case_id": "matrix-2017-15715-2018-16509-2025-32433-2017-12615-2018-19475-2026-24061",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2017-15715",
+        "CVE-2018-16509",
+        "CVE-2025-32433",
+        "CVE-2017-12615",
+        "CVE-2018-19475",
+        "CVE-2026-24061"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_guided/summary.json",
+      "run_id": "3d963e8b3a9a331cf4422d4c",
+      "created_at": "2026-09-13T12:13:04.195145+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "agent_timeout",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "failed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "706747bbc4f77c070d2a",
+      "range_key": "bbe0eee7f0076c8c",
+      "case_id": "matrix-2016-3088-2012-1823-2015-1427-2017-11610-2016-3714-2014-3120",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2016-3088",
+        "CVE-2012-1823",
+        "CVE-2015-1427",
+        "CVE-2017-11610",
+        "CVE-2016-3714",
+        "CVE-2014-3120"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_guided_r2/summary.json",
+      "run_id": "9e258d03eab1d774ca0060b1",
+      "created_at": "2026-09-13T13:18:09.937404+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "agent",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "failed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "cbae0ed1509a6cb210b4",
+      "range_key": "5fc4afa4e90b7ccc",
+      "case_id": "matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2014-3120",
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_guided_r2/summary.json",
+      "run_id": "9e258d03eab1d774ca0060b1",
+      "created_at": "2026-09-13T13:18:09.937404+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "succeeded",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "legacy_inference"
+        },
+        "environment": {
+          "status": "passed",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "passed",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "passed",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "passed",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "passed",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "passed",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "passed",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "a760cb16d5e769c7d47b",
+      "range_key": "5fc4afa4e90b7ccc",
+      "case_id": "matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2014-3120",
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2015-1427"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_preflight/summary.json",
+      "run_id": "72359625302ab9d7013d810c",
+      "created_at": "2026-09-13T09:54:11.233793+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "incomplete",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "generated"
+        },
+        "environment": {
+          "status": "not_evaluated",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "not_evaluated",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "not_evaluated",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "not_evaluated",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "not_evaluated",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "not_evaluated",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "e803034360ef69a1113e",
+      "range_key": "0993369a0158229d",
+      "case_id": "matrix-2016-3714-2017-11610-2018-10933-2012-1823-2016-3088-2019-9193",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2016-3714",
+        "CVE-2017-11610",
+        "CVE-2018-10933",
+        "CVE-2012-1823",
+        "CVE-2016-3088",
+        "CVE-2019-9193"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_preflight/summary.json",
+      "run_id": "72359625302ab9d7013d810c",
+      "created_at": "2026-09-13T09:54:11.233793+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "incomplete",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "generated"
+        },
+        "environment": {
+          "status": "not_evaluated",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "not_evaluated",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "not_evaluated",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "not_evaluated",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "not_evaluated",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "not_evaluated",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "63924fcb627bb30395c6",
+      "range_key": "fdfbf2e529dbd879",
+      "case_id": "matrix-2017-12149-2017-12615-2022-0543-2017-15715-2018-10933-2022-24706",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2017-12149",
+        "CVE-2017-12615",
+        "CVE-2022-0543",
+        "CVE-2017-15715",
+        "CVE-2018-10933",
+        "CVE-2022-24706"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_preflight/summary.json",
+      "run_id": "72359625302ab9d7013d810c",
+      "created_at": "2026-09-13T09:54:11.233793+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "incomplete",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "generated"
+        },
+        "environment": {
+          "status": "not_evaluated",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "not_evaluated",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "not_evaluated",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "not_evaluated",
+          "source": "attack_path_reachable"
+        },
+        "cleanup": {
+          "status": "not_evaluated",
+          "source": "cleanup_failed"
+        },
+        "agent": {
+          "status": "not_evaluated",
+          "source": "agent_success"
+        },
+        "objective": {
+          "status": "not_evaluated",
+          "source": "objective_achieved"
+        }
+      }
+    },
+    {
+      "attempt_id": "86652fe3f404592582ef",
+      "range_key": "2dd0366ebb63fdd7",
+      "case_id": "matrix-2017-15715-2018-16509-2025-32433-2017-12615-2018-19475-2026-24061",
+      "template": "enterprise_tree",
+      "cves": [
+        "CVE-2017-15715",
+        "CVE-2018-16509",
+        "CVE-2025-32433",
+        "CVE-2017-12615",
+        "CVE-2018-19475",
+        "CVE-2026-24061"
+      ],
+      "asset_variants": {},
+      "source_summary": "data/scenarios_tree_preflight/summary.json",
+      "run_id": "72359625302ab9d7013d810c",
+      "created_at": "2026-09-13T09:54:11.233793+00:00",
+      "validation_mode": "guided_agent",
+      "environment_only": false,
+      "agent_context": "guided",
+      "noise_level": "none",
+      "model": "kimi-k3",
+      "agent_runner": "openai",
+      "max_turns": 300,
+      "agent_timeout": 3600,
+      "build_outcome": "incomplete",
+      "failure_stage": "",
+      "execution_complete": true,
+      "stages": {
+        "generation": {
+          "status": "passed",
+          "source": "generated"
+        },
+        "environment": {
+          "status": "not_evaluated",
+          "source": "environment_success"
+        },
+        "range_build": {
+          "status": "not_evaluated",
+          "source": "range_build_verified"
+        },
+        "attack_graph": {
+          "status": "not_evaluated",
+          "source": "attack_graph_valid"
+        },
+        "attack_path": {
+          "status": "not_evaluated",
           "source": "attack_path_reachable"
         },
         "cleanup": {

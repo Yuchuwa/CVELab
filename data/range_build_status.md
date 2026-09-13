@@ -2,25 +2,26 @@
 
 Status: generated snapshot
 
-Generated at: `2026-09-13T08:44:51.004932+00:00`
+Generated at: `2026-09-13T16:34:09.355417+00:00`
 
-Snapshot hash: `e9f40c9e024b67bbe2eacf968f5ae5058707e5995680df2e63f0ff46b9339afb`
+Snapshot hash: `94d0bf6edb4fc7ad11ca6a6538a4d33c407ca5ef3dada731e07edef0f9faac05`
 
 Agent and objective outcomes are not Range build gates.
 
 ## Summary
 
-- `summary_files`: 223
-- `attempt_records`: 5256
-- `unique_ranges`: 2406
-- `latest_build_succeeded`: 588
+- `summary_files`: 229
+- `attempt_records`: 5272
+- `unique_ranges`: 2411
+- `latest_build_succeeded`: 591
 - `latest_build_failed`: 35
-- `latest_build_incomplete`: 1783
+- `latest_build_incomplete`: 1785
 
 ## Templates
 
 - `enterprise_3tier`: unique=2400, succeeded=583, failed=35, incomplete=1782
-- `enterprise_5tier`: unique=6, succeeded=5, failed=0, incomplete=1
+- `enterprise_5tier`: unique=6, succeeded=3, failed=0, incomplete=3
+- `enterprise_tree`: unique=5, succeeded=5, failed=0, incomplete=0
 
 ## Latest Range State by Template
 
@@ -2442,16 +2443,32 @@ Agent and objective outcomes are not Range build gates.
 - `matrix-2016-3714-2017-11610-2012-1823-2016-3088-2018-10933` / `none`; CVEs=CVE-2016-3714,CVE-2017-11610,CVE-2012-1823,CVE-2016-3088,CVE-2018-10933; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=6; source=`data/scenarios_enterprise5_kimi_guide_diverse_p5v1/summary.json`
 - `matrix-2017-12615-2017-12149-2018-10933-2017-15715-2022-0543` / `none`; CVEs=CVE-2017-12615,CVE-2017-12149,CVE-2018-10933,CVE-2017-15715,CVE-2022-0543; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=9; source=`data/scenarios_enterprise5_kimi_guide_diverse_p5v1/summary.json`
 - `matrix-2017-12149-2017-12615-2017-15715-2018-10933-2019-9193` / `none`; CVEs=CVE-2017-12149,CVE-2017-12615,CVE-2017-15715,CVE-2018-10933,CVE-2019-9193; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=7; source=`data/scenarios_enterprise5_kimi_guide_diverse_p5v1/summary.json`
-- `matrix-2016-3088-2012-1823-2017-11610-2016-3714-2015-1427` / `none`; CVEs=CVE-2016-3088,CVE-2012-1823,CVE-2017-11610,CVE-2016-3714,CVE-2015-1427; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=7; source=`data/scenarios_enterprise5_kimi_guide_diverse_r5/summary.json`
-- `matrix-2012-1823-2016-3088-2016-3714-2017-11610-2014-3120` / `none`; CVEs=CVE-2012-1823,CVE-2016-3088,CVE-2016-3714,CVE-2017-11610,CVE-2014-3120; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=28; source=`data/scenarios_enterprise5_kimi_guide_smoke_r18/summary.json`
 
 #### `failed`
 
 - None
 #### `incomplete`
 
+- `matrix-2016-3088-2012-1823-2017-11610-2016-3714-2015-1427` / `none`; CVEs=CVE-2016-3088,CVE-2012-1823,CVE-2017-11610,CVE-2016-3714,CVE-2015-1427; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; attempts=8; source=`data/scenarios_enterprise5_share_pack_case1/summary.json`
 - `matrix-2017-11610-2016-3714-2016-3088-2012-1823-2019-20933` / `none`; CVEs=CVE-2017-11610,CVE-2016-3714,CVE-2016-3088,CVE-2012-1823,CVE-2019-20933; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; attempts=1; source=`data/scenarios_enterprise5_kimi_guide_diverse_preflight/summary.json`
+- `matrix-2012-1823-2016-3088-2016-3714-2017-11610-2014-3120` / `none`; CVEs=CVE-2012-1823,CVE-2016-3088,CVE-2016-3714,CVE-2017-11610,CVE-2014-3120; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; attempts=29; source=`data/scenarios_enterprise5_share_pack_canonical/summary.json`
 
+### `enterprise_tree`
+
+#### `succeeded`
+
+- `matrix-2016-3714-2017-11610-2018-10933-2012-1823-2016-3088-2019-9193` / `none`; CVEs=CVE-2016-3714,CVE-2017-11610,CVE-2018-10933,CVE-2012-1823,CVE-2016-3088,CVE-2019-9193; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=3; source=`data/scenarios_tree_guided/summary.json`
+- `matrix-2017-15715-2018-16509-2025-32433-2017-12615-2018-19475-2026-24061` / `none`; CVEs=CVE-2017-15715,CVE-2018-16509,CVE-2025-32433,CVE-2017-12615,CVE-2018-19475,CVE-2026-24061; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=3; source=`data/scenarios_tree_guided/summary.json`
+- `matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427` / `none`; CVEs=CVE-2012-1823,CVE-2016-3088,CVE-2014-3120,CVE-2016-3714,CVE-2017-11610,CVE-2015-1427; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=4; source=`data/scenarios_tree_guided_r2/summary.json`
+- `matrix-2016-3088-2012-1823-2015-1427-2017-11610-2016-3714-2014-3120` / `none`; CVEs=CVE-2016-3088,CVE-2012-1823,CVE-2015-1427,CVE-2017-11610,CVE-2016-3714,CVE-2014-3120; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=1; source=`data/scenarios_tree_guided_r2/summary.json`
+- `matrix-2017-12149-2017-12615-2022-0543-2017-15715-2018-10933-2022-24706` / `none`; CVEs=CVE-2017-12149,CVE-2017-12615,CVE-2022-0543,CVE-2017-15715,CVE-2018-10933,CVE-2022-24706; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; attempts=3; source=`data/scenarios_tree_guided/summary.json`
+
+#### `failed`
+
+- None
+#### `incomplete`
+
+- None
 
 ## Attempt Ledger
 
@@ -7673,6 +7690,8 @@ Agent and objective outcomes are not Range build gates.
 - `enterprise_5tier` / `matrix-2012-1823-2016-3088-2016-3714-2017-11610-2014-3120` — `incomplete`; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; source=`data/scenarios_enterprise5_kimi_guide_smoke_r8_preflight/summary.json`
 - `enterprise_5tier` / `matrix-2012-1823-2016-3088-2016-3714-2017-11610-2014-3120` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_enterprise5_kimi_guide_smoke_r9/summary.json`
 - `enterprise_5tier` / `matrix-2012-1823-2016-3088-2016-3714-2017-11610-2014-3120` — `incomplete`; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; source=`data/scenarios_enterprise5_kimi_guide_smoke_r9_preflight/summary.json`
+- `enterprise_5tier` / `matrix-2012-1823-2016-3088-2016-3714-2017-11610-2014-3120` — `incomplete`; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; source=`data/scenarios_enterprise5_share_pack_canonical/summary.json`
+- `enterprise_5tier` / `matrix-2016-3088-2012-1823-2017-11610-2016-3714-2015-1427` — `incomplete`; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; source=`data/scenarios_enterprise5_share_pack_case1/summary.json`
 - `enterprise_3tier` / `b00-baseline` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=not_evaluated; source=`data/scenarios_guided_batch/summary.json`
 - `enterprise_3tier` / `b01-dmz-middleware` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=not_evaluated; source=`data/scenarios_guided_batch/summary.json`
 - `enterprise_3tier` / `b02-dmz-web-variant` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=not_evaluated; source=`data/scenarios_guided_batch/summary.json`
@@ -7711,3 +7730,17 @@ Agent and objective outcomes are not Range build gates.
 - `enterprise_3tier` / `b02-dmz-web-variant` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=not_evaluated; source=`data/scenarios_parallel_smoke2/summary.json`
 - `enterprise_3tier` / `b00-baseline` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=not_evaluated; source=`data/scenarios_parallel_smoke3/summary.json`
 - `enterprise_3tier` / `b02-dmz-web-variant` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=not_evaluated; source=`data/scenarios_parallel_smoke3/summary.json`
+- `enterprise_tree` / `matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_env/summary.json`
+- `enterprise_tree` / `matrix-2016-3714-2017-11610-2018-10933-2012-1823-2016-3088-2019-9193` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_env/summary.json`
+- `enterprise_tree` / `matrix-2017-12149-2017-12615-2022-0543-2017-15715-2018-10933-2022-24706` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_env/summary.json`
+- `enterprise_tree` / `matrix-2017-15715-2018-16509-2025-32433-2017-12615-2018-19475-2026-24061` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_env/summary.json`
+- `enterprise_tree` / `matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_guided/summary.json`
+- `enterprise_tree` / `matrix-2016-3714-2017-11610-2018-10933-2012-1823-2016-3088-2019-9193` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_guided/summary.json`
+- `enterprise_tree` / `matrix-2017-12149-2017-12615-2022-0543-2017-15715-2018-10933-2022-24706` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_guided/summary.json`
+- `enterprise_tree` / `matrix-2017-15715-2018-16509-2025-32433-2017-12615-2018-19475-2026-24061` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_guided/summary.json`
+- `enterprise_tree` / `matrix-2016-3088-2012-1823-2015-1427-2017-11610-2016-3714-2014-3120` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_guided_r2/summary.json`
+- `enterprise_tree` / `matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427` — `succeeded`; generation=passed, environment=passed, range_build=passed, attack_graph=passed, attack_path=passed, cleanup=passed; source=`data/scenarios_tree_guided_r2/summary.json`
+- `enterprise_tree` / `matrix-2012-1823-2016-3088-2014-3120-2016-3714-2017-11610-2015-1427` — `incomplete`; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; source=`data/scenarios_tree_preflight/summary.json`
+- `enterprise_tree` / `matrix-2016-3714-2017-11610-2018-10933-2012-1823-2016-3088-2019-9193` — `incomplete`; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; source=`data/scenarios_tree_preflight/summary.json`
+- `enterprise_tree` / `matrix-2017-12149-2017-12615-2022-0543-2017-15715-2018-10933-2022-24706` — `incomplete`; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; source=`data/scenarios_tree_preflight/summary.json`
+- `enterprise_tree` / `matrix-2017-15715-2018-16509-2025-32433-2017-12615-2018-19475-2026-24061` — `incomplete`; generation=passed, environment=not_evaluated, range_build=not_evaluated, attack_graph=not_evaluated, attack_path=not_evaluated, cleanup=not_evaluated; source=`data/scenarios_tree_preflight/summary.json`

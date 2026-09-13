@@ -2,18 +2,18 @@
 
 Status: generated snapshot
 
-Generated at: `2026-09-13T08:44:51.004932+00:00`
+Generated at: `2026-09-13T16:34:09.355417+00:00`
 
 Owner: `B. Range and evaluation`
 
 ## Summary
 
-- `batches`: 223
-- `result_records`: 5256
-- `batches_with_recorded_model`: 87
-- `agent_evaluated`: 2056
-- `agent_succeeded`: 514
-- `objective_succeeded`: 543
+- `batches`: 229
+- `result_records`: 5272
+- `batches_with_recorded_model`: 93
+- `agent_evaluated`: 2062
+- `agent_succeeded`: 515
+- `objective_succeeded`: 553
 
 ## Batches
 
@@ -230,6 +230,8 @@ Owner: `B. Range and evaluation`
 - `data/scenarios_enterprise5_kimi_guide_smoke_r8_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
 - `data/scenarios_enterprise5_kimi_guide_smoke_r9/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
 - `data/scenarios_enterprise5_kimi_guide_smoke_r9_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_share_pack_canonical/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_share_pack_case1/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
 - `data/scenarios_guided_batch/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=6, build=6/6, agent=1/6, objective=1/6
 - `data/scenarios_guided_batch_next/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=6, build=6/6, agent=4/6, objective=4/6
 - `data/scenarios_guided_batch_rerun/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=1, build=0/1, agent=0/0, objective=0/0
@@ -240,3 +242,7 @@ Owner: `B. Range and evaluation`
 - `data/scenarios_parallel_env4/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=4, build=2/4, agent=0/0, objective=0/0
 - `data/scenarios_parallel_smoke2/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=2, build=2/2, agent=0/0, objective=0/0
 - `data/scenarios_parallel_smoke3/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=2, build=2/2, agent=0/0, objective=0/0
+- `data/scenarios_tree_env/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=4, build=4/4, agent=0/0, objective=4/0
+- `data/scenarios_tree_guided/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=4, build=4/4, agent=0/4, objective=4/4
+- `data/scenarios_tree_guided_r2/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=2, build=2/2, agent=1/2, objective=2/2
+- `data/scenarios_tree_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=4, build=0/4, agent=0/0, objective=0/0
