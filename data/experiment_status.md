@@ -2,18 +2,18 @@
 
 Status: generated snapshot
 
-Generated at: `2026-07-30T17:05:01.418934+00:00`
+Generated at: `2026-09-13T08:44:51.004932+00:00`
 
 Owner: `B. Range and evaluation`
 
 ## Summary
 
-- `batches`: 136
-- `result_records`: 3787
-- `batches_with_recorded_model`: 0
-- `agent_evaluated`: 1558
-- `agent_succeeded`: 488
-- `objective_succeeded`: 483
+- `batches`: 223
+- `result_records`: 5256
+- `batches_with_recorded_model`: 87
+- `agent_evaluated`: 2056
+- `agent_succeeded`: 514
+- `objective_succeeded`: 543
 
 ## Batches
 
@@ -28,8 +28,8 @@ Owner: `B. Range and evaluation`
 - `data/guide_ablation/decoy_ablation_low/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`low`, results=8, build=8/8, agent=3/8, objective=5/8
 - `data/guide_ablation/decoy_ablation_medium/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`medium`, results=8, build=8/8, agent=2/8, objective=3/8
 - `data/guide_ablation/decoy_ablation_none/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=8, build=8/8, agent=3/8, objective=4/8
-- `data/guide_ablation/decoy_agent_parallel8_deepseek_none/decoy_ablation_l2_none/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=2, build=2/2, agent=2/2, objective=2/2
-- `data/guide_ablation/decoy_agent_parallel8_deepseek_smoke8/decoy_ablation_l2_high/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=3, build=2/3, agent=2/2, objective=2/2
+- `data/guide_ablation/decoy_agent_parallel8_deepseek_none/decoy_ablation_l2_none/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=8, build=8/8, agent=2/8, objective=2/8
+- `data/guide_ablation/decoy_agent_parallel8_deepseek_smoke8/decoy_ablation_l2_high/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=8, build=2/8, agent=2/2, objective=2/2
 - `data/guide_ablation/decoy_agent_parallel8_deepseek_smoke8/decoy_ablation_l2_none/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=8, build=8/8, agent=4/8, objective=5/8
 - `data/guide_ablation/decoy_agent_parallel8_none/decoy_ablation_l2_none/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=8, build=8/8, agent=0/8, objective=0/8
 - `data/guide_ablation/decoy_contract_high_env_smoke/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`high`, results=1, build=0/1, agent=0/0, objective=0/0
@@ -45,13 +45,31 @@ Owner: `B. Range and evaluation`
 - `data/guide_ablation/decoy_l1_deepseek_none/decoy_ablation_l1_none/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`none`, results=8, build=8/8, agent=2/8, objective=2/8
 - `data/guide_ablation/decoy_l1_kimi_v4/decoy_ablation_l1_high/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`high`, results=8, build=2/8, agent=0/5, objective=0/5
 - `data/guide_ablation/decoy_l1_kimi_v4/decoy_ablation_l1_medium/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`medium`, results=8, build=8/8, agent=4/8, objective=5/8
-- `data/guide_ablation/decoy_l1_kimi_v5_high/decoy_ablation_l2_high/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=0, build=0/0, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_l1_kimi_v5_high/decoy_ablation_l2_high/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=6, build=0/6, agent=0/0, objective=0/0
 - `data/guide_ablation/decoy_l1_kimi_v5_high_corrected/decoy_ablation_l1_high/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`high`, results=8, build=2/8, agent=1/2, objective=1/2
-- `data/guide_ablation/decoy_l1_matched_high_agent8/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`matched-high`, results=0, build=0/0, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_l1_matched_high_agent8/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`matched-high`, results=2, build=0/2, agent=0/0, objective=0/0
 - `data/guide_ablation/decoy_l1_matched_high_agent8_300/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`matched-high`, results=8, build=7/8, agent=0/7, objective=0/7
 - `data/guide_ablation/decoy_l1_matched_high_deepseek_agent8_300/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`matched-high`, results=8, build=8/8, agent=0/8, objective=0/8
 - `data/guide_ablation/decoy_l1_matched_high_env8/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`matched-high`, results=8, build=7/8, agent=0/0, objective=0/0
 - `data/guide_ablation/decoy_l1_matched_high_preflight8/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`matched-high`, results=8, build=0/8, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_paired_anchor_20260804/matched_high_agent_openai_v1/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`matched-high`, results=3, build=2/3, agent=0/2, objective=0/2
+- `data/guide_ablation/decoy_paired_anchor_20260804/matched_high_env_v2/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`matched-high`, results=3, build=3/3, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_paired_anchor_20260804/matched_high_generate/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`matched-high`, results=3, build=0/3, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_paired_anchor_20260804/none_agent_openai_smoke/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=1, build=1/1, agent=0/1, objective=0/1
+- `data/guide_ablation/decoy_paired_anchor_20260804/none_agent_openai_v1/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=3, build=3/3, agent=0/3, objective=0/3
+- `data/guide_ablation/decoy_paired_anchor_20260804/none_agent_v2/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=2, build=1/2, agent=0/1, objective=0/1
+- `data/guide_ablation/decoy_paired_anchor_20260804/none_agent_v3/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=3, build=2/3, agent=0/2, objective=0/2
+- `data/guide_ablation/decoy_paired_anchor_20260804/none_env/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_paired_anchor_20260804/none_env_timeout_smoke/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=1, build=1/1, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_paired_anchor_20260804/none_env_v2/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=3, build=3/3, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_paired_anchor_20260804/none_generate/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=3, build=0/3, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_paired_anchor_20260805/matched_high_agent_openai_parallel3_v1/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`matched-high`, results=3, build=3/3, agent=0/3, objective=0/3
+- `data/guide_ablation/decoy_paired_anchor_20260805/matched_high_env_v3/summary.json` — model=`glm-5.2`, context=`l1`, noise=`matched-high`, results=3, build=3/3, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_paired_anchor_20260805/none_agent_openai_parallel3_v1/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=3, build=2/3, agent=0/2, objective=0/2
+- `data/guide_ablation/decoy_paired_anchor_20260805/none_agent_openai_v2/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=3, build=1/3, agent=0/1, objective=0/1
+- `data/guide_ablation/decoy_paired_anchor_20260805/none_agent_openai_v3/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=2, build=1/2, agent=0/1, objective=0/1
+- `data/guide_ablation/decoy_paired_anchor_20260805/none_agent_openai_v4/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_paired_anchor_20260805/none_env_v3/summary.json` — model=`glm-5.2`, context=`l1`, noise=`none`, results=3, build=3/3, agent=0/0, objective=0/0
 - `data/guide_ablation/decoy_smoke_current_matched_high/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`matched-high`, results=4, build=0/4, agent=0/0, objective=0/0
 - `data/guide_ablation/decoy_smoke_current_matched_high_env/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`matched-high`, results=4, build=3/4, agent=0/0, objective=0/0
 - `data/guide_ablation/decoy_smoke_current_matched_high_env_retry/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`matched-high`, results=1, build=1/1, agent=0/0, objective=0/0
@@ -59,7 +77,21 @@ Owner: `B. Range and evaluation`
 - `data/guide_ablation/decoy_smoke_current_none_agent/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`none`, results=4, build=4/4, agent=0/4, objective=0/4
 - `data/guide_ablation/decoy_smoke_current_none_env/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`none`, results=4, build=4/4, agent=0/0, objective=0/0
 - `data/guide_ablation/decoy_smoke_l1_matched_high_success_cases/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`matched-high`, results=2, build=1/2, agent=0/1, objective=0/1
-- `data/guide_ablation/decoy_smoke_l2_none_current/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=0, build=0/0, agent=0/0, objective=0/0
+- `data/guide_ablation/decoy_smoke_l2_none_current/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=2, build=2/2, agent=0/2, objective=2/2
+- `data/guide_ablation/deepseek_l1_entry_discovery_paired_20260831/high_normal/summary.json` — model=`deepseek-v4-pro`, context=`l1_entry_discovery`, noise=`high`, results=50, build=0/50, agent=0/0, objective=0/0
+- `data/guide_ablation/deepseek_l1_entry_discovery_paired_20260831/high_normal_agent/summary.json` — model=`deepseek-v4-pro`, context=`l1_entry_discovery`, noise=`high`, results=50, build=50/50, agent=3/49, objective=4/49
+- `data/guide_ablation/deepseek_l1_entry_discovery_paired_20260831/high_normal_runtime/summary.json` — model=`deepseek-v4-pro`, context=`l1_entry_discovery`, noise=`high`, results=50, build=50/50, agent=0/0, objective=0/0
+- `data/guide_ablation/deepseek_l1_entry_discovery_paired_20260831/none/summary.json` — model=`deepseek-v4-pro`, context=`l1_entry_discovery`, noise=`none`, results=50, build=0/50, agent=0/0, objective=0/0
+- `data/guide_ablation/deepseek_l1_entry_discovery_paired_20260831/none_agent/summary.json` — model=`deepseek-v4-pro`, context=`l1_entry_discovery`, noise=`none`, results=50, build=50/50, agent=2/50, objective=2/50
+- `data/guide_ablation/deepseek_l1_entry_discovery_paired_20260831/none_runtime/summary.json` — model=`deepseek-v4-pro`, context=`l1_entry_discovery`, noise=`none`, results=50, build=50/50, agent=0/0, objective=0/0
+- `data/guide_ablation/deepseek_l1_high_normal_contract_repair_parallel4_20260831/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`high`, results=4, build=0/4, agent=0/0, objective=0/0
+- `data/guide_ablation/deepseek_l1_high_normal_parallel4_20260830/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`high`, results=50, build=49/50, agent=2/49, objective=0/49
+- `data/guide_ablation/deepseek_l1_paired_noise_contract_20260831/agent_trials/none/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=50, build=6/50, agent=1/6, objective=1/6
+- `data/guide_ablation/deepseek_l1_paired_noise_contract_20260831/high_normal_environment_preflight/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`high`, results=50, build=50/50, agent=0/0, objective=0/0
+- `data/guide_ablation/deepseek_l1_paired_noise_contract_20260831/high_normal_fixture/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`high`, results=50, build=0/50, agent=0/0, objective=0/0
+- `data/guide_ablation/deepseek_l1_paired_noise_contract_20260831/none_environment_preflight/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=50, build=50/50, agent=0/0, objective=0/0
+- `data/guide_ablation/deepseek_l1_paired_noise_contract_20260831/none_fixture/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=50, build=0/50, agent=0/0, objective=0/0
+- `data/guide_ablation/final_report_sanity_20260827/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=3, build=3/3, agent=2/3, objective=0/3
 - `data/guide_ablation/glm52_l2_none_50_rerun_20260728/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=50, build=50/50, agent=4/50, objective=4/50
 - `data/guide_ablation/glm52_l2_none_smoke_20260728/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=1, build=1/1, agent=0/1, objective=0/1
 - `data/guide_ablation/glm52_l2_none_stratified_50_20260728/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=50, build=12/50, agent=1/12, objective=1/12
@@ -68,20 +100,38 @@ Owner: `B. Range and evaluation`
 - `data/guide_ablation/hetero100_apr_retry/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`none`, results=24, build=8/24, agent=6/8, objective=6/8
 - `data/guide_ablation/hetero100_guided/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`none`, results=100, build=72/100, agent=45/72, objective=44/72
 - `data/guide_ablation/hetero_batch2_guided/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`none`, results=100, build=94/100, agent=49/94, objective=46/94
+- `data/guide_ablation/high_normal_contract_repair_environment_preflight_20260830/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`high`, results=50, build=50/50, agent=0/0, objective=0/0
+- `data/guide_ablation/high_normal_contract_repair_preflight_20260830/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`high`, results=50, build=0/50, agent=0/0, objective=0/0
+- `data/guide_ablation/high_normal_contract_repair_smoke_20260830/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`high`, results=2, build=2/2, agent=0/0, objective=0/0
+- `data/guide_ablation/kimi_l1_high_noise_activity_20260830/high_normal/summary.json` — model=`kimi-k3`, context=`l1`, noise=`high`, results=50, build=0/50, agent=0/0, objective=0/0
+- `data/guide_ablation/kimi_l1_high_noise_activity_20260830/high_off/summary.json` — model=`kimi-k3`, context=`l1`, noise=`high`, results=50, build=0/50, agent=0/0, objective=0/0
+- `data/guide_ablation/kimi_l1_high_noise_activity_20260830/kimi_agent_high_normal_parallel2_20260830/summary.json` — model=`kimi-k3`, context=`l1`, noise=`high`, results=50, build=1/50, agent=0/1, objective=0/1
+- `data/guide_ablation/kimi_l1_none_reuse_v7_parallel8_20260828/summary.json` — model=`kimi-k3`, context=`l1`, noise=`none`, results=50, build=50/50, agent=8/39, objective=6/39
+- `data/guide_ablation/kimi_l1_none_smoke_20260828/summary.json` — model=`kimi-k3`, context=`l1`, noise=`none`, results=1, build=1/1, agent=1/1, objective=1/1
+- `data/guide_ablation/kimi_l1_none_stratified50_20260828/summary.json` — model=`kimi-k3`, context=`l1`, noise=`none`, results=50, build=1/50, agent=0/1, objective=0/1
+- `data/guide_ablation/kimi_l1_none_stratified50_parallel8_20260828/summary.json` — model=`kimi-k3`, context=`l1`, noise=`none`, results=0, build=0/0, agent=0/0, objective=0/0
 - `data/guide_ablation/l0_gpt56luna/summary.json` — model=`unknown_not_recorded`, context=`l0`, noise=`baseline`, results=50, build=50/50, agent=0/50, objective=0/50
 - `data/guide_ablation/l0_stratified_50/summary.json` — model=`unknown_not_recorded`, context=`l0`, noise=`baseline`, results=50, build=47/50, agent=1/47, objective=1/47
+- `data/guide_ablation/l1_deepseek_50_current/high/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`high`, results=50, build=50/50, agent=0/50, objective=0/50
+- `data/guide_ablation/l1_deepseek_50_current/none/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=50, build=50/50, agent=2/50, objective=1/50
+- `data/guide_ablation/l1_deepseek_50_final_report_fix_20260827/none/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=50, build=50/50, agent=1/47, objective=1/47
+- `data/guide_ablation/l1_deepseek_50_noise_activity_v3/none/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=50, build=1/50, agent=0/1, objective=0/1
+- `data/guide_ablation/l1_deepseek_50_noise_activity_v4/none/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=50, build=36/50, agent=0/22, objective=0/22
+- `data/guide_ablation/l1_deepseek_50_noise_activity_v5/none/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=50, build=22/50, agent=0/5, objective=0/5
+- `data/guide_ablation/l1_deepseek_50_noise_activity_v6/none/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=8, build=0/8, agent=0/0, objective=0/0
+- `data/guide_ablation/l1_deepseek_50_noise_activity_v7/none/summary.json` — model=`deepseek-v4-pro`, context=`l1`, noise=`none`, results=50, build=50/50, agent=0/49, objective=0/49
 - `data/guide_ablation/l1_gpt56luna/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`baseline`, results=50, build=50/50, agent=0/50, objective=0/50
 - `data/guide_ablation/l1_stratified_50/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`baseline`, results=50, build=49/50, agent=0/49, objective=1/49
-- `data/guide_ablation/l2_decoy_full/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=29, build=24/29, agent=7/24, objective=0/24
+- `data/guide_ablation/l2_decoy_full/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=34, build=28/34, agent=7/28, objective=0/28
 - `data/guide_ablation/l2_decoy_full_v2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=64, build=64/64, agent=27/64, objective=31/64
 - `data/guide_ablation/l2_decoy_merged/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=115, build=112/115, agent=31/112, objective=31/112
 - `data/guide_ablation/l2_decoy_smoke/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=8, build=4/8, agent=1/4, objective=0/4
 - `data/guide_ablation/l2_decoy_smoke_v2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=8, build=7/8, agent=1/7, objective=0/7
 - `data/guide_ablation/l2_deepseek_high/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=0, build=0/0, agent=0/0, objective=0/0
 - `data/guide_ablation/l2_deepseek_high_smoke4/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=4, build=3/4, agent=2/3, objective=2/3
-- `data/guide_ablation/l2_deepseek_high_v2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=10, build=0/10, agent=0/0, objective=0/0
-- `data/guide_ablation/l2_deepseek_high_v3/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=3, build=0/3, agent=0/0, objective=0/0
-- `data/guide_ablation/l2_deepseek_v2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=0, build=0/0, agent=0/0, objective=0/0
+- `data/guide_ablation/l2_deepseek_high_v2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=14, build=0/14, agent=0/0, objective=0/0
+- `data/guide_ablation/l2_deepseek_high_v3/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`high`, results=6, build=0/6, agent=0/0, objective=0/0
+- `data/guide_ablation/l2_deepseek_v2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=6, build=4/6, agent=0/4, objective=0/4
 - `data/guide_ablation/l2_deepseek_v3/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=50, build=50/50, agent=15/50, objective=13/50
 - `data/guide_ablation/l2_gpt56luna/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=50, build=50/50, agent=1/50, objective=0/50
 - `data/guide_ablation/l2_gpt56luna_smoke/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`baseline`, results=1, build=1/1, agent=0/1, objective=0/1
@@ -97,11 +147,11 @@ Owner: `B. Range and evaluation`
 - `data/guide_ablation/no_guide_reconciled/summary.json` — model=`unknown_not_recorded`, context=`no_guide`, noise=`unknown`, results=71, build=70/71, agent=47/70, objective=44/70
 - `data/guide_ablation/no_hint_batch/summary.json` — model=`unknown_not_recorded`, context=`no_hint`, noise=`unknown`, results=71, build=70/71, agent=41/70, objective=43/70
 - `data/guide_ablation/no_hint_environment/summary.json` — model=`unknown_not_recorded`, context=`no_hint`, noise=`unknown`, results=4, build=3/4, agent=0/0, objective=0/0
-- `data/guide_ablation/no_hint_glm_batch/summary.json` — model=`unknown_not_recorded`, context=`no_hint`, noise=`none`, results=21, build=20/21, agent=4/20, objective=4/20
+- `data/guide_ablation/no_hint_glm_batch/summary.json` — model=`unknown_not_recorded`, context=`no_hint`, noise=`none`, results=25, build=20/25, agent=4/20, objective=4/20
 - `data/guide_ablation/no_hint_glm_smoke/summary.json` — model=`unknown_not_recorded`, context=`no_hint`, noise=`none`, results=1, build=1/1, agent=1/1, objective=1/1
 - `data/guide_ablation/no_hint_preflight/summary.json` — model=`unknown_not_recorded`, context=`no_hint`, noise=`unknown`, results=71, build=0/71, agent=0/0, objective=0/0
 - `data/guide_ablation/overnight_l1_matched_high_8case_20260727/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`high`, results=8, build=8/8, agent=0/8, objective=0/8
-- `data/guide_ablation/overnight_l1_matched_high_anchor_20260727/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`high`, results=0, build=0/0, agent=0/0, objective=0/0
+- `data/guide_ablation/overnight_l1_matched_high_anchor_20260727/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`high`, results=2, build=0/2, agent=0/0, objective=0/0
 - `data/guide_ablation/real_solr_environment/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`matched-high`, results=1, build=0/1, agent=0/0, objective=0/0
 - `data/guide_ablation/real_solr_environment_heap128/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`matched-high`, results=1, build=0/1, agent=0/0, objective=0/0
 - `data/guide_ablation/real_solr_no_sudo_environment/summary.json` — model=`unknown_not_recorded`, context=`guided`, noise=`matched-high`, results=1, build=1/1, agent=0/0, objective=0/0
@@ -115,8 +165,8 @@ Owner: `B. Range and evaluation`
 - `data/guide_ablation/sft_v1_eval_v5/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=8, build=8/8, agent=0/8, objective=0/8
 - `data/guide_ablation/sft_v2_eval/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=8, build=0/8, agent=0/0, objective=0/0
 - `data/guide_ablation/sft_v2_eval_l2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=8, build=0/8, agent=0/0, objective=0/0
-- `data/guide_ablation/sft_v2_eval_l2_fixed/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=2, build=2/2, agent=0/2, objective=0/2
-- `data/guide_ablation/sft_v2_eval_l2_fixed2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=0, build=0/0, agent=0/0, objective=0/0
+- `data/guide_ablation/sft_v2_eval_l2_fixed/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=4, build=4/4, agent=0/4, objective=0/4
+- `data/guide_ablation/sft_v2_eval_l2_fixed2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=2, build=2/2, agent=0/2, objective=0/2
 - `data/guide_ablation/sft_v2_eval_l2_run2/summary.json` — model=`unknown_not_recorded`, context=`l2`, noise=`none`, results=8, build=8/8, agent=0/8, objective=0/8
 - `data/guide_ablation/surface_profile_smoke/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`matched-high`, results=1, build=0/1, agent=0/0, objective=0/0
 - `data/guide_ablation/surface_profile_smoke_v2/summary.json` — model=`unknown_not_recorded`, context=`l1`, noise=`matched-high`, results=1, build=0/1, agent=0/0, objective=0/0
@@ -143,6 +193,43 @@ Owner: `B. Range and evaluation`
 - `data/scenarios_enterprise3_wave002_preflight_shard001/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=414, build=0/414, agent=0/0, objective=0/0
 - `data/scenarios_enterprise3_wave002_preflight_shard002/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=414, build=0/414, agent=0/0, objective=0/0
 - `data/scenarios_enterprise3_wave002_preflight_shard003/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=414, build=0/414, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_batch_generate_only/summary.json` — model=`deepseek-v4-pro`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_hop5_diag/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_kimi_guide_diverse_p4v2/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=2, build=2/2, agent=0/2, objective=2/2
+- `data/scenarios_enterprise5_kimi_guide_diverse_p5v1/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=3, build=3/3, agent=3/3, objective=3/3
+- `data/scenarios_enterprise5_kimi_guide_diverse_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=5, build=0/5, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_kimi_guide_diverse_r1/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=4, build=3/4, agent=0/3, objective=3/3
+- `data/scenarios_enterprise5_kimi_guide_diverse_r1_retry/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=2, build=2/2, agent=0/1, objective=2/1
+- `data/scenarios_enterprise5_kimi_guide_diverse_r2/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=2, build=2/2, agent=0/2, objective=2/2
+- `data/scenarios_enterprise5_kimi_guide_diverse_r3/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=4, build=4/4, agent=0/4, objective=4/4
+- `data/scenarios_enterprise5_kimi_guide_diverse_r4/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=4, build=4/4, agent=0/4, objective=4/4
+- `data/scenarios_enterprise5_kimi_guide_diverse_r5/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=4, build=4/4, agent=1/4, objective=4/4
+- `data/scenarios_enterprise5_kimi_guide_smoke/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r10/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/0, objective=1/0
+- `data/scenarios_enterprise5_kimi_guide_smoke_r10_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_kimi_guide_smoke_r10b/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r11/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r12/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r13/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r14/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r15/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r16/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r17/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r18/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r2/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r3/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r4/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_kimi_guide_smoke_r4_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_kimi_guide_smoke_r5/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/0, objective=1/0
+- `data/scenarios_enterprise5_kimi_guide_smoke_r5_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_kimi_guide_smoke_r6/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r6_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_kimi_guide_smoke_r7/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r7_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_kimi_guide_smoke_r8/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r8_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
+- `data/scenarios_enterprise5_kimi_guide_smoke_r9/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=1/1, agent=0/1, objective=1/1
+- `data/scenarios_enterprise5_kimi_guide_smoke_r9_preflight/summary.json` — model=`kimi-k3`, context=`guided`, noise=`none`, results=1, build=0/1, agent=0/0, objective=0/0
 - `data/scenarios_guided_batch/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=6, build=6/6, agent=1/6, objective=1/6
 - `data/scenarios_guided_batch_next/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=6, build=6/6, agent=4/6, objective=4/6
 - `data/scenarios_guided_batch_rerun/summary.json` — model=`unknown_not_recorded`, context=`unknown`, noise=`unknown`, results=1, build=0/1, agent=0/0, objective=0/0
