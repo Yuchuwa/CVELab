@@ -599,6 +599,21 @@ class TestAssemblerDMZSimple:
         assert path[0]["mitre_phase"] == "initial_access"
         assert "provides" in path[0]
 
+    def test_enterprise_5tier_ground_truth_follows_linear_execution_hosts(self, assembler):
+        atoms = [
+            _make_atom(f"CVE-TEST-{index:04d}")
+            for index in range(1, 6)
+        ]
+        result = assembler.assemble("enterprise_5tier", atoms, scenario_name="five-tier-dag")
+        path = result["ground_truth"]["attack_path"]
+
+        assert [item["execution_host_node"] for item in path] == [
+            "attacker", "target-1", "target-2", "target-3", "target-4",
+        ]
+        assert [item["depends_on_nodes"] for item in path] == [
+            [], ["target-1"], ["target-2"], ["target-3"], ["target-4"],
+        ]
+
     def test_ground_truth_contains_runtime_network_policy_checks(self, assembler):
         atoms = [
             _make_atom("CVE-TEST-0001"),

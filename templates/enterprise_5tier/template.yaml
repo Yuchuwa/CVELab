@@ -49,6 +49,7 @@ injection_points:
   - id: dmz-web
     zone: dmz
     role_description: "面向公网的 Web 服务入口"
+    kill_chain_phase: entry
     required_mitre: [initial_access, execution]
     required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass]
     required_service_role: [web_application, middleware, framework]
@@ -57,7 +58,10 @@ injection_points:
   - id: app-service
     zone: app
     role_description: "内部应用服务，需从 DMZ 横向移动到达"
-    required_mitre: [lateral_movement, execution, persistence]
+    kill_chain_phase: foothold
+    depends_on: [dmz-web]
+    required_mitre: []
+    required_capabilities: [execute_command]
     required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection]
     required_service_role: [web_application, middleware, framework]
     count: 1
@@ -65,7 +69,10 @@ injection_points:
   - id: middleware-service
     zone: middleware
     role_description: "中间件服务（消息队列、缓存、CI/CD），需从应用层继续推进到达"
-    required_mitre: [lateral_movement, execution, persistence, credential_access]
+    kill_chain_phase: foothold
+    depends_on: [app-service]
+    required_mitre: []
+    required_capabilities: [execute_command]
     required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection, Info_Leak]
     required_service_role: [web_application, middleware, system_service, framework]
     count: 1
@@ -73,7 +80,10 @@ injection_points:
   - id: internal-workstation
     zone: internal
     role_description: "内部工作站/员工服务，需从中间件层继续横向移动到达"
-    required_mitre: [lateral_movement, execution, privilege_escalation, credential_access]
+    kill_chain_phase: foothold
+    depends_on: [middleware-service]
+    required_mitre: []
+    required_capabilities: [execute_command]
     required_vuln_category: [RCE, Deserialization, LPE, Auth_Bypass, Injection]
     required_service_role: [web_application, middleware, system_service]
     count: 1
@@ -81,6 +91,8 @@ injection_points:
   - id: data-store
     zone: data
     role_description: "核心数据存储，最深层的靶标"
+    kill_chain_phase: objective
+    depends_on: [internal-workstation]
     required_mitre: [initial_access, execution, privilege_escalation]
     required_vuln_category: [RCE, LPE, Auth_Bypass, Info_Leak, Injection]
     required_service_role: [database, file_service, system_service]

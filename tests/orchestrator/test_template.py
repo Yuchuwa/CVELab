@@ -267,6 +267,27 @@ class TestAllTemplates:
         assert "app-router" in ansible
         assert "data-router" in ansible
 
+    def test_enterprise_5tier_declares_a_linear_attack_chain(self, loader):
+        template = loader.load("enterprise_5tier")
+        slots = {item.id: item for item in template.injection_points}
+
+        assert [item.id for item in template.injection_points] == [
+            "dmz-web",
+            "app-service",
+            "middleware-service",
+            "internal-workstation",
+            "data-store",
+        ]
+        assert slots["dmz-web"].kill_chain_phase == "entry"
+        assert slots["app-service"].depends_on == ["dmz-web"]
+        assert slots["middleware-service"].depends_on == ["app-service"]
+        assert slots["internal-workstation"].depends_on == ["middleware-service"]
+        assert slots["data-store"].depends_on == ["internal-workstation"]
+        for slot_id in ("app-service", "middleware-service", "internal-workstation"):
+            assert [capability.value for capability in slots[slot_id].required_capabilities] == [
+                "execute_command"
+            ]
+
     def test_all_templates_have_clab(self, loader):
         """每个模板都有可加载的 clab.yaml。"""
         for name in loader.list_available():
