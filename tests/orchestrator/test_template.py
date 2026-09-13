@@ -288,6 +288,45 @@ class TestAllTemplates:
                 "execute_command"
             ]
 
+    def test_enterprise_tree_declares_a_branched_attack_graph(self, loader):
+        template = loader.load("enterprise_tree")
+        slots = {item.id: item for item in template.injection_points}
+
+        assert [item.id for item in template.injection_points] == [
+            "dmz-web",
+            "app-service",
+            "data-store",
+            "dmz2-web",
+            "app2-service",
+            "data2-store",
+        ]
+        assert slots["dmz-web"].kill_chain_phase == "entry"
+        # Main chain: dmz -> app -> data -> data2.
+        assert slots["app-service"].depends_on == ["dmz-web"]
+        assert slots["data-store"].depends_on == ["app-service"]
+        assert slots["data2-store"].depends_on == ["data-store"]
+        # Leaf branches hang off the chain, not off the previous slot.
+        assert slots["dmz2-web"].depends_on == ["dmz-web"]
+        assert slots["app2-service"].depends_on == ["app-service"]
+        assert slots["data2-store"].kill_chain_phase == "objective"
+        for slot_id in ("app-service", "data-store", "dmz2-web", "app2-service"):
+            assert [capability.value for capability in slots[slot_id].required_capabilities] == [
+                "execute_command"
+            ]
+        # Declared dependencies must not contradict the isolation matrix:
+        # dmz->app/dmz2, app->data/app2, data->data2 (attacker->dmz is the
+        # zone-level entry edge, covered by the entry phase).
+        reachable_from = {
+            "dmz-web": {"app-service", "dmz2-web"},
+            "app-service": {"data-store", "app2-service"},
+            "data-store": {"data2-store"},
+        }
+        for slot in template.injection_points:
+            for dep in slot.depends_on:
+                assert slot.id in reachable_from.get(dep, set()), (
+                    f"{slot.id} depends on {dep} but the ACL matrix denies the edge"
+                )
+
     def test_all_templates_have_clab(self, loader):
         """每个模板都有可加载的 clab.yaml。"""
         for name in loader.list_available():

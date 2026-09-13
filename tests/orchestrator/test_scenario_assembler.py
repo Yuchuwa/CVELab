@@ -614,6 +614,71 @@ class TestAssemblerDMZSimple:
             [], ["target-1"], ["target-2"], ["target-3"], ["target-4"],
         ]
 
+    def test_enterprise_tree_ground_truth_follows_branched_execution_hosts(self, assembler):
+        atoms = [
+            _make_atom(f"CVE-TEST-{index:04d}")
+            for index in range(1, 7)
+        ]
+        result = assembler.assemble("enterprise_tree", atoms, scenario_name="tree-dag")
+        path = result["ground_truth"]["attack_path"]
+
+        assert [item["execution_host_node"] for item in path] == [
+            "attacker", "target-1", "target-2", "target-1", "target-2", "target-3",
+        ]
+        assert [item["depends_on_nodes"] for item in path] == [
+            [], ["target-1"], ["target-2"], ["target-1"], ["target-2"], ["target-3"],
+        ]
+
+    def test_every_router_has_a_route_to_the_attacker_transit(self, assembler):
+        """Tree regression: return traffic to the attacker transit must be
+        routable from every router; previously only zone subnets got routes
+        and attacker->dmz died on the mgmt default route."""
+        atoms = [
+            _make_atom(f"CVE-TEST-{index:04d}")
+            for index in range(1, 7)
+        ]
+        result = assembler.assemble("enterprise_tree", atoms, scenario_name="tree-routes")
+
+        attacker_transit = next(
+            t.subnet for t in assembler.template_loader.load("enterprise_tree").transits
+            if "attacker" in t.endpoints
+        )
+        template = assembler.template_loader.load("enterprise_tree")
+        routers = [
+            node for node in result["ip_allocations"] if node.endswith("-router")
+        ]
+        assert routers, "expected routers in the tree topology"
+        for router in routers:
+            connected = {
+                t.subnet for t in template.transits if router in t.endpoints
+            }
+            if attacker_transit in connected:
+                continue  # directly connected: kernel route, no static route needed
+            dsts = {r["dst"] for r in result["ip_allocations"][router].get("routes", [])}
+            assert attacker_transit in dsts, (
+                f"{router} has no route to the attacker transit {attacker_transit}"
+            )
+        # 5tier routers keep working too (regression safety on the linear template).
+        result5 = assembler.assemble(
+            "enterprise_5tier",
+            [_make_atom(f"CVE-TEST-{index:04d}") for index in range(1, 6)],
+            scenario_name="five-tier-routes",
+        )
+        template5 = assembler.template_loader.load("enterprise_5tier")
+        transit5 = next(
+            t.subnet for t in template5.transits
+            if "attacker" in t.endpoints
+        )
+        for node, config in result5["ip_allocations"].items():
+            if node.endswith("-router"):
+                connected = {
+                    t.subnet for t in template5.transits if node in t.endpoints
+                }
+                if transit5 in connected:
+                    continue
+                dsts = {r["dst"] for r in config.get("routes", [])}
+                assert transit5 in dsts
+
     def test_ground_truth_contains_runtime_network_policy_checks(self, assembler):
         atoms = [
             _make_atom("CVE-TEST-0001"),

@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-10T10:21:04.299300+00:00",
-  "template": "enterprise_3tier",
-  "matrix_manifest": "data/range_matrices/enterprise_3tier_completed.json",
-  "matrix_manifest_sha256": "625f464acd7422b570f04fd8decd24dc1b5cbbfd103e8e9a8a1e6dba6e733900",
+  "generated_at": "2026-09-13T09:52:08.320551+00:00",
+  "template": "enterprise_tree",
+  "matrix_manifest": "data/range_matrices/enterprise_tree.json",
+  "matrix_manifest_sha256": "065a425f57cb30784d95554ed3d64c3fc661d8ec107fe7f4bec9dac2ec7bb935",
   "atom_status": {
     "schema_version": 2,
-    "snapshot_hash": "4df2b2f6d3a8708d3049cfb32455bba133d4d4dc6870c500616d5ce3c5ad0edd",
-    "completed_count": 46
+    "snapshot_hash": "b96537e9d3c9ad4d56cee38c293e54953f86f0c94a9e20d18fdd5b2303873d0b",
+    "completed_count": 57
   },
   "range_candidate_atom_ids": [
     "CVE-2010-2861",
@@ -23,24 +23,30 @@
     "CVE-2017-12615",
     "CVE-2017-14849",
     "CVE-2017-15715",
-    "CVE-2017-17562",
     "CVE-2018-10933",
     "CVE-2018-16509",
     "CVE-2018-18778",
     "CVE-2018-19475",
+    "CVE-2018-3729",
     "CVE-2019-0193",
     "CVE-2019-17558",
     "CVE-2019-9193",
+    "CVE-2020-35476",
+    "CVE-2020-36651",
+    "CVE-2020-7684",
     "CVE-2021-25646",
     "CVE-2021-32682",
     "CVE-2021-42013",
     "CVE-2022-0543",
     "CVE-2022-22965",
+    "CVE-2022-24706",
     "CVE-2022-24816",
     "CVE-2022-41678",
+    "CVE-2023-25826",
     "CVE-2023-26360",
     "CVE-2023-51467",
     "CVE-2024-27348",
+    "CVE-2024-36361",
     "CVE-2024-38856",
     "CVE-2024-45195",
     "CVE-2024-9264",
@@ -60,42 +66,37 @@
     "CVE-2017-12149",
     "CVE-2017-12615",
     "CVE-2017-15715",
-    "CVE-2017-17562",
+    "CVE-2018-10933",
     "CVE-2018-16509",
     "CVE-2018-19475",
-    "CVE-2019-0193",
-    "CVE-2019-17558",
     "CVE-2019-9193",
-    "CVE-2021-25646",
-    "CVE-2021-32682",
-    "CVE-2021-42013",
-    "CVE-2022-22965",
-    "CVE-2022-24816",
-    "CVE-2022-41678",
-    "CVE-2023-51467",
-    "CVE-2024-27348",
-    "CVE-2024-38856",
-    "CVE-2024-45195",
-    "CVE-2024-9264",
-    "CVE-2025-55182",
-    "CVE-2025-68613"
+    "CVE-2022-0543",
+    "CVE-2022-24706",
+    "CVE-2025-32433",
+    "CVE-2026-24061"
   ],
   "summary": {
-    "range_candidate_atoms": 39,
-    "selected_atoms": 28,
-    "accepted_cases": 1800,
-    "selected_cases": 506,
-    "range_input_rejections": 245,
-    "composition_rejections": 21989
+    "range_candidate_atoms": 45,
+    "selected_atoms": 17,
+    "accepted_cases": 8,
+    "selected_cases": 8,
+    "range_input_rejections": 243,
+    "composition_rejections": 15107769
+  },
+  "enumeration": {
+    "search_limit": 0,
+    "per_slot_quota": 1,
+    "quota_pruned_prefixes": 2750328,
+    "truncated": false,
+    "accepted_case_count_exact": true
   },
   "range_input_rejection_counts": {
-    "atom_build_not_completed": 238,
-    "multiple_services_not_supported_by_matrix": 7
+    "atom_build_not_completed": 237,
+    "multiple_services_not_supported_by_matrix": 6
   },
   "composition_rejection_counts": {
-    "asset_service_variant_incompatible": 600,
-    "chain_capability_constraint": 6,
-    "duplicate_cve": 1225,
-    "slot_or_dependency_constraint": 20158
+    "chain_capability_constraint": 9,
+    "duplicate_cve": 1943908,
+    "slot_or_dependency_constraint": 13163852
   }
 }

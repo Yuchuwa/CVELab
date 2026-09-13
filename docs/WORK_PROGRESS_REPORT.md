@@ -11344,3 +11344,28 @@ case-4（t3=libssh）三案，3600s/300 turns、clab-agent:v2、重建后 footho
   `/tmp/opencode/cvelab-5tier-share.tar.gz`（1.7M）：5 场景目录 + 12 Atom +
   `docker/Dockerfile` + README（仅保留一行 sed 改写提示）。
 - 本轮 commit+push 已完成。
+
+### 2026-09-13 — enterprise_tree T1-T3 完成：槽位契约升级 + 树形路由修复 + 4 案环境全绿
+
+- **T1 模板契约升级**：enterprise_tree injection_points 按 5tier 模式升级
+  （entry/foothold/objective 阶段、分支 depends_on、foothold 槽
+  required_capabilities=[execute_command]），新增 branched-graph 契约测试
+  （含 depends_on 与 ACL 矩阵一致性断言）。
+- **T2 矩阵**：quota=1 产出 8 组合（本地镜像延迟 6 个 Atom：5 个 EOL 豁免 +
+  CVE-2019-20933）；数据槽薄如预期（postgres/redis/libssh + 少量新面孔）。
+- **T3 发现并修复一个通用路由契约 bug**（非 case 级）：`_compute_routes` 只为
+  **zone 网段**生成路由，不给**远端 transit 网段**生成路由——树形模板中
+  attacker→dmz 需跨越 edge-router→dmz-router 两跳，dmz-router 没有回到
+  attacker transit 的路由，回包走 mgmt 默认路由死掉（5tier 从未触发因为
+  dmz 网关就是 edge-router 本机）。修复：BFS 路由同时覆盖 transit 网段
+  （含按 router 去重），并锁定"每个非直连 router 必须有到 attacker transit
+  的路由"的回归测试（含 5tier 回归安全）。现场验证：手动补路由后
+  attacker→target-1 立即 200。
+- **T3 环境验证（修复后重跑 4 案）：全部 environment/graph/attack_path/
+  range_build/execution_complete=True，0 条失败边**；DAG 攻击图（主链 +
+  两叶）的 ground truth 生成与 reachability 检查均正确工作（叶子正确
+  挂载 dmz-web/app-service 而非线性前驱）。
+- 全仓 **960 passed, 9 skipped**。
+- 下一步 T4：4 案 guided-agent 冒烟（3600s/300 turns/v2，与 5tier 成功配置
+  一致），重点观察 Agent 对"主链打完回头下钻侧枝"的理解。
+- 本轮未 commit/push。

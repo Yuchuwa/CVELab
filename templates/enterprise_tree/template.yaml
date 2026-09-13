@@ -65,6 +65,7 @@ injection_points:
   - id: dmz-web
     zone: dmz
     role_description: "DMZ 分支第一层 Web 服务入口"
+    kill_chain_phase: entry
     required_mitre: [initial_access, execution]
     required_vuln_category: [RCE, LFI, SSRF, Deserialization, Auth_Bypass]
     required_service_role: [web_application, middleware, framework]
@@ -73,7 +74,10 @@ injection_points:
   - id: app-service
     zone: app
     role_description: "App 分支第一层应用服务"
-    required_mitre: [lateral_movement, execution, persistence]
+    kill_chain_phase: foothold
+    depends_on: [dmz-web]
+    required_mitre: []
+    required_capabilities: [execute_command]
     required_vuln_category: [RCE, Deserialization, Auth_Bypass, Injection]
     required_service_role: [web_application, middleware, framework]
     count: 1
@@ -81,7 +85,10 @@ injection_points:
   - id: data-store
     zone: data
     role_description: "Data 分支第一层数据服务"
-    required_mitre: [initial_access, execution, privilege_escalation]
+    kill_chain_phase: foothold
+    depends_on: [app-service]
+    required_mitre: []
+    required_capabilities: [execute_command]
     required_vuln_category: [RCE, LPE, Auth_Bypass, Info_Leak, Injection]
     required_service_role: [database, file_service, system_service]
     count: 1
@@ -89,7 +96,10 @@ injection_points:
   - id: dmz2-web
     zone: dmz2
     role_description: "DMZ 分支第二层深部服务，需从 dmz 层下钻"
-    required_mitre: [lateral_movement, execution, privilege_escalation]
+    kill_chain_phase: foothold
+    depends_on: [dmz-web]
+    required_mitre: []
+    required_capabilities: [execute_command]
     required_vuln_category: [RCE, LPE, Auth_Bypass, Injection, Info_Leak]
     required_service_role: [web_application, middleware, system_service]
     count: 1
@@ -97,7 +107,10 @@ injection_points:
   - id: app2-service
     zone: app2
     role_description: "App 分支第二层深部应用，需从 app 层下钻"
-    required_mitre: [lateral_movement, execution, privilege_escalation, credential_access]
+    kill_chain_phase: foothold
+    depends_on: [app-service]
+    required_mitre: []
+    required_capabilities: [execute_command]
     required_vuln_category: [RCE, LPE, Auth_Bypass, Injection, Info_Leak]
     required_service_role: [web_application, middleware, system_service]
     count: 1
@@ -105,6 +118,8 @@ injection_points:
   - id: data2-store
     zone: data2
     role_description: "Data 分支第二层核心数据，最深处的靶标"
+    kill_chain_phase: objective
+    depends_on: [data-store]
     required_mitre: [initial_access, execution, privilege_escalation]
     required_vuln_category: [RCE, LPE, Auth_Bypass, Info_Leak, Injection]
     required_service_role: [database, file_service, system_service]

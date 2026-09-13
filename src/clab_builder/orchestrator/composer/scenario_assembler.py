@@ -1519,11 +1519,48 @@ class ScenarioAssembler:
                 visited.add(nb)
                 queue.append((nb, nb))  # (current, first_hop)
 
+        # BFS: 从每个 router 出发，找到到达其他 router 的最短路径下一跳
+        router_routes: dict[str, list[dict]] = defaultdict(list)
+
+        for router_name in template.routers:
+            if router_name not in adj:
+                continue
+
+            # 直连网段（transit subnet + zone subnet）
+            local_subnets = set()
+            for transit in template.transits:
+                if router_name in transit.endpoints:
+                    local_subnets.add(transit.subnet)
+            for subnet in router_local_zones.get(router_name, []):
+                local_subnets.add(subnet)
+
+            seen_dsts = set()
+            # BFS 找下一跳
+            visited = {router_name}
+            queue = deque()
+            # 初始邻居就是下一跳
+            for nb in adj[router_name]:
+                visited.add(nb)
+                queue.append((nb, nb))  # (current, first_hop)
+
             while queue:
                 current, first_hop = queue.popleft()
 
                 # current 连接的 zone 网段 → 通过 first_hop 到达
-                for subnet in router_local_zones.get(current, []):
+                zone_subnets = list(router_local_zones.get(current, []))
+                # Transit subnets of `current` must be routable too: return
+                # traffic to the attacker transit dies on the mgmt default
+                # route otherwise (tree template: attacker->dmz traverses
+                # edge-router -> dmz-router, and dmz-router had no route back
+                # to the attacker transit).  ACLs, not routes, enforce policy.
+                transit_subnets = [
+                    transit.subnet
+                    for transit in template.transits
+                    if current in transit.endpoints
+                ]
+                for subnet in [*zone_subnets, *transit_subnets]:
+                    if subnet in seen_dsts:
+                        continue
                     net = ipaddress.ip_network(subnet, strict=False)
                     if not any(
                         net.overlaps(ipaddress.ip_network(s, strict=False))
@@ -1535,6 +1572,7 @@ class ScenarioAssembler:
                             peer_iface = self._find_link_iface(iface_map, first_hop, router_name)
                             hop_ip = ip_alloc.get(first_hop, {}).get(peer_iface, "") if peer_iface else ""
                             if hop_ip:
+                                seen_dsts.add(subnet)
                                 router_routes[router_name].append({
                                     "dst": subnet,
                                     "via": hop_ip.split("/")[0],
