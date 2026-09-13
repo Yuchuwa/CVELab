@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-09-02T13:54:33.084884+00:00",
+  "generated_at": "2026-09-10T18:15:10.275057+00:00",
   "definitions": {
     "planned": "accepted into the Atom build queue; atom.yaml does not exist yet",
     "building": "Atom construction or verification has started but strict completion gates do not all pass",
@@ -26,8 +26,8 @@
   "summary": {
     "total": 294,
     "planned": 0,
-    "building": 234,
-    "completed": 60
+    "building": 237,
+    "completed": 57
   },
   "atoms": [
     {
@@ -173,7 +173,7 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": true,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -189,6 +189,7 @@
         "orchestrated_environment_verified": true
       },
       "blockers": [
+        "source_bundle_complete",
         "runtime_ready",
         "runtime_build_reproducible"
       ]
@@ -298,7 +299,7 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": false,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -315,6 +316,7 @@
       },
       "blockers": [
         "schema_v3",
+        "source_bundle_complete",
         "runtime_ready",
         "runtime_build_reproducible",
         "native_verified",
@@ -1233,14 +1235,14 @@
     },
     {
       "cve_id": "CVE-2017-17562",
-      "build_status": "completed",
+      "build_status": "building",
       "version": 3,
       "service_role": "web_application",
       "vuln_category": "RCE",
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": true,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -1255,7 +1257,9 @@
         "guide_ready_valid": true,
         "orchestrated_environment_verified": true
       },
-      "blockers": []
+      "blockers": [
+        "source_bundle_complete"
+      ]
     },
     {
       "cve_id": "CVE-2017-2824",
@@ -2028,14 +2032,14 @@
     },
     {
       "cve_id": "CVE-2018-12613",
-      "build_status": "completed",
+      "build_status": "building",
       "version": 3,
       "service_role": "web_application",
       "vuln_category": "RCE",
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": true,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -2050,7 +2054,9 @@
         "guide_ready_valid": true,
         "orchestrated_environment_verified": true
       },
-      "blockers": []
+      "blockers": [
+        "source_bundle_complete"
+      ]
     },
     {
       "cve_id": "CVE-2018-1270",
@@ -2435,7 +2441,7 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": false,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -2452,6 +2458,7 @@
       },
       "blockers": [
         "schema_v3",
+        "source_bundle_complete",
         "runtime_ready",
         "runtime_build_reproducible",
         "native_verified",
@@ -2791,14 +2798,14 @@
     },
     {
       "cve_id": "CVE-2019-11043",
-      "build_status": "completed",
+      "build_status": "building",
       "version": 3,
       "service_role": "middleware",
       "vuln_category": "RCE",
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": true,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -2813,7 +2820,9 @@
         "guide_ready_valid": true,
         "orchestrated_environment_verified": true
       },
-      "blockers": []
+      "blockers": [
+        "source_bundle_complete"
+      ]
     },
     {
       "cve_id": "CVE-2019-11581",
@@ -3834,7 +3843,7 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": false,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -3851,6 +3860,7 @@
       },
       "blockers": [
         "schema_v3",
+        "source_bundle_complete",
         "runtime_ready",
         "runtime_build_reproducible",
         "native_verified",
@@ -6088,7 +6098,7 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": false,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -6105,6 +6115,7 @@
       },
       "blockers": [
         "schema_v3",
+        "source_bundle_complete",
         "runtime_ready",
         "runtime_build_reproducible",
         "native_verified",
@@ -6978,7 +6989,7 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": false,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -6995,6 +7006,7 @@
       },
       "blockers": [
         "schema_v3",
+        "source_bundle_complete",
         "runtime_ready",
         "runtime_build_reproducible",
         "native_verified",
@@ -9187,7 +9199,7 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": false,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -9204,6 +9216,7 @@
       },
       "blockers": [
         "schema_v3",
+        "source_bundle_complete",
         "runtime_ready",
         "runtime_build_reproducible",
         "native_verified",
@@ -10288,7 +10301,7 @@
       "primary_mitre_phase": "initial_access",
       "completion_checks": {
         "schema_v3": false,
-        "source_bundle_complete": true,
+        "source_bundle_complete": false,
         "source_bundle_material_metadata_complete": true,
         "source_bundle_hashed": true,
         "self_contained_paths": true,
@@ -10305,6 +10318,7 @@
       },
       "blockers": [
         "schema_v3",
+        "source_bundle_complete",
         "runtime_ready",
         "runtime_build_reproducible",
         "native_verified",
@@ -10314,5 +10328,5 @@
       ]
     }
   ],
-  "snapshot_hash": "48d7c81d7ba478b8d8da361460adc8650f15342c697850dc9fd3ed0e7453df2e"
+  "snapshot_hash": "b96537e9d3c9ad4d56cee38c293e54953f86f0c94a9e20d18fdd5b2303873d0b"
 }

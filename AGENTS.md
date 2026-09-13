@@ -356,6 +356,28 @@ requirements, transfer limits, fallback procedures, and command hints are not
 uniformly represented. These must be addressed in the generic Guide schema and
 Range preflight, not through CVE-specific fixes.
 
+The generic Guide schema now has dedicated fields for this (2026-09-10):
+`post_exploit.command_channel.constraints` (no_pipelines, max_command_chars,
+concurrency, latency_hint, recovery_hint, notes) and per-step
+`execution.pivot` (required_on_foothold, transfer_materials, notes). Both are
+optional and backward compatible; they survive the scenario write path
+(`_write_guides` model round-trip) and are visible to the guided Agent as raw
+guide YAML. Only CVE-2016-3714 (channel constraints) and CVE-2017-11610
+(pivot context) carry measured values so far — coverage across the pool is
+still the open task, and Range preflight does not yet warn when a middle-hop
+guide lacks pivot context.
+
+Related shared defaults built on this schema (2026-09-12): guided prompts now
+inject a per-target channel-discipline block (integrity-verified staging,
+bounded commands, deferred-execution markers) whenever a hop's guide declares
+a constrained/reusable channel or pivot context, with declared constraints
+rendered as binding rules; guide preflight warns on middle-hop reusable
+channels lacking constraints; the OpenAI runner rejects voluntary final
+reports whose verified_flags values never appeared in run tool output (one
+bounded correction round, never auto-filled); and batch matrix generation
+defers atoms whose declared runtime image is missing locally. All apply only
+to guided context and change no verification gates.
+
 According to the current `data/atom_pool_status.json` snapshot, the managed pool
 contains 109 verified entries. All 109 currently pass the recorded structure,
 source-bundle, environment, native-exploit, validation-model, and template-ready
