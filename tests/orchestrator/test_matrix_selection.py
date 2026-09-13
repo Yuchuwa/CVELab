@@ -219,3 +219,267 @@ def test_coverage_priority_still_beats_balance_when_uncovered_features_exist():
     # because it adds the uncovered elasticsearch variant, even though "c"
     # would reuse the already-balanced CVE-D1 entry.
     assert [case["id"] for case in selected] == ["a", "b"]
+
+
+def test_bounded_matrix_search_is_explicitly_recorded(monkeypatch, tmp_path):
+    """A bounded search must stop exploration without pretending to be exhaustive."""
+    class FakeAtom:
+        def __init__(self, cve_id):
+            self.cve_id = cve_id
+            self.services = []
+
+    class FakeLoader:
+        def load_all_completed(self, single_service_only=False):
+            return [FakeAtom("CVE-A"), FakeAtom("CVE-B")]
+
+    class FakeTemplate:
+        injection_points = [type("Point", (), {"id": "slot"})()]
+        assets = []
+
+    class FakeAssembler:
+        @staticmethod
+        def resolve_asset_bindings(template, selected):
+            return {}
+
+        @staticmethod
+        def slot_asset_compatible(template, ip, atom):
+            return True
+
+    class FakePipeline:
+        def __init__(self):
+            self.atom_loader = FakeLoader()
+            self.assembler = FakeAssembler()
+            self.template_loader = type(
+                "Templates", (), {"load": staticmethod(lambda _: FakeTemplate())}
+            )()
+
+        @staticmethod
+        def _range_usable_atom(atom, validation_mode):
+            return True
+
+        @staticmethod
+        def _keep_chain_capable_atoms(ip, atoms, template):
+            return atoms
+
+    monkeypatch.setattr(MODULE, "ScenarioPipeline", lambda **_: FakePipeline())
+    monkeypatch.setattr(MODULE, "build_snapshot", lambda *args, **kwargs: {})
+    monkeypatch.setattr(MODULE, "load_planned_ids", lambda _: set())
+    monkeypatch.setattr(MODULE, "latest_attempts", lambda _: {})
+    monkeypatch.setattr(
+        MODULE,
+        "load_completed_atom_status",
+        lambda *args, **kwargs: ({"CVE-A", "CVE-B"}, {"rejections": []}),
+    )
+    monkeypatch.setattr(MODULE, "runtime_ready_for_batch", lambda _: True)
+    monkeypatch.setattr(MODULE, "effective_service_family", lambda _: "test")
+    monkeypatch.setattr(
+        MODULE,
+        "match_kill_chain",
+        lambda ip, atoms, **kwargs: atoms,
+    )
+    monkeypatch.setattr(MODULE, "close_capabilities", lambda *args, **kwargs: type("C", (), {"assets": set()})())
+    monkeypatch.setattr(MODULE, "seed_capabilities", lambda *args, **kwargs: set())
+
+    args = argparse.Namespace(
+        atoms_dir=str(tmp_path / "atoms"),
+        atom_status=str(tmp_path / "status.json"),
+        build_plan=str(tmp_path / "plan.json"),
+        templates_dir="templates",
+        template="enterprise_5tier",
+        max_cases=0,
+        search_limit=1,
+    )
+    payload = MODULE.build_manifest(args)
+
+    assert len(payload["cases"]) == 1
+    assert payload["cases"][0]["purpose"] == "auto-compatible enterprise_5tier combination"
+    assert payload["enumeration"] == {
+        "search_limit": 1,
+        "per_slot_quota": 0,
+        "quota_pruned_prefixes": 0,
+        "truncated": True,
+        "accepted_case_count_exact": False,
+    }
+
+
+def _install_two_slot_fake_pipeline(monkeypatch, tmp_path):
+    """Two slots x three atoms; every distinct-CVE pair is compatible."""
+    class FakeAtom:
+        def __init__(self, cve_id):
+            self.cve_id = cve_id
+            self.services = []
+
+    class FakeLoader:
+        def load_all_completed(self, single_service_only=False):
+            return [FakeAtom("CVE-A"), FakeAtom("CVE-B"), FakeAtom("CVE-C")]
+
+    class FakeTemplate:
+        injection_points = [
+            type("Point", (), {"id": "slot-1"})(),
+            type("Point", (), {"id": "slot-2"})(),
+        ]
+        assets = []
+
+    class FakeAssembler:
+        @staticmethod
+        def resolve_asset_bindings(template, selected):
+            return {}
+
+        @staticmethod
+        def slot_asset_compatible(template, ip, atom):
+            return True
+
+    class FakePipeline:
+        def __init__(self):
+            self.atom_loader = FakeLoader()
+            self.assembler = FakeAssembler()
+            self.template_loader = type(
+                "Templates", (), {"load": staticmethod(lambda _: FakeTemplate())}
+            )()
+
+        @staticmethod
+        def _range_usable_atom(atom, validation_mode):
+            return True
+
+        @staticmethod
+        def _keep_chain_capable_atoms(ip, atoms, template):
+            return atoms
+
+    monkeypatch.setattr(MODULE, "ScenarioPipeline", lambda **_: FakePipeline())
+    monkeypatch.setattr(MODULE, "build_snapshot", lambda *args, **kwargs: {})
+    monkeypatch.setattr(MODULE, "load_planned_ids", lambda _: set())
+    monkeypatch.setattr(MODULE, "latest_attempts", lambda _: {})
+    monkeypatch.setattr(
+        MODULE,
+        "load_completed_atom_status",
+        lambda *args, **kwargs: ({"CVE-A", "CVE-B", "CVE-C"}, {"rejections": []}),
+    )
+    monkeypatch.setattr(MODULE, "runtime_ready_for_batch", lambda _: True)
+    monkeypatch.setattr(MODULE, "effective_service_family", lambda _: "test")
+    monkeypatch.setattr(MODULE, "match_kill_chain", lambda ip, atoms, **kwargs: atoms)
+    monkeypatch.setattr(
+        MODULE, "close_capabilities", lambda *args, **kwargs: type("C", (), {"assets": set()})()
+    )
+    monkeypatch.setattr(MODULE, "seed_capabilities", lambda *args, **kwargs: set())
+
+    def _args(per_slot_quota):
+        return argparse.Namespace(
+            atoms_dir=str(tmp_path / "atoms"),
+            atom_status=str(tmp_path / "status.json"),
+            build_plan=str(tmp_path / "plan.json"),
+            templates_dir="templates",
+            template="enterprise_5tier",
+            max_cases=0,
+            search_limit=0,
+            per_slot_quota=per_slot_quota,
+        )
+
+    return _args
+
+
+def test_per_slot_quota_off_keeps_full_enumeration(monkeypatch, tmp_path):
+    make_args = _install_two_slot_fake_pipeline(monkeypatch, tmp_path)
+
+    payload = MODULE.build_manifest(make_args(0))
+
+    assert payload["accepted_case_count"] == 6
+    assert payload["enumeration"]["per_slot_quota"] == 0
+    assert payload["enumeration"]["quota_pruned_prefixes"] == 0
+
+
+def test_per_slot_quota_rotates_atoms_and_stays_bounded(monkeypatch, tmp_path):
+    make_args = _install_two_slot_fake_pipeline(monkeypatch, tmp_path)
+
+    payload = MODULE.build_manifest(make_args(1))
+
+    cases = payload["cases"]
+    # Quota=1 with least-used-first iteration: AB accepted first; then AC is
+    # blocked at acceptance (A's slot-1 quota is spent); BA rotates both slots.
+    # Six combinations collapse to the two that maximize per-slot coverage.
+    assert payload["accepted_case_count"] == 2
+    counts = {"slot-1": {}, "slot-2": {}}
+    for case in cases:
+        for slot, cve in case["slot_atoms"].items():
+            counts[slot][cve] = counts[slot].get(cve, 0) + 1
+    assert all(count <= 1 for slot_counts in counts.values() for count in slot_counts.values())
+    assert payload["enumeration"]["per_slot_quota"] == 1
+    assert payload["enumeration"]["quota_pruned_prefixes"] > 0
+    # Deterministic: same inputs, same accepted IDs.
+    again = MODULE.build_manifest(make_args(1))
+    assert [case["id"] for case in again["cases"]] == [case["id"] for case in cases]
+
+
+def test_rejection_records_are_bounded_with_exact_totals(monkeypatch, tmp_path):
+    """Quota-directed walks can hit millions of rejections; records stay bounded."""
+    make_args = _install_two_slot_fake_pipeline(monkeypatch, tmp_path)
+    monkeypatch.setattr(MODULE, "MAX_REJECTION_RECORDS", 2)
+
+    payload = MODULE.build_manifest(make_args(0))
+
+    # The 2-slot x 3-atom harness produces exactly three duplicate_cve rejections.
+    assert len(payload["rejections"]) == 2
+    assert payload["rejections_total"] == 3
+    assert payload["composition_rejection_counts"] == {"duplicate_cve": 3}
+
+
+def test_exclude_case_filters_before_selection(monkeypatch, tmp_path):
+    make_args = _install_two_slot_fake_pipeline(monkeypatch, tmp_path)
+    args = make_args(0)
+    args.exclude_case = ["matrix-a-b"]
+
+    payload = MODULE.build_manifest(args)
+
+    ids = [case["id"] for case in payload["cases"]]
+    assert "matrix-a-b" not in ids
+    assert len(ids) == 5
+    assert payload["excluded_case_ids"] == ["matrix-a-b"]
+    # Accepted evidence is unchanged; exclusion only affects selection.
+    assert payload["accepted_case_count"] == 6
+
+
+# ── Local runtime-image presence ──────────────────────────────────────
+
+
+def test_local_image_present_without_docker(monkeypatch):
+    MODULE._IMAGE_PRESENT_CACHE.clear()
+    monkeypatch.setattr(MODULE.shutil, "which", lambda _name: None)
+    assert MODULE._local_image_present("img:x") is True
+
+
+def test_local_image_present_empty_value_skips_check():
+    assert MODULE._local_image_present("") is True
+
+
+def test_local_image_present_caches_docker_result(monkeypatch):
+    MODULE._IMAGE_PRESENT_CACHE.clear()
+    calls = []
+
+    class Result:
+        returncode = 1
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return Result()
+
+    monkeypatch.setattr(MODULE.shutil, "which", lambda _name: "/usr/bin/docker")
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    assert MODULE._local_image_present("img:missing") is False
+    assert MODULE._local_image_present("img:missing") is False
+    assert len(calls) == 1
+    assert calls[0][:3] == ["docker", "image", "inspect"]
+
+
+def test_manifest_defers_atoms_with_missing_local_image(monkeypatch, tmp_path):
+    make_args = _install_two_slot_fake_pipeline(monkeypatch, tmp_path)
+    monkeypatch.setattr(MODULE, "_local_image_present", lambda _image: False)
+
+    payload = MODULE.build_manifest(make_args(0))
+
+    assert payload["cases"] == []
+    assert payload["accepted_case_count"] == 0
+    reasons = {row["cve_id"]: row["reason"] for row in payload["runtime_deferred_atoms"]}
+    assert reasons == {
+        "CVE-A": "runtime_image_missing_locally",
+        "CVE-B": "runtime_image_missing_locally",
+        "CVE-C": "runtime_image_missing_locally",
+    }

@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
+import subprocess
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -16,6 +18,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+
+# Bounded rejection records: quota-directed enumeration walks deep into the
+# combination tree and can produce millions of rejection entries.  The manifest
+# keeps a sample for debugging; exact totals live in the aggregated counts.
+MAX_REJECTION_RECORDS = 10_000
 
 from clab_builder.orchestrator.composer.capability_closure import (
     close_capabilities,
@@ -72,6 +79,36 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=0,
         help="Optional coverage-first cap for the accepted case list (0 = all).",
+    )
+    parser.add_argument(
+        "--search-limit",
+        type=int,
+        default=0,
+        help=(
+            "Optional cap on accepted combinations explored before coverage selection "
+            "(0 = enumerate all). A limited search is recorded as truncated."
+        ),
+    )
+    parser.add_argument(
+        "--per-slot-quota",
+        type=int,
+        default=0,
+        help=(
+            "Optional cap on how often one Atom may appear per slot in the "
+            "accepted set (0 = no quota). Quota pruning happens before the "
+            "expensive match/closure checks, so bounded enumeration stays fast "
+            "while every accepted case adds new slot coverage."
+        ),
+    )
+    parser.add_argument(
+        "--exclude-case",
+        action="append",
+        default=[],
+        metavar="CASE_ID",
+        help=(
+            "Case ID to exclude before selection (repeatable). Used to keep a "
+            "new batch disjoint from cases already running elsewhere."
+        ),
     )
     return parser.parse_args()
 
@@ -169,6 +206,39 @@ def runtime_ready_for_batch(atom) -> bool:
     legacy compatibility; this stricter rule applies only to batch manifests.
     """
     return _runtime_image_selection(atom)["selection"] == "runtime_image"
+
+
+_IMAGE_PRESENT_CACHE: dict[str, bool] = {}
+
+
+def _local_image_present(image: str) -> bool:
+    """Whether the declared runtime image exists on this host's docker daemon.
+
+    A batch manifest is consumed by deployments on this host, so a declared
+    ``ready`` runtime contract is not enough when the image itself is absent
+    (observed: CVE-2019-20933 declared ready but had no local image, failing
+    runtime materialization).  When docker is unavailable we keep the declared
+    contract as-is so non-docker hosts and tests keep working.
+    """
+    if not image:
+        # A verified ready contract always names its runtime image; an empty
+        # value only appears under mocked fixtures — do not invent a failure.
+        return True
+    if image in _IMAGE_PRESENT_CACHE:
+        return _IMAGE_PRESENT_CACHE[image]
+    if shutil.which("docker") is None:
+        _IMAGE_PRESENT_CACHE[image] = True
+        return True
+    try:
+        result = subprocess.run(
+            ["docker", "image", "inspect", image],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30,
+        )
+        present = result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        present = True
+    _IMAGE_PRESENT_CACHE[image] = present
+    return present
 
 
 def load_completed_atom_status(
@@ -271,7 +341,7 @@ def build_manifest(args: argparse.Namespace) -> dict:
         ],
         key=lambda atom: atom.cve_id,
     )
-    atoms = [atom for atom in usable_atoms if runtime_ready_for_batch(atom)]
+    atoms = []
     runtime_deferred = [
         {
             "cve_id": atom.cve_id,
@@ -280,8 +350,32 @@ def build_manifest(args: argparse.Namespace) -> dict:
         for atom in usable_atoms
         if not runtime_ready_for_batch(atom)
     ]
+    for atom in usable_atoms:
+        if not runtime_ready_for_batch(atom):
+            continue
+        runtime_image = str(
+            getattr(getattr(atom, "runtime_spec", None), "runtime_image", "") or ""
+        )
+        if not _local_image_present(runtime_image):
+            runtime_deferred.append({
+                "cve_id": atom.cve_id,
+                "reason": "runtime_image_missing_locally",
+            })
+            continue
+        atoms.append(atom)
     accepted: list[dict] = []
     rejected: list[dict] = []
+    rejection_counts: Counter = Counter()
+    search_limit = int(getattr(args, "search_limit", 0) or 0)
+    per_slot_quota = int(getattr(args, "per_slot_quota", 0) or 0)
+    enumeration_truncated = False
+    slot_atom_counts: dict[str, dict[str, int]] = {}
+    quota_pruned = 0
+
+    def record_rejection(entry: dict) -> None:
+        rejection_counts[entry.get("reason", "")] += 1
+        if len(rejected) < MAX_REJECTION_RECORDS:
+            rejected.append(entry)
 
     def visit(
         index: int,
@@ -291,11 +385,15 @@ def build_manifest(args: argparse.Namespace) -> dict:
         closures: dict,
         assets: set[str],
     ) -> None:
+        nonlocal enumeration_truncated, quota_pruned
+        if search_limit and len(accepted) >= search_limit:
+            enumeration_truncated = True
+            return
         if index == len(template.injection_points):
             try:
                 bindings = pipeline.assembler.resolve_asset_bindings(template, selected)
             except ValueError as exc:
-                rejected.append({
+                record_rejection({
                     "prefix": [atom.cve_id for atom in selected],
                     "injection_point": "resolved-assets",
                     "candidate": "",
@@ -303,11 +401,22 @@ def build_manifest(args: argparse.Namespace) -> dict:
                 })
                 return
             cves = [atom.cve_id for atom in selected]
+            if per_slot_quota and any(
+                slot_atom_counts.get(ip.id, {}).get(atom.cve_id, 0)
+                >= per_slot_quota
+                for ip, atom in zip(template.injection_points, selected)
+            ):
+                # Acceptance-time quota check: entry pruning alone is not
+                # enough, because the first subtree entered under quota=1
+                # would otherwise exhaust deeper-slot diversity before the
+                # upper-slot counts accumulate.
+                quota_pruned += 1
+                return
             accepted.append({
                 "id": "matrix-"
                 + "-".join(cve.lower().replace("cve-", "") for cve in cves),
                 "cves": cves,
-                "purpose": "auto-compatible enterprise_3tier combination",
+                "purpose": f"auto-compatible {args.template} combination",
                 "slot_atoms": {
                     ip.id: atom.cve_id
                     for ip, atom in zip(template.injection_points, selected)
@@ -321,15 +430,40 @@ def build_manifest(args: argparse.Namespace) -> dict:
                     for asset_id, binding in bindings.items()
                 },
             })
+            for ip, atom in zip(template.injection_points, selected):
+                counts = slot_atom_counts.setdefault(ip.id, {})
+                counts[atom.cve_id] = counts.get(atom.cve_id, 0) + 1
             return
 
         ip = template.injection_points[index]
-        for atom in atoms:
+        # Least-used-first iteration: with a quota active, each accepted case
+        # consumes fresh Atoms per slot, so the bounded accepted set rotates
+        # coverage across all slots instead of collapsing onto the
+        # lexicographically smallest prefix.
+        ordered = sorted(
+            atoms,
+            key=lambda atom: (
+                slot_atom_counts.get(ip.id, {}).get(atom.cve_id, 0),
+                atom.cve_id,
+            ),
+        ) if per_slot_quota else atoms
+        for atom in ordered:
+            # Quota pruning happens before the expensive match/closure checks:
+            # once an Atom has filled its slot quota, every combination rooted
+            # at it would only re-add already-covered slot/atom pairs, so the
+            # whole subtree is skipped and enumeration stays bounded and diverse.
+            if (
+                per_slot_quota
+                and slot_atom_counts.get(ip.id, {}).get(atom.cve_id, 0)
+                >= per_slot_quota
+            ):
+                quota_pruned += 1
+                continue
             reason = _candidate_reason(
                 pipeline, template, ip, atom, used_cves, upstream, assets
             )
             if reason:
-                rejected.append({
+                record_rejection({
                     "prefix": [item.cve_id for item in selected],
                     "injection_point": ip.id,
                     "candidate": atom.cve_id,
@@ -349,7 +483,10 @@ def build_manifest(args: argparse.Namespace) -> dict:
             )
 
     visit(0, [], [], {}, {}, set())
-    selected_cases = select_coverage_first(accepted, args.max_cases)
+    excluded_ids = set(getattr(args, "exclude_case", None) or [])
+    excluded = [case for case in accepted if case["id"] in excluded_ids]
+    selectable = [case for case in accepted if case["id"] not in excluded_ids]
+    selected_cases = select_coverage_first(selectable, args.max_cases)
     return {
         "schema_version": 1,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -362,9 +499,19 @@ def build_manifest(args: argparse.Namespace) -> dict:
         "candidate_atom_ids": [atom.cve_id for atom in atoms],
         "runtime_deferred_atoms": runtime_deferred,
         "selection_strategy": "coverage_first_slot_atom_and_asset_variant",
+        "excluded_case_ids": sorted(case["id"] for case in excluded),
         "accepted_case_count": len(accepted),
         "cases": selected_cases,
         "rejections": rejected,
+        "rejections_total": sum(rejection_counts.values()),
+        "composition_rejection_counts": dict(sorted(rejection_counts.items())),
+        "enumeration": {
+            "search_limit": search_limit,
+            "per_slot_quota": per_slot_quota,
+            "quota_pruned_prefixes": quota_pruned,
+            "truncated": enumeration_truncated,
+            "accepted_case_count_exact": not enumeration_truncated,
+        },
     }
 
 
@@ -397,8 +544,15 @@ def build_matrix_status(payload: dict, manifest_path: Path) -> dict:
             "accepted_cases": payload["accepted_case_count"],
             "selected_cases": len(payload.get("cases") or []),
             "range_input_rejections": len(payload["range_input_rejections"]),
-            "composition_rejections": len(payload["rejections"]),
+            "composition_rejections": payload.get(
+                "rejections_total", len(payload["rejections"])
+            ),
         },
+        "enumeration": payload.get("enumeration", {
+            "search_limit": 0,
+            "truncated": False,
+            "accepted_case_count_exact": True,
+        }),
         "range_input_rejection_counts": dict(
             sorted(
                 Counter(
@@ -406,7 +560,8 @@ def build_matrix_status(payload: dict, manifest_path: Path) -> dict:
                 ).items()
             )
         ),
-        "composition_rejection_counts": dict(
+        "composition_rejection_counts": payload.get("composition_rejection_counts")
+        or dict(
             sorted(Counter(row["reason"] for row in payload["rejections"]).items())
         ),
     }
@@ -416,6 +571,10 @@ def main() -> int:
     args = parse_args()
     if args.max_cases < 0:
         raise SystemExit("--max-cases must be zero or positive")
+    if args.search_limit < 0:
+        raise SystemExit("--search-limit must be zero or positive")
+    if args.per_slot_quota < 0:
+        raise SystemExit("--per-slot-quota must be zero or positive")
     output = ROOT / args.output
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = build_manifest(args)
@@ -434,7 +593,7 @@ def main() -> int:
         f"Matrix saved to: {output}\n"
         f"Range status saved to: {status_output}\n"
         f"accepted={payload['accepted_case_count']} selected={len(payload['cases'])} "
-        f"rejected={len(payload['rejections'])}"
+        f"rejected={payload.get('rejections_total', len(payload['rejections']))}"
     )
     return 0
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a controlled batch of Guided-Agent enterprise_3tier experiments.
+"""Run a controlled batch of Guided-Agent template experiments.
 
 Each case is isolated by its scenario name.  By default cases run serially;
 ``--parallel N`` enables a bounded number of concurrent trials when the host
@@ -196,6 +196,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="JSON manifest produced by generate_enterprise3_matrix.py.",
     )
     parser.add_argument(
+        "--template",
+        default="enterprise_3tier",
+        help="Topology template used to generate cases (default: enterprise_3tier).",
+    )
+    parser.add_argument(
         "--max-cases",
         type=int,
         default=0,
@@ -388,7 +393,9 @@ def validate_parallelism(parallel: int) -> None:
         raise ValueError("--parallel must be at least 1")
 
 
-def load_manifest_cases(path_value: str) -> tuple[dict[str, object], ...]:
+def load_manifest_cases(
+    path_value: str, *, expected_template: str = ""
+) -> tuple[dict[str, object], ...]:
     path = Path(path_value)
     if not path.is_absolute():
         path = ROOT / path
@@ -396,6 +403,11 @@ def load_manifest_cases(path_value: str) -> tuple[dict[str, object], ...]:
         payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         raise SystemExit(f"Cannot read case manifest {path}: {exc}") from exc
+    declared_template = str(payload.get("template") or "") if isinstance(payload, dict) else ""
+    if expected_template and declared_template and declared_template != expected_template:
+        raise SystemExit(
+            f"Case manifest template differs: {declared_template} != {expected_template}"
+        )
     raw_cases = payload.get("cases") if isinstance(payload, dict) else payload
     if not isinstance(raw_cases, list):
         raise SystemExit("Case manifest must contain a 'cases' list")
@@ -569,6 +581,7 @@ def _resume_contract_matches(
     """Allow a scheduler-only resume across a runner fingerprint revision."""
     options = state.get("options") or {}
     expected = {
+        "template": str(getattr(args, "template", "enterprise_3tier")),
         "environment_only": bool(args.environment_only),
         "generate_only": bool(args.generate_only),
         "agent_timeout": int(args.agent_timeout),
@@ -583,7 +596,8 @@ def _resume_contract_matches(
         "agent_runner": args.agent_runner,
         "reuse_scenarios_from": str(getattr(args, "reuse_scenarios_from", "")),
     }
-    if any(options.get(key) != value for key, value in expected.items()):
+    if any(options.get(key, "enterprise_3tier" if key == "template" else None) != value
+           for key, value in expected.items()):
         return False
     if state.get("selected_case_ids") != [str(case["id"]) for case in selected]:
         return False
@@ -699,6 +713,7 @@ def _digest_inputs(selected: list[dict[str, object]], args: argparse.Namespace) 
     profile = AgentExposureProfile.from_context(context).model_dump(mode="json")
     digest.update(json.dumps({
         "templates_dir": args.templates_dir, "atoms_dir": args.atoms_dir,
+        "template": str(getattr(args, "template", "enterprise_3tier")),
         "max_turns": args.max_turns, "agent_timeout": args.agent_timeout,
         "environment_only": args.environment_only, "generate_only": args.generate_only,
         "validation_mode": "guided_agent",
@@ -1243,7 +1258,8 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
     )
     summary = {
         "schema_version": 1,
-        "created_at": utcnow(), "run_id": state["run_id"], "template": "enterprise_3tier",
+        "created_at": utcnow(), "run_id": state["run_id"],
+        "template": state["options"].get("template", "enterprise_3tier"),
         "validation_mode": "guided_agent", "environment_only": state["options"]["environment_only"],
         "agent_context": context,
         "agent_exposure_profile": profile.model_dump(mode="json"),
@@ -1260,6 +1276,7 @@ def _write_summary(output_dir: Path, state: dict[str, Any]) -> None:
         # per-scenario verify_result.json also carries its own validation_round.
         "validation_round": {
             "run_id": state["run_id"],
+            "template": state["options"].get("template", "enterprise_3tier"),
             "agent_context": context,
             "agent_exposure_profile": profile.model_dump(mode="json"),
             "noise_level": state["options"].get("noise_level", "none"),
@@ -1364,7 +1381,7 @@ def _generate_one_case(payload: dict[str, Any]) -> dict[str, Any]:
             default_validation_mode="guided_agent",
         )
         pipeline.generate(
-            template_name="enterprise_3tier",
+            template_name=payload.get("template", "enterprise_3tier"),
             cve_ids=list(payload["cves"]),
             scenario_name=payload["lab_name"],
             output_dir=payload["scenarios_root"],
@@ -1397,6 +1414,7 @@ def _generate_cases(state: dict[str, Any], args: argparse.Namespace, output_dir:
     common = {
         "templates_dir": args.templates_dir,
         "atoms_dir": args.atoms_dir,
+        "template": str(getattr(args, "template", "enterprise_3tier")),
         "scenarios_root": str(scenarios_root),
         "seed": args.seed,
         "agent_context": str(getattr(args, "agent_context", "guided")),
@@ -1801,6 +1819,7 @@ def _worker_spec(state: dict[str, Any], case_state: dict[str, Any], args: argpar
     profile = AgentExposureProfile.from_context(context).model_dump(mode="json")
     spec = {
         "run_id": state["run_id"], "worker_id": str(worker_id), "case": case_state["case"],
+        "template": str(getattr(args, "template", "enterprise_3tier")),
         "batch_fingerprint": state.get("fingerprint", ""),
         "lab_name": case_state["lab_name"], "scenario_dir": case_state["scenario_dir"],
         "result_path": case_state["result_path"], "lab_lock_path": str(work_dir / "lab.lock"),
@@ -2228,7 +2247,10 @@ def main() -> int:
         raise SystemExit("LLM API key is required. Set LLM_API_KEY or pass --api-key. Use --generate-only for a no-Agent preflight.")
     if not args.environment_only and not args.generate_only and args.parallel > len(CONTROL_SUBNETS):
         raise SystemExit(f"--parallel exceeds the {len(CONTROL_SUBNETS)} available Agent control-network leases")
-    available_cases = load_manifest_cases(args.case_manifest) if args.case_manifest else CASES
+    available_cases = (
+        load_manifest_cases(args.case_manifest, expected_template=args.template)
+        if args.case_manifest else CASES
+    )
     if args.case_manifest and args.max_cases <= 0:
         raise SystemExit("--case-manifest requires an explicit positive --max-cases")
     if args.offset < 0:
@@ -2356,7 +2378,8 @@ def main() -> int:
             "agent_context": args.agent_context,
             "agent_exposure_profile": agent_exposure_profile,
             "parallel_history": [{"parallel": args.parallel, "kind": "initial", "at": utcnow()}],
-            "options": {"environment_only": args.environment_only, "generate_only": args.generate_only,
+            "options": {"template": args.template,
+                        "environment_only": args.environment_only, "generate_only": args.generate_only,
                         "parallel": args.parallel, "agent_timeout": args.agent_timeout, "max_turns": args.max_turns,
                         "seed": args.seed, "case_timeout": args.case_timeout,
                         "agent_context": args.agent_context,

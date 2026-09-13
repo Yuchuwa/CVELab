@@ -117,6 +117,25 @@ def test_reuse_scenarios_option_is_available():
     ]).reuse_scenarios_from == "data/old-batch"
 
 
+def test_template_is_supported_and_part_of_experiment_fingerprint():
+    default = parse_args([])
+    enterprise5 = parse_args(["--template", "enterprise_5tier"])
+
+    assert enterprise5.template == "enterprise_5tier"
+    assert digest_inputs([], default) != digest_inputs([], enterprise5)
+
+
+def test_manifest_template_must_match_requested_template(tmp_path: Path):
+    manifest = tmp_path / "matrix.json"
+    manifest.write_text(json.dumps({
+        "template": "enterprise_5tier",
+        "cases": [],
+    }))
+
+    with pytest.raises(SystemExit, match="template differs"):
+        MODULE.load_manifest_cases(str(manifest), expected_template="enterprise_3tier")
+
+
 def test_resume_parallel_option_is_available():
     args = parse_args(["--resume", "--resume-parallel", "2"])
 
