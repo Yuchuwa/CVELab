@@ -11337,3 +11337,10 @@ case-4（t3=libssh）三案，3600s/300 turns、clab-agent:v2、重建后 footho
   （agent_workspace 已剔除）与 .workspace 缓存。
 - 待办不变：Phase 3 配对消融 / EOL apt 专项 / 池扩展；A 方案暂缓（已记）。
 - 本轮 commit+push 已完成。
+
+### 2026-09-13 — 分享包简化：去除 fix-paths.sh，材料原样交付
+
+- 用户决定：分享包不带路径适配脚本，适配由合作方自理。最终包
+  `/tmp/opencode/cvelab-5tier-share.tar.gz`（1.7M）：5 场景目录 + 12 Atom +
+  `docker/Dockerfile` + README（仅保留一行 sed 改写提示）。
+- 本轮 commit+push 已完成。
