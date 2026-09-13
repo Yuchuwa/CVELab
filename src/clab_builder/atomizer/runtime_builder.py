@@ -223,7 +223,10 @@ def build_runtime_image(
     )
 
     # 2. Smoke every logical tool selected for this Atom. A profile label can
-    # cover a subset of its optional protocol tools.
+    # cover a subset of its optional protocol tools.  Tools declared optional
+    # in runtime_tools (e.g. paramiko on EOL bases) may legitimately be
+    # absent: their failures are recorded but never fail the build.
+    from clab_builder.shared.runtime_tools import _OPTIONAL_LOGICAL_TOOLS
     logical = arts.logical_tools
     smoke = {}
     for name, cmd in smoke_commands(logical):
@@ -232,9 +235,10 @@ def build_runtime_image(
         smoke[name] = c.returncode == 0
     res.smoke_checks = smoke
 
-    if not all(smoke.values()):
+    fatal = [k for k, v in smoke.items() if not v and k not in _OPTIONAL_LOGICAL_TOOLS]
+    if fatal:
         res.status = RuntimeStatus.FAILED
-        res.failure_reason = f"smoke checks failed: {[k for k,v in smoke.items() if not v]}"
+        res.failure_reason = f"smoke checks failed: {fatal}"
         return res
 
     # 3. service behavior via the ORIGINAL compose with project-directory.

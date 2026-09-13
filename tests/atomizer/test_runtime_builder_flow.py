@@ -220,6 +220,31 @@ def test_smoke_failure_blocks_ready(tmp_path):
     assert "curl" in res.failure_reason
 
 
+def test_smoke_optional_paramiko_failure_is_not_fatal(tmp_path):
+    """P5: paramiko smoke failure on EOL bases records but never fails the build."""
+    atom_dir = tmp_path / "CVE-RT-X"
+    atom_dir.mkdir()
+    compose = "services:\n  web:\n    image: vulhub/test:1\n    ports: ['80:80']\n"
+    atom = _atom(atom_dir, compose_body=compose)
+    atom = atom.model_copy(update={
+        "requirements": {"tools_needed": ["curl", "paramiko"]}
+    })
+
+    def fake_run(cmd, **kw):
+        s = " ".join(cmd)
+        if "import paramiko" in s:
+            return _cp(1)  # paramiko absent on this base
+        return _cp(0)
+
+    with patch("clab_builder.atomizer.runtime_builder._run", side_effect=fake_run), \
+         patch("clab_builder.atomizer.runtime_builder._inspect_digest", return_value="sha:b"), \
+         patch("clab_builder.atomizer.runtime_builder._inspect_user", return_value=""):
+        res = build_runtime_image(atom, atom_dir)
+    assert res.status == RuntimeStatus.READY
+    assert res.smoke_checks.get("python3_paramiko") is False
+    assert res.smoke_checks.get("curl") is True
+
+
 def test_smoke_uses_only_declared_remote_tools(tmp_path):
     """A Paramiko-only Atom must not smoke unrelated remote-protocol tools."""
     atom_dir = tmp_path / "CVE-RT-X"

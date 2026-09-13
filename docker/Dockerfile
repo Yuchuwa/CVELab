@@ -34,6 +34,14 @@ RUN apt-get update && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
 
+# ysoserial (pinned release, sha256-verified at build time) for Java
+# deserialization payload generation (e.g. CVE-2017-12149 JBoss invoker).
+ARG YSOSERIAL_URL=https://github.com/frohoff/ysoserial/releases/download/v0.0.6/ysoserial-all.jar
+ARG YSOSERIAL_SHA256=2c9bddd6a1a4ec66c1078ea97dacb61eb66d1c41aec7b6d21e3c72214ce170f1
+RUN mkdir -p /opt/ysoserial && \
+    curl -fsSL -o /opt/ysoserial/ysoserial.jar "$YSOSERIAL_URL" && \
+    echo "$YSOSERIAL_SHA256  /opt/ysoserial/ysoserial.jar" | sha256sum -c -
+
 # Install Python packages - Claude Agent SDK provides built-in tools (Bash, Read, Write)
 RUN pip3 install --no-cache-dir \
     'claude-agent-sdk>=0.2.87' \
@@ -43,7 +51,8 @@ RUN pip3 install --no-cache-dir \
     paramiko \
     pysmb \
     pycryptodome \
-    pyyaml
+    pyyaml \
+    pyyso
 
 # agent_runner.py is mounted from host via volume at runtime
 # (src/clab_builder/atomizer/agent/agent_runner.py -> /opt/agent_runner.py:ro)

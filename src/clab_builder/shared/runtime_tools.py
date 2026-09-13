@@ -6,6 +6,7 @@ no CVE branch hardcodes apt/apk/dnf package names.
 
 Profiles:
   enterprise-standard-v1  — base tools every buildable atom gets by default
+                            (v2 adds paramiko: foothold-side SSH client, P5)
   build-pivot             — gcc/make, only when compilation is required
   remote-protocol         — paramiko/impacket/smbclient, only for remote-proto
                             exploitation
@@ -91,11 +92,18 @@ class ToolProfile:
 
 ENTERPRISE_STANDARD_V1 = ToolProfile(
     name="enterprise-standard-v1",
-    version="1",
+    version="2",
     logical_tools=[
         "bash", "coreutils", "curl", "wget", "ca_certificates", "openssl",
         "procps", "iproute2", "netcat", "python3", "python3_requests",
         "python3_psycopg2", "postgresql_client",
+        # v2 (P5, 2026-09-12): paramiko joins the base profile.  Exploits that
+        # speak SSH (CVE-2018-10933 libssh bypass, future lateral-movement
+        # atoms) execute from an arbitrary upstream foothold in composed
+        # chains, and data-plane containers have no internet to install
+        # clients on demand — the client library must already be present on
+        # every potential pivot host.
+        "python3_paramiko",
     ],
 )
 
@@ -123,6 +131,20 @@ _PROFILES = {
     "remote-protocol": REMOTE_PROTOCOL,
     "java-exploit": JAVA_EXPLOIT,
 }
+
+# Logical tools that may legitimately be absent on some bases.  EOL Debian
+# releases (jessie-era vulhub images) do not ship python3-paramiko, and there
+# is no younger JRE to move to; making the package mandatory would fail the
+# whole runtime build for an optional capability (P5 rebuild wave: 13/56
+# atoms hit exactly this).  Optional tools are installed best-effort
+# (apt/pip fallback chain, never fatal) and their smoke failures are recorded
+# but do not fail the build.  Exploit guides must not hard-require them on
+# arbitrary footholds without a fallback.
+_OPTIONAL_LOGICAL_TOOLS = {"python3_paramiko"}
+
+# pip fallback names for optional tools when the system package manager does
+# not carry them (build-time network only).
+_OPTIONAL_PIP_FALLBACK = {"python3_paramiko": "paramiko>=2,<4"}
 
 
 def resolve_tools_needed(tools_needed: list[str]) -> set[str]:
@@ -225,9 +247,42 @@ def install_commands(package_manager: str, packages: list[str]) -> str:
     releases go straight to archive.debian.org without wasting 10+ minutes
     on a doomed apt-get update. This is a generic release-aging fix, not a
     per-CVE branch.
+
+    Packages of _OPTIONAL_LOGICAL_TOOLS are split into a best-effort block
+    (manager install, then pip fallback for mapped tools, never fatal):
+    EOL bases simply lack these packages and must not fail the whole build.
     """
     if not packages:
         return ""
+    optional_names: set[str] = set()
+    for lt in _OPTIONAL_LOGICAL_TOOLS:
+        mapping = _LOGICAL_TOOLS.get(lt) or {}
+        optional_names.update(mapping.get(package_manager) or mapping.get("apt") or [])
+    optional = [p for p in packages if p in optional_names]
+    packages = [p for p in packages if p not in optional_names]
+
+    def _best_effort(manager_install: str) -> str:
+        if not optional:
+            return ""
+        pip_fallbacks = sorted({
+            _OPTIONAL_PIP_FALLBACK[lt]
+            for lt in _OPTIONAL_LOGICAL_TOOLS
+            if lt in _OPTIONAL_PIP_FALLBACK
+            and set((_LOGICAL_TOOLS.get(lt) or {}).get(package_manager)
+                    or (_LOGICAL_TOOLS.get(lt) or {}).get("apt") or [])
+            & set(optional)
+        })
+        chain = manager_install
+        if pip_fallbacks:
+            chain += (
+                " || pip3 install --no-cache-dir "
+                + " ".join(f"'{p}'" for p in pip_fallbacks)
+            )
+        return (
+            "\n# optional tools (may be absent on EOL bases; never fatal)\n"
+            "( " + chain + " || echo \"optional packages unavailable, continuing\" )"
+        )
+
     if package_manager == "apt":
         return (
             "export DEBIAN_FRONTEND=noninteractive\n"
@@ -239,7 +294,7 @@ def install_commands(package_manager: str, packages: list[str]) -> str:
             "    echo \"deb [trusted=yes] http://archive.debian.org/debian ${VERSION_CODENAME} main\" > /etc/apt/sources.list\n"
             "    rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true\n"
             "    apt-get update -qq\n"
-            "    apt_install_flags=--allow-unauthenticated\n"
+            "    apt_install_flags=\"--allow-unauthenticated --allow-downgrades\"\n"
             "    ;;\n"
             "  *)\n"
             "    apt_log=/tmp/cvelab-apt-update.log\n"
@@ -252,7 +307,7 @@ def install_commands(package_manager: str, packages: list[str]) -> str:
             "          echo \"deb [trusted=yes] http://archive.debian.org/debian $codename main\" > /etc/apt/sources.list\n"
             "          rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true\n"
             "          apt-get update -qq\n"
-            "          apt_install_flags=--allow-unauthenticated\n"
+            "          apt_install_flags=\"--allow-unauthenticated --allow-downgrades\"\n"
             "          ;;\n"
             "        *) cat \"$apt_log\" >&2; exit 1 ;;\n"
             "      esac\n"
@@ -263,14 +318,26 @@ def install_commands(package_manager: str, packages: list[str]) -> str:
             "mkdir -p /usr/share/man/man1 /usr/share/man/man7 &&\n"
             "apt-get install -y --no-install-recommends $apt_install_flags "
             + " ".join(packages) + " && "
-            "rm -rf /var/lib/apt/lists/*"
+            "rm -rf /var/lib/apt/lists/* || exit 1"
+        ) + _best_effort(
+            "apt-get install -y --no-install-recommends $apt_install_flags "
+            + " ".join(optional)
         )
     if package_manager == "apk":
-        return "apk add --no-cache " + " ".join(packages)
+        return (
+            "apk add --no-cache " + " ".join(packages) + " || exit 1"
+            if packages else "# base packages already present\n"
+        ) + _best_effort("apk add --no-cache " + " ".join(optional))
     if package_manager == "dnf":
-        return "dnf install -y " + " ".join(packages) + " && dnf clean all"
+        return (
+            "dnf install -y " + " ".join(packages) + " && dnf clean all || exit 1"
+            if packages else "# base packages already present\n"
+        ) + _best_effort("dnf install -y " + " ".join(optional))
     if package_manager == "yum":
-        return "yum install -y " + " ".join(packages) + " && yum clean all"
+        return (
+            "yum install -y " + " ".join(packages) + " && yum clean all || exit 1"
+            if packages else "# base packages already present\n"
+        ) + _best_effort("yum install -y " + " ".join(optional))
     return ""
 
 

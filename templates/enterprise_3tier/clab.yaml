@@ -3,7 +3,7 @@ topology:
   nodes:
     attacker:
       kind: linux
-      image: clab-agent:latest
+      image: clab-agent:v2
     edge-router:
       kind: linux
       image: frrouting/frr:latest

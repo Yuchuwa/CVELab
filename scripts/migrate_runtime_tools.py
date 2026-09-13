@@ -27,7 +27,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from clab_builder.shared.models.atom import AtomConfig, RuntimeStatus
+from clab_builder.shared.models.atom import AtomConfig, RuntimeBuildSpec, RuntimeStatus
 from clab_builder.atomizer.runtime_generator import generate_runtime_artifacts, write_runtime_dir
 
 
@@ -75,8 +75,25 @@ def migrate_one(atom_dir: Path, build: bool, force: bool) -> str:
         atom.runtime_spec.runtime_image = rt.runtime_image
         atom.runtime_spec.runtime_status = RuntimeStatus.READY
         atom.runtime_spec.runtime_failure_reason = ""
-        # backfill digests + resolved user from the build into runtime_build
-        atom.runtime_spec.runtime_build.base_image_digest = rt.base_image_digest
+        # ``build_runtime_image`` re-generates the recipe only after it has
+        # resolved the immutable base identity.  Persist that *final* recipe,
+        # not the provisional pre-build artifacts created above.
+        final = rt.artifacts
+        atom.runtime_spec.runtime_build = RuntimeBuildSpec(
+            context="runtime",
+            dockerfile="runtime/Dockerfile",
+            install_script="runtime/install-tools.sh",
+            base_image_digest=rt.base_image_digest,
+            generated_hash=(final.manifest.get("generated_hash", "") if final else ""),
+            intermediate_image=(final.base_image_for_runtime if final else ""),
+            source_dockerfile=(final.source_dockerfile if final else ""),
+        )
+        atom.runtime_spec.tool_profile = (
+            ",".join(final.tool_profiles) if final and final.tool_profiles else None
+        )
+        atom.runtime_spec.tool_profile_version = "1" if final else None
+        if rt.resolved_user:
+            atom.runtime_spec.user = rt.resolved_user
         if rt.resolved_user:
             atom.runtime_spec.user = rt.resolved_user
     else:

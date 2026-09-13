@@ -98,8 +98,34 @@ def test_install_commands_apt_eol_archive_fallback():
     assert "httpredir\\.debian\\.org" in cmd
     assert "awk '$1 == \"deb\"" in cmd
     assert "sources.list.d/*.list" in cmd
-    assert "apt_install_flags=--allow-unauthenticated" in cmd
+    assert 'apt_install_flags="--allow-unauthenticated --allow-downgrades"' in cmd
     assert "apt-get install -y --no-install-recommends $apt_install_flags" in cmd
+
+
+def test_install_commands_optional_paramiko_is_best_effort():
+    """P5: paramiko must never hard-fail the build on EOL bases lacking it."""
+    cmd = install_commands("apt", ["curl", "python3-paramiko"])
+    mandatory, _, optional_block = cmd.partition("# optional tools")
+    # Mandatory-chain failure stays fatal at build time (loud apt error in the
+    # build log rather than a silently empty image caught later at smoke).
+    assert mandatory.rstrip().endswith("|| exit 1")
+    # Mandatory line carries curl only; paramiko moved to the best-effort
+    # block with a pip fallback and a non-fatal echo terminator.
+    assert "python3-paramiko" not in mandatory
+    assert optional_block
+    assert "python3-paramiko" in optional_block
+    assert "pip3 install --no-cache-dir 'paramiko>=2,<4'" in optional_block
+    assert '|| echo "optional packages unavailable, continuing"' in optional_block
+
+
+def test_install_commands_optional_partition_other_managers():
+    for pm, pkg in (("apk", "py3-paramiko"), ("dnf", "python3-paramiko"),
+                    ("yum", "python3-paramiko")):
+        cmd = install_commands(pm, ["curl", pkg])
+        mandatory, _, optional_block = cmd.partition("# optional tools")
+        assert pkg not in mandatory
+        assert pkg in optional_block
+        assert "pip3 install --no-cache-dir" in optional_block
 
 
 def test_generator_preserves_command_entrypoint_env(tmp_path):
